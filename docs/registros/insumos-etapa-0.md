@@ -11,14 +11,14 @@ O prazo de 20/10/2026 só corre depois da assinatura e do recebimento de todos o
 - **Validado em**: data da resposta do cliente a uma versão enviada para validação (item 3 de `logs-contratuais.md`).
 - **Situação**: `Sem registro` | `Solicitado` | `Recebido` | `Recebido parcialmente` | `Provisório em uso` | `Dispensado por escrito`.
 
-Em 01/10/2026 nenhum recebimento está registrado no repositório. `Sem registro` significa que o repositório não prova o recebimento, e não que o cliente deixou de enviar.
+Em 10/10/2026 há registro de recebimento do logotipo PNG (item 2), mas sem canal de entrega documentado. `Sem registro` significa que o repositório não prova o recebimento, e não que o cliente deixou de enviar.
 
 ## Itens 1 a 14 (necessários para concluir a Etapa 0)
 
 | # | Insumo | Base | Necessário para | Solicitado em | Recebido em | Validado em | Situação | Observação |
 |---|---|---|---|---|---|---|---|---|
 | 1 | Contrato assinado (Gov.br, ZapSign ou Clicksign) | 3.3, 21.5 | Início | — | — | — | Sem registro | O contrato e os Anexos I e II não estão no repositório. Só existem a documentação (30/09/2026) e o orçamento (30/09/2026, validade até 05/10/2026). Ver `divergencias.md`. |
-| 2 | Logotipo em alta resolução (SVG ou PNG transparente) | 13.1.A | Layout | — | — | — | Recebido (PNG) | PNG 3375×6000, branco sobre preto, recebido em 10/10/2026 e em uso no site, e-mails, PDF e ícones. Falta o vetor (SVG), se houver. |
+| 2 | Logotipo em alta resolução (SVG ou PNG transparente) | 13.1.A | Layout | — | 10/10/2026 (canal não documentado) | — | Recebido (PNG) | `assets-originais/IMG_3404.PNG`, 3375×6000, branco sobre preto, em uso no site, e-mails, PDF e ícones. Falta o vetor (SVG), se houver. |
 | 3 | Cores, fontes e demais materiais de identidade visual | 13.1.A | Layout | — | — | — | Provisório em uso | O protótipo usa preto, branco e roxo como proposta. Aprovação escrita pendente (CA-33). |
 | 4 | Dados cadastrais e contatos da PartyX para rodapé e e-mails | 13.1.A | Site, e-mails | — | — | — | Sem registro | Rodapé e e-mails do protótipo mostram `a fornecer`. |
 | 5 | Escolha do gateway de pagamento entre as opções indicadas pela CONTRATADA | Anexo I, 11 | Integração | — | — | — | Sem registro | Decisão D-01. A documentação sugere apresentar de 2 a 4 opções (seção 9.1). |
@@ -32,7 +32,7 @@ Em 01/10/2026 nenhum recebimento está registrado no repositório. `Sem registro
 | 13 | Dados de pelo menos 1 evento real ou de exemplo: nome, data, horário, local, descrição, atrações, classificação etária, banner | 13.1.B, 13.1.F | Vitrine, testes | — | — | — | Provisório em uso | O protótipo usa eventos fictícios (Noite Neon e outros), marcados como demonstração. |
 | 14 | Tipos de ingresso por evento: nome, valor, quantidade, período de vendas | 13.1.B | Compra | — | — | — | Provisório em uso | Valores e quantidades do protótipo são fictícios. |
 
-Critério de conclusão da Etapa 0: itens 1 a 14 recebidos. Hoje: **0 de 14 com recebimento registrado**; 4 em uso provisório.
+Critério de conclusão da Etapa 0: itens 1 a 14 recebidos. Em 10/10/2026: **1 de 14 com recebimento registrado** (item 2); 3 em uso provisório (3, 13 e 14). A Etapa 0 permanece aberta. O canal do recebimento do PNG e a aprovação visual ainda precisam de comprovação.
 
 ## Itens 15 a 19 (podem chegar durante o desenvolvimento)
 

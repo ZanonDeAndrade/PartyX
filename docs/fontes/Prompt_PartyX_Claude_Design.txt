@@ -1,0 +1,409 @@
+PROMPT COMPLETO PARA CLAUDE DESIGN
+PARTYX | DESIGN DE TODAS AS TELAS DO SISTEMA
+
+Atue como um designer sênior de produto, UX e UI. Crie o design completo da plataforma PartyX, um sistema web responsivo de venda de ingressos, gestão de eventos e controle de entrada. A entrega deve conter todas as telas necessárias, suas variações de estado e um protótipo navegável de alta fidelidade, dentro das possibilidades do ambiente.
+
+Leia integralmente os anexos PartyX_Documentacao_Desenvolvimento(3).pdf e Orcamento_Comercial_PartyX.pdf antes de começar. Use os requisitos RF, os critérios CA e as regras de negócio como base. A documentação de desenvolvimento reproduz e organiza disposições do contrato; não confunda esse documento com uma cópia integral do contrato assinado. Se o contrato e os anexos originais também estiverem disponíveis, eles prevalecem nas divergências. Para o design, siga os requisitos funcionais detalhados da documentação e registre qualquer conflito relevante com o orçamento, sem inventar uma resolução comercial.
+
+Quero o sistema inteiro desenhado: site público, cadastro e login, compra, pagamentos, área do cliente, ingressos, administração, gestão de eventos, promoters, relatórios, equipe e portaria. Produza as telas efetivamente. Não encerre a entrega com uma proposta conceitual, uma lista de páginas ou apenas a página inicial.
+
+1. DIREÇÃO VISUAL
+
+As cores predominantes são PRETO, BRANCO e ROXO.
+
+Use esta paleta como proposta inicial e documente os tokens finais:
+- Preto principal: #0B0B10.
+- Superfície escura: #15151E.
+- Branco: #FFFFFF.
+- Branco de fundo para áreas operacionais: #F7F7FA.
+- Roxo principal: #7C3AED.
+- Roxo de destaque: #8B5CF6.
+- Roxo suave: #EDE9FE.
+- Cinzas neutros para textos secundários, divisórias e bordas.
+- Verde, amarelo e vermelho exclusivamente como cores semânticas, especialmente nos resultados da portaria. Essas cores devem continuar disponíveis apesar da paleta da marca.
+
+Crie uma identidade contemporânea, marcante e apropriada para festas e eventos, com boa legibilidade e sensação de confiança no pagamento. Trabalhe hierarquia tipográfica, fotografias de eventos, contraste e espaçamento. Evite brilho exagerado, excesso de gradientes, animações que atrapalhem e elementos decorativos que disputem atenção com a compra.
+
+Sugestão de aplicação:
+- Site público: base escura, branco para leitura e roxo para ações e destaques.
+- Checkout e área do cliente: superfícies simples e alta legibilidade, mantendo a marca.
+- Administração: fundo claro, navegação preta e destaques roxos, com tabelas e formulários fáceis de consultar.
+- Portaria: interface com alto contraste e ações grandes, adequada ao uso rápido em ambientes escuros.
+
+Não crie dois temas completos nem um seletor de tema sem necessidade. As diferentes áreas podem usar superfícies distintas dentro do mesmo design system.
+
+Use o logotipo da PartyX se estiver disponível. Caso não esteja, aplique um wordmark provisório escrito PartyX e identifique-o como provisório. Não use a marca Arthur Zanon, presente no orçamento, como identidade da plataforma. Não desenvolva um novo projeto de branding como parte desta entrega.
+
+Toda a interface deve estar em português do Brasil. Valores em reais, datas no formato brasileiro e horários claros. Use textos reais de interface, como “Comprar ingressos”, “Meus ingressos” e “Validar ingresso”. Evite lorem ipsum. Não utilize o caractere de travessão nos textos.
+
+2. PERFIS, NAVEGAÇÃO E ESCOPO
+
+Existem três perfis autenticados:
+- Cliente: compra ingressos e consulta apenas seus pedidos, seus ingressos e seus dados.
+- Administrador: gerencia eventos, tipos de ingresso, promoters, pedidos, compradores, relatórios e usuários da equipe. Também pode acessar a validação.
+- Validador: seleciona o evento e valida ingressos pela câmera ou busca manual. Não acessa administração, relatórios financeiros nem gestão de usuários.
+
+O visitante pode navegar pelos eventos sem login. A autenticação é obrigatória para comprar. Ao entrar ou criar uma conta durante a compra, deve retornar ao checkout com sua seleção preservada, sujeita à disponibilidade atual.
+
+Promoter é um registro de atribuição de vendas administrado pela PartyX. Não é um quarto perfil e não possui portal próprio no escopo atual.
+
+Organize a navegação:
+- Público: Eventos, busca, Entrar e Meus ingressos quando autenticado.
+- Cliente: Meus ingressos, Minhas compras, Minha conta e Sair.
+- Administração: Visão geral, Eventos, Pedidos, Compradores, Ingressos, Promoters, Relatórios, Entradas e Equipe. Relatórios pode ter submenu.
+- Portaria: evento selecionado, leitura por câmera, busca manual, contador de entradas e opção de sair ou trocar de evento.
+
+Aplique a separação de permissões também no protótipo. Um seletor de perfil pode existir somente na apresentação do protótipo, identificado como ferramenta de demonstração, sem aparecer como funcionalidade do produto final.
+
+3. INVENTÁRIO OBRIGATÓRIO DE TELAS
+
+Desenhe todas as telas e os estados descritos abaixo. Uma variante pode compartilhar layout e componentes com outra, mas deve estar visível e acessível na entrega. Formulários, drawers e modais podem atender tarefas menores, sem transformar tudo em uma página separada. Preserve os identificadores para facilitar a conferência.
+
+A. SITE PÚBLICO E EVENTOS
+Base: RF-20 a RF-27, RF-65, RF-66 e RF-68; CA-12 a CA-14 e CA-32.
+
+P01. Página inicial
+Header, evento em destaque, próximos eventos, busca por nome ou data, cards com banner, nome, data, local e preço quando houver ingresso disponível. CTA de compra e rodapé com dados da PartyX, contato e links legais. Não invente métricas, depoimentos ou números de público.
+
+P02. Listagem e busca de eventos
+Busca por nome e data, filtros aplicados e opção de limpar. Estados de carregamento, eventos encontrados, nenhum resultado e nenhuma venda disponível. Não adicione filtros que dependam de dados ausentes no escopo, como geolocalização ou categorias obrigatórias.
+
+P03. Página individual do evento
+Banner, nome, data, horário, local/endereço, descrição, atrações, classificação etária, tipos de ingresso, valores e compra. Exiba nome, preço e condição de cada tipo. Inclua compartilhamento em redes sociais e WhatsApp, com feedback ao copiar o link. O compartilhamento deve ter título e imagem de pré-visualização coerentes.
+
+Apresente variantes: disponível, tipo esgotado, vendas ainda não iniciadas, vendas encerradas, tipo desativado indisponível e evento encerrado acessado por link direto. Eventos em rascunho não aparecem publicamente; eventos encerrados saem da listagem de vendas. Não mostre preço “a partir de” calculado com um tipo indisponível.
+
+P04. Termos de Uso.
+P05. Política de Privacidade.
+P06. Política de Cancelamento, Troca e Reembolso.
+Use layouts de leitura com hierarquia e versão/data quando fornecidas. Se os textos jurídicos não estiverem anexados, use uma indicação explícita de conteúdo a fornecer pela PartyX. Não redija políticas fictícias como se fossem aprovadas.
+
+P07. Evento ou página não encontrada
+Mensagem objetiva, retorno aos eventos e navegação consistente. Diferencie uma página inexistente de um evento existente com vendas encerradas.
+
+B. CADASTRO, LOGIN E RECUPERAÇÃO
+Base: RF-01 a RF-10; CA-01 a CA-06.
+
+A01. Login
+E-mail, senha, mostrar/ocultar senha, recuperar senha e criar conta. Variantes: erro de credenciais, bloqueio temporário por tentativas, conta desativada e retorno ao checkout. O mesmo componente pode atender os três perfis, com destinos diferentes após o acesso.
+
+A02. Cadastro do cliente
+Nome, e-mail, CPF, telefone e senha. Máscaras e orientação de preenchimento. Aceite obrigatório de Termos de Uso e Política de Privacidade, com links acessíveis e sem seleção prévia. Mostrar erros de CPF inválido, e-mail/CPF já cadastrados, telefone inválido e campos incompletos. Incluir estado de cadastro concluído e confirmação.
+
+A03. Solicitar recuperação de senha
+Campo de e-mail e ação para enviar o link.
+
+A04. Confirmação da solicitação
+Mensagem neutra sobre o envio, evitando revelar se um e-mail existe no sistema. Retorno ao login e orientação clara.
+
+A05. Definir nova senha
+Nova senha e confirmação. Variantes de link válido, expirado e já utilizado. O link é de uso único, com validade de uma hora. Quando inválido, oferecer nova solicitação.
+
+A06. Senha alterada com sucesso
+Confirmação e retorno ao login.
+
+C. SELEÇÃO, CHECKOUT E PAGAMENTO
+Base: RF-28 a RF-37, Etapa 3; CA-15 a CA-19 e CA-P1 a CA-P5.
+
+C01. Seleção de ingressos
+Tipos, quantidades, preço unitário, subtotal e total. Controles de aumentar/diminuir, limite por compra e indisponibilidade. Pode estar integrada à página do evento. Cada pedido pertence a um evento; não invente um carrinho para vários eventos. Não reserve estoque apenas por navegar ou selecionar quantidades.
+
+C02. Revisão do pedido
+Evento, tipos, quantidades, valores, total e dados do comprador. Campo “Código do promoter”, aplicar/remover e feedback. O código vincula a venda ao promoter e NÃO dá desconto. Não mostrar valor riscado, economia, porcentagem ou redução de total. Variantes de código válido, inválido e desativado.
+
+C03. Escolha da forma de pagamento
+Pix e cartão de crédito. Mostrar o total e acesso à política de cancelamento. Apenas um gateway será integrado, com identidade neutra até a escolha. Parcelamento só aparece se habilitado e aprovado para o gateway escolhido, sem prometer condições ou quantidade de parcelas não definidas.
+
+C04. Pagamento por Pix
+QR de pagamento, código copia e cola, botão copiar, instruções, prazo e contador da reserva. Status “Aguardando pagamento”, atualização automática e orientação de que os ingressos serão disponibilizados após a confirmação. Diferencie visualmente o QR do Pix do QR de acesso ao evento.
+
+C05. Pagamento por cartão
+Layout compatível com campos seguros tokenizados do gateway ou checkout hospedado. Se desenhar campos de cartão, anote a dependência do componente seguro do gateway. Inclua processamento, recusa e erro recuperável, sem exibir dados sensíveis em resumos. Não proponha salvar cartões.
+
+C06. Pedido em processamento
+Status para aguardar confirmação sem induzir uma nova cobrança. A tela não aprova o pagamento por conta própria. Incluir retorno ao pedido e estado de atualização automática.
+
+C07. Compra confirmada
+Número do pedido, evento, resumo e botões “Ver meus ingressos” e “Baixar ingressos”. Informação sobre o e-mail de confirmação. Disponibilização de um ingresso por unidade após aprovação confirmada. Se a emissão ainda estiver concluindo, mostrar “Pagamento confirmado. Preparando seus ingressos”, sem QR utilizável antecipadamente.
+
+C08. Reserva ou Pix expirado
+Mensagem de prazo encerrado, reserva liberada e ação para voltar à seleção, reavaliando disponibilidade. Não reutilizar uma cobrança expirada como se ainda pudesse garantir o estoque.
+
+C09. Pagamento recusado ou falha de pagamento
+Explicar que a compra não foi concluída e oferecer uma nova tentativa ou outro meio, conforme o estado real. Não afirmar aprovação quando existe somente falha de comunicação. Preservar o contexto, mas verificar reserva e estoque novamente.
+
+C10. Pagamento aprovado após expiração, sem estoque
+Estado excepcional: pagamento confirmado, ingresso indisponível e atendimento pela PartyX para resolução/estorno no gateway. Não mostrar ingresso confirmado nem prometer estorno automático. Desenhar também o alerta administrativo correspondente. Se ainda houver estoque e a emissão for autorizada pelo servidor, usar o fluxo normal de confirmação.
+
+Regras transversais do checkout:
+- Reserva começa ao iniciar o pagamento, com tempo definido pela operação. Dez minutos é somente uma sugestão da documentação; identifique como premissa no protótipo.
+- Impedir visualmente quantidade acima do limite e tratar estoque alterado entre seleção e pagamento.
+- Sem emissão duplicada ao atualizar a página ou receber confirmação repetida.
+- O pagamento é realizado na conta da PartyX no gateway.
+- A taxa contratual de R$ 1,00 por ingresso é apuração entre prestador e PartyX. Não adicioná-la ao preço do comprador como taxa de checkout sem decisão comercial expressa.
+
+D. ÁREA DO CLIENTE E INGRESSOS
+Base: RF-06, RF-38 a RF-43; CA-20 a CA-22.
+
+U01. Meus ingressos
+Visão principal da área do cliente. Cards agrupados por evento e identificação de cada unidade. Separar próximos eventos e histórico quando fizer sentido. Estados sem ingressos, carregando, válido, utilizado e cancelado.
+
+U02. Minhas compras
+Histórico de pedidos com data, evento, valor, quantidade e situação. Mostrar pendente, pago, expirado, cancelado, estornado e contestado quando aplicável. Distinguir status do pedido, pagamento e ingresso.
+
+U03. Detalhe da compra
+Resumo, meio de pagamento, situação atual, itens e ingressos associados. Pedido pendente retorna à cobrança ainda válida; expirado retorna à seleção; pago dá acesso aos ingressos. Não incluir cancelamento financeiro automático pelo comprador. Orientar a procurar a PartyX conforme a política fornecida.
+
+U04. Detalhe do ingresso
+Nome do evento, data, horário, local, tipo, nome do comprador, código, QR e status. Ações de baixar PDF e abrir em tela cheia. Nome do comprador em todas as unidades; não criar fluxo de troca de titularidade ou formulário de participante por ingresso.
+
+U05. Ingresso em tela cheia no celular
+QR grande, preto sobre fundo branco, margens de leitura adequadas, informações essenciais e botão de fechar. Não estilizar o QR com gradientes, transparência ou recortes. Mostrar orientação para aumentar o brilho, sem prometer controle automático de brilho pelo navegador. Ingressos utilizados ou cancelados devem ter estado visual claro e não aparentar válidos.
+
+U06. Minha conta
+Nome e telefone editáveis. E-mail e CPF somente leitura para o cliente, com orientação para atendimento em caso de correção. Evitar exposição desnecessária de CPF.
+
+U07. Alterar senha
+Campos adequados, validação, confirmação de sucesso e erros. Pode ser uma seção ou modal na conta.
+
+E. PAINEL ADMINISTRATIVO
+Base: RF-08, RF-11 a RF-19, RF-55 a RF-64; CA-07 a CA-11 e CA-28 a CA-31.
+
+ADM01. Visão geral
+Vendas do dia e do mês, ingressos vendidos, eventos em andamento e ingressos restantes. Gráfico de vendas, resumo por evento e pedidos recentes. Definir o significado de cada indicador. Diferenciar dinheiro vendido, ingressos vendidos, reservas e entradas. Não inventar saldo bancário, lucro ou valores líquidos sem fonte.
+
+ADM02. Lista de eventos
+Busca, filtros por status, tabela/cards e ação “Criar evento”. Mostrar rascunho, publicado e encerrado. Ações coerentes: editar, publicar, encerrar, ver página pública e gerenciar ingressos.
+
+ADM03. Criar e editar evento
+Nome, data, horário, local/endereço, descrição, atrações, classificação etária, banner e destaque na página inicial. Upload com pré-visualização, progresso, erro de formato/tamanho e orientação de proporção. Não inventar limites definitivos de upload; documentar dependência da configuração. Salvar rascunho, pré-visualizar e publicar. Avisar sobre alterações não salvas.
+
+ADM04. Detalhe e gestão de um evento
+Resumo e abas para informações, tipos de ingresso, pedidos/compradores, vendas e entradas. Exibir o status e ações de publicação/encerramento com confirmação. Deixar claro o impacto sobre novas vendas, sem afirmar que encerrar o evento cancela automaticamente todos os ingressos.
+
+ADM05. Tipos de ingresso do evento
+Nome, preço, capacidade, vendidos, reservados, disponíveis, período de vendas e ativo/inativo. Diferenciar reservas temporárias de unidades vendidas. Mostrar disponibilidade de forma consistente.
+
+ADM06. Criar e editar tipo de ingresso
+Nome, valor, quantidade total, início/fim de vendas e ativação. Feedback para capacidade incompatível com vendas/reservas existentes. Limite por compra deve ter sua localização e configuração documentadas conforme a definição da PartyX. Tipos de meia-entrada podem existir, com conferência documental na portaria e sem upload de comprovante. Lotes podem ser nomes de tipos; não desenhar virada automática de lotes.
+
+ADM07. Lista de promoters
+Nome, código exclusivo, contato e ativo/inativo. Busca, edição e ativação/desativação. Não mostrar comissão.
+
+ADM08. Criar e editar promoter
+Nome, telefone e código de cupom exclusivo. Estados de código repetido, inválido e alterações salvas. Informar que o código rastreia vendas e não oferece desconto.
+
+ADM09. Detalhe do promoter
+Ingressos atribuídos e valor das vendas, com filtro por evento e período e exportação. Histórico de vendas atribuídas. Não criar saldo, saque, comissão ou acesso próprio do promoter.
+
+ADM10. Lista de pedidos
+Filtros por evento, status e período. Número, comprador, data, quantidade, valor, forma de pagamento e situação. Status de pagamento e emissão distinguíveis.
+
+ADM11. Detalhe do pedido
+Dados do comprador, itens, ingresso por unidade, promoter quando houver e referências de pagamento adequadas. Linha do tempo com criação, aprovação, emissão, cancelamento/estorno e entradas quando pertinente. Alertas para pagamento tardio sem estoque e casos contestados. Credenciais e dados completos de cartão nunca aparecem.
+
+ADM12. Compradores por evento
+Busca e filtros, nome, contato necessário, pedidos e ingressos. Exportação. Não adicionar funcionalidades de CRM ou marketing.
+
+ADM13. Detalhe do comprador
+Dados, pedidos e ingressos. Correção de e-mail e CPF apenas pelo administrador, com validação, confirmação e anotação de auditoria. Não apagar histórico com exclusão simples. A documentação não exige um centro de solicitações LGPD; não inventar esse módulo.
+
+ADM14. Lista de ingressos por evento
+Código, tipo, comprador, status, emissão e horário de entrada quando existente. Filtros e exportação para operação e contingência.
+
+ADM15. Detalhe e cancelamento de ingresso
+Informações do ingresso e modal explícito de confirmação. Explicar que cancelar invalida o acesso, registra a ação e não realiza estorno financeiro. O estorno é efetuado pela PartyX no gateway. Após confirmação, refletir o cancelamento no cliente e na portaria. Mostrar autor/data da ação disponíveis, sem criar um painel técnico de logs.
+
+ADM16. Relatório de vendas
+Evento, tipo de ingresso e período; quantidade e valor. Resumo, tabela detalhada, gráficos úteis e exportação. Pedidos pagos devem sustentar a apuração. Definir tratamento de reembolsos e estornos nos totais exibidos, sem confundir este relatório com a base contratual da taxa.
+
+ADM17. Relatório e ranking de promoters
+Filtros por evento/período, quantidade de ingressos, valor atribuído e ranking do maior para o menor. Indicar a métrica usada para ordenar. Sem cálculo ou pagamento de comissões.
+
+ADM18. Relatório mensal da taxa contratual
+Seletor de mês, ingressos cujo pagamento foi aprovado naquele mês e taxa de R$ 1,00 por unidade. Exibir explicitamente: “Ingressos com pagamento aprovado continuam na apuração da taxa mesmo após cancelamento, reembolso ou estorno.” Mostrar total de unidades e valor da taxa, detalhe e exportação. Quantidade de ingressos, não quantidade de pedidos. Não duplicar unidades por notificações repetidas. A cobrança mensal e a emissão do boleto são externas ao sistema; não criar portal de assinatura, cobrança ou inadimplência.
+
+ADM19. Acompanhamento das entradas
+Evento, contador, total de ingressos pertinente, entradas por tipo, registros recentes, horário e validador. Atualização automática, indicador de última atualização e estados de conexão. Não contar leituras repetidas ou inválidas como novas entradas. Mostrar diferença entre ingressos vendidos e utilizados.
+
+ADM20. Usuários da equipe
+Nome, e-mail, perfil administrador/validador e ativo/inativo. Busca e ações de criar, editar, ativar/desativar. Não oferecer papéis inexistentes.
+
+ADM21. Criar e editar usuário da equipe
+Campos necessários, perfil, situação e confirmação de alterações de acesso. Aviso claro de que um usuário desativado não poderá entrar. Ações sensíveis com feedback e registro previsto em auditoria.
+
+ADM22. Primeiro acesso com senha temporária
+Troca da senha antes de continuar, quando aplicável aos usuários iniciais, conforme o checklist de publicação. Reutilizar os componentes de senha.
+
+ADM23. Exportações
+Modal ou fluxo reutilizável para CSV/XLSX de listas e relatórios, mantendo filtros. Estado gerando, concluído e falha. Lista de contingência por evento também em PDF imprimível, com código, tipo, comprador e CPF mascarado. Mostrar data/hora da exportação e lembrar que a lista é um retrato daquele momento.
+
+ADM24. Conta do administrador
+Dados de acesso, alteração de senha e sair, reutilizando componentes. Não criar telas de credenciais de Neon, Google Cloud, gateways ou serviços de infraestrutura: esses controles não fazem parte da operação de eventos no escopo.
+
+F. PORTARIA E VALIDAÇÃO
+Base: RF-44 a RF-54; CA-23 a CA-27.
+
+V01. Selecionar evento
+Após login autorizado, escolher o evento de trabalho e iniciar a validação. Mostrar claramente evento, data e local para reduzir leituras no evento errado.
+
+V02. Leitor por câmera
+Evento selecionado sempre visível, visor de leitura, instruções curtas, contador de entradas e acesso à busca manual. Alternar câmera somente se o dispositivo suportar. Estados de solicitar permissão, iniciando câmera, lendo, consultando servidor e câmera indisponível. Prever restrições de permissão em Chrome Android e Safari iPhone, sem depender de instalação de aplicativo.
+
+V03. Busca manual
+Pesquisa por código, nome, CPF ou e-mail. Orientação de preenchimento e estados de consulta. Informações pessoais minimizadas; CPF mascarado nos resultados. Não oferecer exportação financeira ao validador.
+
+V04. Resultado da busca manual
+Lista que permita distinguir pessoas com nomes iguais e os diferentes ingressos de uma compra. Evento, tipo e status. Selecionar uma unidade e confirmar sua validação de forma explícita. Pesquisar ou abrir um resultado não consome o ingresso.
+
+V05. Resultado válido
+Tela de alto destaque VERDE, ícone e texto “Entrada liberada”, tipo do ingresso, identificação necessária, horário e próximo passo. Representar o sinal sonoro e sua alternativa visual. Uma leitura válida registra o uso e incrementa o contador uma única vez.
+
+V06. Ingresso já utilizado
+Tela AMARELA com texto “Ingresso já utilizado”, tipo, horário e responsável pela primeira entrada. Não liberar uma nova entrada nem oferecer botão de ignorar/reutilizar.
+
+V07. Ingresso inválido ou cancelado
+Tela VERMELHA com mensagem específica quando o motivo for conhecido. Não confundir código inválido com cancelamento. Sem ação de liberar à força.
+
+V08. Ingresso de outro evento
+Resultado de recusa com mensagem “Este ingresso pertence a outro evento”, mantendo o contexto do evento selecionado e orientação para conferência.
+
+V09. Falha de conexão, permissão ou leitura
+Exibir “Não foi possível confirmar o ingresso” quando a consulta não terminar. Não usar “válido” nem “inválido” sem resposta do servidor. Oferecer tentar novamente, ajustar permissão ou busca manual quando houver conexão. Sem internet, orientar o procedimento de contingência da PartyX com a lista exportada previamente. Não inventar validação offline, sincronização posterior ou liberação automática.
+
+Regras da portaria:
+- Resultados com cor, ícone, texto e feedback sonoro quando permitido, sem depender apenas de cor ou som.
+- Botão grande para próxima leitura, com prevenção de leituras repetidas enquanto o resultado está sendo processado.
+- Dois validadores lendo a mesma unidade: somente um pode receber entrada liberada; o outro recebe já utilizado.
+- O histórico da primeira entrada não pode ser substituído pelo horário da tentativa repetida.
+- QR adulterado, cancelado ou estornado não libera acesso.
+- Não implementar controles de força, desfazer entrada ou autorizar offline sem previsão expressa.
+
+G. ESTADOS GERAIS E COMPONENTES TRANSVERSAIS
+
+G01. Carregamento e skeletons adequados para listas, detalhes e relatórios.
+G02. Estados vazios específicos: sem eventos, sem pedidos, sem ingressos, sem promoters, sem equipe adicional e sem resultados no período.
+G03. Erro de carregamento com tentar novamente e preservação de contexto.
+G04. Acesso negado por falta de permissão, com retorno à área autorizada.
+G05. Sessão expirada e reautenticação, preservando o contexto quando seguro.
+G06. Indisponibilidade/manutenção com mensagem clara e contato adequado, sem prometer suporte 24 horas.
+G07. Menus mobile, filtros em drawer, confirmações de ações, alterações não salvas, erros de formulário e feedback de sucesso.
+G08. Exportação e download em andamento, concluídos ou com erro.
+
+Não exponha erros técnicos, stack traces, tokens, chaves ou nomes internos do banco aos usuários.
+
+H. E-MAILS, PDF E PRÉ-VISUALIZAÇÕES
+Base: RF-36, RF-41, RF-67 e CA-21.
+
+E01. E-mail de confirmação de cadastro, sem criar etapa obrigatória de verificação não prevista.
+E02. E-mail de recuperação de senha, com validade e ação clara.
+E03. E-mail de compra confirmada, com resumo e link seguro para acessar os ingressos.
+E04. Template do ingresso em PDF, individual e/ou agrupado por pedido, com todos os dados e QR legível. Uma compra de três unidades precisa resultar em três códigos distintos. Privilegiar versão clara para impressão.
+E05. Pré-visualização de compartilhamento do evento, com banner e título.
+
+Use a identidade PartyX também nesses materiais. Não desenhar SMS ou WhatsApp automáticos. O compartilhamento iniciado pelo usuário e o contato com atendimento podem usar WhatsApp, sem criar integração de mensagens.
+
+4. RESPONSIVIDADE, ACESSIBILIDADE E USABILIDADE
+
+- Projetar primeiro os fluxos do comprador e da portaria para celular.
+- Criar layouts representativos em 390 px e 1440 px e documentar adaptação para tablet em 768 px. Conferir também 360 px sem rolagem horizontal.
+- Todas as telas precisam ter comportamento responsivo definido. Não entregar desktop completo com mobile limitado à home.
+- No mobile, tabelas podem virar cards ou visão resumida com detalhe acessível. Não esconder dados essenciais nem exigir redução extrema de fonte.
+- Ações de compra podem ser fixas no mobile quando úteis, sem cobrir informações, erros ou conteúdo legal.
+- Contraste de texto, foco visível, navegação por teclado, labels persistentes, mensagens de erro junto ao campo e alvos de toque de pelo menos 44 px.
+- Não depender só de placeholders para identificar campos, nem só de cor para comunicar status.
+- Animações curtas e discretas, respeitando redução de movimento.
+- QR sempre com contraste e espaço livre de leitura, inclusive em telas escuras.
+- Evitar exposição desnecessária de CPF; não colocar CPF no ingresso sem decisão expressa da PartyX. Nome do comprador é obrigatório.
+- Não inserir consentimento de marketing, rastreadores ou coleta de dados adicionais por iniciativa própria.
+- Os contatos de atendimento ao comprador devem ser da PartyX. O suporte técnico do prestador é destinado à equipe, não ao público final. Não colocar o telefone do prestador como suporte de compras.
+
+5. DESIGN SYSTEM E ORGANIZAÇÃO DA ENTREGA
+
+Crie uma biblioteca reutilizável com:
+- Tokens de cores, tipografia, espaçamento, grid, bordas, raios, sombras e estados de interação.
+- Botões primários, secundários, de texto e destrutivos; default, hover, foco, pressionado, desabilitado e carregando.
+- Inputs, senha, CPF/telefone, selects, checkbox de aceite, datas, horários, upload e controle de quantidade.
+- Cards de evento, pedido e ingresso; tabelas, filtros, badges de status, abas e paginação quando necessária.
+- Header público, navegação da área do cliente, sidebar administrativa e navegação mobile.
+- Modais, drawers, alertas, toasts, skeletons, empty states e resultados de validação.
+- Componentes específicos para Pix, resumo do pedido, reserva e QR de ingresso.
+
+Use layouts editáveis, componentes e auto-layout quando o ambiente oferecer. Se produzir código de protótipo, mantenha dados simulados organizados e componentes reutilizáveis. Segurança, estoque, pagamento e validação reais continuam sendo responsabilidades da implementação; o protótipo somente representa esses comportamentos.
+
+Organize as páginas/arquivos por: fundamentos, público, acesso, checkout, cliente, administração, portaria, e-mails/PDF e estados. Nomeie telas com os IDs deste inventário e títulos claros.
+
+Use eventos, compradores e códigos fictícios consistentes entre as telas. Identifique dados demonstrativos. Não use dados reais do contrato como compradores de exemplo nem apresente QR demonstrativo como ingresso válido de produção.
+
+6. FLUXOS QUE DEVEM SER NAVEGÁVEIS NO PROTÓTIPO
+
+Conecte pelo menos:
+1. Encontrar evento, selecionar ingressos, cadastrar conta, voltar ao pedido, pagar por Pix, receber confirmação e abrir o QR.
+2. Comprar por cartão, ver processamento, confirmação e download.
+3. Recuperar senha com sucesso e lidar com link expirado/utilizado.
+4. Aplicar código válido/inválido de promoter, mantendo o mesmo preço.
+5. Expirar uma reserva e voltar à seleção com disponibilidade atualizada.
+6. Receber pagamento recusado e tentar novamente sem pedido ou ingresso duplicado.
+7. Consultar compras, ingresso válido, utilizado e cancelado.
+8. Criar evento, salvar rascunho, cadastrar tipos, publicar e encerrar vendas/evento.
+9. Cadastrar promoter e consultar suas vendas/ranking.
+10. Consultar pedido e cancelar uma unidade, com confirmação e repercussão nas demais áreas.
+11. Consultar relatórios de vendas, promoters e taxa mensal; aplicar filtros e exportar.
+12. Criar/desativar usuário da equipe e demonstrar restrições de perfil.
+13. Selecionar evento e validar por câmera/manual: válido, repetido, cancelado, inválido e outro evento.
+14. Perder conexão na portaria e ver orientação de contingência sem falsa confirmação.
+15. Ver pagamento tardio sem estoque no comprador e no administrador.
+
+Todos os CTAs essenciais precisam ter um destino coerente. Quando uma ação não puder ser simulada, mostre feedback explicativo e identifique a limitação na apresentação, sem botão silenciosamente inativo.
+
+7. FUNCIONALIDADES QUE NÃO DEVEM SER CRIADAS
+
+O inventário completo se refere ao escopo contratado. Não ampliar o produto com:
+- Cupons de desconto.
+- Cálculo ou pagamento de comissão de promoters.
+- Portal próprio de promoter.
+- Marketplace multi-organizador, cadastro de produtores ou repasses financeiros.
+- Virada automática de lotes.
+- Cortesias, lista de convidados ou ingressos gratuitos.
+- Transferência de titularidade ou revenda de ingresso.
+- Assentos numerados ou mapa de assentos.
+- Bilheteria presencial, POS ou venda por máquina de cartão.
+- Aplicativo nativo Android/iOS.
+- Validação offline e sincronização automática.
+- Cashless, consumação, produtos ou entrega física.
+- Emissão de notas fiscais e integrações fiscais.
+- Mais de um gateway ou carteira financeira.
+- Automação de WhatsApp/SMS, chat interno ou plataforma de suporte.
+- Portal de cobrança da mensalidade do prestador.
+- Gestão de infraestrutura, segredos, backups e custos de nuvem dentro da interface de eventos.
+
+Se identificar uma melhoria fora do escopo, registre separadamente como sugestão futura. Não a incorpore aos fluxos principais.
+
+8. CONFERÊNCIA E CRITÉRIOS DE CONCLUSÃO
+
+Entregue:
+- Sitemap com todas as telas e destinos por perfil.
+- Design system e componentes reutilizáveis.
+- Telas de alta fidelidade de todos os grupos, com adaptações responsivas e estados.
+- Protótipo navegável dos fluxos principais e dos erros críticos.
+- Templates de e-mails, ingresso PDF e pré-visualização de compartilhamento.
+- Anotações para desenvolvimento: estados, transições, permissões, regras e dependências de integração.
+- Matriz “Requisito RF -> Tela/estado -> Critério CA -> Situação da cobertura”. Cubra RF-01 a RF-68, CA-01 a CA-33 e CA-P1 a CA-P5. Para critérios que dependem de backend, concorrência, auditoria, assinatura de QR ou gateway, identifique “comportamento representado; validação depende da implementação”. Um design não comprova segurança nem aprovação técnica.
+- Lista curta de premissas ainda pendentes: gateway, parcelamento, tempo de reserva, limite por compra, banner/logo, textos legais, regras de meia-entrada, exibição opcional de CPF e contatos públicos.
+
+Ao conferir a entrega, verifique especialmente:
+- Comprar exige login e retorna ao contexto anterior.
+- Um pedido com três ingressos apresenta três unidades e três QRs diferentes.
+- Código de promoter não altera o preço.
+- Reservas e pagamentos não são confundidos com ingressos emitidos.
+- Cancelamento de acesso e estorno financeiro são ações distintas.
+- A taxa contratual continua incluindo unidades aprovadas que depois foram canceladas/estornadas.
+- Cliente, administrador e validador veem apenas suas funções.
+- Falha de internet não resulta em liberação de entrada.
+- QR tem legibilidade em tela e impressão.
+- Nenhuma tela perde funções essenciais no celular de 360 px.
+- Não há tela ausente disfarçada de um link sem destino.
+
+Execute a criação de forma contínua. Se o ambiente limitar o tamanho da entrega, divida em blocos, mantenha um checklist persistente do inventário e continue até concluir todas as telas. Não peça aprovação para cada tela nem escolha somente algumas páginas como amostra. Registre premissas sem bloquear o trabalho visual que já pode ser feito.
+
+O resultado esperado é um design completo, coerente e pronto para orientar a implementação do PartyX, com uma experiência de compra simples, uma administração prática e uma portaria rápida, mantendo preto, branco e roxo como identidade predominante.

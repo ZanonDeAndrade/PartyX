@@ -5,7 +5,13 @@ Nada neste registro foi decidido pela equipe técnica. Quando a documentação t
 **Situação**: `Pendente` | `Decidida` | `Decisão da CONTRATADA` | `Dependente de terceiro`.
 **Registro da decisão**: data, quem decidiu, canal e trecho da mensagem. Quando decidida, atualizar também `../rastreabilidade/matriz-requisitos.md`.
 
-Última revisão: 01/10/2026.
+Última revisão documental: 10/10/2026. Esta revisão não registra nova resposta do cliente nem altera o estado das decisões abaixo.
+
+**Índice de pendências para fechamento:** D-01 a D-15 estão mantidas na tabela; D-54 (taxa no caso de pagamento aprovado sem estoque) continua `Pendente (premissa aplicada)`. D-04 depende do gateway. Nenhuma premissa numérica ou operacional abaixo substitui decisão escrita da PartyX.
+
+**Decisões da contratada ainda marcadas para confirmação com o cliente:** D-20, D-21, D-22, D-24, D-26 a D-29, D-31 a D-33, D-35, D-36, D-43, D-44, D-46, D-48, D-49, D-51 a D-53, D-55 a D-61, D-63 e D-64. Não as tratar como aprovação do cliente. Além disso, D-40, D-41, D-47 e D-62 continuam pendências operacionais do cliente.
+
+**Leitura das decisões históricas:** D-74 substitui a proibição absoluta de mock em homologação de D-37, mas nunca libera mock em produção. D-67 substitui a cadência de 2 minutos de D-39 por tarefas em +10/+15/+30 minutos e varredura diária; a divergência com o PDF segue registrada na auditoria. D-72 substitui as 8 tentativas de e-mail de D-46 por 4 tentativas via Cloud Tasks. D-77 torna opcional/desligado em produção o Turnstile obrigatório descrito em D-71. Manter as linhas antigas como histórico, não como configuração vigente.
 
 | ID | Decisão | Origem | Quem decide | Sugestão ou opções da documentação | Efeito no desenvolvimento | Bloqueia (prompts) | Situação | Decidida em | Registro |
 |---|---|---|---|---|---|---|---|---|---|
