@@ -50,6 +50,26 @@ Depois de cancelado: a portaria mostra **vermelho "cancelado"** (testado com lei
 
 **Concorrência:** cancelar e ler ao mesmo tempo nunca dá dois resultados (20 rodadas): ou o ingresso entrou (e o cancelamento recebe 409), ou foi cancelado (e a leitura recebe "cancelado"). O cancelamento tranca a linha do ingresso e faz a mesma marcação condicional (`WHERE status = 'valido'`) da portaria.
 
+## Telas da etapa 05 do fechamento (11/10/2026)
+
+Interface real em `src/site/adminPeople.tsx`, com os componentes do site (a identidade visual será refinada na etapa de UI/UX). Toda regra continua na API; validador e cliente recebem 403 nas rotas e a página G04 nas telas.
+
+| Tela | Rota | O que tem | API |
+|---|---|---|---|
+| Menu do painel | todas | Coluna lateral no computador; gaveta no celular ("Menu do painel"): Visão geral, Eventos, Pedidos, Compradores, Ingressos, Promoters, Relatórios (Vendas, Promoters, Taxa mensal), Entradas, Equipe, Exceções (com contador), Minha conta e Sair | — |
+| ADM07 e ADM08 Promoters | `/admin/promoters` | Busca por nome ou código, filtro por situação, criar e editar (código em maiúsculas, 3 a 20 letras ou números, repetido recusado no campo, aviso de que **não dá desconto** nem gera comissão), ativar e desativar com confirmação | `GET/POST /admin/promoters`, `PATCH /admin/promoters/:id` |
+| ADM09 Detalhe do promoter | `/admin/promoters/:id` | Vendas atribuídas (pedidos pagos, pela data da aprovação), filtro por evento e período, totais, exportação; sem comissão, saldo ou acesso do promoter | `GET /admin/reports/promoters/:id`, `GET /admin/exports/promoters/:id/orders.csv` (novo) |
+| ADM12 Compradores | `/admin/compradores` | Contas de cliente de todos os eventos; busca por nome (sem acento), e-mail ou CPF completo; CPF mascarado | `GET /admin/buyers` (novo) |
+| ADM13 Detalhe do comprador | `/admin/compradores/:id` | Dados, pedidos, ingressos e histórico de correções (quais campos, quem, quando e por quê, sem os valores antigos). CPF mascarado; "Mostrar CPF completo" grava `usuario.cpf_visualizado` na trilha, sem o número. Correção de e-mail ou CPF em dois passos (validação, revisão), motivo obrigatório; encerra as sessões do comprador | `GET /admin/buyers/:id`, `POST /admin/buyers/:id/cpf` (novos), `PATCH /admin/users/:id/identity` |
+| ADM14 Ingressos | `/admin/ingressos?evento=` | Escolha do evento; lista com filtros, exportação e cancelamento (painel já existente); o código leva ao detalhe | `GET /admin/events/:id/tickets` |
+| ADM15 Detalhe do ingresso | `/admin/ingressos/:id` | Tipo, valor, evento, titular, comprador (CPF mascarado), pedido, emissão, entrada (quando e por quem), cancelamento com autor, data e motivo (estorno e contestação aparecem como "pelo sistema"), últimas tentativas na portaria; cancelar explica que invalida o acesso e não estorna. Sem código secreto nem QR | `GET /admin/tickets/:id` (novo), `POST /admin/tickets/:id/cancel` |
+| ADM19 Entradas | `/admin/entradas?evento=` | Abre no próximo evento; contador, por tipo, "ainda não entraram", últimos registros com validador, "Conectado" ou "Sem conexão", última atualização (a cada 4 s) | `GET /admin/events/:id/entries` |
+| ADM20 e ADM21 Equipe | `/admin/equipe` | Busca, criar (senha temporária segura mostrada uma vez, com cópia e orientação de entrega), editar (aviso de que mudar perfil ou e-mail encerra as sessões), desativar com aviso de que perde o acesso e as sessões caem, ativar, nova senha temporária. Ninguém altera o próprio perfil nem se desativa. ADM22 (primeiro acesso) já existia | `/admin/team*` |
+| ADM23 Exportações | todas as telas com exportação | Botão com "Gerando…", "Concluído" (nome do arquivo, data e hora: "retrato deste momento") e "Falha" com nova tentativa; mantém os filtros da tela; o download sai do navegador, sem URL pública | `/admin/exports/*` |
+| ADM24 Minha conta | `/admin/conta` | E-mail e perfil, edição de nome e telefone, troca de senha (mesmo diálogo da conta do cliente) e sair; sem credenciais de infraestrutura | `PATCH /me`, `POST /me/password` |
+
+Verificado no navegador (Chromium, 360 px e 1280 px, banco descartável com dados fictícios): menu e gaveta, código repetido no campo, exportação concluída com data, CPF completo sob demanda, correção com revisão e histórico, cancelamento com autor e data, entradas, criação de validador com senha temporária e desativação, troca de senha e sair; nenhuma rolagem horizontal e nenhum alvo de toque menor que 44 px. Corrigidos no caminho: cartões de dados ilegíveis no painel (texto escuro sobre o fundo escuro da página pública) e botões de 40 px no diálogo de senha.
+
 ## O que foi verificado
 
 - 26 testes novos (525 passam, contra PostgreSQL real): acesso, números do dia e do mês no fuso, separação por situação, restantes com reserva válida e vencida, todos os filtros e a paginação, detalhe, compradores, ingressos, entradas ao vivo refletindo a portaria, cancelamento (confirmação, trilha, nada apagado, idempotência, usado, pedido inteiro, corrida, perfis, evidência da taxa). **Mutações:** sem a confirmação 1 teste falha; período em UTC em vez do fuso 1. A condição `status = 'valido'` no `UPDATE` do cancelamento é redundante com o bloqueio da linha (`FOR UPDATE`) e retirá-la sozinha não quebra teste; mantida como segunda barreira.
@@ -61,6 +81,8 @@ Depois de cancelado: a portaria mostra **vermelho "cancelado"** (testado com lei
 - Leitor de tela e foco do modal (há `aria-modal`, foco inicial no motivo e fechamento por Esc, sem armadilha de foco completa).
 - Aparelhos reais; Safari.
 - A tela de eventos, tipos, promoters e equipe (APIs prontas, telas não).
+- Visão geral no celular: na linha "Total" da tabela de eventos, os rótulos das colunas saem trocados (defeito anterior a esta etapa, ainda não corrigido).
+- Safari, Firefox, aparelhos reais e leitor de tela nas telas da etapa 05.
 
 ## Decisões abertas
 
