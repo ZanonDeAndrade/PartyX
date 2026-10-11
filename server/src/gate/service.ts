@@ -80,8 +80,8 @@ const MESSAGES: Record<GateResult, string> = {
 
 /**
  * Evento que a portaria pode abrir agora: publicado, ou encerrado dentro da janela operacional (de `beforeHours` antes do início até
- * `afterHours` depois). Encerrar o evento tira do site e para as vendas, mas não deve travar a entrada de quem já tem ingresso.
- * Rascunho nunca; encerrado fora da janela, recusa com a explicação e o horário.
+ * `afterHours` depois) **e encerrado já dentro dela** (D-79). Encerrar o evento durante a festa tira do site e para as vendas, mas não
+ * deve travar a entrada de quem já tem ingresso. Encerrado antes da janela (cancelamento antecipado) fica fechado. Rascunho nunca.
  */
 async function loadEvent(deps: Pick<GateDeps, 'db' | 'clock' | 'closedWindow'>, eventId: string) {
   const [event] = await deps.db.select().from(events).where(eq(events.id, eventId)).limit(1);
@@ -90,6 +90,14 @@ async function loadEvent(deps: Pick<GateDeps, 'db' | 'clock' | 'closedWindow'>, 
   if (event.status === 'encerrado') {
     const now = deps.clock.now();
     const { opensAt, closesAt } = gateWindowOf(event.startsAt, deps.closedWindow);
+    // Encerrado antes da janela abrir = cancelamento antecipado: a portaria não abre, nem perto da data.
+    if (closedAtOf(event) < opensAt) {
+      throw new AppError(
+        409,
+        'portaria_fechada',
+        'Este evento foi encerrado antes da data e não está disponível para validação.',
+      );
+    }
     if (now >= opensAt && now <= closesAt) return event;
     throw new AppError(
       409,
@@ -106,6 +114,12 @@ async function loadEvent(deps: Pick<GateDeps, 'db' | 'clock' | 'closedWindow'>, 
     'Este evento ainda não foi publicado e não está aberto para a portaria.',
   );
 }
+
+/**
+ * Quando o evento foi encerrado. Sem `closed_at` (encerrado por uma versão anterior do código), vale `updated_at`: evento encerrado
+ * não aceita mais nenhuma alteração, então essa data é a do encerramento.
+ */
+const closedAtOf = (e: { closedAt: Date | null; updatedAt: Date }) => e.closedAt ?? e.updatedAt;
 
 /** Entradas do evento (ingressos usados) e total de ingressos que ainda valem ou já entraram (cancelados ficam de fora). */
 export async function counterOf(db: Db, eventId: string): Promise<Counter> {
@@ -135,8 +149,8 @@ export async function counterByType(db: Db, eventId: string) {
 }
 
 /**
- * Eventos que a portaria pode abrir agora (RF-45): publicados e, dentro da janela operacional, encerrados (com `salesClosed` para a
- * tela mostrar "Vendas encerradas" e até quando a portaria funciona). Com o contador de cada um.
+ * Eventos que a portaria pode abrir agora (RF-45): publicados e, dentro da janela operacional, os encerrados já dentro dela (com
+ * `salesClosed` para a tela mostrar "Vendas encerradas" e até quando a portaria funciona). Com o contador de cada um.
  */
 export async function gateEvents(deps: Pick<GateDeps, 'db' | 'clock' | 'closedWindow'>) {
   const now = deps.clock.now();
@@ -157,7 +171,8 @@ export async function gateEvents(deps: Pick<GateDeps, 'db' | 'clock' | 'closedWi
     })
     .from(events)
     .where(
-      sql`${events.status} = 'publicado' or (${events.status} = 'encerrado' and ${events.startsAt} >= ${from} and ${events.startsAt} <= ${to})`,
+      sql`${events.status} = 'publicado' or (${events.status} = 'encerrado' and ${events.startsAt} >= ${from} and ${events.startsAt} <= ${to}
+          and coalesce(${events.closedAt}, ${events.updatedAt}) >= ${events.startsAt} - make_interval(hours => ${deps.closedWindow.beforeHours}))`,
     )
     .orderBy(asc(events.startsAt), asc(events.id));
   return rows.map(({ status, ...e }) => ({

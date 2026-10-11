@@ -383,6 +383,8 @@ export interface AdminEventRow {
   ageRating: string;
   bannerUrl: string | null;
   isFeatured: boolean;
+  /** Quando foi encerrado (nulo se não encerrado, ou encerrado por versão anterior: vale `updatedAt`). */
+  closedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

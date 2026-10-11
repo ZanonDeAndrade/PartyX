@@ -802,7 +802,9 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
       ]);
 
       // 4) Encerrar: some da listagem e da página inicial; o link continua, como encerrado; nada é cancelado.
-      expect((await admin.post(`/admin/events/${e.id}/close`)).status).toBe(200);
+      const closing = await admin.post(`/admin/events/${e.id}/close`);
+      expect(closing.status).toBe(200);
+      expect((await json(closing)).event.closedAt).toBe(clock.now().toISOString()); // usado pela portaria (D-79)
       const closed = await publicSlugs();
       expect(closed.list).not.toContain(e.slug);
       expect(closed.home).not.toContain(e.slug);

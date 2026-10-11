@@ -61,13 +61,14 @@ Telas ADM02 a ADM06 em `src/site/adminEvents.tsx` (o `/prototipo` não conta). A
 
 ### Correção do risco de encerrar e travar a portaria (10/10/2026)
 
-Portaria abre evento encerrado dentro da janela operacional (padrão 12 h antes a 24 h depois do início, configurável; D-79 a confirmar), com selo "Vendas encerradas" na seleção (V01); fora da janela recusa com o horário; rascunho nunca. No painel, "Encerrar vendas agora" (ADM02 e ADM04) fecha o período de venda dos tipos ativos, com confirmação e trilha `evento.encerrar_vendas`; "Encerrar evento" continua, com o texto da janela.
+Portaria abre evento encerrado dentro da janela operacional (padrão 12 h antes a 24 h depois do início, configurável; D-79 a confirmar), **se ele foi encerrado já dentro da janela** (`events.closed_at`, migração 0006 com reversão, preenchida a partir da trilha), com selo "Vendas encerradas" na seleção (V01); encerrado antes (cancelamento antecipado) fica fechado com mensagem própria; fora da janela recusa com o horário; rascunho nunca. No painel, "Encerrar vendas agora" (ADM02 e ADM04) fecha o período de venda dos tipos ativos, com confirmação e trilha `evento.encerrar_vendas`; "Encerrar evento" continua, com o texto da janela.
 
 | Requisito ou critério | Evidência |
 |---|---|
 | RF-11, CA-11 (encerrar sem travar a entrada) | `server/src/api/gate.integration.test.ts` (bloco "evento encerrado dentro da janela operacional" e seleção do evento) |
 | RF-15, CA-08 (encerrar vendas pelo período) | `server/src/api/events.integration.test.ts` ("Encerrar vendas agora": checkout 409, vitrine "vendas encerradas", portaria aberta, trilha) |
 | RF-45, RF-48 (seleção e resultados na janela) | `server/src/api/gate.integration.test.ts` (verde, amarelo, vermelho, busca e entrada manual em evento encerrado) |
+| D-79, cancelamento antecipado | `server/src/api/gate.integration.test.ts` (encerrado 3 dias antes recusa com a mensagem e some da seleção; limite exato de 12 h; linha antiga sem `closed_at`), `server/src/db/schema.integration.test.ts` (0006 preenche pela trilha sem mexer em `updated_at`, e reverte) |
 
 ## Requisitos funcionais (RF-01 a RF-68)
 

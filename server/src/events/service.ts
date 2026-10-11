@@ -63,6 +63,7 @@ const eventSnapshot = (e: EventRow) => ({
   bannerUrl: e.bannerUrl,
   status: e.status,
   isFeatured: e.isFeatured,
+  closedAt: e.closedAt?.toISOString() ?? null,
 });
 
 export interface EventInput {
@@ -268,7 +269,7 @@ export async function closeEvent(deps: EventsDeps, actor: Actor, id: string) {
     }
     const [after] = await tx
       .update(events)
-      .set({ status: 'encerrado', isFeatured: false, updatedAt: now })
+      .set({ status: 'encerrado', isFeatured: false, closedAt: now, updatedAt: now })
       .where(eq(events.id, id))
       .returning();
     await writeAudit(tx, {

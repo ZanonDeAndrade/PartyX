@@ -30,6 +30,10 @@ describe('regra expand/contract das migrações', () => {
       ['CREATE TRIGGER t BEFORE DELETE ON "a" FOR EACH ROW EXECUTE FUNCTION f();', 'gatilho que pode recusar gravações'],
       ['REVOKE UPDATE ON "a" FROM papel;', 'revoga privilégio'],
       ['UPDATE "a" SET "b" = 1;', 'migração de dados'],
+      ['UPDATE "events" e SET "closed_at" = now();', 'migração de dados'],
+      ['update only public.events as e set closed_at = now();', 'migração de dados'],
+      ['UPDATE "public"."events" SET "x" = 1;', 'migração de dados'],
+      ['ALTER TABLE "events" DISABLE TRIGGER "events_set_updated_at";', 'desliga gatilho'],
       ['DELETE FROM "a";', 'migração de dados'],
       ['TRUNCATE "a";', 'migração de dados'],
     ];

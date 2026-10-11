@@ -43,6 +43,13 @@
       "when": 1791683749248,
       "tag": "0005_excecoes_pagamento",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791687475328,
+      "tag": "0006_encerramento_do_evento",
+      "breakpoints": true
     }
   ]
 }

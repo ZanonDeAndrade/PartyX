@@ -84,8 +84,9 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
   async function event(name = 'Noite Neon Verão', status = 'publicado') {
     const id = (
       await sql(
-        `insert into events (slug,name,starts_at,venue,address,description,age_rating,status) values ($1,$2,'2026-12-12T22:00:00-03:00','Arena Central','Rua 1','d','Livre',$3) returning id`,
-        [`evento-${++n}`, name, status],
+        // Encerrado aqui = encerrado durante a festa (no início); os casos de encerramento antecipado montam a data à parte.
+        `insert into events (slug,name,starts_at,venue,address,description,age_rating,status,closed_at) values ($1,$2,'2026-12-12T22:00:00-03:00','Arena Central','Rua 1','d','Livre',$3,$4) returning id`,
+        [`evento-${++n}`, name, status, status === 'encerrado' ? '2026-12-12T22:00:00-03:00' : null],
       )
     ).rows[0].id as string;
     const types = {
@@ -341,6 +342,63 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
       expect(manual).toMatchObject({ result: 'valido', method: 'manual', counter: { entered: 2 } });
       // As duas tentativas ficam registradas (mesmo instante no relógio de teste: a ordem não importa aqui).
       expect((await checkinsOf(b.tickets[0]!.id)).map(c => c.result).sort()).toEqual(['ja_utilizado', 'valido']);
+    });
+
+    it('encerrado 3 dias antes (cancelamento antecipado): fechado na data, com a mensagem, e fora da seleção', async () => {
+      const e = await event('Festa Cancelada');
+      const b = await buyer(e);
+      clock.set('2026-12-09T22:00:00-03:00'); // 3 dias antes do início
+      const admin = await session('administrador');
+      expect((await admin.post(`/admin/events/${e.id}/close`)).status).toBe(200);
+      const closedAt = (await sql('select closed_at from events where id = $1', [e.id])).rows[0].closed_at;
+      expect(new Date(closedAt).toISOString()).toBe('2026-12-10T01:00:00.000Z');
+
+      clock.set('2026-12-12T22:30:00-03:00'); // no meio da janela, mas o encerramento foi antes dela
+      const v = await session();
+      for (const res of [
+        await v.scan(e.id, b.tickets[0]!.qr_payload),
+        await v.search(e.id, 'Marina'),
+        await v.admit(e.id, b.tickets[0]!.id),
+      ]) {
+        const body = await json(res);
+        expect([res.status, body.erro.codigo, body.erro.mensagem]).toEqual([
+          409,
+          'portaria_fechada',
+          'Este evento foi encerrado antes da data e não está disponível para validação.',
+        ]);
+      }
+      const names = (await json(await v.get('/gate/events'))).events.map((x: any) => x.name);
+      expect(names).not.toContain('Festa Cancelada');
+      expect((await sql('select status from tickets where id = $1', [b.tickets[0]!.id])).rows[0].status).toBe('valido');
+    });
+
+    it('encerrado exatamente na abertura da janela (12 h antes) ainda vale; um minuto antes, não', async () => {
+      const inside = await event('No Limite');
+      const before = await event('Um Minuto Antes');
+      await sql(
+        `update events set status = 'encerrado', closed_at = timestamptz '2026-12-12T10:00:00-03:00' where id = $1`,
+        [inside.id],
+      );
+      await sql(
+        `update events set status = 'encerrado', closed_at = timestamptz '2026-12-12T09:59:00-03:00' where id = $1`,
+        [before.id],
+      );
+      const b = await buyer(inside);
+      const v = await session();
+      expect((await json(await v.scan(inside.id, b.tickets[0]!.qr_payload))).result).toBe('valido');
+      expect((await json(await v.scan(before.id, 'PX1.1.x'))).erro.mensagem).toBe(
+        'Este evento foi encerrado antes da data e não está disponível para validação.',
+      );
+    });
+
+    it('linha encerrada por versão anterior (sem closed_at) usa a data da última alteração', async () => {
+      const e = await event('Antigo');
+      // updated_at fica com a hora real do banco (bem antes de 12/12): encerramento antecipado.
+      await sql(`update events set status = 'encerrado' where id = $1`, [e.id]);
+      const v = await session();
+      expect((await json(await v.scan(e.id, 'PX1.1.x'))).erro.mensagem).toBe(
+        'Este evento foi encerrado antes da data e não está disponível para validação.',
+      );
     });
 
     it('a janela vem da configuração (GATE_CLOSED_WINDOW_BEFORE_HOURS / AFTER_HOURS)', async () => {

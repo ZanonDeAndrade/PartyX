@@ -297,7 +297,7 @@ function StatusChangeDialog({
     : new Date(closesAt).getTime() < now
       ? `a janela da portaria para este evento terminou em ${whenText(closesAt)}: ela não abre mais este evento.`
       : opensAt && new Date(opensAt).getTime() > now
-        ? `a portaria funciona de ${whenText(opensAt)} até ${whenText(closesAt)}.`
+        ? `como faltam mais de ${w!.beforeHours} h para o início, é um cancelamento antecipado: a portaria não vai abrir este evento.`
         : `a portaria continua funcionando até ${whenText(closesAt)}.`;
   return (
     <ConfirmDialog
@@ -328,6 +328,19 @@ function StatusChangeDialog({
       <p className="px-small px-muted">Não há como reabrir nem editar um evento encerrado.</p>
     </ConfirmDialog>
   );
+}
+
+/** Situação da portaria para um evento encerrado (D-79): aberta na janela, se encerrado dentro dela; fechada se encerrado antes. */
+function gateNote(ev: AdminEvent, meta: EventsMeta | null): string {
+  if (!meta) return '';
+  const starts = new Date(ev.startsAt).getTime();
+  const opensAt = starts - meta.gateWindow.beforeHours * 3_600_000;
+  const closesAt = new Date(starts + meta.gateWindow.afterHours * 3_600_000).toISOString();
+  const closed = new Date(ev.closedAt ?? ev.updatedAt).getTime();
+  if (closed < opensAt)
+    return 'Foi encerrado antes da data (cancelamento antecipado): a portaria não abre este evento.';
+  if (Date.now() > new Date(closesAt).getTime()) return `A portaria funcionou até ${whenText(closesAt)}.`;
+  return `A portaria continua funcionando até ${whenText(closesAt)}.`;
 }
 
 // ---------- ADM02: lista de eventos ----------
@@ -1050,8 +1063,8 @@ export function AdminEventPage({ id }: { id: string }) {
           ) : null}
           {ev.status === 'encerrado' ? (
             <p className="px-notice px-notice-neu" role="note">
-              Encerrado: sem novas vendas e fora da vitrine. Ingressos e pedidos continuam registrados; a portaria ainda
-              abre este evento dentro da janela operacional em torno da data dele.
+              Encerrado: sem novas vendas e fora da vitrine. Ingressos e pedidos continuam registrados.{' '}
+              {gateNote(ev, meta.status === 'ok' ? meta.data : null)}
             </p>
           ) : null}
           <div className="px-tabs" role="tablist" aria-label="Seções do evento">

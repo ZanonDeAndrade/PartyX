@@ -34,7 +34,12 @@ const RULES: { rule: string; test: RegExp }[] = [
   },
   { rule: 'gatilho que pode recusar gravações', test: /\bcreate\s+(or\s+replace\s+)?trigger\b/i },
   { rule: 'revoga privilégio', test: /\brevoke\b/i },
-  { rule: 'migração de dados', test: /\b(truncate|delete\s+from|update\s+"?[\w.]+"?\s+set)\b/i },
+  { rule: 'desliga gatilho', test: /\bdisable\s+trigger\b/i },
+  // UPDATE com ou sem esquema, ONLY e apelido (`UPDATE "events" e SET ...`): sem o apelido na regra, a migração de dados passava despercebida.
+  {
+    rule: 'migração de dados',
+    test: /\b(truncate|delete\s+from|update\s+(only\s+)?"?[\w.]+"?(\s*\.\s*"?\w+"?)?(\s+(as\s+)?"?\w+"?)?\s+set)\b/i,
+  },
 ];
 
 /** Remove comentários. O corpo de `DO $$ ... $$` e de funções FICA: é SQL de verdade (um `REVOKE` pode estar lá dentro). */

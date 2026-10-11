@@ -23,6 +23,12 @@ export const events = pgTable(
     bannerUrl: text('banner_url'),
     status: eventStatus('status').notNull().default('rascunho'),
     isFeatured: boolean('is_featured').notNull().default(false),
+    /**
+     * Quando o evento foi encerrado (D-79). A portaria só abre um evento encerrado se ele foi encerrado dentro da janela operacional;
+     * encerrado antes dela é cancelamento antecipado e fica fechado. Nulo enquanto não encerrado (e em linhas encerradas por uma
+     * versão anterior do código, quando então vale `updated_at`, porque evento encerrado não aceita mais alteração).
+     */
+    closedAt: instant('closed_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

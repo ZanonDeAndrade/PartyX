@@ -144,7 +144,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(6);
+      expect(r.rows[0].n).toBe(7);
     });
   });
 
@@ -595,8 +595,46 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag3 = '0003_anonimizacao_lgpd';
       const tag4 = '0004_limites_globais';
       const tag5 = '0005_excecoes_pagamento';
+      const tag6 = '0006_encerramento_do_evento';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
-      await expect(rollbackLastMigration(db.url, tag4)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
+
+      // 0006: preenche closed_at dos encerrados a partir da trilha (ou de updated_at), sem mexer em updated_at.
+      await rollbackLastMigration(db.url, tag6);
+      const evs = await db.pool.query(
+        `insert into events (slug,name,starts_at,venue,address,description,age_rating,status) values
+           ('com-trilha','Com Trilha','2026-12-12T22:00:00-03:00','A','R','d','Livre','encerrado'),
+           ('sem-trilha','Sem Trilha','2026-12-12T22:00:00-03:00','A','R','d','Livre','encerrado'),
+           ('publicado','Publicado','2026-12-12T22:00:00-03:00','A','R','d','Livre','publicado')
+         returning id, slug, updated_at`,
+      );
+      const byslug = Object.fromEntries(evs.rows.map(r => [r.slug, r]));
+      await db.pool.query(
+        "insert into audit_log (action, entity, entity_id, created_at) values ('evento.encerrar', 'event', $1, '2026-12-13T02:00:00Z'), ('evento.encerrar', 'event', $1, '2026-12-13T03:00:00Z')",
+        [byslug['com-trilha'].id],
+      );
+      const { runMigrations: reapply } = await import('./migrate');
+      await reapply(db.url);
+      const after = Object.fromEntries(
+        (await db.pool.query('select slug, closed_at, updated_at from events')).rows.map(r => [r.slug, r]),
+      );
+      expect(new Date(after['com-trilha'].closed_at).toISOString()).toBe('2026-12-13T02:00:00.000Z'); // o primeiro registro
+      expect(new Date(after['sem-trilha'].closed_at).getTime()).toBe(
+        new Date(byslug['sem-trilha'].updated_at).getTime(),
+      );
+      expect(after.publicado.closed_at).toBeNull();
+      for (const slug of ['com-trilha', 'sem-trilha', 'publicado'])
+        expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
+      const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
+      expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
+      await rollbackLastMigration(db.url, tag6);
+      expect(
+        (
+          await db.pool.query(
+            "select count(*)::int as n from information_schema.columns where table_name = 'events' and column_name = 'closed_at'",
+          )
+        ).rows[0].n,
+      ).toBe(0);
 
       // 0005 recusa reverter se já houver aviso de pagamento sem estoque (perderia o registro de que os administradores foram avisados).
       const admin = (
@@ -610,10 +648,21 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       );
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/perderia esse registro/);
       await db.pool.query('delete from email_log');
-      await db.pool.query("insert into email_log (user_id, template, idempotency_key) values ($1, 'cadastro', 'cadastro:x')", [admin]);
+      await db.pool.query(
+        "insert into email_log (user_id, template, idempotency_key) values ($1, 'cadastro', 'cadastro:x')",
+        [admin],
+      );
       await rollbackLastMigration(db.url, tag5);
-      expect((await db.pool.query("select count(*)::int as n from information_schema.tables where table_name = 'job_leases'")).rows[0].n).toBe(0);
-      const values = (await db.pool.query("select unnest(enum_range(null::email_template))::text as v")).rows.map(r => r.v);
+      expect(
+        (
+          await db.pool.query(
+            "select count(*)::int as n from information_schema.tables where table_name = 'job_leases'",
+          )
+        ).rows[0].n,
+      ).toBe(0);
+      const values = (await db.pool.query('select unnest(enum_range(null::email_template))::text as v')).rows.map(
+        r => r.v,
+      );
       expect(values).toEqual(['cadastro', 'recuperacao_senha', 'compra_confirmada']);
       expect((await db.pool.query('select template::text as t from email_log')).rows).toEqual([{ t: 'cadastro' }]); // dado preservado
       await db.pool.query('delete from email_log');
@@ -622,7 +671,13 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag2)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag3)).rejects.toThrow(/não é a última/);
       await rollbackLastMigration(db.url, tag4);
-      expect((await db.pool.query("select count(*)::int as n from information_schema.tables where table_name = 'global_limit_counters'")).rows[0].n).toBe(0);
+      expect(
+        (
+          await db.pool.query(
+            "select count(*)::int as n from information_schema.tables where table_name = 'global_limit_counters'",
+          )
+        ).rows[0].n,
+      ).toBe(0);
       await rollbackLastMigration(db.url, tag3);
       await rollbackLastMigration(db.url, tag2);
       await rollbackLastMigration(db.url, tag1);
