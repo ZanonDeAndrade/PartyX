@@ -18,7 +18,33 @@ export interface GateDeps {
   db: Db;
   clock: Clock;
   keys: QrKeys;
+  /** Janela operacional para evento encerrado, em horas antes e depois do início (D-79). */
+  closedWindow: GateWindow;
 }
+export interface GateWindow {
+  beforeHours: number;
+  afterHours: number;
+}
+
+const HOUR = 3_600_000;
+/** Início e fim da janela em que a portaria ainda abre um evento encerrado. */
+export function gateWindowOf(startsAt: Date, w: GateWindow) {
+  return {
+    opensAt: new Date(startsAt.getTime() - w.beforeHours * HOUR),
+    closesAt: new Date(startsAt.getTime() + w.afterHours * HOUR),
+  };
+}
+const fmt = (d: Date) =>
+  new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+    .format(d)
+    .replace(', ', ' às ');
 export interface Validator {
   id: string;
   name: string;
@@ -52,13 +78,33 @@ const MESSAGES: Record<GateResult, string> = {
   outro_evento: 'Ingresso de outro evento',
 };
 
-async function loadEvent(db: Db, eventId: string) {
-  const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+/**
+ * Evento que a portaria pode abrir agora: publicado, ou encerrado dentro da janela operacional (de `beforeHours` antes do início até
+ * `afterHours` depois). Encerrar o evento tira do site e para as vendas, mas não deve travar a entrada de quem já tem ingresso.
+ * Rascunho nunca; encerrado fora da janela, recusa com a explicação e o horário.
+ */
+async function loadEvent(deps: Pick<GateDeps, 'db' | 'clock' | 'closedWindow'>, eventId: string) {
+  const [event] = await deps.db.select().from(events).where(eq(events.id, eventId)).limit(1);
   if (!event) throw new AppError(404, 'nao_encontrado', 'Evento não encontrado.');
-  if (event.status !== 'publicado') {
-    throw new AppError(409, 'evento_indisponivel', 'Este evento não está aberto para a portaria.');
+  if (event.status === 'publicado') return event;
+  if (event.status === 'encerrado') {
+    const now = deps.clock.now();
+    const { opensAt, closesAt } = gateWindowOf(event.startsAt, deps.closedWindow);
+    if (now >= opensAt && now <= closesAt) return event;
+    throw new AppError(
+      409,
+      'portaria_fechada',
+      now > closesAt
+        ? `Este evento foi encerrado e a portaria funcionou até ${fmt(closesAt)}. Não é mais possível validar ingressos dele.`
+        : `Este evento foi encerrado. A portaria só abre para ele a partir de ${fmt(opensAt)}.`,
+      { opensAt: opensAt.toISOString(), closesAt: closesAt.toISOString() },
+    );
   }
-  return event;
+  throw new AppError(
+    409,
+    'evento_indisponivel',
+    'Este evento ainda não foi publicado e não está aberto para a portaria.',
+  );
 }
 
 /** Entradas do evento (ingressos usados) e total de ingressos que ainda valem ou já entraram (cancelados ficam de fora). */
@@ -88,22 +134,37 @@ export async function counterByType(db: Db, eventId: string) {
     .orderBy(asc(ticketTypes.name));
 }
 
-/** Eventos que a portaria pode abrir (publicados), com o contador de cada um (RF-45). */
-export async function gateEvents(db: Db) {
-  return db
+/**
+ * Eventos que a portaria pode abrir agora (RF-45): publicados e, dentro da janela operacional, encerrados (com `salesClosed` para a
+ * tela mostrar "Vendas encerradas" e até quando a portaria funciona). Com o contador de cada um.
+ */
+export async function gateEvents(deps: Pick<GateDeps, 'db' | 'clock' | 'closedWindow'>) {
+  const now = deps.clock.now();
+  // Encerrado entra se o início estiver entre (agora - depois) e (agora + antes).
+  const from = new Date(now.getTime() - deps.closedWindow.afterHours * HOUR);
+  const to = new Date(now.getTime() + deps.closedWindow.beforeHours * HOUR);
+  const rows = await deps.db
     .select({
       id: events.id,
       name: events.name,
       slug: events.slug,
       startsAt: events.startsAt,
       venue: events.venue,
+      status: events.status,
       // Subconsultas com nome de tabela explícito: dentro de sql`` o Drizzle não qualifica as colunas e o `id` ficaria ambíguo.
       entered: sql<number>`(select count(*) from tickets t where t.event_id = "events"."id" and t.status = 'utilizado')::int`,
       total: sql<number>`(select count(*) from tickets t where t.event_id = "events"."id" and t.status in ('valido', 'utilizado'))::int`,
     })
     .from(events)
-    .where(eq(events.status, 'publicado'))
+    .where(
+      sql`${events.status} = 'publicado' or (${events.status} = 'encerrado' and ${events.startsAt} >= ${from} and ${events.startsAt} <= ${to})`,
+    )
     .orderBy(asc(events.startsAt), asc(events.id));
+  return rows.map(({ status, ...e }) => ({
+    ...e,
+    salesClosed: status === 'encerrado',
+    gateClosesAt: status === 'encerrado' ? gateWindowOf(e.startsAt, deps.closedWindow).closesAt : null,
+  }));
 }
 
 type TicketRow = {
@@ -228,7 +289,7 @@ async function admit(
 
 /** Leitura de um QR (RF-46 a RF-51, RF-54). Todo resultado fica registrado, inclusive as tentativas inválidas. */
 export async function scan(deps: GateDeps, v: Validator, input: { eventId: string; qr: string }): Promise<GateOutcome> {
-  await loadEvent(deps.db, input.eventId);
+  await loadEvent(deps, input.eventId);
   const now = deps.clock.now();
   const found = await lookupByQr(deps, input.qr);
   if (!found.ok) {
@@ -255,7 +316,7 @@ export async function admitManually(
   v: Validator,
   input: { eventId: string; ticketId: string },
 ): Promise<GateOutcome> {
-  await loadEvent(deps.db, input.eventId);
+  await loadEvent(deps, input.eventId);
   const ticket = await ticketById(deps.db, input.ticketId);
   if (!ticket) throw new AppError(404, 'nao_encontrado', 'Ingresso não encontrado.');
   const now = deps.clock.now();
@@ -316,7 +377,7 @@ export async function searchTickets(
   v: Validator,
   input: { eventId: string; q: string },
 ): Promise<{ kind: SearchKind; hits: SearchHit[] }> {
-  await loadEvent(deps.db, input.eventId);
+  await loadEvent(deps, input.eventId);
   const parsed = classifyQuery(input.q);
   if (!parsed) {
     throw new AppError(

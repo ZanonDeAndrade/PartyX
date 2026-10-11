@@ -44,3 +44,84 @@ export function maskEmail(email: string) {
   const [user = '', domain = ''] = email.trim().split('@');
   return `${user.slice(0, 1)}${'*'.repeat(Math.max(2, Math.min(user.length - 1, 6)))}@${domain}`;
 }
+
+// ---------- formulários do painel (ADM03, ADM06) ----------
+
+/** Deslocamento do fuso do evento, em minutos, no instante `utcMs` (-180 para UTC-3). Calculado pelo Intl, sem tabela fixa. */
+function zoneOffsetMinutes(utcMs: number): number {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: ZONE,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+      .formatToParts(new Date(utcMs))
+      .map(x => [x.type, x.value]),
+  );
+  const asUtc = Date.UTC(+p.year!, +p.month! - 1, +p.day!, +p.hour!, +p.minute!, +p.second!);
+  return Math.round((asUtc - utcMs) / 60000);
+}
+
+/**
+ * Data (AAAA-MM-DD) e horário (HH:MM) digitados, entendidos no fuso do evento, para o ISO com deslocamento que a API recebe
+ * (ex.: 2026-12-12T22:00:00-03:00). Nulo se algum dos dois estiver vazio ou inválido.
+ */
+export function zonedInputsToIso(date: string, time: string): string | null {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  const t = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!d || !t) return null;
+  const [y, mo, da, h, mi] = [+d[1]!, +d[2]!, +d[3]!, +t[1]!, +t[2]!];
+  if (mo < 1 || mo > 12 || da < 1 || da > 31 || h > 23 || mi > 59) return null;
+  const wall = Date.UTC(y, mo - 1, da, h, mi);
+  const check = new Date(wall);
+  if (check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== da) return null; // 31/02 e afins
+  // Duas passadas: o deslocamento depende do instante (horário de verão, se voltar a existir).
+  let offset = zoneOffsetMinutes(wall);
+  offset = zoneOffsetMinutes(wall - offset * 60000);
+  const sign = offset < 0 ? '-' : '+';
+  const abs = Math.abs(offset);
+  const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+  const mm = String(abs % 60).padStart(2, '0');
+  return `${date}T${time}:00${sign}${hh}:${mm}`;
+}
+
+/** Instante da API para os campos de data e horário no fuso do evento. */
+export function isoToZonedInputs(iso: string): { date: string; time: string } {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: ZONE,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+      .formatToParts(new Date(iso))
+      .map(x => [x.type, x.value]),
+  );
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+}
+
+/** Máscara de valor: o que foi digitado vira centavos (só os dígitos contam). "8000" → 8000 centavos (R$ 80,00). */
+export function centsFromMasked(text: string): number {
+  const digits = text.replace(/\D/g, '').replace(/^0+/, '').slice(0, 10);
+  return digits ? Number(digits) : 0;
+}
+
+/** Centavos para o texto do campo com máscara, sem o símbolo: 8000 → "80,00"; 123456 → "1.234,56". */
+export function maskedFromCents(cents: number): string {
+  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100);
+}
+
+/** Atrações digitadas uma por linha: sem linhas vazias nem espaços sobrando. */
+export const attractionsFromText = (text: string): string[] =>
+  text
+    .split('\n')
+    .map(a => a.trim().replace(/\s+/g, ' '))
+    .filter(Boolean);

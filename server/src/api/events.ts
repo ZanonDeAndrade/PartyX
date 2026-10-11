@@ -6,6 +6,7 @@ import type { AuthDeps, AuthVariables } from '../auth/types';
 import { AGE_RATINGS } from '../domain/events';
 import { AppError } from '../domain/errors';
 import {
+  LIMITS,
   closeEvent,
   createEvent,
   createPromoter,
@@ -15,12 +16,14 @@ import {
   listEvents,
   listPromoters,
   publishEvent,
+  stopSalesNow,
   setEventBanner,
   updateEvent,
   updatePromoter,
   updateTicketType,
 } from '../events/service';
-import { BANNER_MAX_BYTES, processBanner, shareObjectName } from '../media/banner';
+import { BANNER_MAX_BYTES, BANNER_MAX_WIDTH, BANNER_MIN_WIDTH, processBanner, shareObjectName } from '../media/banner';
+import { previewById } from '../vitrine/service';
 import { parseJson } from './validate';
 
 const text = z.string().max(6000);
@@ -86,7 +89,44 @@ export function eventsRoutes(deps: AuthDeps) {
 
   // ----- eventos -----
   app.get('/admin/events', async c => c.json({ events: await listEvents(evDeps) }));
+  /**
+   * Regras que a tela de criação e edição mostra (ADM03, ADM06), lidas do servidor e da configuração, para a interface não inventar
+   * limites: banner (tamanho, formatos, largura), classificações, tamanhos de texto, valor e quantidade máximos, reserva e limite por compra.
+   * Registrada antes de `/admin/events/:id`.
+   */
+  app.get('/admin/events/meta', c =>
+    c.json({
+      banner: {
+        maxBytes: BANNER_MAX_BYTES,
+        minWidth: BANNER_MIN_WIDTH,
+        storedWidth: BANNER_MAX_WIDTH,
+        formats: ['image/jpeg', 'image/png', 'image/webp'],
+        available: Boolean(deps.banners),
+      },
+      ageRatings: AGE_RATINGS,
+      limits: {
+        nameMax: LIMITS.nameMax,
+        descriptionMax: LIMITS.textMax,
+        attractionsMax: LIMITS.attractionsMax,
+        attractionMax: LIMITS.attractionMax,
+        typeNameMax: LIMITS.typeNameMax,
+        priceMaxCents: LIMITS.priceMaxCents,
+        quantityMax: LIMITS.quantityMax,
+      },
+      // Janela em que a portaria ainda abre um evento encerrado (D-79), para os textos de confirmação.
+      gateWindow: {
+        beforeHours: deps.config.GATE_CLOSED_WINDOW_BEFORE_HOURS,
+        afterHours: deps.config.GATE_CLOSED_WINDOW_AFTER_HOURS,
+      },
+      reservationMinutes: deps.config.RESERVATION_MINUTES,
+      maxTicketsPerOrder: deps.config.MAX_TICKETS_PER_ORDER,
+    }),
+  );
   app.get('/admin/events/:id', async c => c.json(await getEvent(evDeps, uuid(c.req.param('id'), 'Evento'))));
+  /** Pré-visualização da página pública em qualquer estado (inclusive rascunho), sem nada à venda. */
+  app.get('/admin/events/:id/preview', async c =>
+    c.json({ event: await previewById(evDeps, uuid(c.req.param('id'), 'Evento')) }),
+  );
 
   app.post('/admin/events', async c => {
     const body = await parseJson(c, createEventBody);
@@ -101,6 +141,10 @@ export function eventsRoutes(deps: AuthDeps) {
   );
   app.post('/admin/events/:id/close', async c =>
     c.json({ event: await closeEvent(evDeps, actor(c), uuid(c.req.param('id'), 'Evento')) }),
+  );
+  /** Encerrar vendas agora: ninguém mais compra; o evento continua publicado e a portaria continua funcionando. */
+  app.post('/admin/events/:id/stop-sales', async c =>
+    c.json(await stopSalesNow(evDeps, actor(c), uuid(c.req.param('id'), 'Evento'))),
   );
 
   // ----- banner (RF-13) -----

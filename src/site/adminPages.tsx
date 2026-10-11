@@ -754,37 +754,7 @@ export function AdminOrderPage({ id }: { id: string }) {
 
 // ---------- eventos: estoque, compradores, ingressos e entradas (RF-57, RF-61) ----------
 
-export function AdminEventsPage() {
-  usePageTitle('Eventos · PartyX');
-  const access = useAdmin('/admin/eventos');
-  const [state, retry] = useFetch(s => api.admin.events(s), access === 'ok' ? 'events' : 'espera');
-  return (
-    <Gate access={access} active="eventos">
-      <h1 className="px-h1">Eventos</h1>
-      <Loading state={state} retry={retry} />
-      {state.status === 'ok' ? (
-        <ul className="px-tickets">
-          {state.data.map(e => (
-            <li key={e.id}>
-              <Link to={`/admin/eventos/${e.id}`} className="px-ticketrow">
-                <span>
-                  <b>{e.name}</b>
-                  <br />
-                  <span className="px-muted">
-                    {dateShort(e.startsAt)} · {timeOf(e.startsAt)} · {e.venue}
-                  </span>
-                </span>
-                <span className="px-badge px-badge-neu">{e.status}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </Gate>
-  );
-}
-
-function LiveEntriesPanel({ eventId }: { eventId: string }) {
+export function LiveEntriesPanel({ eventId }: { eventId: string }) {
   const [data, setData] = useState<LiveEntries | null>(null);
   const [failed, setFailed] = useState(false);
   const load = useCallback(async () => {
@@ -878,7 +848,7 @@ function LiveEntriesPanel({ eventId }: { eventId: string }) {
   );
 }
 
-function TicketsPanel({ eventId }: { eventId: string }) {
+export function TicketsPanel({ eventId }: { eventId: string }) {
   const [status, setStatus] = useState('');
   const [q, setQ] = useState('');
   const [applied, setApplied] = useState('');
@@ -1001,7 +971,7 @@ function TicketsPanel({ eventId }: { eventId: string }) {
   );
 }
 
-function BuyersPanel({ eventId }: { eventId: string }) {
+export function BuyersPanel({ eventId }: { eventId: string }) {
   const [q, setQ] = useState('');
   const [applied, setApplied] = useState('');
   const [page, setPage] = useState(1);
@@ -1074,7 +1044,7 @@ function BuyersPanel({ eventId }: { eventId: string }) {
   );
 }
 
-function ContingencyPanel({ eventId }: { eventId: string }) {
+export function ContingencyPanel({ eventId }: { eventId: string }) {
   const base = `/admin/exports/events/${eventId}/contingency`;
   return (
     <section aria-label="Contingência da portaria">
@@ -1094,39 +1064,6 @@ function ContingencyPanel({ eventId }: { eventId: string }) {
         (picote) tudo depois do evento, inclusive os arquivos baixados. Cada download fica registrado em seu nome.
       </p>
     </section>
-  );
-}
-
-export function AdminEventPage({ id }: { id: string }) {
-  usePageTitle('Evento · PartyX');
-  const access = useAdmin(`/admin/eventos/${id}`);
-  const [events] = useFetch(s => api.admin.events(s), access === 'ok' ? 'events' : 'espera');
-  const name = events.status === 'ok' ? events.data.find(e => e.id === id)?.name : undefined;
-  const [tab, setTab] = useState<'entradas' | 'ingressos' | 'compradores' | 'contingencia'>('entradas');
-  return (
-    <Gate access={access} active="eventos">
-      <p>
-        <Link to="/admin/eventos">← Eventos</Link>
-      </p>
-      <h1 className="px-h1">{name ?? 'Evento'}</h1>
-      <div className="px-tabs" role="tablist" aria-label="Seções do evento">
-        {(['entradas', 'ingressos', 'compradores', 'contingencia'] as const).map(t => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
-            {t === 'entradas'
-              ? 'Entradas ao vivo'
-              : t === 'ingressos'
-                ? 'Ingressos'
-                : t === 'compradores'
-                  ? 'Compradores'
-                  : 'Contingência'}
-          </button>
-        ))}
-      </div>
-      {tab === 'entradas' ? <LiveEntriesPanel eventId={id} /> : null}
-      {tab === 'ingressos' ? <TicketsPanel eventId={id} /> : null}
-      {tab === 'compradores' ? <BuyersPanel eventId={id} /> : null}
-      {tab === 'contingencia' ? <ContingencyPanel eventId={id} /> : null}
-    </Gate>
   );
 }
 

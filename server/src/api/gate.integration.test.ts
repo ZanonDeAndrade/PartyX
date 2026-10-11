@@ -258,7 +258,7 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
   });
 
   describe('seleção do evento (RF-45)', () => {
-    it('lista só eventos publicados, com o contador de cada um', async () => {
+    it('lista publicados e, dentro da janela operacional, encerrados (com "vendas encerradas"); rascunho nunca', async () => {
       const a = await event('Evento A');
       await event('Rascunho', 'rascunho');
       await event('Encerrado', 'encerrado');
@@ -266,19 +266,111 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
       const v = await session();
       await v.scan(a.id, b.tickets[0]!.qr_payload);
       const { events } = await json(await v.get('/gate/events'));
-      expect(events.map((x: any) => [x.name, x.entered, x.total])).toEqual([['Evento A', 1, 3]]);
+      const byName = Object.fromEntries(events.map((x: any) => [x.name, x]));
+      expect(Object.keys(byName).sort()).toEqual(['Encerrado', 'Evento A']);
+      expect(byName['Evento A']).toMatchObject({ entered: 1, total: 3, salesClosed: false, gateClosesAt: null });
+      // Portaria do encerrado até 24 h depois do início (12/12 22h em Brasília = 13/12 01h UTC).
+      expect(byName['Encerrado']).toMatchObject({ salesClosed: true, gateClosesAt: '2026-12-14T01:00:00.000Z' });
+      // Passada a janela, o encerrado sai da lista; o publicado continua.
+      clock.advance(24 * 3_600_000 + 60_000);
+      const v2 = await session(); // sessão nova: o relógio andou um dia
+      const later = (await json(await v2.get('/gate/events'))).events.map((x: any) => x.name);
+      expect(later).toEqual(['Evento A']);
     });
 
-    it('evento fora do ar (rascunho, encerrado) ou inexistente não abre a portaria', async () => {
+    it('rascunho e inexistente não abrem a portaria; encerrado fora da janela recusa com o horário', async () => {
       const closed = await event('Encerrado', 'encerrado');
       const draft = await event('Rascunho', 'rascunho');
-      const v = await session();
-      for (const id of [closed.id, draft.id]) {
-        const res = await v.scan(id, 'PX1.1.x');
-        expect([res.status, (await json(res)).erro.codigo]).toEqual([409, 'evento_indisponivel']);
-      }
+      let v = await session();
+      const res = await v.scan(draft.id, 'PX1.1.x');
+      expect([res.status, (await json(res)).erro.codigo]).toEqual([409, 'evento_indisponivel']);
       expect((await v.scan(crypto.randomUUID(), 'PX1.1.x')).status).toBe(404);
       expect((await v.get('/gate/events/nao-uuid/counter')).status).toBe(404);
+
+      // Depois da janela (início + 24 h): mensagem clara de até quando funcionou.
+      clock.set('2026-12-13T22:01:00-03:00');
+      v = await session();
+      const after = await v.scan(closed.id, 'PX1.1.x');
+      const body = await json(after);
+      expect([after.status, body.erro.codigo]).toEqual([409, 'portaria_fechada']);
+      expect(body.erro.mensagem).toBe(
+        'Este evento foi encerrado e a portaria funcionou até 13/12 às 22:00. Não é mais possível validar ingressos dele.',
+      );
+      expect((await v.search(closed.id, 'Marina')).status).toBe(409);
+
+      // Antes da janela (início - 12 h): diz a partir de quando abre.
+      clock.set('2026-12-12T09:59:00-03:00');
+      v = await session();
+      const before = await json(await v.scan(closed.id, 'PX1.1.x'));
+      expect(before.erro.mensagem).toBe(
+        'Este evento foi encerrado. A portaria só abre para ele a partir de 12/12 às 10:00.',
+      );
+    });
+  });
+
+  describe('evento encerrado dentro da janela operacional (D-79)', () => {
+    it('encerrado pelo painel durante a festa: verde, amarelo, vermelho, busca e entrada manual funcionam; tudo na trilha', async () => {
+      const e = await event('Festa em Andamento');
+      const other = await event('Outra Festa');
+      const b = await buyer(e, { name: 'Marina Costa', items: [['Pista', 3]] });
+      const o = await buyer(other, { name: 'Pedro Outro' });
+      clock.advance(2 * 3_600_000); // a festa começou há 2 h
+      const admin = await session('administrador');
+      expect((await admin.post(`/admin/events/${e.id}/close`)).status).toBe(200);
+      expect(
+        (
+          await sql("select count(*)::int as n from audit_log where action = 'evento.encerrar' and entity_id = $1", [
+            e.id,
+          ])
+        ).rows[0].n,
+      ).toBe(1);
+
+      const v = await session('validador', 'Carlos Portaria');
+      const green = await json(await v.scan(e.id, b.tickets[0]!.qr_payload));
+      expect(green).toMatchObject({ result: 'valido', counter: { entered: 1, total: 3 } });
+      const yellow = await json(await v.scan(e.id, b.tickets[0]!.qr_payload));
+      expect(yellow).toMatchObject({ result: 'ja_utilizado', firstEntry: { validatorName: 'Carlos Portaria' } });
+      const red = await json(await v.scan(e.id, o.tickets[0]!.qr_payload));
+      expect(red).toMatchObject({ result: 'outro_evento', otherEvent: { name: 'Outra Festa' } });
+      await admin.post(`/admin/tickets/${b.tickets[1]!.id}/cancel`, { reason: 'Pedido do cliente', confirm: true });
+      expect((await json(await v.scan(e.id, b.tickets[1]!.qr_payload))).result).toBe('cancelado');
+      // Busca manual e entrada manual também.
+      const found = await json(await v.search(e.id, 'Marina'));
+      expect(found.hits.length).toBeGreaterThan(0);
+      const manual = await json(await v.admit(e.id, b.tickets[2]!.id));
+      expect(manual).toMatchObject({ result: 'valido', method: 'manual', counter: { entered: 2 } });
+      // As duas tentativas ficam registradas (mesmo instante no relógio de teste: a ordem não importa aqui).
+      expect((await checkinsOf(b.tickets[0]!.id)).map(c => c.result).sort()).toEqual(['ja_utilizado', 'valido']);
+    });
+
+    it('a janela vem da configuração (GATE_CLOSED_WINDOW_BEFORE_HOURS / AFTER_HOURS)', async () => {
+      const narrow = createApp({
+        config: loadConfig({
+          APP_ENV: 'local',
+          PAYMENT_GATEWAY: 'none',
+          GATE_CLOSED_WINDOW_BEFORE_HOURS: '1',
+          GATE_CLOSED_WINDOW_AFTER_HOURS: '2',
+        }),
+        clock,
+        auth: { db: createDrizzle(testDb.pool), hasher: argon2Hasher, mailer: new MemoryEmailSender() },
+      });
+      const e = await event('Encerrado', 'encerrado');
+      const b = await buyer(e);
+      clock.advance(3 * 3_600_000); // 3 h depois do início
+      const v = await session();
+      const scanIn = (target: typeof app) =>
+        target.request('/api/gate/scan', {
+          method: 'POST',
+          headers: {
+            origin: 'http://localhost',
+            cookie: v.cookie,
+            'x-csrf-token': v.csrf,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ eventId: e.id, qr: b.tickets[0]!.qr_payload }),
+        });
+      expect((await scanIn(narrow)).status).toBe(409); // janela de 2 h: fechado
+      expect((await json(await scanIn(app))).result).toBe('valido'); // padrão de 24 h: aberto
     });
   });
 

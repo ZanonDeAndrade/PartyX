@@ -160,7 +160,12 @@ export function Header() {
                   </Link>
                 ) : null}
                 {user?.role === 'cliente' ? (
-                  <Link to="/minha-conta" className="px-avatar" title="Minha conta" aria-label={`Minha conta, ${user.name}`}>
+                  <Link
+                    to="/minha-conta"
+                    className="px-avatar"
+                    title="Minha conta"
+                    aria-label={`Minha conta, ${user.name}`}
+                  >
                     {initialsOf(user.name)}
                   </Link>
                 ) : null}
@@ -294,7 +299,10 @@ export function Banner({
   step?: number;
 }) {
   return (
-    <div className={`px-banner ${className}`} style={event.bannerUrl ? undefined : { background: stripesFor(event.name, step) }}>
+    <div
+      className={`px-banner ${className}`}
+      style={event.bannerUrl ? undefined : { background: stripesFor(event.name, step) }}
+    >
       {event.bannerUrl ? <img src={event.bannerUrl} alt="" loading="lazy" decoding="async" /> : null}
       {children}
     </div>
@@ -414,5 +422,51 @@ export function SearchForm({
         Buscar
       </button>
     </form>
+  );
+}
+
+// ---------- avisos rápidos (toast) ----------
+
+interface ToastItem {
+  id: number;
+  text: string;
+  tone: 'ok' | 'err';
+}
+let pushToast: ((t: Omit<ToastItem, 'id'>) => void) | null = null;
+
+/** Aviso rápido de sucesso ou erro, lido pelo leitor de tela. Sem `ToastHost` montado, não faz nada. */
+export function toast(text: string, tone: ToastItem['tone'] = 'ok') {
+  pushToast?.({ text, tone });
+}
+
+export function ToastHost() {
+  const [items, setItems] = useState<ToastItem[]>([]);
+  useEffect(() => {
+    let next = 1;
+    pushToast = t => {
+      const id = next++;
+      setItems(list => [...list.slice(-2), { ...t, id }]);
+      window.setTimeout(() => setItems(list => list.filter(x => x.id !== id)), 5000);
+    };
+    return () => {
+      pushToast = null;
+    };
+  }, []);
+  return (
+    <div className="px-toasts" role="status" aria-live="polite">
+      {items.map(t => (
+        <p key={t.id} className={`px-toast px-toast-${t.tone}`}>
+          {t.text}
+          <button
+            type="button"
+            className="px-toast-close"
+            aria-label="Fechar aviso"
+            onClick={() => setItems(list => list.filter(x => x.id !== t.id))}
+          >
+            ×
+          </button>
+        </p>
+      ))}
+    </div>
   );
 }

@@ -284,6 +284,62 @@ export async function closeEvent(deps: EventsDeps, actor: Actor, id: string) {
   });
 }
 
+/**
+ * "Encerrar vendas agora" (ADM02, ADM04): ninguém mais compra, e o evento continua publicado (a portaria segue funcionando).
+ * Sem estado novo: usa o período de vendas que já existe. Todo tipo ATIVO com fim das vendas no futuro passa a terminar agora;
+ * se ainda nem tinha começado ("em breve"), o início também vira agora menos um segundo, para respeitar fim > início.
+ * Tipos inativos e os já encerrados ficam como estão. Quem já tem reserva em andamento ainda pode concluir o pagamento dela.
+ * Uma linha na trilha com o antes e o depois de cada tipo alterado.
+ */
+export async function stopSalesNow(deps: EventsDeps, actor: Actor, id: string) {
+  const now = deps.clock.now();
+  return deps.db.transaction(async tx => {
+    const event = await lockEvent(tx, id);
+    if (event.status !== 'publicado') {
+      throw new AppError(409, 'estado_invalido', 'Só um evento publicado tem vendas para encerrar.');
+    }
+    // Mesma ordem de trava da reserva e da edição de capacidade (id), para não haver impasse.
+    const open = await tx
+      .select()
+      .from(ticketTypes)
+      .where(and(eq(ticketTypes.eventId, id), eq(ticketTypes.isActive, true), gt(ticketTypes.salesEndAt, now)))
+      .orderBy(asc(ticketTypes.id))
+      .for('update');
+    const changes: {
+      id: string;
+      name: string;
+      before: { inicio: string; fim: string };
+      after: { inicio: string; fim: string };
+    }[] = [];
+    for (const t of open) {
+      const start = t.salesStartAt < now ? t.salesStartAt : new Date(now.getTime() - 1000);
+      await tx
+        .update(ticketTypes)
+        .set({ salesStartAt: start, salesEndAt: now, updatedAt: now })
+        .where(eq(ticketTypes.id, t.id));
+      changes.push({
+        id: t.id,
+        name: t.name,
+        before: { inicio: t.salesStartAt.toISOString(), fim: t.salesEndAt.toISOString() },
+        after: { inicio: start.toISOString(), fim: now.toISOString() },
+      });
+    }
+    if (changes.length) {
+      await writeAudit(tx, {
+        actorId: actor.id,
+        action: 'evento.encerrar_vendas',
+        entity: 'event',
+        entityId: id,
+        before: { tipos: changes.map(c => ({ id: c.id, nome: c.name, ...c.before })) },
+        after: { tipos: changes.map(c => ({ id: c.id, nome: c.name, ...c.after })) },
+        reason: 'Vendas encerradas agora pelo painel; o evento continua publicado e a portaria segue funcionando.',
+        at: now,
+      });
+    }
+    return { event, typesClosed: changes.length };
+  });
+}
+
 // ---------- tipos de ingresso (RF-14, RF-15, RF-16, RF-17) ----------
 
 export interface TypeView extends TypeRow {
@@ -456,9 +512,15 @@ export async function updateTicketType(deps: EventsDeps, actor: Actor, typeId: s
         .set({ ...data, updatedAt: now })
         .where(eq(ticketTypes.id, typeId))
         .returning();
+      // Ativar e desativar ganham ação própria na trilha (são as mudanças que tiram ou põem o tipo à venda na hora).
+      const toggled = before.isActive !== after!.isActive;
       await writeAudit(tx, {
         actorId: actor.id,
-        action: 'ingresso_tipo.editar',
+        action: toggled
+          ? after!.isActive
+            ? 'ingresso_tipo.ativar'
+            : 'ingresso_tipo.desativar'
+          : 'ingresso_tipo.editar',
         entity: 'ticket_type',
         entityId: typeId,
         before: typeSnapshot(before),

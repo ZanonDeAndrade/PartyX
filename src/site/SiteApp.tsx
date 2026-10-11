@@ -1,13 +1,8 @@
 import { useEffect } from 'react';
 import './site.css';
-import {
-  AdminEventPage,
-  AdminEventsPage,
-  AdminExceptionsPage,
-  AdminOrderPage,
-  AdminOrdersPage,
-  AdminOverviewPage,
-} from './adminPages';
+import { AdminExceptionsPage, AdminOrderPage, AdminOrdersPage, AdminOverviewPage } from './adminPages';
+import { AdminEventFormPage, AdminEventPage, AdminEventPreviewPage, AdminEventsPage } from './adminEvents';
+import { ToastHost } from './components';
 import { GateEventsPage, GatePage } from './gatePages';
 import { FeeReportPage, PromoterReportPage, SalesReportPage } from './reportPages';
 import { FirstAccessPage, ForgotPasswordPage, LegalPage, LoginPage, ResetPasswordPage, SignupPage } from './authPages';
@@ -35,6 +30,7 @@ function Routes() {
   if (loc.path === '/admin') return <AdminOverviewPage />;
   if (loc.path === '/admin/pedidos') return <AdminOrdersPage />;
   if (loc.path === '/admin/eventos') return <AdminEventsPage />;
+  if (loc.path === '/admin/eventos/novo') return <AdminEventFormPage />;
   if (loc.path === '/admin/excecoes') return <AdminExceptionsPage />;
   if (loc.path === '/admin/relatorios/vendas') return <SalesReportPage />;
   if (loc.path === '/admin/relatorios/promoters') return <PromoterReportPage />;
@@ -43,6 +39,10 @@ function Routes() {
   if (adminOrder) return <AdminOrderPage key={adminOrder[1]} id={adminOrder[1]!} />;
   const adminEvent = /^\/admin\/eventos\/([0-9a-f-]{36})$/.exec(loc.path);
   if (adminEvent) return <AdminEventPage key={adminEvent[1]} id={adminEvent[1]!} />;
+  const adminEventEdit = /^\/admin\/eventos\/([0-9a-f-]{36})\/editar$/.exec(loc.path);
+  if (adminEventEdit) return <AdminEventFormPage key={adminEventEdit[1]} id={adminEventEdit[1]!} />;
+  const adminEventPreview = /^\/admin\/eventos\/([0-9a-f-]{36})\/previa$/.exec(loc.path);
+  if (adminEventPreview) return <AdminEventPreviewPage key={adminEventPreview[1]} id={adminEventPreview[1]!} />;
   if (loc.path === '/portaria') return <GateEventsPage />;
   const gate = /^\/portaria\/([0-9a-f-]{36})$/.exec(loc.path);
   if (gate) return <GatePage key={gate[1]} eventId={gate[1]!} />;
@@ -72,6 +72,7 @@ export function SiteApp() {
     <Router>
       <SessionProvider>
         <Routes />
+        <ToastHost />
       </SessionProvider>
       {/* Depois das rotas: a página já está montada por baixo quando a abertura aparece. */}
       <IntroSplash />

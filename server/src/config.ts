@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { parseQrKeys, type QrKeys } from './domain/ticketCode';
 
 /** Lê uma lista de esperas da conciliação sob demanda (segundos). Nula se inválida (fora da faixa, fora de ordem, repetida). */
-export function parseOffsets(value: string, range: { min: number; max: number } = { min: 10, max: 3600 }): number[] | null {
+export function parseOffsets(
+  value: string,
+  range: { min: number; max: number } = { min: 10, max: 3600 },
+): number[] | null {
   const parts = value.split(',').map(p => p.trim());
   if (parts.length < 1 || parts.length > 10 || parts.some(p => !/^\d+$/.test(p))) return null;
   const nums = parts.map(Number);
@@ -97,6 +100,13 @@ const schema = z
     GLOBAL_RECOVERIES_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(60),
     GATE_SCANS_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(3000),
     GATE_SEARCHES_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(400),
+    /**
+     * Janela operacional da portaria para evento ENCERRADO: de N horas antes do início até M horas depois, a portaria ainda valida os
+     * ingressos dele (encerrar tira o evento do site e para as vendas, mas a festa pode estar acontecendo). Fora dela, fechado.
+     * Rascunho nunca entra; publicado entra sempre. Padrão 12 h antes e 24 h depois: premissa a confirmar com a PartyX (D-79).
+     */
+    GATE_CLOSED_WINDOW_BEFORE_HOURS: z.coerce.number().int().min(0).max(72).default(12),
+    GATE_CLOSED_WINDOW_AFTER_HOURS: z.coerce.number().int().min(1).max(168).default(24),
     /** Fila do Cloud Tasks da conciliação sob demanda: `projects/<projeto>/locations/<região>/queues/<fila>`. Sem ela, só o webhook e a rotina diária conciliam. */
     TASKS_QUEUE: z
       .string()
@@ -112,7 +122,10 @@ const schema = z
     RECONCILE_TASK_OFFSETS_SECONDS: z
       .string()
       .default('60,120,240,480')
-      .refine(v => parseOffsets(v) !== null, 'use de 1 a 10 números inteiros crescentes entre 10 e 3600, separados por vírgula'),
+      .refine(
+        v => parseOffsets(v) !== null,
+        'use de 1 a 10 números inteiros crescentes entre 10 e 3600, separados por vírgula',
+      ),
     /** Margem depois do fim da reserva para a verificação do limite, em segundos. */
     RECONCILE_TASK_MARGIN_SECONDS: z.coerce.number().int().min(0).max(3600).default(120),
     /**

@@ -14,11 +14,20 @@ Toda a árvore `/gate` exige o perfil (inclusive caminhos que nem existem): visi
 
 | Rota | O que faz |
 |---|---|
-| `GET /gate/events` | Eventos publicados, com entradas e total de cada um (RF-45) |
+| `GET /gate/events` | Eventos publicados e, dentro da janela operacional, encerrados (com `salesClosed` e `gateClosesAt`), com entradas e total de cada um (RF-45) |
 | `GET /gate/events/:id/counter` | Contador de entradas e por tipo (RF-53, CA-27) |
 | `POST /gate/scan` `{ eventId, qr }` | Lê um QR |
 | `POST /gate/search` `{ eventId, q }` | Busca manual |
 | `POST /gate/admit` `{ eventId, ticketId }` | Confirma a entrada de um ingresso achado na busca |
+
+## Que eventos a portaria abre (10/10/2026, D-79)
+
+- **Publicado:** sempre.
+- **Encerrado:** só dentro da **janela operacional**, de `GATE_CLOSED_WINDOW_BEFORE_HOURS` (padrão 12) horas antes do início até `GATE_CLOSED_WINDOW_AFTER_HOURS` (padrão 24) horas depois. Encerrar o evento tira do site e para as vendas, mas não pode travar a entrada de quem já tem ingresso. Dentro da janela, tudo funciona igual (verde, amarelo, vermelho, busca e entrada manual). Na seleção (V01) e na tela da câmera aparece o selo **"Vendas encerradas"** e até quando a validação está disponível.
+- **Encerrado fora da janela:** 409 `portaria_fechada` com o horário: "Este evento foi encerrado e a portaria funcionou até 13/12 às 22:00. Não é mais possível validar ingressos dele." (depois) ou "A portaria só abre para ele a partir de ..." (antes).
+- **Rascunho:** nunca (409 `evento_indisponivel`).
+- No painel, **"Encerrar vendas agora"** (`POST /api/admin/events/:id/stop-sales`) para as vendas sem encerrar o evento: a portaria continua normal, sem janela. É o indicado no dia do evento.
+- A janela de 12 h antes e 24 h depois é **premissa** a confirmar com a PartyX (D-79).
 
 ## Resultados (RF-48, RF-54)
 
@@ -67,7 +76,7 @@ Seleção do evento (V01); câmera com contador (V02); busca manual (V03). A câ
 
 ## Decisões abertas
 
-D-48 (entrada manual por código curto), D-49 (limites da busca), D-50 (tempos da tela de resultado).
+D-48 (entrada manual por código curto), D-49 (limites da busca), D-50 (tempos da tela de resultado), D-79 (janela operacional da portaria para evento encerrado).
 
 
 ## Casos difíceis e ensaio (Prompt 23, 05/10/2026)

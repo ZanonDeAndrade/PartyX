@@ -299,6 +299,15 @@ describe('loadConfig', () => {
       expect(() => loadConfig({ GATEWAY_ENVIRONMENT: 'teste' })).toThrow(/GATEWAY_ENVIRONMENT/);
     });
   });
+  it('janela da portaria para evento encerrado: padrão 12 h antes e 24 h depois, configurável e com limites', () => {
+    const c = loadConfig({});
+    expect([c.GATE_CLOSED_WINDOW_BEFORE_HOURS, c.GATE_CLOSED_WINDOW_AFTER_HOURS]).toEqual([12, 24]);
+    const d = loadConfig({ GATE_CLOSED_WINDOW_BEFORE_HOURS: '0', GATE_CLOSED_WINDOW_AFTER_HOURS: '48' });
+    expect([d.GATE_CLOSED_WINDOW_BEFORE_HOURS, d.GATE_CLOSED_WINDOW_AFTER_HOURS]).toEqual([0, 48]);
+    expect(() => loadConfig({ GATE_CLOSED_WINDOW_AFTER_HOURS: '0' })).toThrow(/GATE_CLOSED_WINDOW_AFTER_HOURS/);
+    expect(() => loadConfig({ GATE_CLOSED_WINDOW_BEFORE_HOURS: '100' })).toThrow(/GATE_CLOSED_WINDOW_BEFORE_HOURS/);
+  });
+
   describe('cadência da conciliação e contato da PartyX', () => {
     it('padrão: 1, 2, 4 e 8 min, margem de 2 min, tardias de 15 min a 24 h, trava de 2 min; sem contato configurado', () => {
       const c = loadConfig({});

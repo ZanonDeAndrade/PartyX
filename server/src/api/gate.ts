@@ -25,7 +25,15 @@ const uuid = z.uuid();
  */
 export function gateRoutes(deps: AuthDeps) {
   const app = new Hono<{ Variables: AuthVariables }>();
-  const gateDeps: GateDeps = { db: deps.db, clock: deps.clock, keys: deps.config.qr.keys };
+  const gateDeps: GateDeps = {
+    db: deps.db,
+    clock: deps.clock,
+    keys: deps.config.qr.keys,
+    closedWindow: {
+      beforeHours: deps.config.GATE_CLOSED_WINDOW_BEFORE_HOURS,
+      afterHours: deps.config.GATE_CLOSED_WINDOW_AFTER_HOURS,
+    },
+  };
   const now = () => deps.clock.now().getTime();
   // Teto por pessoa. A leitura contínua da câmera repete o mesmo QR várias vezes por segundo; a tela já espera entre leituras.
   const scanLimit = createMemoryLimiter({ max: 300, windowMs: 60_000, now });
@@ -48,7 +56,7 @@ export function gateRoutes(deps: AuthDeps) {
     return p.data;
   };
 
-  app.get('/gate/events', async c => c.json({ events: await gateEvents(deps.db) }));
+  app.get('/gate/events', async c => c.json({ events: await gateEvents(gateDeps) }));
 
   /** Contador de entradas e por tipo (RF-53, CA-27). A tela consulta a cada poucos segundos. */
   app.get('/gate/events/:id/counter', async c => {

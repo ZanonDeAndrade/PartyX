@@ -1263,7 +1263,6 @@ body.px-site main {
   align-items: center;
 }
 
-
 /* ===== Tema do protótipo (P01–P07, A01–A06): vitrine escura, formulários em cartão claro ===== */
 .px-sr {
   position: absolute;
@@ -3374,8 +3373,13 @@ body.px-dark .px-drawer a.px-drawer-item:hover {
 .px-box-light {
   background: #fff;
 }
-.px-ck-event .px-ck-date { text-transform: uppercase; }
-.px-result .px-mono, .px-done .px-mono { letter-spacing: 0; }
+.px-ck-event .px-ck-date {
+  text-transform: uppercase;
+}
+.px-result .px-mono,
+.px-done .px-mono {
+  letter-spacing: 0;
+}
 
 /* ===== Área do cliente (U01–U06) ===== */
 .px-me-tabs {
@@ -3931,7 +3935,11 @@ body.px-dark .px-drawer a.px-drawer-item:hover {
     padding-bottom: 48px;
   }
 }
-.px-avatar, .px-avatar:hover { text-decoration: none; color: #fff; }
+.px-avatar,
+.px-avatar:hover {
+  text-decoration: none;
+  color: #fff;
+}
 
 /* Abertura em vídeo (IntroSplash). Por cima de tudo; o vídeo quadrado tem o mesmo preto do fundo, então não aparece borda. */
 .px-intro {
@@ -3977,4 +3985,224 @@ body.px-dark .px-drawer a.px-drawer-item:hover {
   color: #fff;
   outline: 2px solid #8b5cf6;
   outline-offset: 3px;
+}
+
+/* Painel: eventos e tipos de ingresso (ADM02 a ADM06). Cartões no celular, linhas no computador; nada de rolagem lateral em 360 px. */
+.px-adm-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0;
+}
+.px-adm-head > * {
+  min-width: 0;
+}
+.px-adm-head .px-h1,
+.px-adm-head .px-h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.px-adm-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.px-adm-card {
+  background: #fff;
+  border: 1px solid #e4e4ec;
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.px-adm-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.px-adm-card-title {
+  font-weight: 800;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+.px-adm-card-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.px-adm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+.px-adm-actions .px-btn {
+  min-height: 44px;
+  flex: 0 1 auto;
+}
+.px-adm-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.px-adm-stats div {
+  background: #f7f7fa;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.px-adm-stats dt {
+  font-size: 12px;
+  color: #3f3f50;
+}
+.px-adm-stats dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+@media (min-width: 768px) {
+  .px-adm-card {
+    grid-template-columns: minmax(0, 2fr) auto minmax(0, 2fr);
+    align-items: center;
+  }
+  .px-adm-card .px-adm-actions {
+    justify-content: flex-end;
+    margin: 0;
+  }
+  .px-adm-type {
+    grid-template-columns: minmax(0, 2fr) auto;
+  }
+  .px-adm-type .px-adm-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .px-adm-type .px-adm-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+.px-break {
+  overflow-wrap: anywhere;
+}
+.px-banner-edit {
+  border: 1px solid #e4e4ec;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.px-banner-edit legend {
+  font-weight: 700;
+  padding: 0 4px;
+}
+.px-banner-edit input[type='file'] {
+  min-height: 44px;
+  padding: 8px 0;
+  border: 0;
+  max-width: 100%;
+}
+.px-banner-preview {
+  border-radius: 10px;
+  max-width: 640px;
+}
+.px-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.px-progress progress {
+  width: 100%;
+  height: 10px;
+}
+.px-money {
+  display: flex;
+  align-items: center;
+  border: 1px solid #8a8a9e;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.px-money span {
+  padding: 0 10px;
+  font-weight: 700;
+  color: #3f3f50;
+}
+.px-field .px-money input {
+  border: 0;
+  border-radius: 0;
+  padding-left: 0;
+  min-width: 0;
+}
+.px-modal-wide {
+  max-width: 640px;
+}
+.px-field textarea {
+  resize: vertical;
+}
+.px-preview-bar {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #422006;
+  font-size: 14px;
+}
+body.px-dark .px-preview-bar a {
+  color: #422006;
+  text-decoration: underline;
+}
+.px-toasts {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.px-toast {
+  pointer-events: auto;
+  margin: 0;
+  max-width: 480px;
+  width: 100%;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 6px 10px 14px;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(11, 11, 16, 0.2);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.px-toast-ok {
+  background: #14532d;
+  color: #fff;
+}
+.px-toast-err {
+  background: #991b1b;
+  color: #fff;
+}
+.px-toast-close {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  cursor: pointer;
 }

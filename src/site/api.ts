@@ -202,6 +202,9 @@ export interface GateEvent {
   venue: string;
   entered: number;
   total: number;
+  /** Evento encerrado dentro da janela operacional: vendas encerradas, portaria funcionando até `gateClosesAt`. */
+  salesClosed: boolean;
+  gateClosesAt: string | null;
 }
 export interface GateHit {
   ticketId: string;
@@ -365,13 +368,122 @@ export interface AdminOrderDetail {
     attempts: number;
   }[];
 }
+export type EventStatus = 'rascunho' | 'publicado' | 'encerrado';
+/** Evento como o painel recebe (`server/src/events/service.ts`). */
 export interface AdminEventRow {
   id: string;
   name: string;
   slug: string;
   startsAt: string;
-  status: 'rascunho' | 'publicado' | 'encerrado';
+  status: EventStatus;
   venue: string;
+  address: string;
+  description: string;
+  attractions: string[];
+  ageRating: string;
+  bannerUrl: string | null;
+  isFeatured: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+export type AdminEvent = AdminEventRow;
+
+/** Tipo de ingresso no painel: vendidos (pagos) separados de reservados (temporários, de quem está pagando). */
+export interface AdminTicketType {
+  id: string;
+  eventId: string;
+  name: string;
+  priceCents: number;
+  quantityTotal: number;
+  quantitySold: number;
+  quantityReserved: number;
+  available: number;
+  salesStartAt: string;
+  salesEndAt: string;
+  isActive: boolean;
+  salesState: 'a_venda' | 'em_breve' | 'encerrada' | 'indisponivel' | 'esgotado' | 'reservado';
+}
+
+/** Regras para os formulários do painel, lidas do servidor (`GET /admin/events/meta`). */
+export interface EventsMeta {
+  banner: { maxBytes: number; minWidth: number; storedWidth: number; formats: string[]; available: boolean };
+  ageRatings: string[];
+  limits: {
+    nameMax: number;
+    descriptionMax: number;
+    attractionsMax: number;
+    attractionMax: number;
+    typeNameMax: number;
+    priceMaxCents: number;
+    quantityMax: number;
+  };
+  /** Janela em que a portaria ainda abre um evento encerrado, em horas em torno do início (D-79). */
+  gateWindow: { beforeHours: number; afterHours: number };
+  reservationMinutes: number;
+  maxTicketsPerOrder: number;
+}
+
+export interface EventInputBody {
+  name: string;
+  startsAt: string;
+  venue: string;
+  address: string;
+  description: string;
+  attractions: string[];
+  ageRating: string;
+  isFeatured: boolean;
+}
+export interface TicketTypeBody {
+  name: string;
+  priceCents: number;
+  quantityTotal: number;
+  salesStartAt: string;
+  salesEndAt: string;
+  isActive: boolean;
+}
+
+/**
+ * Envio do banner com progresso (o `fetch` não informa o progresso do envio). Mesmo contrato de erro e o mesmo token CSRF das
+ * outras chamadas. `onProgress` recebe de 0 a 1.
+ */
+export function uploadBanner(
+  eventId: string,
+  file: File,
+  onProgress: (fraction: number) => void,
+): Promise<{ event: AdminEvent }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', `/api/admin/events/${encodeURIComponent(eventId)}/banner`);
+    xhr.setRequestHeader('accept', 'application/json');
+    if (csrfToken) xhr.setRequestHeader('x-csrf-token', csrfToken);
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onerror = () => reject(new ApiError(0, 'Sem conexão. Verifique a internet e tente de novo.', 'sem_conexao'));
+    xhr.onload = () => {
+      let data: { erro?: { codigo?: string; mensagem?: string; detalhes?: unknown } } | null = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = null;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(1);
+        resolve(data as unknown as { event: AdminEvent });
+      } else
+        reject(
+          new ApiError(
+            xhr.status,
+            data?.erro?.mensagem ?? 'Não foi possível enviar a imagem.',
+            data?.erro?.codigo,
+            data?.erro?.detalhes,
+          ),
+        );
+    };
+    const form = new FormData();
+    form.append('file', file);
+    xhr.send(form);
+  });
 }
 
 export interface SalesReport {
@@ -522,6 +634,32 @@ export const api = {
     overview: (month?: string, signal?: AbortSignal) =>
       get<AdminOverview>(`/admin/overview${month ? `?month=${month}` : ''}`, signal),
     events: (signal?: AbortSignal) => get<{ events: AdminEventRow[] }>('/admin/events', signal).then(r => r.events),
+    eventsMeta: (signal?: AbortSignal) => get<EventsMeta>('/admin/events/meta', signal),
+    event: (id: string, signal?: AbortSignal) =>
+      get<{ event: AdminEvent; ticketTypes: AdminTicketType[] }>(`/admin/events/${encodeURIComponent(id)}`, signal),
+    eventPreview: (id: string, signal?: AbortSignal) =>
+      get<{ event: EventDetail & { status: EventStatus } }>(
+        `/admin/events/${encodeURIComponent(id)}/preview`,
+        signal,
+      ).then(r => r.event),
+    createEvent: (body: EventInputBody) => request<{ event: AdminEvent }>('POST', '/admin/events', body),
+    updateEvent: (id: string, body: Partial<EventInputBody>) =>
+      request<{ event: AdminEvent }>('PATCH', `/admin/events/${encodeURIComponent(id)}`, body),
+    publishEvent: (id: string) =>
+      request<{ event: AdminEvent }>('POST', `/admin/events/${encodeURIComponent(id)}/publish`),
+    closeEvent: (id: string) => request<{ event: AdminEvent }>('POST', `/admin/events/${encodeURIComponent(id)}/close`),
+    stopSales: (id: string) =>
+      request<{ event: AdminEvent; typesClosed: number }>('POST', `/admin/events/${encodeURIComponent(id)}/stop-sales`),
+    removeBanner: (id: string) =>
+      request<{ event: AdminEvent }>('DELETE', `/admin/events/${encodeURIComponent(id)}/banner`),
+    createTicketType: (eventId: string, body: TicketTypeBody) =>
+      request<{ ticketType: AdminTicketType }>(
+        'POST',
+        `/admin/events/${encodeURIComponent(eventId)}/ticket-types`,
+        body,
+      ),
+    updateTicketType: (id: string, body: Partial<TicketTypeBody>) =>
+      request<{ ticketType: AdminTicketType }>('PATCH', `/admin/ticket-types/${encodeURIComponent(id)}`, body),
     orders: (query: string, signal?: AbortSignal) =>
       get<{ page: number; pageSize: number; total: number; orders: AdminOrderRow[] }>(
         `/admin/orders?${query}`,

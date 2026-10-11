@@ -169,6 +169,23 @@ export async function search(deps: VitrineDeps, input: SearchInput) {
 export async function bySlug(deps: VitrineDeps, slug: string): Promise<PublicEventDetail> {
   const [row] = await deps.db.select().from(events).where(eq(events.slug, slug)).limit(1);
   if (!row || row.status === 'rascunho') throw new AppError(404, 'nao_encontrado', 'Evento não encontrado.');
+  return detail(deps, row, false);
+}
+
+/**
+ * Pré-visualização para o administrador (ADM03): a mesma página pública, montada pelo id e em qualquer estado, inclusive rascunho.
+ * Nada fica à venda nela (`canBuy` falso): é só para conferir texto, banner e tipos antes de publicar.
+ */
+export async function previewById(
+  deps: VitrineDeps,
+  id: string,
+): Promise<PublicEventDetail & { status: EventRow['status'] }> {
+  const [row] = await deps.db.select().from(events).where(eq(events.id, id)).limit(1);
+  if (!row) throw new AppError(404, 'nao_encontrado', 'Evento não encontrado.');
+  return { ...(await detail(deps, row, true)), status: row.status };
+}
+
+async function detail(deps: VitrineDeps, row: EventRow, preview: boolean): Promise<PublicEventDetail> {
   const { now, byEvent } = await load(deps, [row]);
   const types = byEvent.get(row.id) ?? [];
   const base = strip(card(row, types, now));
@@ -189,7 +206,7 @@ export async function bySlug(deps: VitrineDeps, slug: string): Promise<PublicEve
         state,
         label: TYPE_LABEL[state],
         note: typeNote(state, t),
-        canBuy: state === 'a_venda' && availableQuantity(t) > 0,
+        canBuy: !preview && state === 'a_venda' && availableQuantity(t) > 0,
       };
     }),
   };

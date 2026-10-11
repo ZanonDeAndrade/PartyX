@@ -207,7 +207,13 @@ function ShareDialog({ event, onClose }: { event: EventDetail; onClose: () => vo
       >
         <div className="px-modal-head">
           <h2 id="share-title">{event.name}</h2>
-          <button ref={closeRef} type="button" className="px-icon-btn px-icon-btn-light" aria-label="Fechar" onClick={onClose}>
+          <button
+            ref={closeRef}
+            type="button"
+            className="px-icon-btn px-icon-btn-light"
+            aria-label="Fechar"
+            onClick={onClose}
+          >
             ×
           </button>
         </div>
@@ -381,30 +387,9 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
 export function EventPage({ slug }: { slug: string }) {
   const [state, retry] = useFetch(s => api.event(slug, s), slug);
   usePageTitle(state.status === 'ok' ? `${state.data.name} · PartyX` : 'Evento · PartyX');
-  const [share, setShare] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   if (state.status === 'error' && state.code === 404) return <NotFoundPage />;
   const event = state.status === 'ok' ? state.data : null;
-  const sale = event?.sale;
-
-  const copyLink = async () => {
-    const url = `${window.location.origin}/eventos/${slug}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch {
-      window.prompt('Copie o link do evento:', url);
-    }
-  };
-  const shareNow = () => {
-    if (!event) return;
-    // No celular, a folha de compartilhamento do sistema; no computador, a pré-visualização com as opções.
-    if (typeof navigator.share === 'function' && window.matchMedia('(max-width: 639px)').matches) {
-      navigator.share({ title: event.name, url: `${window.location.origin}/eventos/${event.slug}` }).catch(() => {});
-    } else setShare(true);
-  };
 
   return (
     <Layout dark>
@@ -419,113 +404,143 @@ export function EventPage({ slug }: { slug: string }) {
           <ErrorBox onRetry={retry} />
         </div>
       ) : null}
-      {event && sale ? (
-        <>
-          <div className="px-wrap">
-            <Banner event={event} className="px-event-banner" step={14}>
-              {sale.kind === 'ended' ? <span className="px-ended-tag">Evento encerrado</span> : null}
-            </Banner>
-          </div>
-          <div className="px-wrap px-event">
-            <article className="px-event-main">
-              <div className="px-event-title">
-                <h1>{event.name}</h1>
-                <dl className="px-facts">
-                  <div>
-                    <dt>Data e horário</dt>
-                    <dd>{capital(dateLong(event.startsAt))}</dd>
-                    <dd className="px-facts-sub">Início às {timeOf(event.startsAt)}</dd>
-                  </div>
-                  <div>
-                    <dt>Local</dt>
-                    <dd>{event.venue}</dd>
-                    <dd className="px-facts-sub">{event.address}</dd>
-                  </div>
-                  <div>
-                    <dt>Classificação</dt>
-                    <dd>{event.ageRating}</dd>
-                  </div>
-                </dl>
-                <div className="px-share-row">
-                  <button type="button" className="px-btn px-btn-ghost" onClick={shareNow} aria-haspopup="dialog">
-                    Compartilhar
-                  </button>
-                  <button type="button" className="px-btn px-btn-ghost" onClick={copyLink}>
-                    Copiar link
-                  </button>
-                </div>
-                <p role="status" aria-live="polite" className="px-copied">
-                  {copied ? 'Link copiado.' : ''}
-                </p>
-              </div>
-              {sale.kind === 'ended' ? (
-                <div className="px-notice px-notice-dark" role="status">
-                  <b>Este evento já aconteceu</b>
-                  <span>
-                    As vendas não estão mais disponíveis. Esta página continua acessível para consulta pelo link.
-                  </span>
-                  <Link to="/eventos" className="px-btn px-btn-dark">
-                    Ver próximos eventos
-                  </Link>
-                </div>
-              ) : null}
-              <section aria-labelledby="sobre">
-                <h2 id="sobre" className="px-h3">
-                  Sobre o evento
-                </h2>
-                <p className="px-desc">{event.description}</p>
-              </section>
-              {event.attractions.length > 0 ? (
-                <section aria-labelledby="atracoes">
-                  <h2 id="atracoes" className="px-h3">
-                    Atrações
-                  </h2>
-                  <ul className="px-attractions">
-                    {event.attractions.map(a => (
-                      <li key={a}>{a}</li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
-            </article>
-
-            <aside className="px-event-side" aria-labelledby="ingressos">
-              <TicketPicker
-                event={event}
-                notices={
-                  <>
-                    {sale.kind === 'soon' ? (
-                      <div className="px-notice px-notice-info" role="status">
-                        <b>Vendas ainda não iniciadas</b>
-                        <span>{sale.label}.</span>
-                      </div>
-                    ) : null}
-                    {sale.kind === 'out' ? (
-                      <div className="px-notice px-notice-err" role="status">
-                        <b>Ingressos esgotados</b>
-                        <span>Todos os ingressos disponíveis foram vendidos.</span>
-                      </div>
-                    ) : null}
-                    {sale.kind === 'closed' ? (
-                      <div className="px-notice px-notice-neu" role="status">
-                        <b>Vendas encerradas</b>
-                        <span>As vendas online deste evento foram encerradas. Em caso de dúvida, fale com a PartyX.</span>
-                      </div>
-                    ) : null}
-                    {event.ticketTypes.some(t => /meia/i.test(t.name)) ? (
-                      <p className="px-fine">
-                        Ingresso de meia-entrada: <Link to="/meia-entrada">veja as regras e os documentos exigidos</Link>.
-                      </p>
-                    ) : null}
-                  </>
-                }
-              />
-            </aside>
-          </div>
-          {share ? <ShareDialog event={event} onClose={() => setShare(false)} /> : null}
-        </>
-      ) : null}
+      {event ? <EventView event={event} /> : null}
     </Layout>
+  );
+}
+
+/**
+ * Conteúdo da página do evento. Usado pela vitrine e pela pré-visualização do painel (ADM03): em `preview`, sem compartilhar e com
+ * os tipos só para conferência (o servidor já manda nada à venda).
+ */
+export function EventView({ event, preview = false }: { event: EventDetail; preview?: boolean }) {
+  const [share, setShare] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const sale = event.sale;
+  const slug = event.slug;
+
+  const copyLink = async () => {
+    const url = `${window.location.origin}/eventos/${slug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      window.prompt('Copie o link do evento:', url);
+    }
+  };
+  const shareNow = () => {
+    // No celular, a folha de compartilhamento do sistema; no computador, a pré-visualização com as opções.
+    if (typeof navigator.share === 'function' && window.matchMedia('(max-width: 639px)').matches) {
+      navigator.share({ title: event.name, url: `${window.location.origin}/eventos/${event.slug}` }).catch(() => {});
+    } else setShare(true);
+  };
+
+  return (
+    <>
+      <div className="px-wrap">
+        <Banner event={event} className="px-event-banner" step={14}>
+          {sale.kind === 'ended' ? <span className="px-ended-tag">Evento encerrado</span> : null}
+        </Banner>
+      </div>
+      <div className="px-wrap px-event">
+        <article className="px-event-main">
+          <div className="px-event-title">
+            <h1>{event.name}</h1>
+            <dl className="px-facts">
+              <div>
+                <dt>Data e horário</dt>
+                <dd>{capital(dateLong(event.startsAt))}</dd>
+                <dd className="px-facts-sub">Início às {timeOf(event.startsAt)}</dd>
+              </div>
+              <div>
+                <dt>Local</dt>
+                <dd>{event.venue}</dd>
+                <dd className="px-facts-sub">{event.address}</dd>
+              </div>
+              <div>
+                <dt>Classificação</dt>
+                <dd>{event.ageRating}</dd>
+              </div>
+            </dl>
+            {preview ? null : (
+              <div className="px-share-row">
+                <button type="button" className="px-btn px-btn-ghost" onClick={shareNow} aria-haspopup="dialog">
+                  Compartilhar
+                </button>
+                <button type="button" className="px-btn px-btn-ghost" onClick={copyLink}>
+                  Copiar link
+                </button>
+              </div>
+            )}
+            <p role="status" aria-live="polite" className="px-copied">
+              {copied ? 'Link copiado.' : ''}
+            </p>
+          </div>
+          {sale.kind === 'ended' ? (
+            <div className="px-notice px-notice-dark" role="status">
+              <b>Este evento já aconteceu</b>
+              <span>As vendas não estão mais disponíveis. Esta página continua acessível para consulta pelo link.</span>
+              <Link to="/eventos" className="px-btn px-btn-dark">
+                Ver próximos eventos
+              </Link>
+            </div>
+          ) : null}
+          <section aria-labelledby="sobre">
+            <h2 id="sobre" className="px-h3">
+              Sobre o evento
+            </h2>
+            <p className="px-desc">{event.description}</p>
+          </section>
+          {event.attractions.length > 0 ? (
+            <section aria-labelledby="atracoes">
+              <h2 id="atracoes" className="px-h3">
+                Atrações
+              </h2>
+              <ul className="px-attractions">
+                {event.attractions.map(a => (
+                  <li key={a}>{a}</li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </article>
+
+        <aside className="px-event-side" aria-labelledby="ingressos">
+          <TicketPicker
+            event={event}
+            notices={
+              <>
+                {sale.kind === 'soon' ? (
+                  <div className="px-notice px-notice-info" role="status">
+                    <b>Vendas ainda não iniciadas</b>
+                    <span>{sale.label}.</span>
+                  </div>
+                ) : null}
+                {sale.kind === 'out' ? (
+                  <div className="px-notice px-notice-err" role="status">
+                    <b>Ingressos esgotados</b>
+                    <span>Todos os ingressos disponíveis foram vendidos.</span>
+                  </div>
+                ) : null}
+                {sale.kind === 'closed' ? (
+                  <div className="px-notice px-notice-neu" role="status">
+                    <b>Vendas encerradas</b>
+                    <span>As vendas online deste evento foram encerradas. Em caso de dúvida, fale com a PartyX.</span>
+                  </div>
+                ) : null}
+                {event.ticketTypes.some(t => /meia/i.test(t.name)) ? (
+                  <p className="px-fine">
+                    Ingresso de meia-entrada: <Link to="/meia-entrada">veja as regras e os documentos exigidos</Link>.
+                  </p>
+                ) : null}
+              </>
+            }
+          />
+        </aside>
+      </div>
+      {share ? <ShareDialog event={event} onClose={() => setShare(false)} /> : null}
+    </>
   );
 }
 
@@ -538,8 +553,8 @@ export function NotFoundPage() {
           <p className="px-404-code">Erro 404</p>
           <h1>Não encontramos esta página</h1>
           <p>
-            O endereço pode estar incorreto ou o evento não está disponível no site. Eventos que já aconteceram continuam
-            acessíveis pelo link original, com o aviso de evento encerrado.
+            O endereço pode estar incorreto ou o evento não está disponível no site. Eventos que já aconteceram
+            continuam acessíveis pelo link original, com o aviso de evento encerrado.
           </p>
           <div className="px-404-actions">
             <Link to="/eventos" className="px-btn px-btn-pri px-btn-lg">

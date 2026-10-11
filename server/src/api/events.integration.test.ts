@@ -707,5 +707,297 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
       }
       expect((await sql('select name from events')).rows[0].name).toBe('Festa Neon 2026');
     });
+
+    it('regras do formulário e pré-visualização também são só do administrador', async () => {
+      const admin = await session();
+      const e = await newEvent(admin);
+      for (const role of ['validador', 'cliente'] as const) {
+        const s = await session(role);
+        expect((await s.get('/admin/events/meta')).status, role).toBe(403);
+        expect((await s.get(`/admin/events/${e.id}/preview`)).status, role).toBe(403);
+        expect((await s.del(`/admin/events/${e.id}/banner`)).status, role).toBe(403);
+      }
+      expect((await app.request('/api/admin/events/meta')).status).toBe(401);
+    });
+  });
+
+  describe('painel de eventos (ADM02 a ADM06): fluxo completo e apoio à interface', () => {
+    const pub = async (path: string) => app.request(`/api/public${path}`);
+    const publicSlugs = async () => {
+      const list = (await json(await pub('/events'))).events as { slug: string }[];
+      const home = await json(await pub('/home'));
+      return {
+        list: list.map(x => x.slug),
+        home: [...home.featured, ...home.upcoming].map((x: { slug: string }) => x.slug),
+      };
+    };
+
+    it('criar rascunho, 3 tipos com períodos diferentes, publicar, aparecer na vitrine, encerrar e sumir da listagem', async () => {
+      const admin = await session();
+      // 1) Rascunho: não existe para o público, nem pela busca nem pelo link.
+      const e = await newEvent(admin, { name: 'Baile do Fechamento', isFeatured: true });
+      expect(e.status).toBe('rascunho');
+      expect((await publicSlugs()).list).not.toContain(e.slug);
+      expect((await pub(`/events/${e.slug}`)).status).toBe(404);
+      // Publicar sem tipo é recusado, com o campo que falta.
+      const early = await admin.post(`/admin/events/${e.id}/publish`);
+      expect(early.status).toBe(422);
+      expect(await fieldsOf(early)).toEqual(['ticketTypes']);
+
+      // 2) Três tipos com períodos diferentes (agora: 01/10/2026 12h UTC).
+      await newType(admin, e.id, {
+        name: '1º lote',
+        priceCents: 6000,
+        quantityTotal: 50,
+        salesStartAt: '2026-09-20T00:00:00-03:00',
+        salesEndAt: '2026-09-30T23:59:00-03:00',
+      });
+      await newType(admin, e.id, {
+        name: '2º lote',
+        priceCents: 8000,
+        quantityTotal: 100,
+        salesStartAt: '2026-10-01T00:00:00-03:00',
+        salesEndAt: '2026-12-12T20:00:00-03:00',
+      });
+      await newType(admin, e.id, {
+        name: 'Camarote',
+        priceCents: 25000,
+        quantityTotal: 20,
+        salesStartAt: '2026-11-01T10:00:00-03:00',
+        salesEndAt: '2026-12-12T20:00:00-03:00',
+      });
+      const detail = await json(await admin.get(`/admin/events/${e.id}`));
+      expect(detail.ticketTypes.map((t: { name: string; salesState: string }) => [t.name, t.salesState])).toEqual([
+        ['1º lote', 'encerrada'],
+        ['2º lote', 'a_venda'],
+        ['Camarote', 'em_breve'],
+      ]);
+      // Vendidos e reservados vêm separados, e disponíveis = capacidade - vendidos - reservados.
+      expect(detail.ticketTypes[1]).toMatchObject({
+        quantityTotal: 100,
+        quantitySold: 0,
+        quantityReserved: 0,
+        available: 100,
+      });
+
+      // Pré-visualização do rascunho: mesma página pública, nada à venda, e o público continua sem acesso.
+      const preview = (await json(await admin.get(`/admin/events/${e.id}/preview`))).event;
+      expect(preview).toMatchObject({ slug: e.slug, name: 'Baile do Fechamento', status: 'rascunho' });
+      expect(preview.ticketTypes).toHaveLength(3);
+      expect(preview.ticketTypes.every((t: { canBuy: boolean }) => t.canBuy === false)).toBe(true);
+      expect((await pub(`/events/${e.slug}`)).status).toBe(404);
+
+      // 3) Publicar: aparece na listagem, na página inicial (destaque) e no link, com os três tipos e seus estados.
+      expect((await admin.post(`/admin/events/${e.id}/publish`)).status).toBe(200);
+      const after = await publicSlugs();
+      expect(after.list).toContain(e.slug);
+      expect(after.home).toContain(e.slug);
+      const page = (await json(await pub(`/events/${e.slug}`))).event;
+      expect(
+        page.ticketTypes.map((t: { name: string; state: string; canBuy: boolean }) => [t.name, t.state, t.canBuy]),
+      ).toEqual([
+        ['1º lote', 'encerrada', false],
+        ['2º lote', 'a_venda', true],
+        ['Camarote', 'em_breve', false],
+      ]);
+
+      // 4) Encerrar: some da listagem e da página inicial; o link continua, como encerrado; nada é cancelado.
+      expect((await admin.post(`/admin/events/${e.id}/close`)).status).toBe(200);
+      const closed = await publicSlugs();
+      expect(closed.list).not.toContain(e.slug);
+      expect(closed.home).not.toContain(e.slug);
+      const ended = (await json(await pub(`/events/${e.slug}`))).event;
+      expect(ended.sale.kind).toBe('ended');
+      expect(ended.ticketTypes.every((t: { canBuy: boolean }) => !t.canBuy)).toBe(true);
+      // No painel continua listado, como encerrado, e não aceita mais edição nem tipo novo.
+      const adminList = (await json(await admin.get('/admin/events'))).events as { id: string; status: string }[];
+      expect(adminList.find(x => x.id === e.id)?.status).toBe('encerrado');
+      expect((await admin.patch(`/admin/events/${e.id}`, { name: 'Outro Nome' })).status).toBe(409);
+      expect((await admin.post(`/admin/events/${e.id}/ticket-types`, typeBody({ name: 'Extra' }))).status).toBe(409);
+
+      // Trilha: criação, três tipos, publicação e encerramento, todos com o administrador.
+      const trail = (
+        await sql(
+          `select action, actor_id is not null as by_admin from audit_log where action like 'evento.%' or action like 'ingresso_tipo.%' order by created_at, action`,
+        )
+      ).rows;
+      expect(trail.map(r => r.action).sort()).toEqual(
+        [
+          'evento.criar',
+          'evento.encerrar',
+          'evento.publicar',
+          'ingresso_tipo.criar',
+          'ingresso_tipo.criar',
+          'ingresso_tipo.criar',
+        ].sort(),
+      );
+      expect(trail.every(r => r.by_admin)).toBe(true);
+    });
+
+    it('regras para o formulário vêm do servidor: banner, classificações, limites, reserva e limite por compra', async () => {
+      const admin = await session();
+      const meta = await json(await admin.get('/admin/events/meta'));
+      expect(meta.banner).toMatchObject({
+        maxBytes: 5 * 1024 * 1024,
+        minWidth: 600,
+        formats: ['image/jpeg', 'image/png', 'image/webp'],
+        available: true,
+      });
+      expect(meta.ageRatings).toContain('18 anos');
+      expect(meta.limits).toMatchObject({ priceMaxCents: 10_000_000, quantityMax: 100_000, typeNameMax: 60 });
+      expect(meta.reservationMinutes).toBe(10);
+      expect(meta.gateWindow).toEqual({ beforeHours: 12, afterHours: 24 });
+      expect(meta.maxTicketsPerOrder).toBe(6);
+      // Sem armazenamento configurado, a tela sabe que o banner está indisponível.
+      const noStorage = makeApp(false);
+      const res = await admin.raw('GET', '/admin/events/meta', {}, noStorage);
+      expect((await json(res)).banner.available).toBe(false);
+    });
+
+    it('pré-visualização de evento inexistente ou id inválido: 404', async () => {
+      const admin = await session();
+      expect((await admin.get('/admin/events/00000000-0000-4000-8000-000000000000/preview')).status).toBe(404);
+      expect((await admin.get('/admin/events/nao-e-id/preview')).status).toBe(404);
+    });
+
+    it('ativar e desativar um tipo ficam na trilha com ação própria; editar continua "editar"', async () => {
+      const admin = await session();
+      const e = await newEvent(admin);
+      const t = await newType(admin, e.id);
+      for (const change of [{ isActive: false }, { isActive: true }, { priceCents: 9000 }]) {
+        clock.advance(1000);
+        expect((await admin.patch(`/admin/ticket-types/${t.id}`, change)).status).toBe(200);
+      }
+      const actions = (
+        await sql(`select action from audit_log where entity = 'ticket_type' order by created_at, action`)
+      ).rows.map(r => r.action);
+      expect(actions.slice(1)).toEqual(['ingresso_tipo.desativar', 'ingresso_tipo.ativar', 'ingresso_tipo.editar']);
+    });
+
+    it('capacidade abaixo de vendidos + reservas: 409 com os números para a tela explicar', async () => {
+      const admin = await session();
+      const e = await newEvent(admin);
+      const t = await newType(admin, e.id, { quantityTotal: 10 });
+      await sql(`update ticket_types set quantity_sold = 4 where id = $1`, [t.id]);
+      const res = await admin.patch(`/admin/ticket-types/${t.id}`, { quantityTotal: 3 });
+      expect(res.status).toBe(409);
+      const body = await json(res);
+      expect(body.erro.codigo).toBe('capacidade_abaixo_do_comprometido');
+      expect(body.erro.mensagem).toMatch(/não pode ser menor que 4: 4 vendidos e 0 reservados/);
+      expect(body.erro.detalhes).toEqual({ vendidos: 4, reservados: 0, minimo: 4 });
+    });
+
+    it('"Encerrar vendas agora": checkout recusa, vitrine mostra vendas encerradas, portaria segue aberta, trilha registra', async () => {
+      const admin = await session();
+      const e = await newEvent(admin, { name: 'Festa Hoje' });
+      const open = await newType(admin, e.id, { name: 'Pista' }); // à venda agora
+      await newType(admin, e.id, {
+        name: 'Camarote',
+        salesStartAt: '2026-11-01T10:00:00-03:00',
+        salesEndAt: '2026-12-12T20:00:00-03:00',
+      }); // em breve
+      const off = await newType(admin, e.id, { name: 'Antigo' });
+      await admin.patch(`/admin/ticket-types/${off.id}`, { isActive: false });
+      expect((await admin.post(`/admin/events/${e.id}/publish`)).status).toBe(200);
+
+      // Uma compradora já reservou antes do encerramento das vendas.
+      const early = await session('cliente');
+      const reserved = await early.post('/orders', {
+        eventSlug: e.slug,
+        items: [{ ticketTypeId: open.id, quantity: 1 }],
+      });
+      expect(reserved.status).toBe(201);
+
+      clock.advance(60_000);
+      const res = await admin.post(`/admin/events/${e.id}/stop-sales`);
+      expect(res.status).toBe(200);
+      const body = await json(res);
+      expect(body.typesClosed).toBe(2); // Pista e Camarote; o inativo fica como está
+      expect(body.event.status).toBe('publicado'); // sem estado novo
+
+      const types = (await json(await admin.get(`/admin/events/${e.id}`))).ticketTypes as {
+        name: string;
+        salesState: string;
+        salesStartAt: string;
+        salesEndAt: string;
+      }[];
+      const now = clock.now().toISOString();
+      const byName = Object.fromEntries(types.map(t => [t.name, t]));
+      expect(byName.Pista).toMatchObject({ salesState: 'encerrada', salesEndAt: now });
+      expect(byName.Camarote).toMatchObject({ salesState: 'encerrada', salesEndAt: now });
+      expect(new Date(byName.Camarote!.salesStartAt) < new Date(now)).toBe(true); // fim depois do início, sempre
+      expect(byName.Antigo).toMatchObject({ salesState: 'indisponivel', salesEndAt: '2026-12-12T23:00:00.000Z' });
+
+      // Checkout recusa qualquer compra nova, com o motivo por tipo.
+      const late = await session('cliente');
+      const refused = await late.post('/orders', {
+        eventSlug: e.slug,
+        items: [{ ticketTypeId: open.id, quantity: 1 }],
+      });
+      expect(refused.status).toBe(409);
+      const err = (await json(refused)).erro;
+      expect(err.codigo).toBe('estoque_alterado');
+      expect(err.detalhes.itens[0]).toMatchObject({
+        motivo: 'encerrada',
+        mensagem: 'As vendas deste ingresso foram encerradas.',
+      });
+
+      // Vitrine: a página continua no ar, com vendas encerradas e nada à venda.
+      const page = (await json(await pub(`/events/${e.slug}`))).event;
+      expect(page.sale).toMatchObject({ kind: 'closed', label: 'Vendas encerradas' });
+      expect(page.ticketTypes.every((t: { canBuy: boolean }) => !t.canBuy)).toBe(true);
+      expect(page.ticketTypes.find((t: { name: string }) => t.name === 'Pista').state).toBe('encerrada');
+
+      // Portaria segue aberta (o evento continua publicado).
+      const v = await session('validador');
+      const gate = (await json(await v.get('/gate/events'))).events as { id: string; salesClosed: boolean }[];
+      expect(gate.find(g => g.id === e.id)).toMatchObject({ salesClosed: false });
+
+      // Trilha: uma linha, com antes e depois de cada tipo alterado e o administrador.
+      const trail = (
+        await sql(
+          "select actor_id, before_json, after_json, reason from audit_log where action = 'evento.encerrar_vendas' and entity_id = $1",
+          [e.id],
+        )
+      ).rows;
+      expect(trail).toHaveLength(1);
+      expect(trail[0].actor_id).toBeTruthy();
+      expect(trail[0].after_json.tipos.map((t: { nome: string; fim: string }) => [t.nome, t.fim]).sort()).toEqual([
+        ['Camarote', now],
+        ['Pista', now],
+      ]);
+      expect(trail[0].before_json.tipos.find((t: { nome: string }) => t.nome === 'Pista').fim).toBe(
+        '2026-12-12T23:00:00.000Z',
+      );
+
+      // Repetir não muda nada nem duplica a trilha; reabrir é editar o período de um tipo.
+      expect((await json(await admin.post(`/admin/events/${e.id}/stop-sales`))).typesClosed).toBe(0);
+      expect(
+        (await sql("select count(*)::int as n from audit_log where action = 'evento.encerrar_vendas'")).rows[0].n,
+      ).toBe(1);
+      await admin.patch(`/admin/ticket-types/${open.id}`, { salesEndAt: '2026-12-12T20:00:00-03:00' });
+      const again = await late.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: open.id, quantity: 1 }] });
+      expect(again.status).toBe(201);
+    });
+
+    it('"Encerrar vendas agora" só vale para evento publicado e só para o administrador', async () => {
+      const admin = await session();
+      const draft = await newEvent(admin);
+      const r = await admin.post(`/admin/events/${draft.id}/stop-sales`);
+      expect([r.status, (await json(r)).erro.codigo]).toEqual([409, 'estado_invalido']);
+      for (const role of ['validador', 'cliente'] as const) {
+        const s = await session(role);
+        expect((await s.post(`/admin/events/${draft.id}/stop-sales`)).status, role).toBe(403);
+      }
+      expect((await admin.post('/admin/events/00000000-0000-4000-8000-000000000000/stop-sales')).status).toBe(404);
+    });
+
+    it('preço zero continua recusado (sem cortesia nem ingresso gratuito)', async () => {
+      const admin = await session();
+      const e = await newEvent(admin);
+      const res = await admin.post(`/admin/events/${e.id}/ticket-types`, typeBody({ priceCents: 0 }));
+      expect(res.status).toBe(422);
+      expect(await fieldsOf(res)).toEqual(['priceCents']);
+    });
   });
 });

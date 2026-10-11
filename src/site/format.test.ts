@@ -24,3 +24,45 @@ describe('formatação da vitrine', () => {
     expect(l.facebook).toContain('u=https%3A%2F%2Fx.test%2Feventos%2Fa%3Fb%3D1%26c%3D2');
   });
 });
+
+describe('formulários do painel: fuso do evento, valor e atrações', () => {
+  it('data e horário digitados valem no fuso do evento (São Paulo, UTC-3) e voltam iguais', async () => {
+    const { zonedInputsToIso, isoToZonedInputs } = await import('./format');
+    const iso = zonedInputsToIso('2026-12-12', '22:00');
+    expect(iso).toBe('2026-12-12T22:00:00-03:00');
+    expect(new Date(iso!).toISOString()).toBe('2026-12-13T01:00:00.000Z');
+    expect(isoToZonedInputs('2026-12-13T01:00:00.000Z')).toEqual({ date: '2026-12-12', time: '22:00' });
+    expect(isoToZonedInputs(zonedInputsToIso('2027-01-01', '00:05')!)).toEqual({ date: '2027-01-01', time: '00:05' });
+  });
+
+  it('campos vazios ou datas impossíveis não viram instante', async () => {
+    const { zonedInputsToIso } = await import('./format');
+    for (const [d, t] of [
+      ['', '22:00'],
+      ['2026-12-12', ''],
+      ['2026-02-31', '10:00'],
+      ['2026-13-01', '10:00'],
+      ['2026-12-12', '24:00'],
+      ['12/12/2026', '22:00'],
+    ])
+      expect(zonedInputsToIso(d!, t!), `${d} ${t}`).toBeNull();
+  });
+
+  it('máscara de R$: só dígitos contam, em centavos inteiros; zero fica zero', async () => {
+    const { centsFromMasked, maskedFromCents } = await import('./format');
+    expect(centsFromMasked('80,00')).toBe(8000);
+    expect(centsFromMasked('R$ 1.234,56')).toBe(123456);
+    expect(centsFromMasked('8000')).toBe(8000);
+    expect(centsFromMasked('abc')).toBe(0);
+    expect(centsFromMasked('0,00')).toBe(0);
+    expect(centsFromMasked('-5')).toBe(5); // sinal ignorado: o servidor recusa zero e negativo de qualquer forma
+    expect(maskedFromCents(8000)).toBe('80,00');
+    expect(maskedFromCents(123456)).toBe('1.234,56');
+    expect(maskedFromCents(5)).toBe('0,05');
+  });
+
+  it('atrações: uma por linha, sem linha vazia nem espaço sobrando', async () => {
+    const { attractionsFromText } = await import('./format');
+    expect(attractionsFromText('  DJ   Exemplo \n\nBanda Fictícia\n ')).toEqual(['DJ Exemplo', 'Banda Fictícia']);
+  });
+});

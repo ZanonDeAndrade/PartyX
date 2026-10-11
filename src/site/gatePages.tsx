@@ -98,7 +98,10 @@ export function GateEventsPage() {
         {state.status === 'ok' && state.data.length === 0 ? (
           <div className="px-box">
             <h2>Nenhum evento aberto</h2>
-            <p>Só eventos publicados aparecem aqui.</p>
+            <p>
+              Aparecem os eventos publicados e, perto da data, os encerrados (enquanto a portaria ainda funciona para
+              eles).
+            </p>
           </div>
         ) : null}
         {state.status === 'ok' ? (
@@ -112,6 +115,17 @@ export function GateEventsPage() {
                     <span className="px-muted">
                       {dateShort(e.startsAt)} · {timeOf(e.startsAt)} · {e.venue}
                     </span>
+                    {e.salesClosed ? (
+                      <>
+                        <br />
+                        <span className="px-badge px-badge-neu">Vendas encerradas</span>{' '}
+                        {e.gateClosesAt ? (
+                          <span className="px-small px-muted">
+                            Portaria até {dateShort(e.gateClosesAt)} {timeOf(e.gateClosesAt)}
+                          </span>
+                        ) : null}
+                      </>
+                    ) : null}
                   </span>
                   <span className="px-mono">
                     {e.entered}/{e.total}
@@ -326,6 +340,14 @@ export function GatePage({ eventId }: { eventId: string }) {
           <Link to="/portaria">← Trocar de evento</Link>
         </p>
         <h1 className="px-h2">{event?.name ?? 'Portaria'}</h1>
+        {event?.salesClosed ? (
+          <p className="px-small">
+            <span className="px-badge px-badge-neu">Vendas encerradas</span>{' '}
+            {event.gateClosesAt
+              ? `Validação disponível até ${dateShort(event.gateClosesAt)} ${timeOf(event.gateClosesAt)}.`
+              : null}
+          </p>
+        ) : null}
         <div className="px-gate-counter" role="status" aria-live="polite">
           <b className="px-gate-count">{counter ? counter.entered : '–'}</b> entradas
           {counter ? <span className="px-muted"> de {counter.total} ingressos</span> : null}
