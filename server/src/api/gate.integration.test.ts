@@ -372,6 +372,51 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
       expect((await sql('select status from tickets where id = $1', [b.tickets[0]!.id])).rows[0].status).toBe('valido');
     });
 
+    it('reabrir evento encerrado antes da data: volta a publicado, portaria valida, trilha com motivo; validador 403', async () => {
+      const e = await event('Festa Reaberta');
+      const b = await buyer(e);
+      clock.set('2026-12-09T22:00:00-03:00'); // encerrado 3 dias antes, por engano
+      let admin = await session('administrador');
+      expect((await admin.post(`/admin/events/${e.id}/close`)).status).toBe(200);
+
+      clock.set('2026-12-12T22:30:00-03:00');
+      const v = await session();
+      expect((await json(await v.scan(e.id, b.tickets[0]!.qr_payload))).erro.codigo).toBe('portaria_fechada');
+
+      // Validador não reabre (nem por esta rota); motivo curto é recusado; publicado não "reabre".
+      expect((await v.post(`/admin/events/${e.id}/reopen`, { reason: 'Encerrado por engano' })).status).toBe(403);
+      admin = await session('administrador');
+      const short = await admin.post(`/admin/events/${e.id}/reopen`, { reason: 'x' });
+      expect(short.status).toBe(422);
+      expect((await json(short)).erro.detalhes).toEqual([
+        { campo: 'reason', mensagem: 'Informe o motivo (de 5 a 500 caracteres).' },
+      ]);
+
+      const res = await admin.post(`/admin/events/${e.id}/reopen`, { reason: '  Encerrado por engano no painel  ' });
+      expect(res.status).toBe(200);
+      const body = await json(res);
+      expect(body.event).toMatchObject({ status: 'publicado', closedAt: null });
+      expect(body.typesOnSale).toBe(0); // o período dos tipos já tinha terminado (20h): continua encerrado
+      expect((await admin.post(`/admin/events/${e.id}/reopen`, { reason: 'De novo, por engano' })).status).toBe(409);
+
+      // Portaria volta a validar normalmente.
+      const green = await json(await v.scan(e.id, b.tickets[0]!.qr_payload));
+      expect(green.result).toBe('valido');
+      const names = (await json(await v.get('/gate/events'))).events.map((x: any) => [x.name, x.salesClosed]);
+      expect(names).toContainEqual(['Festa Reaberta', false]);
+
+      const trail = (
+        await sql(
+          "select actor_id, reason, before_json, after_json from audit_log where action = 'evento.reabrir' and entity_id = $1",
+          [e.id],
+        )
+      ).rows;
+      expect(trail).toHaveLength(1);
+      expect(trail[0]).toMatchObject({ actor_id: admin.id, reason: 'Encerrado por engano no painel' });
+      expect(trail[0].before_json.status).toBe('encerrado');
+      expect(trail[0].after_json).toMatchObject({ status: 'publicado', closedAt: null });
+    });
+
     it('encerrado exatamente na abertura da janela (12 h antes) ainda vale; um minuto antes, não', async () => {
       const inside = await event('No Limite');
       const before = await event('Um Minuto Antes');

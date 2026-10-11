@@ -286,6 +286,51 @@ export async function closeEvent(deps: EventsDeps, actor: Actor, id: string) {
 }
 
 /**
+ * Encerrado → publicado (reabrir), só pelo administrador, com motivo obrigatório na trilha (`evento.reabrir`). Limpa `closed_at`,
+ * então a portaria volta a abrir o evento como qualquer publicado (D-79). Os tipos de ingresso ficam com o período que tinham:
+ * se as vendas já tinham terminado, continuam encerradas até alguém editar o período. O destaque não volta sozinho.
+ */
+export async function reopenEvent(deps: EventsDeps, actor: Actor, id: string, rawReason: string) {
+  const reason = rawReason.trim().replace(/\s+/g, ' ');
+  if (reason.length < 5 || reason.length > 500)
+    throw invalid([{ campo: 'reason', mensagem: 'Informe o motivo (de 5 a 500 caracteres).' }]);
+  const now = deps.clock.now();
+  return deps.db.transaction(async tx => {
+    const before = await lockEvent(tx, id);
+    if (before.status !== 'encerrado') {
+      throw new AppError(409, 'estado_invalido', 'Só um evento encerrado pode ser reaberto.');
+    }
+    const [after] = await tx
+      .update(events)
+      .set({ status: 'publicado', closedAt: null, updatedAt: now })
+      .where(eq(events.id, id))
+      .returning();
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: 'evento.reabrir',
+      entity: 'event',
+      entityId: id,
+      before: eventSnapshot(before),
+      after: eventSnapshot(after!),
+      reason,
+      at: now,
+    });
+    const [onSale] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(ticketTypes)
+      .where(
+        and(
+          eq(ticketTypes.eventId, id),
+          eq(ticketTypes.isActive, true),
+          sql`${ticketTypes.salesStartAt} <= ${now}`,
+          gt(ticketTypes.salesEndAt, now),
+        ),
+      );
+    return { event: after!, typesOnSale: onSale?.n ?? 0 };
+  });
+}
+
+/**
  * "Encerrar vendas agora" (ADM02, ADM04): ninguém mais compra, e o evento continua publicado (a portaria segue funcionando).
  * Sem estado novo: usa o período de vendas que já existe. Todo tipo ATIVO com fim das vendas no futuro passa a terminar agora;
  * se ainda nem tinha começado ("em breve"), o início também vira agora menos um segundo, para respeitar fim > início.

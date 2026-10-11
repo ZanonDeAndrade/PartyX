@@ -16,6 +16,7 @@ import {
   listEvents,
   listPromoters,
   publishEvent,
+  reopenEvent,
   stopSalesNow,
   setEventBanner,
   updateEvent,
@@ -142,6 +143,11 @@ export function eventsRoutes(deps: AuthDeps) {
   app.post('/admin/events/:id/close', async c =>
     c.json({ event: await closeEvent(evDeps, actor(c), uuid(c.req.param('id'), 'Evento')) }),
   );
+  /** Reabrir evento encerrado (motivo obrigatório na trilha). Volta a publicado; a portaria volta a abrir. */
+  app.post('/admin/events/:id/reopen', async c => {
+    const body = await parseJson(c, z.object({ reason: z.string().max(600) }));
+    return c.json(await reopenEvent(evDeps, actor(c), uuid(c.req.param('id'), 'Evento'), body.reason));
+  });
   /** Encerrar vendas agora: ninguém mais compra; o evento continua publicado e a portaria continua funcionando. */
   app.post('/admin/events/:id/stop-sales', async c =>
     c.json(await stopSalesNow(evDeps, actor(c), uuid(c.req.param('id'), 'Evento'))),

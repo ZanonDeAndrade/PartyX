@@ -27,6 +27,7 @@ Toda a árvore `/gate` exige o perfil (inclusive caminhos que nem existem): visi
 - **Encerrado fora da janela:** 409 `portaria_fechada` com o horário: "Este evento foi encerrado e a portaria funcionou até 13/12 às 22:00. Não é mais possível validar ingressos dele." (depois) ou "A portaria só abre para ele a partir de ..." (antes).
 - **Rascunho:** nunca (409 `evento_indisponivel`).
 - No painel, **"Encerrar vendas agora"** (`POST /api/admin/events/:id/stop-sales`) para as vendas sem encerrar o evento: a portaria continua normal, sem janela. É o indicado no dia do evento.
+- Evento encerrado por engano (inclusive antes da data) pode ser **reaberto** pelo administrador no painel: volta a publicado e a portaria volta a validar (motivo na trilha `evento.reabrir`).
 - A janela de 12 h antes e 24 h depois é **premissa** a confirmar com a PartyX (D-79).
 
 ## Resultados (RF-48, RF-54)

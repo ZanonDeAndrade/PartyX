@@ -23,7 +23,7 @@ Datas chegam em ISO 8601 **com fuso** (`2026-12-12T22:00:00-03:00`); sem fuso é
 
 ## Regras
 
-- **Estados do evento:** rascunho → publicado → encerrado, sem volta. Encerrar tira o destaque; evento encerrado não aceita edição, tipo novo nem banner. Nada é apagado.
+- **Estados do evento:** rascunho → publicado → encerrado; encerrado → publicado só por "Reabrir evento" (abaixo). Encerrar tira o destaque; evento encerrado não aceita edição, tipo novo nem banner. Nada é apagado.
 - **Publicar** exige data futura e ao menos um tipo ativo (D-27). Publicações simultâneas resultam em uma só (linha trancada).
 - **Tipo de ingresso:** preço de 1 centavo a R$ 100.000, quantidade de 1 a 100.000, fim das vendas depois do início, nome único por evento. Zero é proibido (gratuito e cortesia estão fora do escopo).
 - **Estado de venda** (`salesState`, `domain/events.ts`): `indisponivel` (desativado) → `em_breve` → `encerrada` → `esgotado` (vendidos ≥ capacidade) → `reservado` (vendidos mais reservas ≥ capacidade) → `a_venda`. Reserva sozinha **não** esgota, porque pode voltar ao estoque: aparece como "Indisponível no momento". O checkout confere de novo.
@@ -31,6 +31,7 @@ Datas chegam em ISO 8601 **com fuso** (`2026-12-12T22:00:00-03:00`); sem fuso é
 - **Promoter:** código de 3 a 20 letras ou números, sem acento. Minúsculas viram maiúsculas; duplicado é recusado pelo banco (inclusive em criações simultâneas). O código só atribui a venda: sem desconto, sem comissão.
 - **Auditoria:** toda criação e edição grava autor, momento, antes e depois em `audit_log` (`evento.*`, `ingresso_tipo.*`, `promoter.*`). Desde 10/10/2026, ativar e desativar um tipo têm ação própria (`ingresso_tipo.ativar`, `ingresso_tipo.desativar`).
 - **Encerrar o evento** tira do site e para as vendas, sem cancelar ingressos nem estornar. Desde 10/10/2026 a portaria **continua abrindo** o evento encerrado dentro da janela operacional (padrão de 12 h antes a 24 h depois do início; `GATE_CLOSED_WINDOW_*`, D-79), se ele foi encerrado já dentro dela; encerrado antes (cancelamento antecipado) fica fechado. O encerramento grava `events.closed_at` (migração 0006). Ver `portaria.md`.
+- **Reabrir evento** (`POST /admin/events/:id/reopen` `{ reason }`, ADM02 e ADM04, 10/10/2026): só administrador e só evento encerrado. Volta a publicado, limpa `closed_at` (a portaria volta a abrir como qualquer publicado) e grava `evento.reabrir` com o motivo (5 a 500 caracteres) e o antes e depois. Os tipos mantêm o período: se as vendas já terminaram, o diálogo avisa que é preciso editar o período para voltar a vender; a resposta traz `typesOnSale`. O destaque não volta sozinho.
 - **Encerrar vendas agora** (`POST /admin/events/:id/stop-sales`, 10/10/2026): ninguém mais compra; o evento continua publicado e a portaria funciona normalmente. Sem estado novo: todo tipo **ativo** com fim das vendas no futuro passa a terminar agora (um tipo "em breve" também tem o início trazido para agora menos 1 s, para manter fim > início). Inativos e já encerrados não mudam. Quem já tinha reserva pode concluir o pagamento dela. Uma linha `evento.encerrar_vendas` na trilha, com o antes e o depois de cada tipo. Reabrir = editar o período de um tipo. Repetir não muda nada.
 
 ## Banner (RF-13)

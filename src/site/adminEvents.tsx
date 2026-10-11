@@ -343,6 +343,104 @@ function gateNote(ev: AdminEvent, meta: EventsMeta | null): string {
   return `A portaria continua funcionando até ${whenText(closesAt)}.`;
 }
 
+/**
+ * Reabrir evento encerrado (só administrador): volta a publicado, a portaria volta a abrir, motivo obrigatório na trilha.
+ * Os tipos mantêm o período: se as vendas já terminaram, o diálogo avisa que é preciso editar o período para voltar a vender.
+ */
+function ReopenDialog({ event, onCancel, onDone }: { event: AdminEvent; onCancel: () => void; onDone: () => void }) {
+  const [detail] = useFetch(s => api.admin.event(event.id, s), `reabrir|${event.id}`);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const first = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    first.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !busy && onCancel();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel, busy]);
+  const types = detail.status === 'ok' ? detail.data.ticketTypes : null;
+  const onSale = types?.filter(t => t.salesState === 'a_venda' || t.salesState === 'em_breve').length ?? 0;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const res = await api.admin.reopenEvent(event.id, reason.trim());
+      toast(
+        res.typesOnSale > 0
+          ? `"${event.name}" foi reaberto e está à venda.`
+          : `"${event.name}" foi reaberto. Edite o período de um tipo para voltar a vender.`,
+      );
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? (err.fields.reason ?? err.message) : 'Não foi possível reabrir.');
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="px-modal-bg" onClick={() => !busy && onCancel()}>
+      <form
+        className="px-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reopen-title"
+        onSubmit={submit}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 id="reopen-title" className="px-h3">
+          Reabrir "{event.name}"?
+        </h2>
+        <p>
+          O evento volta a ficar <b>publicado</b>: aparece de novo no site e a <b>portaria volta a validar</b> os
+          ingressos dele. Pedidos e ingressos não mudam.
+        </p>
+        {types === null ? (
+          <p aria-busy="true" className="px-small">
+            Conferindo os tipos de ingresso…
+          </p>
+        ) : onSale === 0 ? (
+          <p className="px-notice px-notice-info" role="note">
+            As vendas de todos os tipos estão encerradas ou inativas. Para voltar a vender, depois de reabrir, edite o
+            período de vendas de um tipo.
+          </p>
+        ) : (
+          <p className="px-small">
+            {onSale} tipo{onSale === 1 ? '' : 's'} ainda dentro do período de vendas volta{onSale === 1 ? '' : 'm'} a
+            vender na hora.
+          </p>
+        )}
+        <div className="px-field">
+          <label htmlFor="reopen-motivo">Motivo (fica na trilha de auditoria)</label>
+          <textarea
+            id="reopen-motivo"
+            ref={first}
+            rows={3}
+            maxLength={500}
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? 'reopen-erro' : undefined}
+          />
+          {error ? (
+            <small id="reopen-erro" className="px-error" role="alert">
+              {error}
+            </small>
+          ) : null}
+        </div>
+        <div className="px-actions">
+          <button type="button" className="px-btn" onClick={onCancel} disabled={busy}>
+            Voltar
+          </button>
+          <button type="submit" className="px-btn px-btn-pri" disabled={busy || reason.trim().length < 5}>
+            {busy ? 'Reabrindo…' : 'Reabrir evento'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ---------- ADM02: lista de eventos ----------
 
 export function AdminEventsPage() {
@@ -354,6 +452,7 @@ export function AdminEventsPage() {
   const [status, setStatus] = useState<'' | EventStatus>('');
   const [meta] = useFetch(s => api.admin.eventsMeta(s), access === 'ok' ? 'meta' : 'espera');
   const [target, setTarget] = useState<{ event: AdminEvent; action: StatusAction } | null>(null);
+  const [reopening, setReopening] = useState<AdminEvent | null>(null);
   const all = state.status === 'ok' ? state.data : [];
   const rows = useMemo(
     () => all.filter(e => (!status || e.status === status) && (!q.trim() || fold(e.name).includes(fold(q.trim())))),
@@ -460,6 +559,11 @@ export function AdminEventsPage() {
                         </button>
                       </>
                     ) : null}
+                    {e.status === 'encerrado' ? (
+                      <button type="button" className="px-btn" onClick={() => setReopening(e)}>
+                        Reabrir evento
+                      </button>
+                    ) : null}
                   </div>
                 </li>
               ))}
@@ -475,6 +579,16 @@ export function AdminEventsPage() {
           onCancel={() => setTarget(null)}
           onDone={() => {
             setTarget(null);
+            setVersion(v => v + 1);
+          }}
+        />
+      ) : null}
+      {reopening ? (
+        <ReopenDialog
+          event={reopening}
+          onCancel={() => setReopening(null)}
+          onDone={() => {
+            setReopening(null);
             setVersion(v => v + 1);
           }}
         />
@@ -1005,6 +1119,7 @@ export function AdminEventPage({ id }: { id: string }) {
   const [state, retry] = useFetch(s => api.admin.event(id, s), access === 'ok' ? `ev|${id}|${version}` : 'espera');
   const [meta] = useFetch(s => api.admin.eventsMeta(s), access === 'ok' ? 'meta' : 'espera');
   const [target, setTarget] = useState<StatusAction | null>(null);
+  const [reopening, setReopening] = useState(false);
   const data = state.status === 'ok' ? state.data : null;
   const ev = data?.event;
   usePageTitle(ev ? `${ev.name} · PartyX` : 'Evento · PartyX');
@@ -1054,6 +1169,11 @@ export function AdminEventPage({ id }: { id: string }) {
                 </button>
               </>
             ) : null}
+            {ev.status === 'encerrado' ? (
+              <button type="button" className="px-btn" onClick={() => setReopening(true)}>
+                Reabrir evento
+              </button>
+            ) : null}
           </div>
           {ev.status === 'rascunho' ? (
             <p className="px-notice px-notice-info" role="note">
@@ -1095,6 +1215,16 @@ export function AdminEventPage({ id }: { id: string }) {
               onCancel={() => setTarget(null)}
               onDone={() => {
                 setTarget(null);
+                setVersion(v => v + 1);
+              }}
+            />
+          ) : null}
+          {reopening ? (
+            <ReopenDialog
+              event={ev}
+              onCancel={() => setReopening(false)}
+              onDone={() => {
+                setReopening(false);
                 setVersion(v => v + 1);
               }}
             />

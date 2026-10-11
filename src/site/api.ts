@@ -650,6 +650,10 @@ export const api = {
     publishEvent: (id: string) =>
       request<{ event: AdminEvent }>('POST', `/admin/events/${encodeURIComponent(id)}/publish`),
     closeEvent: (id: string) => request<{ event: AdminEvent }>('POST', `/admin/events/${encodeURIComponent(id)}/close`),
+    reopenEvent: (id: string, reason: string) =>
+      request<{ event: AdminEvent; typesOnSale: number }>('POST', `/admin/events/${encodeURIComponent(id)}/reopen`, {
+        reason,
+      }),
     stopSales: (id: string) =>
       request<{ event: AdminEvent; typesClosed: number }>('POST', `/admin/events/${encodeURIComponent(id)}/stop-sales`),
     removeBanner: (id: string) =>
