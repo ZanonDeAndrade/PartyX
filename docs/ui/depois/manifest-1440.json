@@ -1,0 +1,1087 @@
+[
+ {
+  "id": "P01",
+  "route": "/",
+  "state": "carregado",
+  "width": 1440,
+  "file": "P01__carregado__1440.jpg"
+ },
+ {
+  "id": "P01",
+  "route": "/",
+  "state": "carregando",
+  "width": 1440,
+  "file": "P01__carregando__1440.jpg"
+ },
+ {
+  "id": "P01",
+  "route": "/",
+  "state": "erro de carregamento",
+  "width": 1440,
+  "file": "P01__erro-de-carregamento__1440.jpg"
+ },
+ {
+  "id": "P01",
+  "route": "/",
+  "state": "sem eventos",
+  "width": 1440,
+  "file": "P01__sem-eventos__1440.jpg"
+ },
+ {
+  "id": "G07",
+  "route": "/",
+  "state": "menu do celular aberto",
+  "width": 1440,
+  "file": "G07__menu-do-celular-aberto__1440.jpg"
+ },
+ {
+  "id": "P02",
+  "route": "/eventos",
+  "state": "lista",
+  "width": 1440,
+  "file": "P02__lista__1440.jpg"
+ },
+ {
+  "id": "P02",
+  "route": "/eventos?q=noite",
+  "state": "busca com filtro",
+  "width": 1440,
+  "file": "P02__busca-com-filtro__1440.jpg"
+ },
+ {
+  "id": "P02",
+  "route": "/eventos?q=inexistente&date=2030-01-01",
+  "state": "nenhum resultado",
+  "width": 1440,
+  "file": "P02__nenhum-resultado__1440.jpg"
+ },
+ {
+  "id": "P02",
+  "route": "/eventos",
+  "state": "nenhuma venda disponivel",
+  "width": 1440,
+  "file": "P02__nenhuma-venda-disponivel__1440.jpg"
+ },
+ {
+  "id": "P02",
+  "route": "/eventos",
+  "state": "carregando",
+  "width": 1440,
+  "file": "P02__carregando__1440.jpg"
+ },
+ {
+  "id": "P02",
+  "route": "/eventos",
+  "state": "erro",
+  "width": 1440,
+  "file": "P02__erro__1440.jpg"
+ },
+ {
+  "id": "P03",
+  "route": "/eventos/noite-roxa-warehouse",
+  "state": "disponivel com tipo esgotado e desativado",
+  "width": 1440,
+  "file": "P03__disponivel-com-tipo-esgotado-e-desativado__1440.jpg"
+ },
+ {
+  "id": "C01",
+  "route": "/eventos/noite-roxa-warehouse",
+  "state": "selecao de ingressos",
+  "width": 1440,
+  "file": "C01__selecao-de-ingressos__1440.jpg"
+ },
+ {
+  "id": "C01",
+  "route": "/eventos/noite-roxa-warehouse",
+  "state": "limite por compra atingido",
+  "width": 1440,
+  "file": "C01__limite-por-compra-atingido__1440.jpg"
+ },
+ {
+  "id": "P03",
+  "route": "/eventos/reveillon-ficticio-2027",
+  "state": "vendas ainda nao iniciadas",
+  "width": 1440,
+  "file": "P03__vendas-ainda-nao-iniciadas__1440.jpg"
+ },
+ {
+  "id": "P03",
+  "route": "/eventos/rosa-eletrica",
+  "state": "esgotado",
+  "width": 1440,
+  "file": "P03__esgotado__1440.jpg"
+ },
+ {
+  "id": "P03",
+  "route": "/eventos/domingo-de-ressaca",
+  "state": "vendas encerradas",
+  "width": 1440,
+  "file": "P03__vendas-encerradas__1440.jpg"
+ },
+ {
+  "id": "P03",
+  "route": "/eventos/pre-estreia-lotada",
+  "state": "unidades reservadas",
+  "width": 1440,
+  "file": "P03__unidades-reservadas__1440.jpg"
+ },
+ {
+  "id": "P03",
+  "route": "/eventos/halloween-ficticio",
+  "state": "evento encerrado por link direto",
+  "width": 1440,
+  "file": "P03__evento-encerrado-por-link-direto__1440.jpg"
+ },
+ {
+  "id": "P03",
+  "route": "/eventos/quinta-experimental",
+  "state": "sem banner e sem atracoes",
+  "width": 1440,
+  "file": "P03__sem-banner-e-sem-atracoes__1440.jpg"
+ },
+ {
+  "id": "P03",
+  "route": "/eventos/noite-roxa-warehouse",
+  "state": "carregando",
+  "width": 1440,
+  "file": "P03__carregando__1440.jpg"
+ },
+ {
+  "id": "E05",
+  "route": "/eventos/noite-roxa-warehouse",
+  "state": "compartilhar com pre-visualizacao",
+  "width": 1440,
+  "file": "E05__compartilhar-com-pre-visualizacao__1440.jpg"
+ },
+ {
+  "id": "P04",
+  "route": "/termos-de-uso",
+  "state": "texto nao fornecido",
+  "width": 1440,
+  "file": "P04__texto-nao-fornecido__1440.jpg"
+ },
+ {
+  "id": "P05",
+  "route": "/privacidade",
+  "state": "texto nao fornecido",
+  "width": 1440,
+  "file": "P05__texto-nao-fornecido__1440.jpg"
+ },
+ {
+  "id": "P06",
+  "route": "/politica-de-cancelamento",
+  "state": "texto nao fornecido",
+  "width": 1440,
+  "file": "P06__texto-nao-fornecido__1440.jpg"
+ },
+ {
+  "id": "P06",
+  "route": "/meia-entrada",
+  "state": "meia-entrada",
+  "width": 1440,
+  "file": "P06__meia-entrada__1440.jpg"
+ },
+ {
+  "id": "P07",
+  "route": "/pagina-que-nao-existe",
+  "state": "pagina inexistente",
+  "width": 1440,
+  "file": "P07__pagina-inexistente__1440.jpg"
+ },
+ {
+  "id": "P07",
+  "route": "/eventos/evento-que-nao-existe",
+  "state": "evento inexistente",
+  "width": 1440,
+  "file": "P07__evento-inexistente__1440.jpg"
+ },
+ {
+  "id": "A01",
+  "route": "/entrar",
+  "state": "padrao",
+  "width": 1440,
+  "file": "A01__padrao__1440.jpg"
+ },
+ {
+  "id": "A01",
+  "route": "/entrar",
+  "state": "credenciais incorretas",
+  "width": 1440,
+  "file": "A01__credenciais-incorretas__1440.jpg"
+ },
+ {
+  "id": "A01",
+  "route": "/entrar",
+  "state": "bloqueio temporario",
+  "width": 1440,
+  "file": "A01__bloqueio-temporario__1440.jpg"
+ },
+ {
+  "id": "A01",
+  "route": "/entrar",
+  "state": "conta desativada",
+  "width": 1440,
+  "file": "A01__conta-desativada__1440.jpg"
+ },
+ {
+  "id": "A01",
+  "route": "/entrar?voltar=/checkout/noite-roxa-warehouse",
+  "state": "retorno ao checkout",
+  "width": 1440,
+  "file": "A01__retorno-ao-checkout__1440.jpg"
+ },
+ {
+  "id": "A02",
+  "route": "/criar-conta",
+  "state": "padrao",
+  "width": 1440,
+  "file": "A02__padrao__1440.jpg"
+ },
+ {
+  "id": "A02",
+  "route": "/criar-conta",
+  "state": "campos incompletos",
+  "width": 1440,
+  "file": "A02__campos-incompletos__1440.jpg"
+ },
+ {
+  "id": "A02",
+  "route": "/criar-conta",
+  "state": "cpf invalido e email ja cadastrado",
+  "width": 1440,
+  "file": "A02__cpf-invalido-e-email-ja-cadastrado__1440.jpg"
+ },
+ {
+  "id": "A02",
+  "route": "/criar-conta?voltar=/checkout/noite-roxa-warehouse",
+  "state": "retorno ao checkout",
+  "width": 1440,
+  "file": "A02__retorno-ao-checkout__1440.jpg"
+ },
+ {
+  "id": "A03",
+  "route": "/recuperar-senha",
+  "state": "padrao",
+  "width": 1440,
+  "file": "A03__padrao__1440.jpg"
+ },
+ {
+  "id": "A04",
+  "route": "/recuperar-senha",
+  "state": "confirmacao neutra",
+  "width": 1440,
+  "file": "A04__confirmacao-neutra__1440.jpg"
+ },
+ {
+  "id": "A05",
+  "route": "/redefinir-senha?token=invalido",
+  "state": "link invalido",
+  "width": 1440,
+  "file": "A05__link-invalido__1440.jpg"
+ },
+ {
+  "id": "A05",
+  "route": "/redefinir-senha?token=x",
+  "state": "link expirado",
+  "width": 1440,
+  "file": "A05__link-expirado__1440.jpg"
+ },
+ {
+  "id": "A05",
+  "route": "/redefinir-senha?token=x",
+  "state": "link ja utilizado",
+  "width": 1440,
+  "file": "A05__link-ja-utilizado__1440.jpg"
+ },
+ {
+  "id": "A05",
+  "route": "/redefinir-senha?token=x",
+  "state": "link valido",
+  "width": 1440,
+  "file": "A05__link-valido__1440.jpg"
+ },
+ {
+  "id": "A05",
+  "route": "/redefinir-senha?token=x",
+  "state": "senhas diferentes",
+  "width": 1440,
+  "file": "A05__senhas-diferentes__1440.jpg"
+ },
+ {
+  "id": "A06",
+  "route": "/redefinir-senha?token=x",
+  "state": "senha alterada",
+  "width": 1440,
+  "file": "A06__senha-alterada__1440.jpg"
+ },
+ {
+  "id": "ADM22",
+  "route": "/primeiro-acesso",
+  "state": "troca da senha temporaria",
+  "width": 1440,
+  "file": "ADM22__troca-da-senha-temporaria__1440.jpg"
+ },
+ {
+  "id": "C02",
+  "route": "/checkout/noite-roxa-warehouse",
+  "state": "visitante vai ao login",
+  "width": 1440,
+  "file": "C02__visitante-vai-ao-login__1440.jpg"
+ },
+ {
+  "id": "C02",
+  "route": "/checkout/noite-roxa-warehouse",
+  "state": "revisao do pedido",
+  "width": 1440,
+  "file": "C02__revisao-do-pedido__1440.jpg"
+ },
+ {
+  "id": "C02",
+  "route": "/checkout/noite-roxa-warehouse",
+  "state": "codigo do promoter valido",
+  "width": 1440,
+  "file": "C02__codigo-do-promoter-valido__1440.jpg"
+ },
+ {
+  "id": "C02",
+  "route": "/checkout/noite-roxa-warehouse",
+  "state": "codigo do promoter invalido",
+  "width": 1440,
+  "file": "C02__codigo-do-promoter-invalido__1440.jpg"
+ },
+ {
+  "id": "C02",
+  "route": "/checkout/noite-roxa-warehouse",
+  "state": "codigo do promoter desativado",
+  "width": 1440,
+  "file": "C02__codigo-do-promoter-desativado__1440.jpg"
+ },
+ {
+  "id": "C02",
+  "route": "/checkout/noite-roxa-warehouse",
+  "state": "estoque alterado",
+  "width": 1440,
+  "file": "C02__estoque-alterado__1440.jpg"
+ },
+ {
+  "id": "C02",
+  "route": "/checkout/noite-roxa-warehouse",
+  "state": "carrinho vazio",
+  "width": 1440,
+  "file": "C02__carrinho-vazio__1440.jpg"
+ },
+ {
+  "id": "C02",
+  "route": "/checkout/noite-roxa-warehouse",
+  "state": "conferindo disponibilidade",
+  "width": 1440,
+  "file": "C02__conferindo-disponibilidade__1440.jpg"
+ },
+ {
+  "id": "C03",
+  "route": "/pedido/1778a806-0e57-4fe7-a062-5e62881de348",
+  "state": "escolha da forma de pagamento",
+  "width": 1440,
+  "file": "C03__escolha-da-forma-de-pagamento__1440.jpg"
+ },
+ {
+  "id": "C03",
+  "route": "/pedido/1778a806-0e57-4fe7-a062-5e62881de348",
+  "state": "cartao selecionado",
+  "width": 1440,
+  "file": "C03__cartao-selecionado__1440.jpg"
+ },
+ {
+  "id": "C04",
+  "route": "/pedido/5716c08d-4995-448e-b964-5fe6d5d4d568",
+  "state": "pix aguardando pagamento",
+  "width": 1440,
+  "file": "C04__pix-aguardando-pagamento__1440.jpg"
+ },
+ {
+  "id": "C04",
+  "route": "/pedido/5716c08d-4995-448e-b964-5fe6d5d4d568",
+  "state": "codigo pix copiado",
+  "width": 1440,
+  "file": "C04__codigo-pix-copiado__1440.jpg"
+ },
+ {
+  "id": "C04",
+  "route": "/pedido/5716c08d-4995-448e-b964-5fe6d5d4d568",
+  "state": "ultimos 60 segundos da reserva",
+  "width": 1440,
+  "file": "C04__ultimos-60-segundos-da-reserva__1440.jpg"
+ },
+ {
+  "id": "C05",
+  "route": "/pedido/16d81a7f-f503-48c2-9384-db14bb193fce",
+  "state": "cartao em pagina segura do gateway",
+  "width": 1440,
+  "file": "C05__cartao-em-pagina-segura-do-gateway__1440.jpg"
+ },
+ {
+  "id": "C06",
+  "route": "/pedido/ce0b9813-4463-4fbb-a07e-1811c251ed77",
+  "state": "pagamento confirmado preparando ingressos",
+  "width": 1440,
+  "file": "C06__pagamento-confirmado-preparando-ingressos__1440.jpg"
+ },
+ {
+  "id": "C07",
+  "route": "/pedido/ce0b9813-4463-4fbb-a07e-1811c251ed77",
+  "state": "compra confirmada",
+  "width": 1440,
+  "file": "C07__compra-confirmada__1440.jpg"
+ },
+ {
+  "id": "C08",
+  "route": "/pedido/c00bea6b-7009-46c7-a368-d3b3aeeea27e",
+  "state": "reserva expirada",
+  "width": 1440,
+  "file": "C08__reserva-expirada__1440.jpg"
+ },
+ {
+  "id": "C09",
+  "route": "/pedido/60aca7e9-334d-449c-a514-88316a958ef9",
+  "state": "pagamento recusado",
+  "width": 1440,
+  "file": "C09__pagamento-recusado__1440.jpg"
+ },
+ {
+  "id": "C10",
+  "route": "/pedido/6ca83bbd-d4c5-4b7e-a331-aff61364ec47",
+  "state": "pago sem estoque",
+  "width": 1440,
+  "file": "C10__pago-sem-estoque__1440.jpg"
+ },
+ {
+  "id": "U03",
+  "route": "/pedido/f8e28ea0-90e3-4e70-bd1a-e6a819c08829",
+  "state": "pedido estornado",
+  "width": 1440,
+  "file": "U03__pedido-estornado__1440.jpg"
+ },
+ {
+  "id": "U03",
+  "route": "/pedido/d7086393-9b78-4be8-a3ad-7f69b53f9645",
+  "state": "pedido cancelado",
+  "width": 1440,
+  "file": "U03__pedido-cancelado__1440.jpg"
+ },
+ {
+  "id": "U03",
+  "route": "/pedido/00000000-0000-4000-8000-000000000000",
+  "state": "pedido nao encontrado",
+  "width": 1440,
+  "file": "U03__pedido-nao-encontrado__1440.jpg"
+ },
+ {
+  "id": "U01",
+  "route": "/meus-ingressos",
+  "state": "proximos",
+  "width": 1440,
+  "file": "U01__proximos__1440.jpg"
+ },
+ {
+  "id": "U01",
+  "route": "/meus-ingressos",
+  "state": "historico",
+  "width": 1440,
+  "file": "U01__historico__1440.jpg"
+ },
+ {
+  "id": "U01",
+  "route": "/meus-ingressos",
+  "state": "sem ingressos",
+  "width": 1440,
+  "file": "U01__sem-ingressos__1440.jpg"
+ },
+ {
+  "id": "U01",
+  "route": "/meus-ingressos",
+  "state": "carregando",
+  "width": 1440,
+  "file": "U01__carregando__1440.jpg"
+ },
+ {
+  "id": "U01",
+  "route": "/meus-ingressos",
+  "state": "erro",
+  "width": 1440,
+  "file": "U01__erro__1440.jpg"
+ },
+ {
+  "id": "U02",
+  "route": "/minhas-compras",
+  "state": "lista com todas as situacoes",
+  "width": 1440,
+  "file": "U02__lista-com-todas-as-situacoes__1440.jpg"
+ },
+ {
+  "id": "U02",
+  "route": "/minhas-compras",
+  "state": "sem compras",
+  "width": 1440,
+  "file": "U02__sem-compras__1440.jpg"
+ },
+ {
+  "id": "U04",
+  "route": "/ingressos/1dbaa3ff-e241-4e28-9735-8e1c07a74f6f",
+  "state": "valido",
+  "width": 1440,
+  "file": "U04__valido__1440.jpg"
+ },
+ {
+  "id": "U04",
+  "route": "/ingressos/dc2b7898-42e0-4ee4-9274-ad5013e01887",
+  "state": "utilizado",
+  "width": 1440,
+  "file": "U04__utilizado__1440.jpg"
+ },
+ {
+  "id": "U04",
+  "route": "/ingressos/3a55d2ad-5f02-42be-8b56-4cd2845f48ac",
+  "state": "cancelado",
+  "width": 1440,
+  "file": "U04__cancelado__1440.jpg"
+ },
+ {
+  "id": "U04",
+  "route": "/ingressos/00000000-0000-4000-8000-000000000000",
+  "state": "nao encontrado",
+  "width": 1440,
+  "file": "U04__nao-encontrado__1440.jpg"
+ },
+ {
+  "id": "U05",
+  "route": "/ingressos/1dbaa3ff-e241-4e28-9735-8e1c07a74f6f/tela-cheia",
+  "state": "tela cheia valido",
+  "width": 1440,
+  "file": "U05__tela-cheia-valido__1440.jpg"
+ },
+ {
+  "id": "U05",
+  "route": "/ingressos/3a55d2ad-5f02-42be-8b56-4cd2845f48ac/tela-cheia",
+  "state": "tela cheia cancelado",
+  "width": 1440,
+  "file": "U05__tela-cheia-cancelado__1440.jpg"
+ },
+ {
+  "id": "U06",
+  "route": "/minha-conta",
+  "state": "dados",
+  "width": 1440,
+  "file": "U06__dados__1440.jpg"
+ },
+ {
+  "id": "U06",
+  "route": "/minha-conta",
+  "state": "alteracoes salvas",
+  "width": 1440,
+  "file": "U06__alteracoes-salvas__1440.jpg"
+ },
+ {
+  "id": "U07",
+  "route": "/minha-conta",
+  "state": "alterar senha",
+  "width": 1440,
+  "file": "U07__alterar-senha__1440.jpg"
+ },
+ {
+  "id": "U07",
+  "route": "/minha-conta",
+  "state": "alterar senha com erro",
+  "width": 1440,
+  "file": "U07__alterar-senha-com-erro__1440.jpg"
+ },
+ {
+  "id": "V01",
+  "route": "/portaria",
+  "state": "selecionar evento",
+  "width": 1440,
+  "file": "V01__selecionar-evento__1440.jpg"
+ },
+ {
+  "id": "V02",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "camera parada",
+  "width": 1440,
+  "file": "V02__camera-parada__1440.jpg"
+ },
+ {
+  "id": "V02",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "camera indisponivel",
+  "width": 1440,
+  "file": "V02__camera-indisponivel__1440.jpg"
+ },
+ {
+  "id": "V03",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "busca manual",
+  "width": 1440,
+  "file": "V03__busca-manual__1440.jpg"
+ },
+ {
+  "id": "V04",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "resultado com homonimos",
+  "width": 1440,
+  "file": "V04__resultado-com-homonimos__1440.jpg"
+ },
+ {
+  "id": "V04",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "nenhum resultado",
+  "width": 1440,
+  "file": "V04__nenhum-resultado__1440.jpg"
+ },
+ {
+  "id": "V09",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "sem conexao",
+  "width": 1440,
+  "file": "V09__sem-conexao__1440.jpg"
+ },
+ {
+  "id": "G04",
+  "route": "/portaria",
+  "state": "acesso negado ao cliente",
+  "width": 1440,
+  "file": "G04__acesso-negado-ao-cliente__1440.jpg"
+ },
+ {
+  "id": "ADM01",
+  "route": "/admin",
+  "state": "visao geral",
+  "width": 1440,
+  "file": "ADM01__visao-geral__1440.jpg"
+ },
+ {
+  "id": "ADM01",
+  "route": "/admin",
+  "state": "carregando",
+  "width": 1440,
+  "file": "ADM01__carregando__1440.jpg"
+ },
+ {
+  "id": "ADM01",
+  "route": "/admin",
+  "state": "erro",
+  "width": 1440,
+  "file": "ADM01__erro__1440.jpg"
+ },
+ {
+  "id": "G07",
+  "route": "/admin",
+  "state": "menu do painel no celular",
+  "width": 1440,
+  "file": "G07__menu-do-painel-no-celular__1440.jpg"
+ },
+ {
+  "id": "ADM02",
+  "route": "/admin/eventos",
+  "state": "lista de eventos",
+  "width": 1440,
+  "file": "ADM02__lista-de-eventos__1440.jpg"
+ },
+ {
+  "id": "ADM03",
+  "route": "/admin/eventos/novo",
+  "state": "criar evento",
+  "width": 1440,
+  "file": "ADM03__criar-evento__1440.jpg"
+ },
+ {
+  "id": "ADM03",
+  "route": "/admin/eventos/novo",
+  "state": "erros do formulario",
+  "width": 1440,
+  "file": "ADM03__erros-do-formulario__1440.jpg"
+ },
+ {
+  "id": "ADM03",
+  "route": "/admin/eventos/1826d133-e427-49ea-a7fc-c7306c8e1628/editar",
+  "state": "editar evento publicado",
+  "width": 1440,
+  "file": "ADM03__editar-evento-publicado__1440.jpg"
+ },
+ {
+  "id": "ADM03",
+  "route": "/admin/eventos/0aa63153-bd04-43b3-81e6-4d2408e92ef4/previa",
+  "state": "pre-visualizacao",
+  "width": 1440,
+  "file": "ADM03__pre-visualizacao__1440.jpg"
+ },
+ {
+  "id": "ADM04",
+  "route": "/admin/eventos/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "informacoes",
+  "width": 1440,
+  "file": "ADM04__informacoes__1440.jpg"
+ },
+ {
+  "id": "ADM04",
+  "route": "/admin/eventos/0aa63153-bd04-43b3-81e6-4d2408e92ef4",
+  "state": "rascunho",
+  "width": 1440,
+  "file": "ADM04__rascunho__1440.jpg"
+ },
+ {
+  "id": "ADM04",
+  "route": "/admin/eventos/df9b1bb2-7387-4690-aa9d-a30835789174",
+  "state": "encerrado",
+  "width": 1440,
+  "file": "ADM04__encerrado__1440.jpg"
+ },
+ {
+  "id": "ADM04",
+  "route": "/admin/eventos/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "confirmar encerramento",
+  "width": 1440,
+  "file": "ADM04__confirmar-encerramento__1440.jpg"
+ },
+ {
+  "id": "ADM04",
+  "route": "/admin/eventos/0aa63153-bd04-43b3-81e6-4d2408e92ef4",
+  "state": "confirmar publicacao",
+  "width": 1440,
+  "file": "ADM04__confirmar-publicacao__1440.jpg"
+ },
+ {
+  "id": "ADM05",
+  "route": "/admin/eventos/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "tipos de ingresso",
+  "width": 1440,
+  "file": "ADM05__tipos-de-ingresso__1440.jpg"
+ },
+ {
+  "id": "ADM06",
+  "route": "/admin/eventos/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "novo tipo de ingresso",
+  "width": 1440,
+  "file": "ADM06__novo-tipo-de-ingresso__1440.jpg"
+ },
+ {
+  "id": "ADM19",
+  "route": "/admin/eventos/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "entradas ao vivo no evento",
+  "width": 1440,
+  "file": "ADM19__entradas-ao-vivo-no-evento__1440.jpg"
+ },
+ {
+  "id": "ADM14",
+  "route": "/admin/eventos/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "ingressos do evento",
+  "width": 1440,
+  "file": "ADM14__ingressos-do-evento__1440.jpg"
+ },
+ {
+  "id": "ADM12",
+  "route": "/admin/eventos/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "compradores do evento",
+  "width": 1440,
+  "file": "ADM12__compradores-do-evento__1440.jpg"
+ },
+ {
+  "id": "ADM23",
+  "route": "/admin/eventos/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "contingencia",
+  "width": 1440,
+  "file": "ADM23__contingencia__1440.jpg"
+ },
+ {
+  "id": "ADM07",
+  "route": "/admin/promoters",
+  "state": "lista",
+  "width": 1440,
+  "file": "ADM07__lista__1440.jpg"
+ },
+ {
+  "id": "ADM08",
+  "route": "/admin/promoters",
+  "state": "novo promoter",
+  "width": 1440,
+  "file": "ADM08__novo-promoter__1440.jpg"
+ },
+ {
+  "id": "ADM08",
+  "route": "/admin/promoters",
+  "state": "codigo repetido",
+  "width": 1440,
+  "file": "ADM08__codigo-repetido__1440.jpg"
+ },
+ {
+  "id": "ADM09",
+  "route": "/admin/promoters",
+  "state": "detalhe do promoter",
+  "width": 1440,
+  "file": "ADM09__detalhe-do-promoter__1440.jpg"
+ },
+ {
+  "id": "ADM10",
+  "route": "/admin/pedidos",
+  "state": "lista de pedidos",
+  "width": 1440,
+  "file": "ADM10__lista-de-pedidos__1440.jpg"
+ },
+ {
+  "id": "ADM11",
+  "route": "/admin/pedidos/ce0b9813-4463-4fbb-a07e-1811c251ed77",
+  "state": "detalhe do pedido",
+  "width": 1440,
+  "file": "ADM11__detalhe-do-pedido__1440.jpg"
+ },
+ {
+  "id": "ADM11",
+  "route": "/admin/pedidos/6ca83bbd-d4c5-4b7e-a331-aff61364ec47",
+  "state": "pago sem estoque",
+  "width": 1440,
+  "file": "ADM11__pago-sem-estoque__1440.jpg"
+ },
+ {
+  "id": "ADM15",
+  "route": "/admin/pedidos/ce0b9813-4463-4fbb-a07e-1811c251ed77",
+  "state": "cancelar unidade",
+  "width": 1440,
+  "file": "ADM15__cancelar-unidade__1440.jpg"
+ },
+ {
+  "id": "ADM12",
+  "route": "/admin/compradores",
+  "state": "compradores",
+  "width": 1440,
+  "file": "ADM12__compradores__1440.jpg"
+ },
+ {
+  "id": "ADM13",
+  "route": "/admin/compradores",
+  "state": "detalhe do comprador",
+  "width": 1440,
+  "file": "ADM13__detalhe-do-comprador__1440.jpg"
+ },
+ {
+  "id": "ADM13",
+  "route": "/admin/compradores",
+  "state": "corrigir e-mail ou cpf",
+  "width": 1440,
+  "file": "ADM13__corrigir-e-mail-ou-cpf__1440.jpg"
+ },
+ {
+  "id": "ADM14",
+  "route": "/admin/ingressos",
+  "state": "ingressos",
+  "width": 1440,
+  "file": "ADM14__ingressos__1440.jpg"
+ },
+ {
+  "id": "ADM15",
+  "route": "/admin/ingressos/1dbaa3ff-e241-4e28-9735-8e1c07a74f6f",
+  "state": "detalhe do ingresso",
+  "width": 1440,
+  "file": "ADM15__detalhe-do-ingresso__1440.jpg"
+ },
+ {
+  "id": "ADM15",
+  "route": "/admin/ingressos/3a55d2ad-5f02-42be-8b56-4cd2845f48ac",
+  "state": "ingresso cancelado",
+  "width": 1440,
+  "file": "ADM15__ingresso-cancelado__1440.jpg"
+ },
+ {
+  "id": "ADM15",
+  "route": "/admin/ingressos/1dbaa3ff-e241-4e28-9735-8e1c07a74f6f",
+  "state": "confirmar cancelamento",
+  "width": 1440,
+  "file": "ADM15__confirmar-cancelamento__1440.jpg"
+ },
+ {
+  "id": "ADM16",
+  "route": "/admin/relatorios/vendas",
+  "state": "relatorio de vendas",
+  "width": 1440,
+  "file": "ADM16__relatorio-de-vendas__1440.jpg"
+ },
+ {
+  "id": "ADM17",
+  "route": "/admin/relatorios/promoters",
+  "state": "ranking de promoters",
+  "width": 1440,
+  "file": "ADM17__ranking-de-promoters__1440.jpg"
+ },
+ {
+  "id": "ADM18",
+  "route": "/admin/relatorios/taxa-mensal",
+  "state": "taxa mensal",
+  "width": 1440,
+  "file": "ADM18__taxa-mensal__1440.jpg"
+ },
+ {
+  "id": "ADM19",
+  "route": "/admin/entradas",
+  "state": "acompanhamento das entradas",
+  "width": 1440,
+  "file": "ADM19__acompanhamento-das-entradas__1440.jpg"
+ },
+ {
+  "id": "ADM20",
+  "route": "/admin/equipe",
+  "state": "equipe",
+  "width": 1440,
+  "file": "ADM20__equipe__1440.jpg"
+ },
+ {
+  "id": "ADM21",
+  "route": "/admin/equipe",
+  "state": "novo usuario",
+  "width": 1440,
+  "file": "ADM21__novo-usuario__1440.jpg"
+ },
+ {
+  "id": "ADM24",
+  "route": "/admin/conta",
+  "state": "conta do administrador",
+  "width": 1440,
+  "file": "ADM24__conta-do-administrador__1440.jpg"
+ },
+ {
+  "id": "ADM24",
+  "route": "/admin/conta",
+  "state": "alterar senha",
+  "width": 1440,
+  "file": "ADM24__alterar-senha__1440.jpg"
+ },
+ {
+  "id": "ADM11",
+  "route": "/admin/excecoes",
+  "state": "excecoes de pagamento",
+  "width": 1440,
+  "file": "ADM11__excecoes-de-pagamento__1440.jpg"
+ },
+ {
+  "id": "G04",
+  "route": "/admin",
+  "state": "acesso negado ao validador",
+  "width": 1440,
+  "file": "G04__acesso-negado-ao-validador__1440.jpg"
+ },
+ {
+  "id": "G04",
+  "route": "/admin",
+  "state": "acesso negado ao cliente",
+  "width": 1440,
+  "file": "G04__acesso-negado-ao-cliente__1440.jpg"
+ },
+ {
+  "id": "V05",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "entrada liberada",
+  "width": 1440,
+  "file": "V05__entrada-liberada__1440.jpg"
+ },
+ {
+  "id": "V06",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "ingresso ja utilizado",
+  "width": 1440,
+  "file": "V06__ingresso-ja-utilizado__1440.jpg"
+ },
+ {
+  "id": "V07",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "ingresso invalido",
+  "width": 1440,
+  "file": "V07__ingresso-invalido__1440.jpg"
+ },
+ {
+  "id": "V07",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "ingresso cancelado",
+  "width": 1440,
+  "file": "V07__ingresso-cancelado__1440.jpg"
+ },
+ {
+  "id": "V08",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "ingresso de outro evento",
+  "width": 1440,
+  "file": "V08__ingresso-de-outro-evento__1440.jpg"
+ },
+ {
+  "id": "V09",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "falha ao consultar o servidor",
+  "width": 1440,
+  "file": "V09__falha-ao-consultar-o-servidor__1440.jpg"
+ },
+ {
+  "id": "V02",
+  "route": "/portaria/1826d133-e427-49ea-a7fc-c7306c8e1628",
+  "state": "camera lendo",
+  "width": 1440,
+  "file": "V02__camera-lendo__1440.jpg"
+ },
+ {
+  "id": "INTRO",
+  "route": "/",
+  "state": "abertura em video",
+  "width": 1440,
+  "file": "INTRO__abertura-em-video__1440.jpg"
+ },
+ {
+  "id": "E01",
+  "route": "e-mail cadastro",
+  "state": "email cadastro",
+  "width": 1440,
+  "file": "E01__email-cadastro__1440.jpg"
+ },
+ {
+  "id": "E02",
+  "route": "e-mail recuperacao_senha",
+  "state": "email recuperacao_senha",
+  "width": 1440,
+  "file": "E02__email-recuperacao-senha__1440.jpg"
+ },
+ {
+  "id": "E03",
+  "route": "e-mail compra_confirmada",
+  "state": "email compra_confirmada",
+  "width": 1440,
+  "file": "E03__email-compra-confirmada__1440.jpg"
+ },
+ {
+  "id": "C10",
+  "route": "e-mail pagamento_sem_estoque",
+  "state": "email pagamento_sem_estoque",
+  "width": 1440,
+  "file": "C10__email-pagamento-sem-estoque__1440.jpg"
+ },
+ {
+  "id": "E04",
+  "route": "/api/tickets/1dbaa3ff-e241-4e28-9735-8e1c07a74f6f/pdf",
+  "state": "pdf do ingresso",
+  "width": 0,
+  "file": "E04__pdf-do-ingresso-1.jpg"
+ },
+ {
+  "id": "E04",
+  "route": "/api/orders/ce0b9813-4463-4fbb-a07e-1811c251ed77/tickets/pdf",
+  "state": "pdf do pedido",
+  "width": 0,
+  "file": "E04__pdf-do-pedido-1.jpg"
+ },
+ {
+  "id": "E04",
+  "route": "/api/orders/ce0b9813-4463-4fbb-a07e-1811c251ed77/tickets/pdf",
+  "state": "pdf do pedido",
+  "width": 0,
+  "file": "E04__pdf-do-pedido-2.jpg"
+ },
+ {
+  "id": "E04",
+  "route": "/api/orders/ce0b9813-4463-4fbb-a07e-1811c251ed77/tickets/pdf",
+  "state": "pdf do pedido",
+  "width": 0,
+  "file": "E04__pdf-do-pedido-3.jpg"
+ }
+]
