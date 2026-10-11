@@ -1,0 +1,12 @@
+/* Páginas de documentação, publicadas somente em homologação. */
+body[data-doc='documentation'] a {
+  color: #5b21b6;
+}
+
+body[data-doc='documentation'] a:hover {
+  color: #7c3aed;
+}
+
+#root:has(> [data-doc-root]) {
+  height: auto;
+}

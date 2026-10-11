@@ -38,8 +38,13 @@ export function authContext(deps: AuthDeps) {
     const unsafe = UNSAFE.has(c.req.method);
     if (unsafe) {
       const origin = c.req.header('origin');
-      if (origin && !allowedOrigins(deps, c.req.url).has(origin)) {
+      const production = deps.config.APP_ENV === 'producao';
+      const expectedOrigin = deps.config.PUBLIC_BASE_URL && new URL(deps.config.PUBLIC_BASE_URL).origin;
+      if (origin && (production ? origin !== expectedOrigin : !allowedOrigins(deps, c.req.url).has(origin))) {
         throw new AppError(403, 'origem_invalida', 'Requisição recusada.');
+      }
+      if (production && !origin && c.req.header('sec-fetch-site') !== 'same-origin') {
+        throw new AppError(403, 'origem_ausente', 'Requisição recusada.');
       }
     }
 

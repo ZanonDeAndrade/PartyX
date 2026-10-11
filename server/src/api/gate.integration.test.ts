@@ -65,6 +65,12 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
     csrf = ((await (await raw('GET', '/auth/me')).json()) as { csrfToken: string }).csrfToken;
     return {
       ...u,
+      get cookie() {
+        return cookie;
+      },
+      get csrf() {
+        return csrf;
+      },
       raw,
       get: (p: string) => raw('GET', p),
       post: (p: string, b: unknown = {}) => raw('POST', p, b),
@@ -160,12 +166,49 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
   });
   beforeEach(async () => {
     await sql(
-      'truncate payment_events, checkins, tickets, reservations, order_items, orders, ticket_types, events, email_log, audit_log, sessions, login_attempts, users cascade',
+      'truncate payment_events, checkins, tickets, reservations, order_items, orders, ticket_types, events, email_log, audit_log, sessions, login_attempts, global_limit_counters, users cascade',
     );
     clock.set('2026-12-12T22:00:00-03:00');
   });
 
   describe('acesso (RF-44)', () => {
+    it('teto de leituras e buscas vale entre instâncias, com contador no banco', async () => {
+      const e = await event();
+      const val = await session('validador');
+      const limited = { ...config, GATE_SCANS_PER_MINUTE: 2, GATE_SEARCHES_PER_MINUTE: 1 };
+      const make = () =>
+        createApp({
+          config: limited,
+          clock,
+          auth: { db: createDrizzle(testDb.pool), hasher: argon2Hasher, mailer: new MemoryEmailSender() },
+        });
+      const a = make();
+      const b = make();
+      const post = (instance: typeof a, route: string, body: unknown) =>
+        instance.request(`/api/gate/${route}`, {
+          method: 'POST',
+          headers: {
+            origin: 'http://localhost',
+            cookie: val.cookie,
+            'x-csrf-token': val.csrf,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
+      const scan = { eventId: e.id, qr: 'invalido' };
+      expect((await post(a, 'scan', scan)).status).toBe(200);
+      expect((await post(b, 'scan', scan)).status).toBe(200);
+      expect((await post(a, 'scan', scan)).status).toBe(429);
+      expect((await post(a, 'search', { eventId: e.id, q: 'abc' })).status).toBe(200);
+      expect((await post(b, 'search', { eventId: e.id, q: 'abc' })).status).toBe(429);
+      const counts = await sql(
+        "select kind, sum(count)::int as n from global_limit_counters where kind like 'portaria_%' group by kind order by kind",
+      );
+      expect(counts.rows).toEqual([
+        { kind: 'portaria_busca', n: 1 },
+        { kind: 'portaria_leitura', n: 2 },
+      ]);
+    });
     it('só validador e administrador; sem sessão 401, cliente 403, em todas as rotas', async () => {
       const e = await event();
       const b = await buyer(e);
@@ -472,16 +515,20 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
       const mine = await buyer(e);
       const foreign = await buyer(other);
       const v = await session();
-      const forged = mine.tickets[0]!.qr_payload.slice(0, -2) + (mine.tickets[0]!.qr_payload.endsWith('AA') ? 'BB' : 'AA');
+      const forged =
+        mine.tickets[0]!.qr_payload.slice(0, -2) + (mine.tickets[0]!.qr_payload.endsWith('AA') ? 'BB' : 'AA');
       const out = await Promise.all([
         v.scan(e.id, forged),
         v.scan(e.id, foreign.tickets[0]!.qr_payload),
         v.scan(e.id, mine.tickets[0]!.qr_payload),
         v.scan(e.id, 'lixo-qualquer'),
       ]);
-      expect((await Promise.all(out.map(async r => (await json(r)).result))).sort()).toEqual(
-        ['invalido', 'invalido', 'outro_evento', 'valido'],
-      );
+      expect((await Promise.all(out.map(async r => (await json(r)).result))).sort()).toEqual([
+        'invalido',
+        'invalido',
+        'outro_evento',
+        'valido',
+      ]);
       expect((await sql('select status from tickets where id = $1', [foreign.tickets[0]!.id])).rows[0].status).toBe(
         'valido',
       );

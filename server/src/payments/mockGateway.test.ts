@@ -109,10 +109,12 @@ describe('adaptador fictício', () => {
 
 describe('escolha do gateway pela configuração (mock só no local)', () => {
   const cloud = {
+    PUBLIC_BASE_URL: 'https://partyx.example.com',
     DATABASE_URL: 'postgres://x',
     SESSION_SECRET: 's'.repeat(40),
     QR_HMAC_KEYS: `1:${randomBytes(32).toString('base64url')}`,
-    TURNSTILE_SECRET: 'segredo-turnstile-teste', TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
+    TURNSTILE_SECRET: 'segredo-turnstile-teste',
+    TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
   };
   it('local usa o fictício por padrão; homologação e produção, nenhum', () => {
     expect(loadConfig({}).PAYMENT_GATEWAY).toBe('mock');
@@ -130,20 +132,34 @@ describe('escolha do gateway pela configuração (mock só no local)', () => {
   it('homologação libera o fictício SÓ com a variável explícita; produção nunca, com ou sem ela', () => {
     const hml = { APP_ENV: 'homologacao', PAYMENT_GATEWAY: 'mock', ...cloud };
     expect(() => loadConfig(hml)).toThrow(/HOMOLOGACAO_GATEWAY_FICTICIO=true/);
-    expect(() => loadConfig({ ...hml, HOMOLOGACAO_GATEWAY_FICTICIO: 'false' })).toThrow(/só pode ser usado no ambiente local/);
+    expect(() => loadConfig({ ...hml, HOMOLOGACAO_GATEWAY_FICTICIO: 'false' })).toThrow(
+      /só pode ser usado no ambiente local/,
+    );
     const ok = loadConfig({ ...hml, HOMOLOGACAO_GATEWAY_FICTICIO: 'true' });
     expect([ok.PAYMENT_GATEWAY, ok.mockGatewayInHomologacao]).toEqual(['mock', true]);
     // Em produção a configuração recusa o fictício e recusa a própria variável.
-    expect(() => loadConfig({ ...hml, APP_ENV: 'producao', HOMOLOGACAO_GATEWAY_FICTICIO: 'true' })).toThrow(/gateway fictício só pode ser usado/s);
-    expect(() => loadConfig({ APP_ENV: 'producao', HOMOLOGACAO_GATEWAY_FICTICIO: 'true', PAYMENT_GATEWAY: 'none', ...cloud })).toThrow(/só existe em homologação/);
+    expect(() => loadConfig({ ...hml, APP_ENV: 'producao', HOMOLOGACAO_GATEWAY_FICTICIO: 'true' })).toThrow(
+      /gateway fictício só pode ser usado/s,
+    );
+    expect(() =>
+      loadConfig({ APP_ENV: 'producao', HOMOLOGACAO_GATEWAY_FICTICIO: 'true', PAYMENT_GATEWAY: 'none', ...cloud }),
+    ).toThrow(/só existe em homologação/);
     expect(() => loadConfig({ HOMOLOGACAO_GATEWAY_FICTICIO: 'true' })).toThrow(/só existe em homologação/); // nem no local
     // Sem a escolha do gateway, homologação continua sem gateway.
-    expect(loadConfig({ APP_ENV: 'homologacao', HOMOLOGACAO_GATEWAY_FICTICIO: 'true', ...cloud }).PAYMENT_GATEWAY).toBe('none');
+    expect(loadConfig({ APP_ENV: 'homologacao', HOMOLOGACAO_GATEWAY_FICTICIO: 'true', ...cloud }).PAYMENT_GATEWAY).toBe(
+      'none',
+    );
   });
   it('a fábrica também recusa: homologação só com o aval, produção nunca', () => {
-    expect(() => createGateway({ APP_ENV: 'homologacao', PAYMENT_GATEWAY: 'mock' }, clock)).toThrow(/só pode ser usado no ambiente local/);
-    expect(createGateway({ APP_ENV: 'homologacao', PAYMENT_GATEWAY: 'mock', mockGatewayInHomologacao: true }, clock)).toBeDefined();
-    expect(() => createGateway({ APP_ENV: 'producao', PAYMENT_GATEWAY: 'mock', mockGatewayInHomologacao: true }, clock)).toThrow(/só pode ser usado no ambiente local/);
+    expect(() => createGateway({ APP_ENV: 'homologacao', PAYMENT_GATEWAY: 'mock' }, clock)).toThrow(
+      /só pode ser usado no ambiente local/,
+    );
+    expect(
+      createGateway({ APP_ENV: 'homologacao', PAYMENT_GATEWAY: 'mock', mockGatewayInHomologacao: true }, clock),
+    ).toBeDefined();
+    expect(() =>
+      createGateway({ APP_ENV: 'producao', PAYMENT_GATEWAY: 'mock', mockGatewayInHomologacao: true }, clock),
+    ).toThrow(/só pode ser usado no ambiente local/);
   });
   it('mesmo sem passar pela configuração, a fábrica recusa o fictício fora do local', () => {
     for (const APP_ENV of ['homologacao', 'producao'] as const) {

@@ -1,7 +1,13 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { assertDatabaseEnvironment, DatabaseEnvironmentError, markDatabaseEnvironment, markDatabaseEnvironmentSafely, readDatabaseEnvironment } from './environment';
+import {
+  assertDatabaseEnvironment,
+  DatabaseEnvironmentError,
+  markDatabaseEnvironment,
+  markDatabaseEnvironmentSafely,
+  readDatabaseEnvironment,
+} from './environment';
 import { runMigrations } from './migrate';
 import { createTestDatabase } from './testing';
 
@@ -38,7 +44,9 @@ describe.skipIf(!ADMIN_URL)('marca de ambiente do banco (integração)', () => {
     const pg = (await import('pg')).default;
     const pool = new pg.Pool({ connectionString: d.url, max: 1 });
     await expect(assertDatabaseEnvironment(pool, 'producao')).rejects.toThrow(DatabaseEnvironmentError);
-    await expect(assertDatabaseEnvironment(pool, 'producao')).rejects.toThrow(/ambiente producao.*pertence ao ambiente homologacao/);
+    await expect(assertDatabaseEnvironment(pool, 'producao')).rejects.toThrow(
+      /ambiente producao.*pertence ao ambiente homologacao/,
+    );
     await expect(assertDatabaseEnvironment(pool, 'homologacao')).resolves.toBeUndefined();
     await expect(assertDatabaseEnvironment(pool, 'local')).resolves.toBeUndefined();
     await pool.end();
@@ -56,13 +64,22 @@ describe.skipIf(!ADMIN_URL)('marca de ambiente do banco (integração)', () => {
 
   it('a MIGRAÇÃO recusa banco de outro ambiente ou sem marca, antes de criar qualquer tabela', async () => {
     const d = await fresh();
-    await expect(runMigrations(d.url, 'drizzle', { allowMissingAppRole: true, expectedEnvironment: 'producao' })).rejects.toThrow(/sem marca|não tem marca/);
+    await expect(
+      runMigrations(d.url, 'drizzle', { allowMissingAppRole: true, expectedEnvironment: 'producao' }),
+    ).rejects.toThrow(/sem marca|não tem marca/);
     await markDatabaseEnvironment(d.pool, 'homologacao');
-    await expect(runMigrations(d.url, 'drizzle', { allowMissingAppRole: true, expectedEnvironment: 'producao' })).rejects.toThrow(/pertence ao ambiente homologacao/);
-    const tables = await d.pool.query("select count(*)::int as n from information_schema.tables where table_schema in ('public','drizzle')");
+    await expect(
+      runMigrations(d.url, 'drizzle', { allowMissingAppRole: true, expectedEnvironment: 'producao' }),
+    ).rejects.toThrow(/pertence ao ambiente homologacao/);
+    const tables = await d.pool.query(
+      "select count(*)::int as n from information_schema.tables where table_schema in ('public','drizzle')",
+    );
     expect(tables.rows[0].n).toBe(0); // nada foi criado
     await runMigrations(d.url, 'drizzle', { allowMissingAppRole: true, expectedEnvironment: 'homologacao' });
-    expect((await d.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'")).rows[0].n).toBeGreaterThan(10);
+    expect(
+      (await d.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'"))
+        .rows[0].n,
+    ).toBeGreaterThan(10);
   });
 
   /** Sobe o servidor de verdade e devolve o que aconteceu: saiu (com código) ou iniciou (e então é encerrado). */
@@ -91,8 +108,18 @@ describe.skipIf(!ADMIN_URL)('marca de ambiente do banco (integração)', () => {
   it('o SERVIDOR se recusa a subir (processo real) com banco de outro ambiente ou sem marca; com a marca certa sobe', async () => {
     const d = await fresh(true);
     await markDatabaseEnvironment(d.pool, 'homologacao');
-    const base = { DATABASE_URL: d.url, SESSION_SECRET: 's'.repeat(40), QR_HMAC_KEYS: `1:${randomBytes(32).toString('base64url')}` };
-    const prod = await boot({ ...base, APP_ENV: 'producao', TURNSTILE_SECRET: 'segredo-turnstile-teste', TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste' });
+    const base = {
+      DATABASE_URL: d.url,
+      PUBLIC_BASE_URL: 'https://partyx.example.com',
+      SESSION_SECRET: 's'.repeat(40),
+      QR_HMAC_KEYS: `1:${randomBytes(32).toString('base64url')}`,
+    };
+    const prod = await boot({
+      ...base,
+      APP_ENV: 'producao',
+      TURNSTILE_SECRET: 'segredo-turnstile-teste',
+      TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
+    });
     expect(prod.exited).toBe(1);
     expect(prod.started).toBe(false);
     expect(prod.err).toContain('"alert":"banco_de_outro_ambiente"');

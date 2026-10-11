@@ -312,8 +312,8 @@ export function SignupPage() {
             </span>
             <h1 id="auth-title">Conta criada</h1>
             <p>
-              Você já está conectado. Enviamos uma confirmação de cadastro para <b>{created}</b>. Não é preciso confirmar
-              o e-mail para continuar.
+              Você já está conectado. Enviamos uma confirmação de cadastro para <b>{created}</b>. Não é preciso
+              confirmar o e-mail para continuar.
             </p>
             <button type="button" className="px-btn px-btn-pri px-btn-lg" onClick={() => go(back)}>
               {back === '/' ? 'Ver eventos' : 'Continuar para o pedido'}
@@ -564,8 +564,8 @@ export function ForgotPasswordPage() {
               </>
             }
           >
-            Se houver uma conta PartyX com o e-mail <b>{email.trim()}</b>, você receberá um link para criar uma nova senha
-            nos próximos minutos.
+            Se houver uma conta PartyX com o e-mail <b>{email.trim()}</b>, você receberá um link para criar uma nova
+            senha nos próximos minutos.
           </MessageCard>
         </AuthCard>
       </Layout>
@@ -775,6 +775,7 @@ export function FirstAccessPage() {
 
   useEffect(() => {
     if (session.status === 'anon') go('/entrar?voltar=%2Fprimeiro-acesso');
+    else if (session.status === 'user' && session.user?.role === 'cliente') go('/minha-conta');
   }, [session.status, go]);
 
   const submit = async (e: FormEvent) => {

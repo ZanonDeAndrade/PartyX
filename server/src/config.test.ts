@@ -53,7 +53,15 @@ describe('loadConfig', () => {
       ready: true,
       provisional: true,
     });
-    const prod = { APP_ENV: 'producao', DATABASE_URL: 'postgres://x', SESSION_SECRET: SECRET, QR_HMAC_KEYS: QR, TURNSTILE_SECRET: 'segredo-turnstile-teste', TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste' };
+    const prod = {
+      APP_ENV: 'producao',
+      PUBLIC_BASE_URL: 'https://partyx.example.com',
+      DATABASE_URL: 'postgres://x',
+      SESSION_SECRET: SECRET,
+      QR_HMAC_KEYS: QR,
+      TURNSTILE_SECRET: 'segredo-turnstile-teste',
+      TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
+    };
     expect(loadConfig(prod).legal).toMatchObject({ ready: false });
     expect(loadConfig({ ...prod, TERMS_VERSION: 'v1' }).legal).toMatchObject({ ready: false });
     expect(loadConfig({ ...prod, TERMS_VERSION: 'v1', PRIVACY_VERSION: 'v1' }).legal).toEqual({
@@ -78,7 +86,14 @@ describe('loadConfig', () => {
   });
 
   describe('reserva, limite e abertura das vendas', () => {
-    const cloud = { DATABASE_URL: 'postgres://x', SESSION_SECRET: SECRET, QR_HMAC_KEYS: QR, TURNSTILE_SECRET: 'segredo-turnstile-teste', TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste' };
+    const cloud = {
+      PUBLIC_BASE_URL: 'https://partyx.example.com',
+      DATABASE_URL: 'postgres://x',
+      SESSION_SECRET: SECRET,
+      QR_HMAC_KEYS: QR,
+      TURNSTILE_SECRET: 'segredo-turnstile-teste',
+      TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
+    };
     it('padrões: reserva de 10 minutos e 6 ingressos por compra (premissas D-03 e D-05)', () => {
       expect(loadConfig({})).toMatchObject({ RESERVATION_MINUTES: 10, MAX_TICKETS_PER_ORDER: 6 });
     });
@@ -180,20 +195,42 @@ describe('loadConfig', () => {
 
   describe('verificação humana (Turnstile): opcional, desligada por padrão', () => {
     const keys = { TURNSTILE_SECRET: 'segredo-longo-123', TURNSTILE_SITE_KEY: '0x4AAAAAAAchave123' };
-    const prod = { APP_ENV: 'producao', DATABASE_URL: 'postgres://u:p@h/db', SESSION_SECRET: 'a'.repeat(40), QR_HMAC_KEYS: `1:${Buffer.alloc(48, 1).toString('base64url')}` };
+    const prod = {
+      APP_ENV: 'producao',
+      PUBLIC_BASE_URL: 'https://partyx.example.com',
+      DATABASE_URL: 'postgres://u:p@h/db',
+      SESSION_SECRET: 'a'.repeat(40),
+      QR_HMAC_KEYS: `1:${Buffer.alloc(48, 1).toString('base64url')}`,
+    };
     it('desligada (padrão): PRODUÇÃO sobe sem nenhuma chave; as chaves, se existirem, são ignoradas e não saem da configuração', () => {
       const off = loadConfig(prod);
-      expect([off.turnstileEnabled, off.TURNSTILE_SECRET, off.TURNSTILE_SITE_KEY]).toEqual([false, undefined, undefined]);
+      expect([off.turnstileEnabled, off.TURNSTILE_SECRET, off.TURNSTILE_SITE_KEY]).toEqual([
+        false,
+        undefined,
+        undefined,
+      ]);
       const ignored = loadConfig({ ...prod, ...keys });
-      expect([ignored.turnstileEnabled, ignored.TURNSTILE_SECRET, ignored.TURNSTILE_SITE_KEY]).toEqual([false, undefined, undefined]);
+      expect([ignored.turnstileEnabled, ignored.TURNSTILE_SECRET, ignored.TURNSTILE_SITE_KEY]).toEqual([
+        false,
+        undefined,
+        undefined,
+      ]);
       expect(loadConfig({ ...prod, ...keys, TURNSTILE_ENABLED: 'false' }).TURNSTILE_SECRET).toBeUndefined();
     });
     it('ligada (TURNSTILE_ENABLED=true): exige as DUAS chaves, em qualquer ambiente', () => {
-      expect(() => loadConfig({ ...prod, TURNSTILE_ENABLED: 'true' })).toThrow(/TURNSTILE_SECRET.*obrigatória com TURNSTILE_ENABLED=true/s);
-      expect(() => loadConfig({ ...prod, TURNSTILE_ENABLED: 'true', TURNSTILE_SECRET: keys.TURNSTILE_SECRET })).toThrow(/TURNSTILE_SITE_KEY/);
+      expect(() => loadConfig({ ...prod, TURNSTILE_ENABLED: 'true' })).toThrow(
+        /TURNSTILE_SECRET.*obrigatória com TURNSTILE_ENABLED=true/s,
+      );
+      expect(() => loadConfig({ ...prod, TURNSTILE_ENABLED: 'true', TURNSTILE_SECRET: keys.TURNSTILE_SECRET })).toThrow(
+        /TURNSTILE_SITE_KEY/,
+      );
       expect(() => loadConfig({ TURNSTILE_ENABLED: 'true' })).toThrow(/TURNSTILE_SECRET/);
       const on = loadConfig({ ...prod, ...keys, TURNSTILE_ENABLED: 'true' });
-      expect([on.turnstileEnabled, on.TURNSTILE_SECRET, on.TURNSTILE_SITE_KEY]).toEqual([true, keys.TURNSTILE_SECRET, keys.TURNSTILE_SITE_KEY]);
+      expect([on.turnstileEnabled, on.TURNSTILE_SECRET, on.TURNSTILE_SITE_KEY]).toEqual([
+        true,
+        keys.TURNSTILE_SECRET,
+        keys.TURNSTILE_SITE_KEY,
+      ]);
     });
     it('valor inválido é recusado e a chave secreta não aparece na mensagem de erro', () => {
       expect(() => loadConfig({ TURNSTILE_ENABLED: 'sim' })).toThrow(/TURNSTILE_ENABLED/);
@@ -206,22 +243,57 @@ describe('loadConfig', () => {
   });
 
   describe('limites globais', () => {
-    it('padrões de 30 cadastros e 60 recuperações por hora; configuráveis; valor absurdo recusado', () => {
+    it('padrões de cadastro por IP e global, recuperação e portaria; configuráveis', () => {
       const c = loadConfig({});
-      expect([c.GLOBAL_SIGNUPS_PER_HOUR, c.GLOBAL_RECOVERIES_PER_HOUR]).toEqual([30, 60]);
-      const d = loadConfig({ GLOBAL_SIGNUPS_PER_HOUR: '600', GLOBAL_RECOVERIES_PER_HOUR: '200' });
-      expect([d.GLOBAL_SIGNUPS_PER_HOUR, d.GLOBAL_RECOVERIES_PER_HOUR]).toEqual([600, 200]);
-      for (const bad of ['0', '-1', 'muitos', '1000000']) expect(() => loadConfig({ GLOBAL_SIGNUPS_PER_HOUR: bad }), bad).toThrow(/GLOBAL_SIGNUPS_PER_HOUR/);
+      expect([
+        c.SIGNUPS_PER_IP_PER_HOUR,
+        c.GLOBAL_SIGNUPS_PER_HOUR,
+        c.GLOBAL_RECOVERIES_PER_HOUR,
+        c.GATE_SCANS_PER_MINUTE,
+        c.GATE_SEARCHES_PER_MINUTE,
+      ]).toEqual([100, 1000, 60, 3000, 400]);
+      const d = loadConfig({
+        SIGNUPS_PER_IP_PER_HOUR: '40',
+        GLOBAL_SIGNUPS_PER_HOUR: '600',
+        GLOBAL_RECOVERIES_PER_HOUR: '200',
+      });
+      expect([d.SIGNUPS_PER_IP_PER_HOUR, d.GLOBAL_SIGNUPS_PER_HOUR, d.GLOBAL_RECOVERIES_PER_HOUR]).toEqual([
+        40, 600, 200,
+      ]);
+      for (const bad of ['0', '-1', 'muitos', '1000000'])
+        expect(() => loadConfig({ GLOBAL_SIGNUPS_PER_HOUR: bad }), bad).toThrow(/GLOBAL_SIGNUPS_PER_HOUR/);
     });
   });
 
+  it('exige domínio público em produção e recusa protótipo nesse ambiente', () => {
+    const cloud = { APP_ENV: 'producao', DATABASE_URL: 'postgres://x', SESSION_SECRET: SECRET, QR_HMAC_KEYS: QR };
+    expect(() => loadConfig(cloud)).toThrow(/PUBLIC_BASE_URL/);
+    expect(() =>
+      loadConfig({ ...cloud, PUBLIC_BASE_URL: 'https://partyx.example.com', ENABLE_PROTOTYPE: 'true' }),
+    ).toThrow(/ENABLE_PROTOTYPE/);
+    expect(loadConfig({ ...cloud, PUBLIC_BASE_URL: 'https://partyx.example.com' }).ENABLE_PROTOTYPE).toBe('false');
+  });
+
   describe('ambiente das credenciais do gateway', () => {
-    const cloud = { DATABASE_URL: 'postgres://x', SESSION_SECRET: 's'.repeat(40), QR_HMAC_KEYS: `1:${Buffer.alloc(48, 2).toString('base64url')}`, TURNSTILE_SECRET: 'segredo-turnstile-teste', TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste' };
+    const cloud = {
+      PUBLIC_BASE_URL: 'https://partyx.example.com',
+      DATABASE_URL: 'postgres://x',
+      SESSION_SECRET: 's'.repeat(40),
+      QR_HMAC_KEYS: `1:${Buffer.alloc(48, 2).toString('base64url')}`,
+      TURNSTILE_SECRET: 'segredo-turnstile-teste',
+      TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
+    };
     it('credenciais de SANDBOX em produção são recusadas; de PRODUÇÃO em homologação também', () => {
-      expect(() => loadConfig({ APP_ENV: 'producao', GATEWAY_ENVIRONMENT: 'sandbox', ...cloud })).toThrow(/SANDBOX do gateway em produção/);
-      expect(() => loadConfig({ APP_ENV: 'homologacao', GATEWAY_ENVIRONMENT: 'producao', ...cloud })).toThrow(/PRODUÇÃO do gateway em homologação/);
+      expect(() => loadConfig({ APP_ENV: 'producao', GATEWAY_ENVIRONMENT: 'sandbox', ...cloud })).toThrow(
+        /SANDBOX do gateway em produção/,
+      );
+      expect(() => loadConfig({ APP_ENV: 'homologacao', GATEWAY_ENVIRONMENT: 'producao', ...cloud })).toThrow(
+        /PRODUÇÃO do gateway em homologação/,
+      );
       expect(loadConfig({ APP_ENV: 'producao', GATEWAY_ENVIRONMENT: 'producao', ...cloud }).APP_ENV).toBe('producao');
-      expect(loadConfig({ APP_ENV: 'homologacao', GATEWAY_ENVIRONMENT: 'sandbox', ...cloud }).APP_ENV).toBe('homologacao');
+      expect(loadConfig({ APP_ENV: 'homologacao', GATEWAY_ENVIRONMENT: 'sandbox', ...cloud }).APP_ENV).toBe(
+        'homologacao',
+      );
     });
     it('valor inválido é recusado', () => {
       expect(() => loadConfig({ GATEWAY_ENVIRONMENT: 'teste' })).toThrow(/GATEWAY_ENVIRONMENT/);

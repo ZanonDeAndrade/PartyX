@@ -45,6 +45,7 @@ exists() { "$@" >/dev/null 2>&1; }
 # Endereço run.app previsível (nome do serviço + número do projeto). É o `audience` dos tokens das tarefas e do Scheduler,
 # e para onde elas são entregues. Não é o domínio próprio: o Cloud Tasks e o Scheduler chamam o Cloud Run direto.
 run_url() { echo "https://${SERVICE}-$(g projects describe "$PROJECT" --format='value(projectNumber)').${REGION}.run.app"; }
+public_host() { node -e 'process.stdout.write(new URL(process.argv[1]).host)' "$PUBLIC_BASE_URL"; }
 
 cmd_setup() {
   : "${BILLING_ACCOUNT:?informe BILLING_ACCOUNT}"
@@ -128,10 +129,12 @@ cmd_setup() {
 # Varredura diária, UMA vez por dia, de madrugada: rede de segurança para e-mails pendentes e para qualquer pagamento que escapou.
 # Acorda o Neon por alguns minutos por dia. Rodar depois do primeiro deploy (precisa do serviço no ar).
 cmd_varredura() {
-  local url; url="$(run_url)"
+  : "${PUBLIC_BASE_URL:?informe PUBLIC_BASE_URL para o X-Forwarded-Host da varredura}"
+  local url host; url="$(run_url)"; host="$(public_host)"
   local verb=create; exists g scheduler jobs describe "$SWEEP_JOB" --location="$REGION" && verb=update
   g scheduler jobs "$verb" http "$SWEEP_JOB" --location="$REGION" --schedule="0 4 * * *" --time-zone="America/Sao_Paulo" \
     --uri="$url/api/internal/jobs/reconcile-payments" --http-method=POST \
+    --headers="X-Forwarded-Host=$host" \
     --oidc-service-account-email="$(sa $SCHED_SA)" --oidc-token-audience="$url" --attempt-deadline=120s --max-retry-attempts=1
   echo "Varredura diária às 04:00 (America/Sao_Paulo) -> $url"
 }
@@ -192,7 +195,7 @@ cmd_deploy() {
     [ "$GO_LIVE_CONFIRMED" = "sim-aceite-e-autorizacao-registrados" ] || { echo "Recuso: registre aceite/autorização e use GO_LIVE_CONFIRMED=sim-aceite-e-autorizacao-registrados." >&2; exit 1; }
     [ "${VISUAL_APPROVED:-}" = "true" ] || { echo "Recuso: identidade visual sem aprovação escrita (CA-33)." >&2; exit 1; }
   fi
-  local tag="${TAG:-$(date -u +%Y%m%d-%H%M%S)}" url; url="$(run_url)"
+  local tag="${TAG:-$(date -u +%Y%m%d-%H%M%S)}" url host; url="$(run_url)"; host="$(public_host)"
   export IMAGE="$REGION-docker.pkg.dev/$PROJECT/$REPO/partyx-api:$tag"
 
   echo "== build $tag (Cloud Build, manual: só roda quando você chama)"
@@ -209,11 +212,11 @@ cmd_deploy() {
     "PUBLIC_BASE_URL=$PUBLIC_BASE_URL" "BANNER_BUCKET=$BANNERS" "JOBS_AUDIENCE=$url"
     "JOBS_CALLER_EMAIL=$(sa $SCHED_SA),$(sa $TASKS_SA)"
     "TASKS_QUEUE=projects/$PROJECT/locations/$REGION/queues/$QUEUE" "TASKS_INVOKER_EMAIL=$(sa $TASKS_SA)"
-    "TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-false}" "GLOBAL_SIGNUPS_PER_HOUR=${GLOBAL_SIGNUPS_PER_HOUR:-30}" "GLOBAL_RECOVERIES_PER_HOUR=${GLOBAL_RECOVERIES_PER_HOUR:-60}"
+    "TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-false}" "GLOBAL_SIGNUPS_PER_HOUR=${GLOBAL_SIGNUPS_PER_HOUR:-1000}" "SIGNUPS_PER_IP_PER_HOUR=${SIGNUPS_PER_IP_PER_HOUR:-100}" "GLOBAL_RECOVERIES_PER_HOUR=${GLOBAL_RECOVERIES_PER_HOUR:-60}"
     ${GATEWAY_ENVIRONMENT:+"GATEWAY_ENVIRONMENT=$GATEWAY_ENVIRONMENT"}
     "QR_HMAC_CURRENT=${QR_HMAC_CURRENT:-1}" "SALES_OPEN=$sales" "PAYMENT_GATEWAY=$gateway" "VISUAL_APPROVED=${VISUAL_APPROVED:-false}")
   for v in TERMS_VERSION PRIVACY_VERSION CANCELLATION_VERSION EMAIL_FROM EMAIL_REPLY_TO RESERVATION_MINUTES MAX_TICKETS_PER_ORDER \
-           RETENTION_LOGIN_ATTEMPTS_DAYS RETENTION_SESSIONS_DAYS RETENTION_PASSWORD_RESETS_DAYS; do
+           RETENTION_LOGIN_ATTEMPTS_DAYS RETENTION_SESSIONS_DAYS RETENTION_PASSWORD_RESETS_DAYS GATE_SCANS_PER_MINUTE GATE_SEARCHES_PER_MINUTE; do
     [ -z "${!v:-}" ] || vars+=("$v=${!v}")
   done
   [ "${TURNSTILE_ENABLED:-false}" != "true" ] || vars+=("TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY")
@@ -239,7 +242,7 @@ cmd_deploy() {
     [ "$i" = 5 ] && { echo "FALHOU: /api/health/ready" >&2; exit 1; }; sleep 3
   done
   curl -fsS "$url/api/health" >/dev/null
-  curl -fsS "$url/api/public/site" | grep -q "\"salesOpen\":$sales" || { echo "FALHOU: salesOpen difere do esperado" >&2; exit 1; }
+  curl -fsS -H "X-Forwarded-Host: $host" "$url/api/public/site" | grep -q "\"salesOpen\":$sales" || { echo "FALHOU: salesOpen difere do esperado" >&2; exit 1; }
   curl -fsSI "$url/api/health" | tr -d '\r' | grep -qi '^cache-control: private, no-store' || { echo "FALHOU: /api sem Cache-Control private, no-store" >&2; exit 1; }
   echo "pronto. Ajuda para voltar: ./infra/producao/deploy.sh rollback"
 }

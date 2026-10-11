@@ -12,10 +12,12 @@ import { isLegalKind, legalDocument, parseBlocks, salesBlockers } from './docume
 const prod = (extra: Record<string, string> = {}) =>
   loadConfig({
     APP_ENV: 'producao',
+    PUBLIC_BASE_URL: 'https://partyx.example.com',
     DATABASE_URL: 'postgres://x',
     SESSION_SECRET: 's'.repeat(40),
     QR_HMAC_KEYS: `1:${randomBytes(32).toString('base64url')}`,
-    TURNSTILE_SECRET: 'segredo-turnstile-teste', TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
+    TURNSTILE_SECRET: 'segredo-turnstile-teste',
+    TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
     ...extra,
   });
 const dirWith = (files: Record<string, string>) => {

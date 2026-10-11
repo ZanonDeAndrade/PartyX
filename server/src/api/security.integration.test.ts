@@ -1,4 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app';
 import { loadConfig } from '../config';
@@ -197,6 +200,132 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
   });
 
   describe('cabeçalhos, cookies e CSRF', () => {
+    it('em produção, mutações sem sessão exigem Origin público ou Sec-Fetch-Site same-origin', async () => {
+      const prod = createApp({
+        config: { ...config, APP_ENV: 'producao', PUBLIC_BASE_URL: 'https://partyx.example.com' },
+        clock,
+        auth: { db: createDrizzle(testDb.pool), hasher: argon2Hasher, mailer: new MemoryEmailSender() },
+      });
+      for (const route of [
+        '/auth/login',
+        '/auth/register',
+        '/auth/password/forgot',
+        '/auth/password/check',
+        '/auth/password/reset',
+      ]) {
+        const url = `https://partyx.example.com/api${route}`;
+        const body = JSON.stringify({});
+        const headers = { host: 'partyx.example.com', 'content-type': 'application/json' };
+        expect((await prod.request(url, { method: 'POST', headers, body })).status).toBe(403);
+        expect(
+          (await prod.request(url, { method: 'POST', headers: { ...headers, origin: 'https://evil.example' }, body }))
+            .status,
+        ).toBe(403);
+        expect(
+          (
+            await prod.request(url, {
+              method: 'POST',
+              headers: { ...headers, origin: 'https://partyx.example.com' },
+              body,
+            })
+          ).status,
+        ).not.toBe(403);
+        expect(
+          (await prod.request(url, { method: 'POST', headers: { ...headers, 'sec-fetch-site': 'same-origin' }, body }))
+            .status,
+        ).not.toBe(403);
+      }
+    });
+
+    it('em produção, aceita o domínio e o encaminhamento medido do Hosting, mas recusa run.app direto', async () => {
+      const prod = createApp({
+        config: { ...config, APP_ENV: 'producao', PUBLIC_BASE_URL: 'https://partyx.example.com' },
+        clock,
+      });
+      expect(
+        (await prod.request('https://partyx.example.com/', { headers: { host: 'partyx.example.com' } })).status,
+      ).toBe(200);
+      expect(
+        (
+          await prod.request('https://servico.run.app/', {
+            headers: { host: 'servico.run.app', 'x-forwarded-host': 'partyx.example.com' },
+          })
+        ).status,
+      ).toBe(200);
+      expect((await prod.request('https://servico.run.app/', { headers: { host: 'servico.run.app' } })).status).toBe(
+        403,
+      );
+      expect(
+        (
+          await prod.request('https://servico.run.app/', {
+            headers: { host: 'servico.run.app', 'x-forwarded-host': 'outro.example.com' },
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (await prod.request('https://servico.run.app/api/health', { headers: { host: 'servico.run.app' } })).status,
+      ).toBe(200);
+    });
+
+    it('HTML restrito: visitante redireciona; validador só entra na portaria; cliente recebe G04', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'partyx-shell-'));
+      try {
+        await writeFile(path.join(dir, 'index.html'), '<!doctype html><title>Shell de teste</title>');
+        const htmlApp = createApp({
+          config: { ...config, WEB_DIST_DIR: dir },
+          clock,
+          auth: { db: createDrizzle(testDb.pool), hasher: argon2Hasher, mailer: new MemoryEmailSender() },
+        });
+        const anon = await htmlApp.request('/admin/pedidos?q=1');
+        expect(anon.status).toBe(302);
+        expect(anon.headers.get('location')).toBe('/entrar?voltar=%2Fadmin%2Fpedidos%3Fq%3D1');
+        for (const route of ['/portaria', '/primeiro-acesso']) {
+          const res = await htmlApp.request(route);
+          expect(res.status).toBe(302);
+          expect(res.headers.get('location')).toBe(`/entrar?voltar=${encodeURIComponent(route)}`);
+        }
+        const val = await session('validador');
+        expect((await htmlApp.request('/portaria', { headers: { cookie: val.cookie } })).status).toBe(200);
+        const denied = await htmlApp.request('/admin', { headers: { cookie: val.cookie } });
+        expect(denied.status).toBe(403);
+        const deniedHtml = await denied.text();
+        expect(deniedHtml).toContain('G04');
+        expect(deniedHtml).toContain('href="/portaria"');
+        expect(deniedHtml).not.toContain('Shell de teste');
+        const client = await session('cliente');
+        for (const route of ['/admin', '/admin/pedidos', '/portaria', '/portaria/qualquer', '/primeiro-acesso']) {
+          const res = await htmlApp.request(route, { headers: { cookie: client.cookie } });
+          expect(res.status).toBe(403);
+          expect(await res.text()).toContain('href="/minha-conta"');
+        }
+        const adm = await session('administrador');
+        expect((await htmlApp.request('/admin', { headers: { cookie: adm.cookie } })).status).toBe(200);
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('protótipo e docs só entregam HTML em homologação com ENABLE_PROTOTYPE=true', async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), 'partyx-proto-'));
+      try {
+        await writeFile(path.join(dir, 'index.html'), '<!doctype html><title>Shell de teste</title>');
+        const make = (appEnv: 'homologacao' | 'producao', enabled: boolean) =>
+          createApp({
+            config: { ...config, APP_ENV: appEnv, ENABLE_PROTOTYPE: enabled ? 'true' : 'false', WEB_DIST_DIR: dir },
+            clock,
+          });
+        for (const route of ['/prototipo', '/docs', '/docs/fundamentos', '/docs-qualquer']) {
+          expect((await make('homologacao', false).request(route)).status).toBe(404);
+          expect((await make('homologacao', true).request(route)).status).toBe(200);
+          expect(
+            (await make('producao', true).request(`http://localhost${route}`, { headers: { host: 'localhost' } }))
+              .status,
+          ).toBe(404);
+        }
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    });
     it('CSP restritiva, HSTS, sem enquadramento, câmera só do próprio site', async () => {
       const res = await app.request('/api/health');
       const csp = res.headers.get('content-security-policy')!;

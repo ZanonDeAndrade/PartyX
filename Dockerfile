@@ -2,11 +2,13 @@
 # Nenhum segredo entra na imagem: variáveis vêm do Cloud Run e do Secret Manager.
 
 FROM node:24-slim AS build
+ARG APP_ENV=producao
+ARG ENABLE_PROTOTYPE=false
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN APP_ENV="$APP_ENV" ENABLE_PROTOTYPE="$ENABLE_PROTOTYPE" npm run build
 
 FROM node:24-slim AS runtime
 ENV NODE_ENV=production

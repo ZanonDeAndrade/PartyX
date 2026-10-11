@@ -43,6 +43,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
         method,
         headers: {
           origin: ORIGIN,
+          host: 'localhost',
           'content-type': 'application/json',
           'user-agent': 'teste',
           'x-forwarded-for': '203.0.113.7',
@@ -102,7 +103,9 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
     await testDb?.drop();
   });
   beforeEach(async () => {
-    await sql('truncate login_attempts, sessions, password_resets, consents, email_log, global_limit_counters, users cascade');
+    await sql(
+      'truncate login_attempts, sessions, password_resets, consents, email_log, global_limit_counters, users cascade',
+    );
     clock.set('2026-10-17T12:00:00Z');
     mailer = new MemoryEmailSender();
     app = build();
@@ -201,10 +204,12 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
     it('em produção, sem os textos legais do cliente, o cadastro real é bloqueado', async () => {
       const cfg = config({
         APP_ENV: 'producao',
+        PUBLIC_BASE_URL: ORIGIN,
         DATABASE_URL: 'postgres://x',
         SESSION_SECRET: 'x'.repeat(40),
         QR_HMAC_KEYS: `1:${randomBytes(32).toString('base64url')}`,
-        TURNSTILE_SECRET: 'segredo-turnstile-teste', TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
+        TURNSTILE_SECRET: 'segredo-turnstile-teste',
+        TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
       });
       expect(cfg.legal).toMatchObject({ ready: false, provisional: false });
       const res = await browser(() => build({ cfg })).call('POST', '/auth/register', person());
@@ -216,10 +221,12 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
     it('em produção com os textos informados, o cadastro volta a funcionar', async () => {
       const cfg = config({
         APP_ENV: 'producao',
+        PUBLIC_BASE_URL: ORIGIN,
         DATABASE_URL: 'postgres://x',
         QR_HMAC_KEYS: `1:${randomBytes(32).toString('base64url')}`,
         SESSION_SECRET: 'x'.repeat(40),
-        TURNSTILE_SECRET: 'segredo-turnstile-teste', TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
+        TURNSTILE_SECRET: 'segredo-turnstile-teste',
+        TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
         TERMS_VERSION: '2026-10',
         PRIVACY_VERSION: '2026-10',
       });
@@ -665,7 +672,11 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       const victim = person();
       expect((await call('/auth/register', { ...victim, captchaToken: 'bom-0' })).status).toBe(201);
       for (let i = 1; i <= 12; i++) {
-        const r = await call('/auth/password/forgot', { email: victim.email, captchaToken: `bom-${i}` }, `198.51.100.${i}`);
+        const r = await call(
+          '/auth/password/forgot',
+          { email: victim.email, captchaToken: `bom-${i}` },
+          `198.51.100.${i}`,
+        );
         expect(r.status).toBe(202); // a resposta é sempre a mesma: não revela o limite
       }
       expect(await recoveryEmails()).toBe(3);
@@ -674,7 +685,15 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
     it('o limite por IP continua como camada extra, sobre o token', async () => {
       const codes: number[] = [];
       for (let i = 1; i <= 24; i++)
-        codes.push((await call('/auth/password/forgot', { email: 'ninguem@exemplo.com', captchaToken: `bom-${i}` }, '203.0.113.99')).status);
+        codes.push(
+          (
+            await call(
+              '/auth/password/forgot',
+              { email: 'ninguem@exemplo.com', captchaToken: `bom-${i}` },
+              '203.0.113.99',
+            )
+          ).status,
+        );
       expect(codes.slice(0, 20).every(c => c === 202)).toBe(true);
       expect(codes.slice(20).every(c => c === 429)).toBe(true);
     });
@@ -691,9 +710,27 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
   });
 
   describe('limites GLOBAIS de cadastro e de recuperação (no banco, sem depender de IP)', () => {
+    it('cadastro aceita tetos configuráveis por IP e global sem compartilhar o bloqueio local entre IPs', async () => {
+      expect(config().SIGNUPS_PER_IP_PER_HOUR).toBe(100);
+      expect(config().GLOBAL_SIGNUPS_PER_HOUR).toBe(1000);
+      const capped = build({ cfg: config({ SIGNUPS_PER_IP_PER_HOUR: '2', GLOBAL_SIGNUPS_PER_HOUR: '10' }) });
+      const send = (i: number, ip: string) =>
+        capped.request('/api/auth/register', {
+          method: 'POST',
+          headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': ip },
+          body: JSON.stringify(person({ cpf: cpfFor(i) })),
+        });
+      expect((await send(1, '198.51.100.1')).status).toBe(201);
+      expect((await send(2, '198.51.100.1')).status).toBe(201);
+      expect((await send(3, '198.51.100.1')).status).toBe(429);
+      expect((await send(4, '198.51.100.2')).status).toBe(201);
+    });
     /** CPF válido e diferente para cada índice. */
     const cpfFor = (i: number) => {
-      const d = String(100000000 + i * 7919).slice(0, 9).split('').map(Number);
+      const d = String(100000000 + i * 7919)
+        .slice(0, 9)
+        .split('')
+        .map(Number);
       const dv = (a: number[], w: number) => {
         const r = (a.reduce((t, x, k) => t + x * (w - k), 0) * 10) % 11;
         return r === 10 ? 0 : r;
@@ -711,11 +748,15 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
         headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': ip },
         body: JSON.stringify(body),
       });
-    const signup = (i: number, ip = `198.51.100.${i + 1}`, over: Record<string, unknown> = {}) => post('/auth/register', person({ cpf: cpfFor(i), ...over }), ip);
+    const signup = (i: number, ip = `198.51.100.${i + 1}`, over: Record<string, unknown> = {}) =>
+      post('/auth/register', person({ cpf: cpfFor(i), ...over }), ip);
     const users = async () => (await sql('select count(*)::int as n from users')).rows[0].n as number;
     const stderr = () => {
       const spy = vi.spyOn(process.stderr, 'write');
-      return { spy, alerts: () => spy.mock.calls.map(c => String(c[0])).filter(l => l.includes('"alert":"limite_global_atingido"')) };
+      return {
+        spy,
+        alerts: () => spy.mock.calls.map(c => String(c[0])).filter(l => l.includes('"alert":"limite_global_atingido"')),
+      };
     };
 
     it('cadastro: o 4º do total é recusado com 429 mesmo com IPs todos diferentes (IP forjado não fura); nada é criado', async () => {
@@ -755,7 +796,8 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       const unknown = await post('/auth/password/forgot', { email: 'ninguem@exemplo.com' }, '10.0.0.2');
       expect([first.status, unknown.status]).toEqual([202, 202]);
       expect(await first.json()).toEqual(await unknown.json());
-      for (let i = 3; i <= 5; i++) expect((await post('/auth/password/forgot', { email: `x${i}@exemplo.com` }, `10.0.0.${i}`)).status).toBe(202);
+      for (let i = 3; i <= 5; i++)
+        expect((await post('/auth/password/forgot', { email: `x${i}@exemplo.com` }, `10.0.0.${i}`)).status).toBe(202);
       const over = await post('/auth/password/forgot', { email: real.email }, '10.0.0.99');
       const overUnknown = await post('/auth/password/forgot', { email: 'ninguem@exemplo.com' }, '10.0.0.98');
       expect([over.status, overUnknown.status]).toEqual([429, 429]); // existir ou não a conta não muda nada
@@ -767,9 +809,21 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
     it('recuperação: o limite por CONTA (3 por hora) continua valendo por dentro do global', async () => {
       const wide = build({ cfg: config({ GLOBAL_RECOVERIES_PER_HOUR: '100' }) });
       const p = person();
-      expect((await wide.request('/api/auth/register', { method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.9' }, body: JSON.stringify(p) })).status).toBe(201);
+      expect(
+        (
+          await wide.request('/api/auth/register', {
+            method: 'POST',
+            headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.9' },
+            body: JSON.stringify(p),
+          })
+        ).status,
+      ).toBe(201);
       for (let i = 0; i < 8; i++)
-        await wide.request('/api/auth/password/forgot', { method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': `10.1.0.${i + 1}` }, body: JSON.stringify({ email: p.email }) });
+        await wide.request('/api/auth/password/forgot', {
+          method: 'POST',
+          headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': `10.1.0.${i + 1}` },
+          body: JSON.stringify({ email: p.email }),
+        });
       expect(mailer.sent.filter(m => m.template === 'recuperacao_senha')).toHaveLength(3);
     });
 
@@ -779,7 +833,8 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
         for (let i = 1; i <= 3; i++) await signup(i);
         for (let i = 4; i <= 14; i++) await signup(i, `203.0.113.${i}`);
         for (let i = 1; i <= 5; i++) await post('/auth/password/forgot', { email: `y${i}@exemplo.com` }, `10.2.0.${i}`);
-        for (let i = 6; i <= 20; i++) await post('/auth/password/forgot', { email: `y${i}@exemplo.com` }, `10.2.0.${i}`);
+        for (let i = 6; i <= 20; i++)
+          await post('/auth/password/forgot', { email: `y${i}@exemplo.com` }, `10.2.0.${i}`);
         const lines = a.alerts();
         expect(lines).toHaveLength(2); // um de cadastro e um de recuperação, apesar de dezenas de recusas
         expect(lines.some(l => l.includes('"kind":"cadastro"') && l.includes('"limitPerHour":3'))).toBe(true);

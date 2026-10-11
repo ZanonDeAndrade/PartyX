@@ -25,6 +25,17 @@ O [registro da execução](../registros/testes-postgresql-2026-10-10.md) comprov
 
 Esta verificação é local com PostgreSQL e gateway fictício. Os critérios que dependem de sandbox do gateway real, aparelhos reais ou decisões da PartyX mantêm as pendências indicadas abaixo.
 
+## Revalidação dos achados da auditoria em 10/10/2026
+
+Foram aprovados 752 testes com PostgreSQL (748 na suíte principal e 4 de papéis), além de lint, typecheck e build. O relatório e os riscos residuais estão em `../relatorio-correcoes-auditoria-2026-10-10.md` e `../registros/riscos-aceitos.md`.
+
+| Requisitos e controles revalidados | Evidência |
+|---|---|
+| RF-09, CA-05: autorização das páginas HTML antes do shell | `server/src/api/security.integration.test.ts` |
+| Origem das mutações anônimas e roteamento Host/Hosting | `server/src/api/security.integration.test.ts` |
+| Limites por IP e globais de cadastro e portaria | `server/src/api/auth.integration.test.ts`, `server/src/api/gate.integration.test.ts` |
+| Protótipo e documentação restritos à homologação | `server/src/api/security.integration.test.ts`, build de produção |
+
 ## Requisitos funcionais (RF-01 a RF-68)
 
 | ID | Requisito (texto da documentação) | Módulo | Anexo I | Implementar em | Testar em | Design (telas) | Situação do design | Implementação real | Evidência |
@@ -37,7 +48,7 @@ Esta verificação é local com PostgreSQL e gateway fictício. Os critérios qu
 | RF-06 | Área do cliente com edição de nome, telefone e senha (e-mail e CPF editáveis só pelo administrador, para evitar fraude). | Usuários, cadastro e acesso | 1 | P05 | P26 | U06, U07, ADM13 correção | Representado | Implementada (edição de nome, telefone e senha pelo cliente; e-mail e CPF só pelo administrador, com motivo e auditoria) | `server/src/api/auth.integration.test.ts`, `server/src/api/team.integration.test.ts` |
 | RF-07 | Perfis: administrador, validador e cliente. | Usuários, cadastro e acesso | 8 | P06 | P26 | A01, ADM20, ADM21 | Representado | Implementada (API) | `server/src/api/team.integration.test.ts` |
 | RF-08 | Administrador cadastra, edita, ativa e desativa usuários da equipe. | Usuários, cadastro e acesso | 8 | P06 | P26 | ADM20, ADM21, ADM22 | Representado | Implementada (API) | `server/src/api/team.integration.test.ts` |
-| RF-09 | Cada rota do sistema verifica a permissão do perfil no servidor, não só na interface. | Usuários, cadastro e acesso | 8 | P06 | P26 | G04 | Representado; validação depende da implementação | Implementada (API) | `server/src/api/team.integration.test.ts` |
+| RF-09 | Cada rota do sistema verifica a permissão do perfil no servidor, não só na interface. | Usuários, cadastro e acesso | 8 | P06 | P26 | G04 | Representado; validação depende da implementação | Implementada (API e HTML de `/admin/*`, `/portaria/*` e `/primeiro-acesso`) | `server/src/api/team.integration.test.ts`, `server/src/api/security.integration.test.ts` |
 | RF-10 | Limite de tentativas de login (ex.: 5 falhas em 15 minutos bloqueiam temporariamente). | Usuários, cadastro e acesso | 1 | P05 | P26 | A01 bloqueio | Representado; validação depende da implementação | Implementada (API) | `server/src/api/auth.integration.test.ts` |
 | RF-11 | Cadastro, edição, publicação e encerramento de eventos. | Gestão de eventos, ingressos e promoters | 6 | P07 | P26 | ADM02, ADM03, ADM04 | Representado | Implementada (API) | `server/src/api/events.integration.test.ts` |
 | RF-12 | Campos: nome, data, horário, local, descrição, atrações, banner e classificação etária. | Gestão de eventos, ingressos e promoters | 6 | P07 | P26 | ADM03, P03 | Representado | Implementada (API) | `server/src/api/events.integration.test.ts` |
@@ -106,7 +117,7 @@ Esta verificação é local com PostgreSQL e gateway fictício. Os critérios qu
 | CA-02 | CPF inválido ou já cadastrado é recusado com mensagem clara. | Usuários, cadastro e acesso | 1 | P05 | P24, P26 | A02 erros | Representado; validação depende da implementação | Implementada (API) | `server/src/api/auth.integration.test.ts` |
 | CA-03 | Sem marcar o aceite dos termos, o cadastro não é concluído. | Usuários, cadastro e acesso | 1 | P05 | P24, P26 | A02 | Representado | Implementada (API) | `server/src/api/auth.integration.test.ts` |
 | CA-04 | A recuperação de senha funciona e o link não funciona uma segunda vez. | Usuários, cadastro e acesso | 1 | P05 | P24, P26 | A05 → A06 → A05 usado | Representado; validação depende da implementação | Implementada (link de uso único, vencimento de 1 hora e e-mail com o link na captura local; **entrega real depende de D-08/D-09**) | `server/src/api/auth.integration.test.ts`, `server/src/api/mail.integration.test.ts` |
-| CA-05 | Um validador não consegue abrir telas do administrador, nem digitando o endereço. | Usuários, cadastro e acesso | 8 | P06 | P24, P26 | G04 | Representado; validação depende da implementação | Implementada (API) | `server/src/api/team.integration.test.ts` |
+| CA-05 | Um validador não consegue abrir telas do administrador, nem digitando o endereço. | Usuários, cadastro e acesso | 8 | P06 | P24, P26 | G04 | Representado; validação depende da implementação | Implementada (API e HTML: 403 G04; validador entra na portaria, cliente em nenhuma das duas) | `server/src/api/team.integration.test.ts`, `server/src/api/security.integration.test.ts` |
 | CA-06 | Um usuário desativado não consegue entrar. | Usuários, cadastro e acesso | 8 | P06 | P24, P26 | A01 desativada, ADM21 | Representado; validação depende da implementação | Implementada (API) | `server/src/api/team.integration.test.ts` |
 | CA-07 | Um evento em rascunho não aparece no site; ao publicar, aparece. | Gestão de eventos, ingressos e promoters | 6 | P07 | P24, P26 | ADM04, P07 rascunho, P01 | Representado | Implementada (rascunho 404 na vitrine e no OG; publicar faz aparecer) | `server/src/api/events.integration.test.ts`, `server/src/api/public.integration.test.ts` |
 | CA-08 | Um tipo de ingresso fora do período de vendas aparece como "vendas encerradas" ou "em breve". | Gestão de eventos, ingressos e promoters | 6 | P07 | P24, P26 | P03 variantes | Representado | Implementada (página mostra "em breve" e "vendas encerradas") | `server/src/api/events.integration.test.ts`, `server/src/domain/events.test.ts`, `server/src/api/public.integration.test.ts` |

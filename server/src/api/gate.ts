@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { createMemoryLimiter } from '../auth/limits';
+import { consumeGlobal } from '../auth/globalLimits';
 import { requireRole, ROUTE_POLICY } from '../auth/permissions';
 import type { AuthDeps, AuthVariables } from '../auth/types';
 import { AppError } from '../domain/errors';
@@ -58,6 +59,7 @@ export function gateRoutes(deps: AuthDeps) {
   app.post('/gate/scan', async c => {
     const v = who(c);
     if (scanLimit.hit(v.id)) throw tooMany();
+    await consumeGlobal(deps, 'portaria_leitura', deps.config.GATE_SCANS_PER_MINUTE);
     const body = await parseJson(c, z.object({ eventId: uuid, qr: z.string().min(1).max(300) }));
     return c.json(await scan(gateDeps, v, body));
   });
@@ -65,6 +67,7 @@ export function gateRoutes(deps: AuthDeps) {
   app.post('/gate/search', async c => {
     const v = who(c);
     if (searchLimit.hit(v.id)) throw tooMany();
+    await consumeGlobal(deps, 'portaria_busca', deps.config.GATE_SEARCHES_PER_MINUTE);
     const body = await parseJson(c, z.object({ eventId: uuid, q: z.string().max(200) }));
     return c.json(await searchTickets(gateDeps, v, body));
   });
@@ -72,6 +75,7 @@ export function gateRoutes(deps: AuthDeps) {
   app.post('/gate/admit', async c => {
     const v = who(c);
     if (scanLimit.hit(v.id)) throw tooMany();
+    await consumeGlobal(deps, 'portaria_leitura', deps.config.GATE_SCANS_PER_MINUTE);
     const body = await parseJson(c, z.object({ eventId: uuid, ticketId: uuid }));
     return c.json(await admitManually(gateDeps, v, body));
   });

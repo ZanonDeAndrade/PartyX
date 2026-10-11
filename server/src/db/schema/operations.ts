@@ -1,5 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, jsonb, pgTable, primaryKey, text, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { createdAt, instant } from './columns';
 import { checkinMethod, checkinResult, emailStatus, emailTemplate } from './enums';
 import { events } from './events';
@@ -127,10 +138,8 @@ export const auditLog = pgTable(
 );
 
 /**
- * Contadores dos limites GLOBAIS (cadastros e pedidos de recuperação de senha por hora, no total). No banco porque há várias instâncias
- * do Cloud Run e porque o limite não pode depender de IP. Janela deslizante de 60 minutos feita de baldes de 10 minutos: `bucket` é o
- * início do balde; `alerted_at` marca o balde em que o alerta de limite atingido já foi dado (um alerta por balde, não um por requisição).
- * Tabela técnica (fora das 14 da documentação). Cresce 6 linhas por hora por tipo; sem dado pessoal.
+ * Contadores compartilhados de cadastro, recuperação e portaria. Cadastro e recuperação usam baldes de 10 minutos;
+ * portaria usa baldes de 1 minuto. `alerted_at` marca o alerta emitido para cada balde. Sem dados pessoais.
  */
 export const globalLimitCounters = pgTable(
   'global_limit_counters',
@@ -140,8 +149,5 @@ export const globalLimitCounters = pgTable(
     count: integer('count').notNull().default(0),
     alertedAt: instant('alerted_at'),
   },
-  t => [
-    primaryKey({ columns: [t.kind, t.bucket] }),
-    check('global_limit_counters_count_nonneg', sql`${t.count} >= 0`),
-  ],
+  t => [primaryKey({ columns: [t.kind, t.bucket] }), check('global_limit_counters_count_nonneg', sql`${t.count} >= 0`)],
 );

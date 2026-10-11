@@ -1,7 +1,9 @@
 # Como publicar o PartyX em produção (custo mínimo)
 
 Google Cloud (Cloud Run + Cloud Tasks) em **São Paulo**, **Firebase Hosting** na frente (domínio próprio, HTTPS e CDN) e **Neon** (Postgres) em `aws-sa-east-1`.
-Tudo aqui foi **preparado e testado onde foi possível, mas a produção ainda não foi criada**. Nada neste roteiro foi executado em produção.
+Este roteiro registra a preparação original e o primeiro deploy descrito na seção 13. Nenhuma publicação foi feita nesta correção.
+
+**Roteamento validado para o deploy atual:** em produção, o Hono aceita o `Host` de `PUBLIC_BASE_URL` ou o encaminhamento medido do Firebase Hosting (`Host=*.run.app` e `X-Forwarded-Host=PUBLIC_BASE_URL`). Acesso ao `run.app` sem esse cabeçalho recebe 403, exceto nos health checks. Cloud Tasks, Scheduler e o teste rápido enviam o mesmo cabeçalho ao chamar o serviço diretamente. O script está liberado, mas não foi executado nesta correção.
 
 ```
 navegador ──HTTPS──> Firebase Hosting (domínio próprio, CDN) ──rewrite "**"──> Cloud Run "partyx" (SP) ──pooler──> Neon (sa-east-1)
@@ -34,11 +36,11 @@ navegador ──HTTPS──> Firebase Hosting (domínio próprio, CDN) ──rew
 | `x-forwarded-proto`, `via` | `https`, `1.1 Firebase Hosting` |
 | **Direto no `run.app`** com `1.2.3.4, 5.6.7.8` forjado | `1.2.3.4, 5.6.7.8,<IP real>` (o Google acrescenta o real no fim) |
 
-**Valor correto de `TRUSTED_PROXY_HOPS`: 2** atrás do Hosting (o cliente é o penúltimo da lista). Com 1, todos os usuários cairiam no mesmo IP do Google e os limites por IP (cadastro: 10/h, recuperação: 20/h) bloqueariam todo mundo junto.
+**Valor medido de `TRUSTED_PROXY_HOPS`: 2** atrás do Hosting (o cliente é o penúltimo da lista). Com 1, todos os usuários cairiam no mesmo IP do Google e os limites por IP bloqueariam todo mundo junto. A regra de Host não altera `X-Forwarded-For`, portanto o valor continua correto. Revalidar os saltos se a infraestrutura de entrada mudar.
 
-**Risco residual (não resolvido):** o `run.app` precisa ficar público (o Hosting, o Cloud Tasks e o Scheduler chamam por ele). Quem acessar o `run.app` direto pode forjar o penúltimo item e escolher a "chave de IP" dos limites. **Não afeta** o bloqueio de login por conta (5 falhas em 15 min por e-mail, no banco). Mitigação atual: `max-instances` baixo. Reforço possível depois (não implementado): só confiar no penúltimo item se o último for faixa de IP do Google.
+**Acesso direto ao `run.app`:** sem `X-Forwarded-Host` válido, o Hono devolve 403 antes de ler o IP ou rotear a API. Esse cabeçalho pode ser forjado por um cliente HTTP direto, portanto a barreira reduz acesso casual e não comprova a origem. O risco residual e a alternativa futura estão em `docs/registros/riscos-aceitos.md`.
 
-**Latência (medida, 15 requisições, uma única origem, conexão nova a cada requisição):** mediana 0,77 s pelo Hosting contra 0,32 s direto no Cloud Run, ou seja, **cerca de 0,4 s a mais**. Navegadores reutilizam conexão e devem ficar melhor, mas o domínio próprio via Hosting tem esse custo. Alternativa (balanceador) foi vetada pelo custo fixo.
+**Latência (medida, 15 requisições, uma única origem, conexão nova a cada requisição):** mediana 0,77 s pelo Hosting contra 0,32 s direto no Cloud Run, ou seja, **cerca de 0,4 s a mais**. Navegadores reutilizam conexão e devem ficar melhor, mas o domínio próprio via Hosting tem esse custo. O balanceador fica como evolução condicionada a abuso real ou aumento de tráfego e a aprovação do custo.
 
 ## 2. O que mudou no código
 
@@ -140,14 +142,15 @@ Instância parada cobra CPU e memória em tarifa reduzida: cerca de **US$ 0,014 
 ### Limites globais (no banco, valem entre todas as instâncias, não dependem de IP)
 | Limite | Padrão | Como conta |
 |---|---|---|
-| **Cadastros** novos, no total | **30 por hora** (`GLOBAL_SIGNUPS_PER_HOUR`) | Confere **antes** e só conta **depois** de criar a conta. Tentativa inválida (CPF repetido, senha fraca, sem aceite) **não** gasta o limite |
+| **Cadastros** novos, no total | **1000 por hora** (`GLOBAL_SIGNUPS_PER_HOUR`) | Confere **antes** e só conta **depois** de criar a conta. Tentativa inválida (CPF repetido, senha fraca, sem aceite) **não** gasta o limite |
 | **Pedidos de recuperação** de senha, no total | **60 por hora** (`GLOBAL_RECOVERIES_PER_HOUR`) | Conta cada pedido aceito, de forma atômica (uma trava por tipo no banco), com o mesmo 202 exista a conta ou não |
 | **Por conta**, na recuperação (já existia) | 3 por hora | Dentro do global; vale com IP forjado |
-| Por IP (camada extra, já existia) | cadastro 10/h, recuperação 20/h por instância | Contornável chamando o `run.app` direto: por isso o global |
+| Por IP (camada rápida) | cadastro 100/h (`SIGNUPS_PER_IP_PER_HOUR`), recuperação 20/h por instância | Compartilhar NAT ainda pode concentrar usuários; acompanhar os 429 em uma abertura |
+| Portaria, todas as instâncias | 3000 leituras/min e 400 buscas/min (`GATE_SCANS_PER_MINUTE`, `GATE_SEARCHES_PER_MINUTE`) | Contador atômico no banco por minuto fixo; memória por validador filtra primeiro |
 
 Janela deslizante de 60 minutos feita de baldes de 10 minutos (tabela `global_limit_counters`, migração `0004`; na prática 50 a 60 minutos). Atingido o limite: **429 `limite_global`** e **um alerta `limite_global_atingido` por balde**, por tipo (não um por requisição), no canal de e-mail existente (`alerts.sh` cria a política). Provado: 60 pedidos simultâneos com limite 10 passam exatamente 10; IPs todos diferentes não furam; lixo não bloqueia cadastro legítimo.
 
-> **ATENÇÃO, evento:** 30 cadastros por hora é muito pouco para uma abertura de vendas com centenas de pessoas criando conta ao mesmo tempo. **Antes do evento, suba o limite** (`GLOBAL_SIGNUPS_PER_HOUR=600 ./infra/producao/deploy.sh deploy`, ou `gcloud run services update partyx --update-env-vars=GLOBAL_SIGNUPS_PER_HOUR=600`) e depois desça. Sem isso, a partir do 31º cadastro da hora, quem tentar recebe "Muitos cadastros neste momento". O limite é um disjuntor: também barra clientes de verdade.
+> **Dimensionamento provisório:** 1000 cadastros/h deixa espaço para uma abertura de vendas com centenas de compradores; 100/h por IP tolera redes compartilhadas melhor que 10/h. São tetos de proteção, não capacidade comprovada do banco ou do gateway. Medir a taxa de cadastro e os 429 na homologação antes do evento e ajustar as duas variáveis conforme a carga esperada.
 > **Custo de usar contador "aceito":** lixo enviado ao pedido de recuperação (e-mails inexistentes) também gasta os 60 por hora e bloqueia a recuperação de quem precisa até a janela deslizar.
 
 ### Como LIGAR o Turnstile no futuro

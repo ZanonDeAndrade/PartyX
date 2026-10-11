@@ -67,8 +67,8 @@ function Denied() {
         <div className="px-box">
           <h1 className="px-h2">Acesso negado</h1>
           <p>Esta área é só para a equipe de portaria.</p>
-          <Link to="/" className="px-btn px-btn-pri">
-            Voltar ao início
+          <Link to="/minha-conta" className="px-btn px-btn-pri">
+            Ir para minha área
           </Link>
         </div>
       </div>

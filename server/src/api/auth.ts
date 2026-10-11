@@ -70,22 +70,31 @@ export function authRoutes(deps: AuthDeps) {
   const app = new Hono<{ Variables: AuthVariables }>();
   const secure = deps.config.APP_ENV !== 'local';
   const now = () => deps.clock.now().getTime();
-  // Camada extra por IP, por instância. O limite rigoroso entre instâncias do login está no banco (`auth/limits.ts`).
-  const registerLimiter = createMemoryLimiter({ max: 10, windowMs: 3_600_000, now });
+  // Camada rápida por IP e por instância; o teto global de cadastro fica no banco.
+  const registerLimiter = createMemoryLimiter({ max: deps.config.SIGNUPS_PER_IP_PER_HOUR, windowMs: 3_600_000, now });
   const resetLimiter = createMemoryLimiter({ max: 60, windowMs: 3_600_000, now });
   const forgotLimiter = createMemoryLimiter({ max: 20, windowMs: 3_600_000, now });
   /**
    * Verificação humana ANTES dos limites por IP e de qualquer trabalho no banco. O token não é forjável, ao contrário do IP vindo
-   * de um `X-Forwarded-For` quando o `run.app` é chamado direto. Sem token: 422 sem chamar a Cloudflare (não gasta cota).
+   * de um `X-Forwarded-For` quando o proxy não é confiável. Sem token: 422 sem chamar a Cloudflare (não gasta cota).
    */
   const requireHuman = async (token: string | undefined) => {
     if (!deps.human) return;
-    if (!token) throw new AppError(422, 'verificacao_humana_obrigatoria', 'Confirme que você não é um robô para continuar.');
+    if (!token)
+      throw new AppError(422, 'verificacao_humana_obrigatoria', 'Confirme que você não é um robô para continuar.');
     const result = await deps.human.verify(token);
     if (result === 'invalid')
-      throw new AppError(422, 'verificacao_humana_invalida', 'Não foi possível confirmar a verificação. Tente de novo.');
+      throw new AppError(
+        422,
+        'verificacao_humana_invalida',
+        'Não foi possível confirmar a verificação. Tente de novo.',
+      );
     if (result === 'unavailable')
-      throw new AppError(503, 'verificacao_indisponivel', 'A verificação está indisponível agora. Tente de novo em instantes.');
+      throw new AppError(
+        503,
+        'verificacao_indisponivel',
+        'A verificação está indisponível agora. Tente de novo em instantes.',
+      );
   };
   const tooMany = () => new AppError(429, 'muitas_requisicoes', 'Muitas tentativas. Aguarde um pouco e tente de novo.');
 

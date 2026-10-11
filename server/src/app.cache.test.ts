@@ -10,7 +10,10 @@ import { createFakeClock } from './providers/clock';
 function appWithDist() {
   const dist = mkdtempSync(path.join(tmpdir(), 'partyx-dist-'));
   mkdirSync(path.join(dist, 'assets'));
-  writeFileSync(path.join(dist, 'index.html'), '<!doctype html><html><head></head><body><div id="root"></div></body></html>');
+  writeFileSync(
+    path.join(dist, 'index.html'),
+    '<!doctype html><html><head></head><body><div id="root"></div></body></html>',
+  );
   writeFileSync(path.join(dist, 'assets', 'index-AbC123.js'), 'console.log(1)');
   writeFileSync(path.join(dist, 'assets', 'index-AbC123.css'), 'body{}');
   writeFileSync(path.join(dist, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
@@ -34,7 +37,13 @@ describe('política de cache', () => {
   const cc = async (path: string, init?: RequestInit) => (await app.request(path, init)).headers.get('cache-control');
 
   it('toda resposta de /api é private, no-store: sucesso, erro do banco, 404 e método errado', async () => {
-    for (const p of ['/api/health', '/api/health/ready', '/api/nao-existe', '/api/auth/nao-existe', '/api/public/events']) {
+    for (const p of [
+      '/api/health',
+      '/api/health/ready',
+      '/api/nao-existe',
+      '/api/auth/nao-existe',
+      '/api/public/events',
+    ]) {
       expect(await cc(p), p).toBe('private, no-store');
     }
     expect(await cc('/api/health', { method: 'POST' }), 'POST /api/health').toBe('private, no-store');
@@ -47,11 +56,12 @@ describe('política de cache', () => {
   });
 
   it('index.html e qualquer rota do app (fallback): no-cache, nunca imutável', async () => {
-    for (const p of ['/', '/index.html', '/meus-ingressos', '/portaria', '/rota/que/nao/existe']) {
+    for (const p of ['/', '/index.html', '/meus-ingressos', '/rota/que/nao/existe']) {
       const value = await cc(p);
       expect(value, p).toBe('no-cache');
       expect(value ?? '', p).not.toMatch(/immutable|max-age/);
     }
+    expect(await cc('/portaria')).toBe('private, no-store'); // redirecionamento dependente da sessão
   });
 
   it('demais estáticos (ícone) têm prazo curto', async () => {

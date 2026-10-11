@@ -45,6 +45,7 @@ const taskQueue =
     ? cloudTasksQueue({
         queuePath: config.TASKS_QUEUE,
         targetUrl: config.JOBS_AUDIENCE,
+        publicHost: new URL(config.PUBLIC_BASE_URL!).host,
         invokerEmail: config.TASKS_INVOKER_EMAIL,
       })
     : undefined;

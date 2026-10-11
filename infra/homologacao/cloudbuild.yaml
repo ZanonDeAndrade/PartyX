@@ -1,0 +1,4 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '--build-arg', 'APP_ENV=homologacao', '--build-arg', 'ENABLE_PROTOTYPE=true', '-t', '${_IMAGE}', '.']
+images: ['${_IMAGE}']

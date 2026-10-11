@@ -63,6 +63,8 @@ export interface CloudTasksConfig {
   queuePath: string;
   /** Endereço `run.app` do serviço (não o domínio próprio): é para onde a tarefa é entregue e o `audience` do token. */
   targetUrl: string;
+  /** Host público esperado pelo filtro de entrada quando a tarefa chama o run.app diretamente. */
+  publicHost: string;
   /** Conta de serviço em nome da qual o Cloud Tasks assina o token OIDC. */
   invokerEmail: string;
   /** Cliente HTTP autenticado. Padrão: credenciais da conta de serviço do Cloud Run. Injetável para verificação e testes. */
@@ -94,7 +96,7 @@ export function cloudTasksQueue(cfg: CloudTasksConfig): TaskQueue {
             httpRequest: {
               url: `${target}${path}`,
               httpMethod: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'X-Forwarded-Host': cfg.publicHost },
               body,
               oidcToken: { serviceAccountEmail: cfg.invokerEmail, audience: target },
             },
@@ -109,9 +111,19 @@ export function cloudTasksQueue(cfg: CloudTasksConfig): TaskQueue {
   }
   return {
     enqueue: task =>
-      post(`reconcile-${task.orderId}-${task.attempt}`, RECONCILE_TASK_PATH, { orderId: task.orderId, attempt: task.attempt }, task.delaySeconds),
+      post(
+        `reconcile-${task.orderId}-${task.attempt}`,
+        RECONCILE_TASK_PATH,
+        { orderId: task.orderId, attempt: task.attempt },
+        task.delaySeconds,
+      ),
     enqueueEmail: task =>
-      post(`email-${task.emailId}-${task.attempt}`, EMAIL_TASK_PATH, { emailId: task.emailId, attempt: task.attempt }, task.delaySeconds),
+      post(
+        `email-${task.emailId}-${task.attempt}`,
+        EMAIL_TASK_PATH,
+        { emailId: task.emailId, attempt: task.attempt },
+        task.delaySeconds,
+      ),
   };
 }
 

@@ -61,6 +61,7 @@ export function Gate({
   children: ReactNode;
   active: AdminTab;
 }) {
+  const session = useSession();
   if (access === 'negado') {
     return (
       <Layout>
@@ -68,8 +69,8 @@ export function Gate({
           <div className="px-box">
             <h1 className="px-h2">Acesso negado</h1>
             <p>Esta área é só para administradores.</p>
-            <Link to="/" className="px-btn px-btn-pri">
-              Voltar ao início
+            <Link to={session.user?.role === 'validador' ? '/portaria' : '/minha-conta'} className="px-btn px-btn-pri">
+              Ir para minha área
             </Link>
           </div>
         </div>

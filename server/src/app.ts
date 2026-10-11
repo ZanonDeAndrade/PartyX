@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { getCookie } from 'hono/cookie';
 import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
@@ -11,6 +12,7 @@ import { localMediaRoutes } from './api/media';
 import { LocalCaptureEmailSender } from './providers/email';
 import { webhookRoutes } from './api/webhooks';
 import type { AuthDeps } from './auth/types';
+import { loadSession, SESSION_COOKIE } from './auth/sessions';
 import type { Config } from './config';
 import { AppError } from './domain/errors';
 import { logger } from './logger';
@@ -35,6 +37,16 @@ export interface AppDeps {
   issueTickets?: TicketIssuer;
 }
 
+function requestAuthority(value: string | undefined): { host: string; hostname: string } | null {
+  if (!value || value !== value.trim() || /[,/@\\\s]/.test(value)) return null;
+  try {
+    const parsed = new URL(`https://${value}`);
+    return { host: parsed.host.toLowerCase(), hostname: parsed.hostname.toLowerCase().replace(/\.$/, '') };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Monta a aplicação HTTP. Recebe as dependências por parâmetro para os testes
  * trocarem relógio, banco e configuração sem tocar em variáveis globais.
@@ -46,6 +58,19 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
   const app = new Hono();
 
   app.use(requestId());
+  // O Hosting foi medido enviando Host=*.run.app e X-Forwarded-Host=<domínio público>. O segundo cabeçalho pode ser
+  // forjado por quem chama o run.app direto; esta barreira reduz acesso casual, enquanto limites globais protegem o banco.
+  app.use('*', async (c, next) => {
+    if (config.APP_ENV === 'producao' && !['/api/health', '/api/health/ready'].includes(c.req.path)) {
+      const expected = new URL(config.PUBLIC_BASE_URL!).host.toLowerCase();
+      const host = requestAuthority(c.req.header('host'));
+      const forwardedHost = requestAuthority(c.req.header('x-forwarded-host'));
+      const directDomain = host?.host === expected;
+      const viaHosting = host?.hostname.endsWith('.run.app') && forwardedHost?.host === expected;
+      if (!directDomain && !viaHosting) return c.text('Host não autorizado.', 403);
+    }
+    await next();
+  });
   // Logo da marca (`/brand/*`): pública, igual para todos e feita para aparecer fora do site (nos e-mails). Só ela pode ser
   // carregada por outra origem; o resto segue `same-origin`. Registrado antes dos cabeçalhos de segurança porque eles são
   // gravados na volta da requisição: assim este é o último a escrever.
@@ -106,6 +131,36 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
   if (auth) app.route('/api', authRoutes({ ...auth, config, clock }));
   if (extraApiRoutes) app.route('/api', extraApiRoutes);
   app.all('/api/*', c => c.json({ erro: { codigo: 'nao_encontrado', mensagem: 'Recurso não encontrado.' } }, 404));
+
+  // RF-09/CA-05: negar a navegação HTML antes de servir qualquer shell ou arquivo estático.
+  app.use('*', async (c, next) => {
+    const p = c.req.path;
+    if (!['GET', 'HEAD'].includes(c.req.method) || c.req.path.startsWith('/api/')) return next();
+    if (
+      (p === '/prototipo' || p.startsWith('/prototipo/') || p.startsWith('/docs')) &&
+      !(config.APP_ENV === 'homologacao' && config.ENABLE_PROTOTYPE === 'true')
+    )
+      return c.notFound();
+    const admin = p === '/admin' || p.startsWith('/admin/');
+    const gate = p === '/portaria' || p.startsWith('/portaria/');
+    const first = p === '/primeiro-acesso';
+    if (!admin && !gate && !first) return next();
+    c.header('Cache-Control', 'private, no-store');
+    const token = getCookie(c, SESSION_COOKIE);
+    const session = token && auth ? await loadSession({ ...auth, config, clock }, token) : null;
+    if (!session) return c.redirect(`/entrar?voltar=${encodeURIComponent(p + new URL(c.req.url).search)}`, 302);
+    const role = session.user.role;
+    const permitted = admin ? role === 'administrador' : role === 'administrador' || role === 'validador';
+    if (!permitted) {
+      const destination = role === 'cliente' ? '/minha-conta' : '/portaria';
+      return c.html(
+        `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso negado · PartyX</title><link rel="stylesheet" href="/access-denied.css"></head><body><main><span class="code">G04</span><h1>Acesso negado</h1><p>Você não tem permissão para acessar esta área.</p><a href="${destination}">Ir para minha área</a></main></body></html>`,
+        403,
+      );
+    }
+    if (session.user.mustChangePassword && !first) return c.redirect('/primeiro-acesso', 302);
+    await next();
+  });
 
   // Front-end (build do Vite). Em desenvolvimento o Vite serve as páginas e faz proxy de /api para cá.
   const dist = path.resolve(config.WEB_DIST_DIR);

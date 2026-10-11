@@ -9,6 +9,10 @@ describe('clientIp', () => {
     expect(clientIp('6.6.6.6, 1.1.1.1, 203.0.113.9, 10.0.0.1', 2)).toBe('203.0.113.9');
   });
 
+  it('com dois saltos extrai o cliente da cadeia medida atrás do Firebase Hosting', () => {
+    expect(clientIp('177.86.10.20, 192.178.11.130', 2)).toBe('177.86.10.20');
+  });
+
   it('sem proxy confiável ou sem cabeçalho, não confia em nada', () => {
     expect(clientIp('1.1.1.1', 0)).toBeNull();
     expect(clientIp(undefined, 1)).toBeNull();

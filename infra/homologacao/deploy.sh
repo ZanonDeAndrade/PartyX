@@ -23,7 +23,8 @@ POOLED="$(gcloud secrets versions access latest --secret=database-url --project=
   || { echo "Recuso: o banco apontado NÃO é o de homologação." >&2; exit 1; }
 
 echo "== build $TAG"
-gcloud builds submit . --project="$PROJECT" --region="$REGION" --tag="$IMAGE" --quiet
+gcloud builds submit . --project="$PROJECT" --region="$REGION" \
+  --config=infra/homologacao/cloudbuild.yaml --substitutions="_IMAGE=$IMAGE" --quiet
 
 echo "== migração (job com a conexão direta, só a conta de deploy lê o segredo)"
 if gcloud run jobs describe "$JOB" --project="$PROJECT" --region="$REGION" >/dev/null 2>&1; then verb=update; else verb=create; fi
@@ -38,7 +39,7 @@ PROJECT_NUMBER="$(gcloud projects describe "$PROJECT" --format='value(projectNum
 RUN_URL="https://${SERVICE}-${PROJECT_NUMBER}.${REGION}.run.app"   # audience das tarefas (a URL run.app, não o domínio)
 TASKS_SA="partyx-tasks@${PROJECT}.iam.gserviceaccount.com"
 SCHED_SA="partyx-scheduler@${PROJECT}.iam.gserviceaccount.com"
-vars=(NODE_ENV=production APP_ENV=homologacao DB_POOL_MAX=5 "TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-2}" "PUBLIC_BASE_URL=$PUBLIC_BASE_URL"
+vars=(NODE_ENV=production APP_ENV=homologacao ENABLE_PROTOTYPE=true DB_POOL_MAX=5 "TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-2}" "PUBLIC_BASE_URL=$PUBLIC_BASE_URL"
   "BANNER_BUCKET=${PROJECT}-banners" "JOBS_AUDIENCE=$RUN_URL" "JOBS_CALLER_EMAIL=${SCHED_SA},${TASKS_SA}"
   "TASKS_QUEUE=projects/$PROJECT/locations/$REGION/queues/partyx-conciliacao" "TASKS_INVOKER_EMAIL=$TASKS_SA"
   "TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-true}" "TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}")   # homologação mantém o Turnstile LIGADO, com a chave de TESTE da Cloudflare (aceita qualquer token)

@@ -37,6 +37,8 @@ const schema = z
     RETENTION_PASSWORD_RESETS_DAYS: z.coerce.number().int().min(1).max(3650).optional(),
     /** Endereço público, usado nos links dos e-mails e na checagem de origem (CSRF). */
     PUBLIC_BASE_URL: z.url().optional(),
+    /** Publica protótipo e documentação somente em homologação. */
+    ENABLE_PROTOTYPE: z.enum(['true', 'false']).default('false'),
     /** Origens extras aceitas em requisições que alteram dados, separadas por vírgula. */
     ALLOWED_ORIGINS: z.string().optional(),
     /** Bucket público de leitura dos banners. Sem ele, só o ambiente local grava em disco; nos demais o upload é recusado. */
@@ -78,14 +80,18 @@ const schema = z
     TURNSTILE_SECRET: z.string().min(10).optional(),
     TURNSTILE_SITE_KEY: z.string().min(10).optional(),
     /**
-     * Limites GLOBAIS, guardados no banco (valem entre todas as instâncias e não dependem de IP). Cadastros novos por hora, no total, e pedidos de
-     * recuperação de senha por hora, no total. Ao atingir: 429, e o alerta `limite_global_atingido`. **Em dia de evento com muita gente
-     * criando conta, suba o limite de cadastros ANTES** (variável `GLOBAL_SIGNUPS_PER_HOUR` no deploy).
+     * Limites globais compartilhados no banco. Ajuste os tetos para a capacidade do evento antes da abertura.
      */
-    GLOBAL_SIGNUPS_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(30),
+    GLOBAL_SIGNUPS_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(1000),
+    SIGNUPS_PER_IP_PER_HOUR: z.coerce.number().int().min(1).max(10000).default(100),
     GLOBAL_RECOVERIES_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(60),
+    GATE_SCANS_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(3000),
+    GATE_SEARCHES_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(400),
     /** Fila do Cloud Tasks da conciliação sob demanda: `projects/<projeto>/locations/<região>/queues/<fila>`. Sem ela, só o webhook e a varredura diária conciliam. */
-    TASKS_QUEUE: z.string().regex(/^projects\/[^/]+\/locations\/[^/]+\/queues\/[^/]+$/, 'formato projects/P/locations/L/queues/Q').optional(),
+    TASKS_QUEUE: z
+      .string()
+      .regex(/^projects\/[^/]+\/locations\/[^/]+\/queues\/[^/]+$/, 'formato projects/P/locations/L/queues/Q')
+      .optional(),
     /** Conta de serviço com que o Cloud Tasks assina o token OIDC. Precisa estar também em JOBS_CALLER_EMAIL. */
     TASKS_INVOKER_EMAIL: z.email().optional(),
     /** Chaves do HMAC dos QR Codes, "versão:chave" separados por vírgula (chave em base64url, 32+ bytes). Vêm do Secret Manager. Obrigatória fora do local. Para rotacionar, **acrescente** a versão nova e troque `QR_HMAC_CURRENT`: as antigas continuam valendo para ingressos já emitidos. */
@@ -101,6 +107,12 @@ const schema = z
     TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
   })
   .superRefine((env, ctx) => {
+    if (env.APP_ENV === 'producao' && !env.PUBLIC_BASE_URL) {
+      ctx.addIssue({ code: 'custom', path: ['PUBLIC_BASE_URL'], message: 'obrigatória em produção' });
+    }
+    if (env.APP_ENV === 'producao' && env.ENABLE_PROTOTYPE === 'true') {
+      ctx.addIssue({ code: 'custom', path: ['ENABLE_PROTOTYPE'], message: 'proibido em produção' });
+    }
     if (env.APP_ENV !== 'local' && !env.DATABASE_URL) {
       ctx.addIssue({ code: 'custom', path: ['DATABASE_URL'], message: 'obrigatória fora do ambiente local' });
     }
@@ -143,13 +155,30 @@ const schema = z
       }
     }
     if (env.APP_ENV === 'producao' && env.GATEWAY_ENVIRONMENT === 'sandbox') {
-      ctx.addIssue({ code: 'custom', path: ['GATEWAY_ENVIRONMENT'], message: 'credenciais de SANDBOX do gateway em produção: recusado' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GATEWAY_ENVIRONMENT'],
+        message: 'credenciais de SANDBOX do gateway em produção: recusado',
+      });
     }
     if (env.APP_ENV === 'homologacao' && env.GATEWAY_ENVIRONMENT === 'producao') {
-      ctx.addIssue({ code: 'custom', path: ['GATEWAY_ENVIRONMENT'], message: 'credenciais de PRODUÇÃO do gateway em homologação: recusado' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GATEWAY_ENVIRONMENT'],
+        message: 'credenciais de PRODUÇÃO do gateway em homologação: recusado',
+      });
     }
-    if (env.APP_ENV === 'producao' && env.PAYMENT_GATEWAY && env.PAYMENT_GATEWAY !== 'none' && env.GATEWAY_ENVIRONMENT !== 'producao') {
-      ctx.addIssue({ code: 'custom', path: ['GATEWAY_ENVIRONMENT'], message: 'em produção, com gateway configurado, GATEWAY_ENVIRONMENT precisa ser producao' });
+    if (
+      env.APP_ENV === 'producao' &&
+      env.PAYMENT_GATEWAY &&
+      env.PAYMENT_GATEWAY !== 'none' &&
+      env.GATEWAY_ENVIRONMENT !== 'producao'
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GATEWAY_ENVIRONMENT'],
+        message: 'em produção, com gateway configurado, GATEWAY_ENVIRONMENT precisa ser producao',
+      });
     }
     if (env.TURNSTILE_ENABLED === 'true') {
       for (const key of ['TURNSTILE_SECRET', 'TURNSTILE_SITE_KEY'] as const) {
