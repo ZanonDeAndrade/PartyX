@@ -86,6 +86,7 @@ Fluxo de branches: `main` produção (protegida), `develop` homologação, `feat
 | Backup diário e teste de restauração | Prompt 25. |
 | Produção | Prompt 28, com aceite do cliente. |
 | Revisão do acesso público da URL | A homologação está aberta na internet, sem login, porque o app ainda é protótipo com dados fictícios. Restringir antes de colocar dados reais do cliente. |
+| `sslmode` da URL do Neon antes de upgrade major do `pg` | Testar `sslmode=verify-full` na URL do Neon de homologação antes de qualquer upgrade major do `pg`; replicar em produção no próximo deploy. Motivo: o `pg` 8 avisa que, no `pg` 9 (`pg-connection-string` 3), `sslmode=require` passa à semântica do libpq e deixa de verificar o certificado. Hoje: `pg` 8.23.1 e `pg-connection-string` 2.14.1; `"pg": "^8.23.1"` não deixa subir para a 9. URLs **não** alteradas (pedido do responsável, 10/10/2026). Ver `registros/migracoes-neon-2026-10-10.md`. |
 
 ## Ocorrências desta etapa
 
