@@ -7,6 +7,7 @@ Este arquivo vale para as próximas tarefas no repositório. Antes de implementa
 - Front-end real: React 19, Vite e TypeScript. Servidor: Hono. Persistência: Drizzle e PostgreSQL (Neon). Infraestrutura prevista: Cloud Run, Cloud Storage, Cloud Tasks e Cloud Scheduler.
 - Não migrar para Next.js nem Tailwind por causa dos prompts antigos. Uma mudança de stack exige decisão expressa do responsável.
 - Precedência: contrato assinado e anexos originais > `docs/fontes/PartyX_Documentacao_Desenvolvimento.pdf` > `docs/fontes/PartyX_30_prompts_desenvolvimento.txt` e `docs/fontes/Prompt_PartyX_Claude_Design.txt`. Não presumir conteúdo do contrato/anexos que não esteja disponível.
+- Sequência de fechamento: 00 preparação, 01 banco de teste, 02 segurança, 03 conciliação, 04 admin eventos/tipos, 05 admin promoters/equipe/compradores, 06 gateway real, 07 webhook/estorno sandbox, 08 e-mail/legal, 09 E2E/carga, 10 infra homologação/backup, 11 fechamento; mais um prompt separado de UI/UX.
 - Estado auditado e lacunas: `docs/AUDITORIA_PartyX.md`. Requisitos e aceite: `docs/rastreabilidade/matriz-requisitos.md`. Decisões e insumos: `docs/registros/`.
 
 ## Regras invioláveis
