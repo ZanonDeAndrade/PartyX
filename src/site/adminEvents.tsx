@@ -52,7 +52,7 @@ const TYPE_STATE: Record<AdminTicketType['salesState'], [string, string]> = {
 };
 
 /** Campos com erro da API (`detalhes: [{ campo, mensagem }]`), traduzidos para os campos da tela. */
-function fieldErrors(error: unknown, map: Record<string, string> = {}): Record<string, string> {
+export function fieldErrors(error: unknown, map: Record<string, string> = {}): Record<string, string> {
   if (!(error instanceof ApiError) || !Array.isArray(error.details)) return {};
   const out: Record<string, string> = {};
   for (const d of error.details as FieldProblem[]) {
@@ -61,12 +61,12 @@ function fieldErrors(error: unknown, map: Record<string, string> = {}): Record<s
   return out;
 }
 
-const errorText = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
+export const errorText = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
 
 const fold = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
 /** Campo com rótulo, dica e erro ligados por `aria-describedby`, no mesmo padrão dos formulários da conta. */
-function FormField({
+export function FormField({
   id,
   label,
   error,
@@ -98,13 +98,13 @@ function FormField({
     </div>
   );
 }
-const described = (id: string, error?: string, hint?: unknown) => ({
+export const described = (id: string, error?: string, hint?: unknown) => ({
   'aria-invalid': error ? true : undefined,
   'aria-describedby': [error ? `${id}-erro` : '', hint ? `${id}-dica` : ''].filter(Boolean).join(' ') || undefined,
 });
 
 /** Diálogo de confirmação, com o impacto explicado no corpo. Esc e o fundo cancelam (exceto durante o envio). */
-function ConfirmDialog({
+export function ConfirmDialog({
   title,
   children,
   confirmLabel,

@@ -3,6 +3,17 @@ import './site.css';
 import { AdminExceptionsPage, AdminOrderPage, AdminOrdersPage, AdminOverviewPage } from './adminPages';
 import { AdminEventFormPage, AdminEventPage, AdminEventPreviewPage, AdminEventsPage } from './adminEvents';
 import { ToastHost } from './components';
+import {
+  AdminAccountPage,
+  AdminBuyerPage,
+  AdminBuyersPage,
+  AdminEntriesPage,
+  AdminPromoterPage,
+  AdminPromotersPage,
+  AdminTeamPage,
+  AdminTicketPage,
+  AdminTicketsPage,
+} from './adminPeople';
 import { GateEventsPage, GatePage } from './gatePages';
 import { FeeReportPage, PromoterReportPage, SalesReportPage } from './reportPages';
 import { FirstAccessPage, ForgotPasswordPage, LegalPage, LoginPage, ResetPasswordPage, SignupPage } from './authPages';
@@ -32,6 +43,18 @@ function Routes() {
   if (loc.path === '/admin/eventos') return <AdminEventsPage />;
   if (loc.path === '/admin/eventos/novo') return <AdminEventFormPage />;
   if (loc.path === '/admin/excecoes') return <AdminExceptionsPage />;
+  if (loc.path === '/admin/promoters') return <AdminPromotersPage />;
+  if (loc.path === '/admin/compradores') return <AdminBuyersPage />;
+  if (loc.path === '/admin/ingressos') return <AdminTicketsPage />;
+  if (loc.path === '/admin/entradas') return <AdminEntriesPage />;
+  if (loc.path === '/admin/equipe') return <AdminTeamPage />;
+  if (loc.path === '/admin/conta') return <AdminAccountPage />;
+  const adminPromoter = /^\/admin\/promoters\/([0-9a-f-]{36})$/.exec(loc.path);
+  if (adminPromoter) return <AdminPromoterPage key={adminPromoter[1]} id={adminPromoter[1]!} />;
+  const adminBuyer = /^\/admin\/compradores\/([0-9a-f-]{36})$/.exec(loc.path);
+  if (adminBuyer) return <AdminBuyerPage key={adminBuyer[1]} id={adminBuyer[1]!} />;
+  const adminTicket = /^\/admin\/ingressos\/([0-9a-f-]{36})$/.exec(loc.path);
+  if (adminTicket) return <AdminTicketPage key={adminTicket[1]} id={adminTicket[1]!} />;
   if (loc.path === '/admin/relatorios/vendas') return <SalesReportPage />;
   if (loc.path === '/admin/relatorios/promoters') return <PromoterReportPage />;
   if (loc.path === '/admin/relatorios/taxa-mensal') return <FeeReportPage />;

@@ -13,6 +13,7 @@ import {
   overview,
 } from '../panel/service';
 import { parseJson } from './validate';
+import { buyerDetail, listBuyers, revealBuyerCpf, ticketDetail } from '../panel/people';
 
 const uuid = z.uuid();
 const orderStatus = z.enum([
@@ -104,6 +105,20 @@ export function panelRoutes(deps: AuthDeps) {
   app.get('/admin/events/:id/entries', async c => c.json(await liveEntries(panel, id(c.req.param('id'), 'Evento'))));
 
   const cancelBody = z.object({ reason: z.string().max(600), confirm: z.boolean() });
+  // ----- compradores (ADM12, ADM13) e ingresso (ADM15) -----
+  app.get('/admin/buyers', async c => {
+    const p = page(c);
+    const q = z.string().max(100).optional().safeParse(c.req.query('q') || undefined);
+    if (!q.success) throw new AppError(422, 'dados_invalidos', 'Busca inválida.');
+    return c.json(await listBuyers(panel, { ...p, q: q.data }));
+  });
+  app.get('/admin/buyers/:id', async c => c.json(await buyerDetail(panel, id(c.req.param('id'), 'Comprador'))));
+  /** CPF completo sob demanda: ação registrada na trilha, resposta sem cache (já é a política de /admin). */
+  app.post('/admin/buyers/:id/cpf', async c =>
+    c.json(await revealBuyerCpf(panel, actor(c), id(c.req.param('id'), 'Comprador'))),
+  );
+  app.get('/admin/tickets/:id', async c => c.json(await ticketDetail(panel, id(c.req.param('id'), 'Ingresso'))));
+
   app.post('/admin/tickets/:id/cancel', async c => {
     const body = await parseJson(c, cancelBody);
     return c.json(await cancelTickets(panel, actor(c), { ticketId: id(c.req.param('id'), 'Ingresso') }, body));

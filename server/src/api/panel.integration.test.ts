@@ -828,4 +828,143 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
       expect(row.emitidos).toBe(2); // continuam emitidos (e contados) em novembro, mesmo cancelados
     });
   });
+
+  describe('compradores, ingresso e promoter (ADM09, ADM12, ADM13, ADM15)', () => {
+    it('lista de compradores: busca por nome sem acento, e-mail e CPF completo; CPF sempre mascarado', async () => {
+      const e = await event();
+      await order(e, { buyer: { name: 'Márcia Lopes', email: 'marcia@exemplo.com', cpf: '52998224725' } });
+      await order(e, { buyer: { name: 'João Pedro', email: 'joao@exemplo.com' } });
+      const adm = await session();
+      const all = await json(await adm.get('/admin/buyers'));
+      expect(all.total).toBe(2);
+      expect(all.buyers.every((b: { cpf: string }) => /^\*\*\*\.\d{3}\.\d{3}-\*\*$/.test(b.cpf))).toBe(true);
+      const names = async (q: string) =>
+        (await json(await adm.get(`/admin/buyers?q=${encodeURIComponent(q)}`))).buyers.map(
+          (b: { name: string }) => b.name,
+        );
+      expect(await names('marcia')).toEqual(['Márcia Lopes']);
+      expect(await names('joao@')).toEqual(['João Pedro']);
+      expect(await names('529.982.247-25')).toEqual(['Márcia Lopes']);
+      expect((await adm.get('/admin/buyers?q=ab')).status).toBe(422);
+      const m = all.buyers.find((b: { name: string }) => b.name === 'Márcia Lopes');
+      expect(m).toMatchObject({ orders: 1, tickets: 2 });
+    });
+
+    it('detalhe do comprador: dados, pedidos, ingressos e correções (sem os valores antigos); CPF completo só sob demanda, na trilha', async () => {
+      const e = await event('Festa Detalhe');
+      const o = await order(e, { buyer: { name: 'Márcia Lopes', email: 'marcia@exemplo.com', cpf: '52998224725' } });
+      const adm = await session();
+      const d = await json(await adm.get(`/admin/buyers/${o.userId}`));
+      expect(d.buyer).toMatchObject({ name: 'Márcia Lopes', email: 'marcia@exemplo.com', cpf: '***.982.247-**' });
+      expect(d.orders).toHaveLength(1);
+      expect(d.orders[0]).toMatchObject({ id: o.id, status: 'pago', units: 2, event: { name: 'Festa Detalhe' } });
+      expect(d.tickets).toHaveLength(2);
+      expect(JSON.stringify(d)).not.toContain('52998224725');
+
+      // Correção de e-mail pelo administrador (rota já existente), com motivo: aparece no histórico sem os valores.
+      const fix = await adm.raw('PATCH', `/admin/users/${o.userId}/identity`, {
+        email: 'marcia.lopes@exemplo.com',
+        reason: 'Pedido da compradora por e-mail',
+      });
+      expect(fix.status).toBe(200);
+      const d2 = await json(await adm.get(`/admin/buyers/${o.userId}`));
+      expect(d2.buyer.email).toBe('marcia.lopes@exemplo.com');
+      expect(d2.corrections).toHaveLength(1);
+      expect(d2.corrections[0]).toMatchObject({ fields: ['email'], reason: 'Pedido da compradora por e-mail' });
+      expect(JSON.stringify(d2.corrections)).not.toContain('marcia@exemplo.com');
+
+      const shown = await adm.post(`/admin/buyers/${o.userId}/cpf`);
+      expect(await json(shown)).toEqual({ cpf: '52998224725' });
+      const trail = (
+        await sql(
+          "select actor_id, before_json, after_json from audit_log where action = 'usuario.cpf_visualizado' and entity_id = $1",
+          [o.userId],
+        )
+      ).rows;
+      expect(trail).toHaveLength(1);
+      expect(trail[0].actor_id).toBe(adm.id);
+      expect(JSON.stringify(trail[0])).not.toContain('52998224725');
+
+      // Membro da equipe não é "comprador".
+      expect((await adm.get(`/admin/buyers/${adm.id}`)).status).toBe(404);
+    });
+
+    it('detalhe do ingresso: tipo, evento, pedido, comprador mascarado, entrada e cancelamento com autor e data; sem código nem QR', async () => {
+      const e = await event('Festa Ingresso');
+      const o = await order(e, { items: [['VIP', 2]], buyer: { cpf: '52998224725' } });
+      const adm = await session('administrador', 'Ana Admin');
+      const v = await session('validador', 'Carlos Portaria');
+      await v.post('/gate/scan', { eventId: e.id, qr: o.tickets[0]!.qr_payload });
+      clock.advance(60_000);
+      await adm.post(`/admin/tickets/${o.tickets[1]!.id}/cancel`, { reason: 'Pedido do comprador', confirm: true });
+
+      const used = await json(await adm.get(`/admin/tickets/${o.tickets[0]!.id}`));
+      expect(used.ticket).toMatchObject({
+        status: 'utilizado',
+        typeName: 'VIP',
+        event: { name: 'Festa Ingresso' },
+        order: { id: o.id },
+        buyer: { cpf: '***.982.247-**' },
+        entry: { validator: 'Carlos Portaria' },
+        cancellation: null,
+      });
+      expect(used.attempts).toEqual([expect.objectContaining({ result: 'valido', validator: 'Carlos Portaria' })]);
+      const text = JSON.stringify(used);
+      expect(text).not.toContain(o.tickets[0]!.qr_payload);
+      expect(text).not.toContain('52998224725');
+
+      const cancelled = await json(await adm.get(`/admin/tickets/${o.tickets[1]!.id}`));
+      expect(cancelled.ticket.status).toBe('cancelado');
+      expect(cancelled.ticket.cancellation).toMatchObject({ reason: 'Pedido do comprador', by: 'Ana Admin' });
+      expect(cancelled.ticket.cancellation.at).toBe(clock.now().toISOString());
+      expect((await adm.get(`/admin/tickets/${crypto.randomUUID()}`)).status).toBe(404);
+    });
+
+    it('exportação das vendas de um promoter, com os filtros da tela e na trilha', async () => {
+      const e = await event('Festa Promoter');
+      await order(e, { coupon: 'MARINA10', items: [['Pista', 3]] });
+      await order(e, { coupon: 'OUTRO10', items: [['Pista', 1]] });
+      const adm = await session();
+      const pid = (await sql("select id from promoters where coupon_code = 'MARINA10'")).rows[0].id;
+      const res = await adm.get(`/admin/exports/promoters/${pid}/orders.csv?eventId=${e.id}`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-disposition')).toMatch(/attachment; filename="vendas-promoter_marina10/);
+      const csv = await res.text();
+      expect(csv).toContain('Festa Promoter');
+      expect(csv).toMatch(/Total;;;3;240,00/);
+      expect(csv).toContain('Sem desconto e sem comissão');
+      expect(csv).not.toContain('OUTRO10');
+      expect(
+        (await sql("select count(*)::int as n from audit_log where action = 'exportacao.vendas_promoter'")).rows[0].n,
+      ).toBe(1);
+    });
+
+    it('validador recebe 403 em cada rota nova (e cliente também)', async () => {
+      const e = await event();
+      const o = await order(e);
+      const pid = (await sql("insert into promoters (name, coupon_code) values ('P', 'PROMO1') returning id")).rows[0]
+        .id;
+      for (const role of ['validador', 'cliente'] as const) {
+        const s = await session(role);
+        const calls = [
+          s.get('/admin/buyers'),
+          s.get(`/admin/buyers/${o.userId}`),
+          s.post(`/admin/buyers/${o.userId}/cpf`),
+          s.get(`/admin/tickets/${o.tickets[0]!.id}`),
+          s.get(`/admin/exports/promoters/${pid}/orders.csv`),
+          s.get(`/admin/reports/promoters/${pid}`),
+          s.get('/admin/promoters'),
+          s.get('/admin/team'),
+          s.get(`/admin/events/${e.id}/entries`),
+        ];
+        expect(
+          (await Promise.all(calls)).map(r => r.status),
+          role,
+        ).toEqual(Array(calls.length).fill(403));
+      }
+      expect(
+        (await sql("select count(*)::int as n from audit_log where action = 'usuario.cpf_visualizado'")).rows[0].n,
+      ).toBe(0);
+    });
+  });
 });

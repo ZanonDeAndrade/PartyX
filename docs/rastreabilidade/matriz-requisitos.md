@@ -71,6 +71,19 @@ Portaria abre evento encerrado dentro da janela operacional (padrão 12 h antes 
 | RF-11, D-79 (reabrir evento) | `server/src/api/gate.integration.test.ts` ("reabrir evento encerrado antes da data": portaria volta a validar, trilha `evento.reabrir` com motivo, validador 403, motivo curto 422, reabrir publicado 409) |
 | D-79, cancelamento antecipado | `server/src/api/gate.integration.test.ts` (encerrado 3 dias antes recusa com a mensagem e some da seleção; limite exato de 12 h; linha antiga sem `closed_at`), `server/src/db/schema.integration.test.ts` (0006 preenche pela trilha sem mexer em `updated_at`, e reverte) |
 
+## Painel: promoters, compradores, ingressos, entradas, equipe e conta (11/10/2026, etapa 05 do fechamento)
+
+Interface real em `src/site/adminPeople.tsx` (ADM07 a ADM09, ADM12 a ADM15, ADM19 a ADM21, ADM24), menu lateral com gaveta no celular e exportação com estados e data (ADM23, `ExportLink`). API nova com testes: `GET /admin/buyers`, `GET /admin/buyers/:id`, `POST /admin/buyers/:id/cpf` (CPF completo sob demanda, trilha `usuario.cpf_visualizado`), `GET /admin/tickets/:id` (autor e data do cancelamento), `GET /admin/exports/promoters/:id/orders.csv`. Verificado no navegador (Chromium, 360 px e 1280 px, dados fictícios): sem rolagem horizontal e sem alvo menor que 44 px.
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-06 (correção de e-mail e CPF só pelo administrador, motivo, trilha) | `server/src/api/panel.integration.test.ts` (detalhe do comprador), `src/site/format.test.ts` |
+| RF-08 (equipe: criar, editar, ativar e desativar) | `server/src/api/team.integration.test.ts`, `src/site/adminPeople.tsx` |
+| RF-18, CA-10 (promoters, código único) | `server/src/api/events.integration.test.ts`, `src/site/adminPeople.tsx` (código repetido no campo, verificado no navegador) |
+| RF-57 (compradores e ingressos) | `server/src/api/panel.integration.test.ts` (lista, detalhe, ingresso) |
+| CA-05 (validador sem telas nem rotas do administrador) | `server/src/api/security.integration.test.ts` (16 telas, 403 G04), `server/src/api/panel.integration.test.ts` (rotas novas, 403) |
+| CA-19 (venda com cupom no promoter certo) | `server/src/api/reports.integration.test.ts`, `server/src/api/panel.integration.test.ts` (exportação do promoter) |
+
 ## Requisitos funcionais (RF-01 a RF-68)
 
 | ID | Requisito (texto da documentação) | Módulo | Anexo I | Implementar em | Testar em | Design (telas) | Situação do design | Implementação real | Evidência |

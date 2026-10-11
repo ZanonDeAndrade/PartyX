@@ -292,6 +292,32 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
         expect(deniedHtml).toContain('G04');
         expect(deniedHtml).toContain('href="/portaria"');
         expect(deniedHtml).not.toContain('Shell de teste');
+        // Cada tela nova do painel (sequência de fechamento 04 e 05), digitando o endereço: 403 G04 antes de qualquer HTML do app.
+        const id = '00000000-0000-4000-8000-000000000000';
+        for (const route of [
+          '/admin/eventos',
+          '/admin/eventos/novo',
+          `/admin/eventos/${id}`,
+          `/admin/eventos/${id}/editar`,
+          `/admin/eventos/${id}/previa`,
+          '/admin/promoters',
+          `/admin/promoters/${id}`,
+          '/admin/compradores',
+          `/admin/compradores/${id}`,
+          '/admin/ingressos',
+          `/admin/ingressos/${id}`,
+          '/admin/entradas',
+          '/admin/equipe',
+          '/admin/conta',
+          '/admin/excecoes',
+          '/admin/relatorios/taxa-mensal',
+        ]) {
+          const res = await htmlApp.request(route, { headers: { cookie: val.cookie } });
+          expect(res.status, route).toBe(403);
+          const html = await res.text();
+          expect(html, route).toContain('G04');
+          expect(html, route).not.toContain('Shell de teste');
+        }
         const client = await session('cliente');
         for (const route of ['/admin', '/admin/pedidos', '/portaria', '/portaria/qualquer', '/primeiro-acesso']) {
           const res = await htmlApp.request(route, { headers: { cookie: client.cookie } });

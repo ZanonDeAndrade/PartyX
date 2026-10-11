@@ -27,7 +27,18 @@ export function useAdmin(returnTo: string): 'espera' | 'ok' | 'negado' {
   return session.user?.role === 'administrador' ? 'ok' : 'negado';
 }
 
-export type AdminTab = 'geral' | 'pedidos' | 'eventos' | 'relatorios' | 'excecoes';
+export type AdminTab =
+  | 'geral'
+  | 'pedidos'
+  | 'eventos'
+  | 'compradores'
+  | 'ingressos'
+  | 'promoters'
+  | 'relatorios'
+  | 'entradas'
+  | 'equipe'
+  | 'excecoes'
+  | 'conta';
 
 /** Avisa o painel de que a lista de exceções mudou (um caso foi tratado), para o contador do alerta se atualizar. */
 const EXCEPTIONS_CHANGED = 'px-excecoes-mudaram';
@@ -55,42 +66,155 @@ function useOpenExceptions(): number {
   return open;
 }
 
+const NAV: { tab: AdminTab; label: string; to: string }[] = [
+  { tab: 'geral', label: 'Visão geral', to: '/admin' },
+  { tab: 'eventos', label: 'Eventos', to: '/admin/eventos' },
+  { tab: 'pedidos', label: 'Pedidos', to: '/admin/pedidos' },
+  { tab: 'compradores', label: 'Compradores', to: '/admin/compradores' },
+  { tab: 'ingressos', label: 'Ingressos', to: '/admin/ingressos' },
+  { tab: 'promoters', label: 'Promoters', to: '/admin/promoters' },
+];
+const REPORTS: { label: string; to: string }[] = [
+  { label: 'Vendas', to: '/admin/relatorios/vendas' },
+  { label: 'Promoters (ranking)', to: '/admin/relatorios/promoters' },
+  { label: 'Taxa mensal', to: '/admin/relatorios/taxa-mensal' },
+];
+const NAV_END: { tab: AdminTab; label: string; to: string }[] = [
+  { tab: 'entradas', label: 'Entradas', to: '/admin/entradas' },
+  { tab: 'equipe', label: 'Equipe', to: '/admin/equipe' },
+];
+
+/** Itens do painel: no computador, coluna lateral; no celular, dentro da gaveta. */
+function AdminNav({ active, open, onNavigate }: { active: AdminTab; open: number; onNavigate?: () => void }) {
+  const { loc } = useRouter();
+  const session = useSession();
+  const { go } = useRouter();
+  const item = (tab: AdminTab, label: string, to: string, extra?: ReactNode) => (
+    <li key={to}>
+      <Link to={to} aria-current={active === tab ? 'page' : undefined} onClick={onNavigate}>
+        {label}
+        {extra}
+      </Link>
+    </li>
+  );
+  return (
+    <nav className="px-adm-nav" aria-label="Painel">
+      <ul>
+        {NAV.map(n => item(n.tab, n.label, n.to))}
+        <li>
+          <span className={`px-adm-nav-group${active === 'relatorios' ? ' px-adm-nav-group-on' : ''}`}>Relatórios</span>
+          <ul>
+            {REPORTS.map(r => (
+              <li key={r.to}>
+                <Link to={r.to} aria-current={loc.path === r.to ? 'page' : undefined} onClick={onNavigate}>
+                  {r.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </li>
+        {NAV_END.map(n => item(n.tab, n.label, n.to))}
+        {item(
+          'excecoes',
+          'Exceções',
+          '/admin/excecoes',
+          open > 0 ? (
+            <span className="px-badge px-badge-err" aria-label={`${open} em aberto`}>
+              {open}
+            </span>
+          ) : null,
+        )}
+      </ul>
+      <ul className="px-adm-nav-foot">
+        {item('conta', 'Minha conta', '/admin/conta')}
+        <li>
+          <button
+            type="button"
+            className="px-adm-nav-out"
+            onClick={() => {
+              onNavigate?.();
+              void session.logout().then(() => go('/', { force: true }));
+            }}
+          >
+            Sair
+          </button>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+
+/** Painel administrativo: menu lateral no computador e gaveta no celular (o botão "Menu do painel" abre). */
 function AdminShell({ children, active }: { children: ReactNode; active: AdminTab }) {
   const open = useOpenExceptions();
+  const [drawer, setDrawer] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const label = [...NAV, ...NAV_END, { tab: 'excecoes', label: 'Exceções' }, { tab: 'conta', label: 'Minha conta' }].find(
+    n => n.tab === active,
+  )?.label ?? (active === 'relatorios' ? 'Relatórios' : 'Painel');
+  useEffect(() => {
+    if (!drawer) return;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawer(false);
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [drawer]);
   return (
     <Layout>
-      <div className="px-wrap">
-        <nav className="px-subnav" aria-label="Painel">
-          <Link to="/admin" aria-current={active === 'geral' ? 'page' : undefined}>
-            Visão geral
-          </Link>
-          <Link to="/admin/pedidos" aria-current={active === 'pedidos' ? 'page' : undefined}>
-            Pedidos
-          </Link>
-          <Link to="/admin/eventos" aria-current={active === 'eventos' ? 'page' : undefined}>
-            Eventos
-          </Link>
-          <Link to="/admin/relatorios/vendas" aria-current={active === 'relatorios' ? 'page' : undefined}>
-            Relatórios
-          </Link>
-          <Link to="/admin/excecoes" aria-current={active === 'excecoes' ? 'page' : undefined}>
-            Exceções{' '}
-            {open > 0 ? (
-              <span className="px-badge px-badge-err" aria-label={`${open} em aberto`}>
-                {open}
-              </span>
-            ) : null}
-          </Link>
-        </nav>
-        {open > 0 && active !== 'excecoes' ? (
-          <p className="px-notice px-notice-err" role="alert">
-            <b>{open}</b> {open === 1 ? 'pagamento aprovado' : 'pagamentos aprovados'} sem ingresso disponível{' '}
-            {open === 1 ? 'aguarda' : 'aguardam'} tratamento: o estorno é feito pela PartyX no gateway.{' '}
-            <Link to="/admin/excecoes">Ver exceções</Link>
-          </p>
-        ) : null}
-        {children}
+      <div className="px-wrap px-adm-layout">
+        <aside className="px-adm-side">
+          <AdminNav active={active} open={open} />
+        </aside>
+        <div className="px-adm-main">
+          <div className="px-adm-mobilebar">
+            <button
+              type="button"
+              className="px-btn"
+              aria-expanded={drawer}
+              aria-controls="px-adm-drawer"
+              onClick={() => setDrawer(true)}
+            >
+              ☰ Menu do painel
+            </button>
+            <span className="px-small px-muted">
+              {label}
+              {open > 0 ? ` · ${open} exceção${open === 1 ? '' : 'ões'}` : ''}
+            </span>
+          </div>
+          {open > 0 && active !== 'excecoes' ? (
+            <p className="px-notice px-notice-err" role="alert">
+              <b>{open}</b> {open === 1 ? 'pagamento aprovado' : 'pagamentos aprovados'} sem ingresso disponível{' '}
+              {open === 1 ? 'aguarda' : 'aguardam'} tratamento: o estorno é feito pela PartyX no gateway.{' '}
+              <Link to="/admin/excecoes">Ver exceções</Link>
+            </p>
+          ) : null}
+          {children}
+        </div>
       </div>
+      {drawer ? (
+        <div className="px-drawer-bg" onClick={() => setDrawer(false)}>
+          <div
+            id="px-adm-drawer"
+            className="px-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu do painel"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-drawer-head">
+              <b>Painel</b>
+              <button ref={closeRef} type="button" className="px-btn" onClick={() => setDrawer(false)}>
+                Fechar
+              </button>
+            </div>
+            <AdminNav active={active} open={open} onNavigate={() => setDrawer(false)} />
+          </div>
+        </div>
+      ) : null}
     </Layout>
   );
 }
@@ -340,6 +464,11 @@ export function AdminOverviewPage() {
 // ---------- pedidos (RF-56) ----------
 
 /** Baixa o arquivo gerado na hora, com os mesmos filtros da tela. Link comum: a sessão vai no cookie, não há URL pública. */
+/**
+ * Exportação reutilizável (ADM23): gera o arquivo na hora com os filtros desta tela (o caminho e a consulta vêm de quem chama),
+ * com estados "gerando", "concluído" e "falha", e mostra a data e a hora da geração: é um retrato daquele momento.
+ * O download sai do próprio navegador (sem URL pública); a API exige sessão de administrador e registra cada geração.
+ */
 export function ExportLink({
   path,
   query = '',
@@ -350,13 +479,74 @@ export function ExportLink({
   label?: string;
 }) {
   const href = `/api${path}${query ? `?${query}` : ''}`;
+  const pdf = path.endsWith('.pdf');
+  const [state, setState] = useState<
+    { s: 'idle' } | { s: 'busy' } | { s: 'ok'; at: Date; file: string } | { s: 'err'; message: string }
+  >({ s: 'idle' });
+  // Filtros mudaram: o arquivo gerado antes já não corresponde à tela.
+  useEffect(() => setState({ s: 'idle' }), [href]);
+  const run = async () => {
+    setState({ s: 'busy' });
+    try {
+      const res = await fetch(href, { headers: { accept: pdf ? 'application/pdf' : 'text/csv' } });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { erro?: { mensagem?: string } } | null;
+        throw new Error(data?.erro?.mensagem ?? 'Não foi possível gerar o arquivo.');
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition') ?? '';
+      const file = /filename="([^"]+)"/.exec(disposition)?.[1] ?? (pdf ? 'exportacao.pdf' : 'exportacao.csv');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setState({ s: 'ok', at: new Date(), file });
+    } catch (err) {
+      setState({
+        s: 'err',
+        message:
+          err instanceof TypeError ? 'Sem conexão. Verifique a internet e tente de novo.' : (err as Error).message,
+      });
+    }
+  };
   return (
-    <p className="px-export">
-      <a className="px-btn" href={href} download>
-        {label}
-      </a>{' '}
-      <span className="px-muted">Planilha para o Excel (UTF-8, separador “;”), com os filtros desta tela.</span>
-    </p>
+    <div className="px-export">
+      <button
+        type="button"
+        className="px-btn"
+        onClick={run}
+        disabled={state.s === 'busy'}
+        aria-describedby={`${path}-st`}
+      >
+        {state.s === 'busy' ? 'Gerando…' : label}
+      </button>{' '}
+      <span id={`${path}-st`} className="px-small" role="status" aria-live="polite">
+        {state.s === 'idle' ? (
+          <span className="px-muted">
+            {pdf ? 'PDF para imprimir' : 'Planilha para o Excel (UTF-8, separador “;”)'}, com os filtros desta tela.
+          </span>
+        ) : state.s === 'busy' ? (
+          'Gerando o arquivo…'
+        ) : state.s === 'ok' ? (
+          <>
+            <b>Concluído:</b> {state.file}, gerado em {dateShort(state.at.toISOString())} às{' '}
+            {state.at.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}. É um retrato deste momento: o que
+            mudar depois não entra.
+          </>
+        ) : (
+          <span className="px-error">
+            Falha: {state.message}{' '}
+            <button type="button" className="px-link" onClick={run}>
+              Tentar de novo
+            </button>
+          </span>
+        )}
+      </span>
+    </div>
   );
 }
 
@@ -523,7 +713,7 @@ export function AdminOrdersPage() {
 // ---------- cancelamento (RF-62) ----------
 
 /** Confirmação do cancelamento: motivo obrigatório e aviso de que o estorno financeiro é do cliente, no gateway. */
-function CancelDialog({
+export function CancelDialog({
   title,
   onCancel,
   onConfirm,
@@ -757,10 +947,12 @@ export function AdminOrderPage({ id }: { id: string }) {
 export function LiveEntriesPanel({ eventId }: { eventId: string }) {
   const [data, setData] = useState<LiveEntries | null>(null);
   const [failed, setFailed] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const load = useCallback(async () => {
     try {
       setData(await api.admin.entries(eventId));
       setFailed(false);
+      setUpdatedAt(new Date());
     } catch {
       setFailed(true);
     }
@@ -782,6 +974,15 @@ export function LiveEntriesPanel({ eventId }: { eventId: string }) {
   };
   return (
     <section aria-label="Entradas ao vivo">
+      <p className="px-small" role="status" aria-live="polite">
+        <span className={`px-badge ${failed ? 'px-badge-err' : 'px-badge-ok'}`}>
+          {failed ? 'Sem conexão: tentando de novo' : 'Conectado'}
+        </span>{' '}
+        Atualiza sozinho a cada 4 segundos.{' '}
+        {updatedAt
+          ? `Última atualização: ${updatedAt.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.`
+          : 'Carregando…'}
+      </p>
       {failed ? (
         <p className="px-notice px-notice-err" role="alert">
           Sem conexão com o servidor. Os números abaixo podem estar desatualizados.
@@ -793,7 +994,10 @@ export function LiveEntriesPanel({ eventId }: { eventId: string }) {
             <b className="px-gate-count">{data.counter.entered}</b> entradas{' '}
             <span className="px-muted">de {data.counter.total} ingressos</span>
           </p>
-          <p className="px-small px-muted">Atualiza sozinho a cada 4 segundos · servidor {timeOf(data.serverTime)}</p>
+          <p className="px-small">
+            Ainda não entraram: <b>{Math.max(0, data.counter.total - data.counter.entered)}</b> · horário do servidor{' '}
+            {timeOf(data.serverTime)}. Leituras repetidas ou inválidas não contam como entrada.
+          </p>
           <ul className="px-gate-types">
             {data.byType.map(t => (
               <li key={t.typeName}>
@@ -917,7 +1121,9 @@ export function TicketsPanel({ eventId }: { eventId: string }) {
               <tbody>
                 {state.data.rows.map(t => (
                   <tr key={t.id}>
-                    <td className="px-mono">{t.shortCode}</td>
+                    <td className="px-mono">
+                      <Link to={`/admin/ingressos/${t.id}`}>{t.shortCode}</Link>
+                    </td>
                     <td>{t.typeName}</td>
                     <td>
                       {t.holderName}
@@ -1083,8 +1289,8 @@ export function AdminExceptionsPage() {
       <h1 className="px-h1">Exceções de pagamento</h1>
       <p>
         Pagamentos aprovados pelo gateway depois do fim da reserva, quando os ingressos já tinham sido vendidos. Nenhum
-        ingresso foi emitido. O estorno é feito pela PartyX no painel do gateway; a plataforma não estorna. Depois de tratar,
-        marque o caso como tratado informando o motivo.
+        ingresso foi emitido. O estorno é feito pela PartyX no painel do gateway; a plataforma não estorna. Depois de
+        tratar, marque o caso como tratado informando o motivo.
       </p>
       {done ? (
         <p className="px-notice px-notice-info" role="status">
@@ -1122,7 +1328,13 @@ export function AdminExceptionsPage() {
   );
 }
 
-function ExceptionTable({ rows, onTreat }: { rows: PaidWithoutStockCase[]; onTreat?: (c: PaidWithoutStockCase) => void }) {
+function ExceptionTable({
+  rows,
+  onTreat,
+}: {
+  rows: PaidWithoutStockCase[];
+  onTreat?: (c: PaidWithoutStockCase) => void;
+}) {
   return (
     <TableWrap>
       <table className="px-table">
@@ -1221,8 +1433,8 @@ function TreatDialog({
           Marcar o pedido PX-{item.number} como tratado
         </h2>
         <p>
-          A marcação só registra que o caso foi tratado. O pedido continua como pago sem estoque, nenhum estorno é feito pela
-          plataforma e o relatório da taxa não muda.
+          A marcação só registra que o caso foi tratado. O pedido continua como pago sem estoque, nenhum estorno é feito
+          pela plataforma e o relatório da taxa não muda.
         </p>
         <div className="px-field">
           <label htmlFor="motivo-tratado">Motivo (fica na trilha de auditoria)</label>

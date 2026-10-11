@@ -66,3 +66,24 @@ describe('formulários do painel: fuso do evento, valor e atrações', () => {
     expect(attractionsFromText('  DJ   Exemplo \n\nBanda Fictícia\n ')).toEqual(['DJ Exemplo', 'Banda Fictícia']);
   });
 });
+
+describe('validações do painel: CPF, e-mail e código de promoter', () => {
+  it('CPF com dígitos verificadores, repetidos recusados, máscara enquanto digita', async () => {
+    const { isCpfValid, maskCpfInput } = await import('./format');
+    expect(isCpfValid('529.982.247-25')).toBe(true);
+    expect(isCpfValid('52998224724')).toBe(false);
+    expect(isCpfValid('111.111.111-11')).toBe(false);
+    expect(isCpfValid('1234')).toBe(false);
+    expect(maskCpfInput('52998224725')).toBe('529.982.247-25');
+    expect(maskCpfInput('5299')).toBe('529.9');
+    expect(maskCpfInput('529982247')).toBe('529.982.247');
+  });
+  it('e-mail e código de promoter (maiúsculas, 3 a 20, sem acento nem símbolo)', async () => {
+    const { isEmailLike, normalizeCoupon, isCouponValid } = await import('./format');
+    expect(isEmailLike('a@b.co')).toBe(true);
+    expect(isEmailLike('a@b')).toBe(false);
+    expect(normalizeCoupon(' marina10 ')).toBe('MARINA10');
+    expect(isCouponValid('MARINA10')).toBe(true);
+    for (const bad of ['AB', 'A'.repeat(21), 'JOÃO', 'MARI NA', 'MARI-NA']) expect(isCouponValid(bad), bad).toBe(false);
+  });
+});

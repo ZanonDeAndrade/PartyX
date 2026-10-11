@@ -5,7 +5,7 @@ import { maskCpf } from '../domain/cpf';
 import { AppError } from '../domain/errors';
 import { formatEventDateTime } from '../domain/time';
 import { eventBuyers, eventTickets, listOrders, PAYMENT_SITUATION, type OrderFilter } from '../panel/service';
-import { feeReport, promoterRanking, salesReport, type RankMetric } from '../reports/service';
+import { feeReport, promoterOrders, promoterRanking, salesReport, type RankMetric } from '../reports/service';
 import type { Clock } from '../providers/clock';
 import { int, money, safeFilename, toCsv, type Cell } from './csv';
 
@@ -297,6 +297,33 @@ export async function exportPromoters(
     csv,
     rows: r.ranking.length,
     filters: { eventId: f.eventId ?? null, from: f.from ?? null, to: f.to ?? null, metric: f.metric },
+  };
+}
+
+/** Vendas atribuídas a UM promoter (ADM09), com os mesmos filtros da tela. Sem comissão: só ingressos e valor atribuído. */
+export async function exportPromoterOrders(
+  deps: ExportDeps,
+  promoterId: string,
+  f: { eventId?: string; from?: string; to?: string },
+): Promise<CsvExport> {
+  const r = await promoterOrders({ db: deps.db }, promoterId, f);
+  const evName = f.eventId ? await eventName(deps.db, f.eventId) : 'Todos';
+  const csv = toCsv(
+    ['Pedido', 'Evento', 'Pagamento aprovado em', 'Ingressos', 'Valor (R$)'],
+    r.orders.map(o => [`PX-${o.number}`, o.eventName, when(o.paidAt), int(o.tickets), money(o.cents)]),
+    [
+      ['Total', '', '', int(r.totals.tickets), money(r.totals.cents)],
+      ['Promoter', `${r.promoter.name} (${r.promoter.code})`],
+      ['Critério', 'Pedidos pagos com o código do promoter, pela data original da aprovação. Sem desconto e sem comissão.'],
+      ['Filtros aplicados', `Evento: ${evName}; Período de aprovação: ${period(f)}`],
+      ['Gerado em', stamp(deps)],
+    ],
+  );
+  return {
+    filename: safeFilename('vendas-promoter', r.promoter.code, f.from ?? '', f.to ?? ''),
+    csv,
+    rows: r.orders.length,
+    filters: { promoterId, eventId: f.eventId ?? null, from: f.from ?? null, to: f.to ?? null },
   };
 }
 

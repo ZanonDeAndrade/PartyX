@@ -13,6 +13,7 @@ import {
   exportEventTickets,
   exportFee,
   exportOrders,
+  exportPromoterOrders,
   exportPromoters,
   exportSales,
   loadContingency,
@@ -132,6 +133,13 @@ export function exportRoutes(deps: AuthDeps) {
       { ...query(c, 'eventId', 'from', 'to'), metric: c.req.query('metric') },
     );
     return sendCsv(c, 'promoters', await exportPromoters(ed, f), f.eventId);
+  });
+
+  app.get('/admin/exports/promoters/:id/orders.csv', async c => {
+    const id = uuid.safeParse(c.req.param('id'));
+    if (!id.success) throw new AppError(404, 'nao_encontrado', 'Promoter não encontrado.');
+    const f = parse(z.object({ eventId: uuid.optional(), from: date, to: date }), query(c, 'eventId', 'from', 'to'));
+    return sendCsv(c, 'vendas_promoter', await exportPromoterOrders(ed, id.data, f), f.eventId);
   });
 
   app.get('/admin/exports/fee.csv', async c => {

@@ -7,7 +7,7 @@ import { useRouter } from './router';
 import { useSession } from './session';
 
 /** Troca de senha (U07), em janela sobre a conta. A senha atual é conferida pelo servidor. */
-function PasswordDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+export function PasswordDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');

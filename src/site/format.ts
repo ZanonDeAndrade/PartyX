@@ -125,3 +125,29 @@ export const attractionsFromText = (text: string): string[] =>
     .split('\n')
     .map(a => a.trim().replace(/\s+/g, ' '))
     .filter(Boolean);
+
+// ---------- correção de dados pelo administrador (ADM13) e promoters (ADM08) ----------
+
+const cpfCheck = (digits: number[], weightStart: number) => {
+  const rest = (digits.reduce((t, d, i) => t + d * (weightStart - i), 0) * 10) % 11;
+  return rest === 10 ? 0 : rest;
+};
+/** Mesmo critério do servidor (`domain/cpf.ts`): 11 dígitos, não repetidos, dígitos verificadores corretos. Só orienta. */
+export function isCpfValid(input: string): boolean {
+  const d = input.replace(/\D/g, '');
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const n = [...d].map(Number);
+  return cpfCheck(n.slice(0, 9), 10) === n[9] && cpfCheck(n.slice(0, 10), 11) === n[10];
+}
+/** 000.000.000-00 enquanto digita. */
+export function maskCpfInput(input: string): string {
+  const d = input.replace(/\D/g, '').slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2');
+}
+export const isEmailLike = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+/** Código de promoter como o servidor guarda: maiúsculas, sem espaços. Válido com 3 a 20 letras ou números sem acento. */
+export const normalizeCoupon = (v: string) => v.trim().toUpperCase();
+export const isCouponValid = (v: string) => /^[A-Z0-9]{3,20}$/.test(v);

@@ -274,7 +274,7 @@ export function PromoterReportPage() {
                       <b>{p.position}º</b>
                     </td>
                     <td>
-                      {p.name}
+                      <Link to={`/admin/promoters/${p.id}`}>{p.name}</Link>
                       <br />
                       <span className="px-muted px-mono">
                         {p.code}

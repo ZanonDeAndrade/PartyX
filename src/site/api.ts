@@ -406,6 +406,96 @@ export interface AdminTicketType {
   salesState: 'a_venda' | 'em_breve' | 'encerrada' | 'indisponivel' | 'esgotado' | 'reservado';
 }
 
+export interface Promoter {
+  id: string;
+  name: string;
+  couponCode: string;
+  phone: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+export interface PromoterOrders {
+  promoter: { id: string; name: string; code: string; isActive: boolean };
+  orders: { id: string; number: number; eventName: string; tickets: number; cents: number; paidAt: string }[];
+  totals: { tickets: number; cents: number };
+}
+export interface BuyerRow {
+  id: string;
+  name: string;
+  email: string;
+  cpf: string | null;
+  phone: string | null;
+  isActive: boolean;
+  anonymized: boolean;
+  orders: number;
+  tickets: number;
+  lastOrderAt: string | null;
+}
+export interface BuyerDetail {
+  buyer: {
+    id: string;
+    name: string;
+    email: string;
+    cpf: string | null;
+    phone: string | null;
+    isActive: boolean;
+    anonymized: boolean;
+    createdAt: string;
+    lastLoginAt: string | null;
+  };
+  orders: {
+    id: string;
+    number: number;
+    status: OrderStatus;
+    totalCents: number;
+    units: number;
+    paymentMethod: string | null;
+    createdAt: string;
+    paidAt: string | null;
+    event: { id: string; name: string };
+  }[];
+  tickets: {
+    id: string;
+    shortCode: string;
+    status: 'valido' | 'utilizado' | 'cancelado';
+    typeName: string;
+    eventName: string;
+    orderNumber: number;
+    usedAt: string | null;
+    cancelledAt: string | null;
+  }[];
+  corrections: { at: string; actor: string | null; reason: string; fields: ('email' | 'cpf')[] }[];
+}
+export interface AdminTicketDetail {
+  ticket: {
+    id: string;
+    shortCode: string;
+    status: 'valido' | 'utilizado' | 'cancelado';
+    holderName: string;
+    typeName: string;
+    priceCents: number;
+    issuedAt: string;
+    event: { id: string; name: string; startsAt: string };
+    order: { id: string; number: number; status: OrderStatus; paidAt: string | null };
+    buyer: { id: string; name: string; email: string; cpf: string | null };
+    entry: { at: string; validator: string | null } | null;
+    cancellation: { at: string; reason: string | null; by: string | null } | null;
+  };
+  attempts: { at: string; result: string; method: string; validator: string }[];
+}
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  cpf: string | null;
+  phone: string | null;
+  role: 'validador' | 'administrador';
+  isActive: boolean;
+  mustChangePassword: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
 /** Regras para os formulários do painel, lidas do servidor (`GET /admin/events/meta`). */
 export interface EventsMeta {
   banner: { maxBytes: number; minWidth: number; storedWidth: number; formats: string[]; available: boolean };
@@ -685,6 +775,43 @@ export const api = {
       ).then(r => ({ ...r, rows: r.tickets })),
     entries: (eventId: string, signal?: AbortSignal) => get<LiveEntries>(`/admin/events/${eventId}/entries`, signal),
     salesReport: (query: string, signal?: AbortSignal) => get<SalesReport>(`/admin/reports/sales?${query}`, signal),
+    promoters: (signal?: AbortSignal) =>
+      get<{ promoters: Promoter[] }>('/admin/promoters', signal).then(r => r.promoters),
+    createPromoter: (body: { name: string; couponCode: string; phone: string | null; isActive: boolean }) =>
+      request<{ promoter: Promoter }>('POST', '/admin/promoters', body),
+    updatePromoter: (
+      id: string,
+      body: Partial<{ name: string; couponCode: string; phone: string | null; isActive: boolean }>,
+    ) => request<{ promoter: Promoter }>('PATCH', `/admin/promoters/${encodeURIComponent(id)}`, body),
+    promoterOrders: (id: string, query: string, signal?: AbortSignal) =>
+      get<PromoterOrders>(`/admin/reports/promoters/${encodeURIComponent(id)}?${query}`, signal),
+    buyersAll: (query: string, signal?: AbortSignal) =>
+      get<{ page: number; pageSize: number; total: number; buyers: BuyerRow[] }>(`/admin/buyers?${query}`, signal).then(
+        r => ({ ...r, rows: r.buyers }),
+      ),
+    buyer: (id: string, signal?: AbortSignal) => get<BuyerDetail>(`/admin/buyers/${encodeURIComponent(id)}`, signal),
+    revealCpf: (id: string) => request<{ cpf: string }>('POST', `/admin/buyers/${encodeURIComponent(id)}/cpf`),
+    correctIdentity: (id: string, body: { email?: string; cpf?: string; reason: string }) =>
+      request<{ mensagem: string }>('PATCH', `/admin/users/${encodeURIComponent(id)}/identity`, body),
+    ticket: (id: string, signal?: AbortSignal) =>
+      get<AdminTicketDetail>(`/admin/tickets/${encodeURIComponent(id)}`, signal),
+    team: (signal?: AbortSignal) => get<{ team: TeamMember[] }>('/admin/team', signal).then(r => r.team),
+    createMember: (body: { name: string; email: string; phone: string | null; role: TeamMember['role'] }) =>
+      request<{ member: TeamMember; temporaryPassword: string }>('POST', '/admin/team', body),
+    updateMember: (
+      id: string,
+      body: Partial<{ name: string; email: string; phone: string | null; role: TeamMember['role'] }>,
+    ) => request<{ member: TeamMember }>('PATCH', `/admin/team/${encodeURIComponent(id)}`, body),
+    setMemberActive: (id: string, active: boolean) =>
+      request<{ member: TeamMember }>(
+        'POST',
+        `/admin/team/${encodeURIComponent(id)}/${active ? 'activate' : 'deactivate'}`,
+      ),
+    temporaryPassword: (id: string) =>
+      request<{ member: TeamMember; temporaryPassword: string }>(
+        'POST',
+        `/admin/team/${encodeURIComponent(id)}/temporary-password`,
+      ),
     promoterRanking: (query: string, signal?: AbortSignal) =>
       get<PromoterRanking>(`/admin/reports/promoters?${query}`, signal),
     feeReport: (query: string, signal?: AbortSignal) => get<FeeReport>(`/admin/reports/fee?${query}`, signal),
