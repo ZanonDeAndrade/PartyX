@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "public": "infra/producao/hosting-public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/api/**", "run": { "serviceId": "partyx", "region": "southamerica-east1" } },
+      { "source": "**", "run": { "serviceId": "partyx", "region": "southamerica-east1" } }
+    ]
+  }
+}

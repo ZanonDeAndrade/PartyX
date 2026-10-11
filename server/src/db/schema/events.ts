@@ -1,0 +1,88 @@
+import { sql } from 'drizzle-orm';
+import { boolean, check, index, integer, pgTable, text, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { createdAt, instant, updatedAt } from './columns';
+import { eventStatus } from './enums';
+
+/** Eventos. Nunca apagados: o ciclo é rascunho, publicado e encerrado. */
+export const events = pgTable(
+  'events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Endereço amigável: /eventos/:slug (RF-27). */
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    startsAt: instant('starts_at').notNull(),
+    venue: text('venue').notNull(),
+    address: text('address').notNull(),
+    description: text('description').notNull(),
+    attractions: text('attractions')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    ageRating: text('age_rating').notNull(),
+    bannerUrl: text('banner_url'),
+    status: eventStatus('status').notNull().default('rascunho'),
+    isFeatured: boolean('is_featured').notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  t => [
+    uniqueIndex('events_slug_key').on(t.slug),
+    index('events_status_starts_idx').on(t.status, t.startsAt),
+    check('events_slug_format', sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
+    check('events_name_not_blank', sql`length(btrim(${t.name})) > 0`),
+  ],
+);
+
+/**
+ * Pista, VIP, Camarote e outros. Lotes são tipos com nome e período próprios (sem virada automática).
+ * `quantity_sold` só muda dentro de transação com bloqueio de linha (seção 6.2).
+ */
+export const ticketTypes = pgTable(
+  'ticket_types',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => events.id),
+    name: text('name').notNull(),
+    /** Centavos. Zero é proibido: ingresso gratuito e cortesia estão fora do escopo. */
+    priceCents: integer('price_cents').notNull(),
+    quantityTotal: integer('quantity_total').notNull(),
+    quantitySold: integer('quantity_sold').notNull().default(0),
+    salesStartAt: instant('sales_start_at').notNull(),
+    salesEndAt: instant('sales_end_at').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  t => [
+    uniqueIndex('ticket_types_event_name_key').on(t.eventId, t.name),
+    // Alvo das chaves estrangeiras compostas que impedem item de outro evento.
+    unique('ticket_types_id_event_key').on(t.id, t.eventId),
+    index('ticket_types_event_active_idx').on(t.eventId, t.isActive),
+    check('ticket_types_price_positive', sql`${t.priceCents} > 0`),
+    check('ticket_types_total_positive', sql`${t.quantityTotal} > 0`),
+    check('ticket_types_sold_in_range', sql`${t.quantitySold} >= 0 and ${t.quantitySold} <= ${t.quantityTotal}`),
+    check('ticket_types_sales_window', sql`${t.salesEndAt} > ${t.salesStartAt}`),
+    check('ticket_types_name_not_blank', sql`length(btrim(${t.name})) > 0`),
+  ],
+);
+
+/** Promoters com código exclusivo. O código só atribui a venda: sem desconto e sem comissão. */
+export const promoters = pgTable(
+  'promoters',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    /** De 3 a 20 letras maiúsculas sem acento ou números. */
+    couponCode: text('coupon_code').notNull(),
+    phone: text('phone'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: createdAt(),
+  },
+  t => [
+    uniqueIndex('promoters_coupon_code_key').on(t.couponCode),
+    check('promoters_coupon_code_format', sql`${t.couponCode} ~ '^[A-Z0-9]{3,20}$'`),
+  ],
+);

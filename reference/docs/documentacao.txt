@@ -1,0 +1,1329 @@
+PartyX — Documentação de
+Desenvolvimento da Plataforma de Venda de
+Ingressos
+Sep 30, 2026 · @Arthur
+1. Visão geral do projeto
+A PLATAFORMA PartyX deve ser entregue para testes até 20/10/2026, com 10 dias
+corridos de homologação, e depois operar por no mínimo 12 meses contados da
+publicação. Este documento transforma o contrato e seus Anexos I e II em etapas
+executáveis de desenvolvimento, com requisitos, critérios de aceite e checklists.
+1.1 Controle do documento
+Item 	Valor
+Projeto 	PartyX — Plataforma web de venda de ingressos
+Base contratual 	Contrato de Prestação de Serviços + Anexo I
+(Escopo) + Anexo II (Nível de Serviço)
+Versão do documento 1.0
+Responsável técnico 	Arthur Zanon de Andrade (Zanon de Andrade
+Softwares)
+Cliente 	Bernardo Peixoto Fortes Bittencourt (PartyX)
+Regra de precedência Em caso de divergência, prevalece o texto do
+contrato e dos anexos sobre este documento e
+sobre o quadro-síntese
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 1 of 32
+
+-- 1 of 32 --
+
+1.2 Partes
+1.3 Objeto (Cláusula 1ª)
+Plataforma web responsiva composta por cinco blocos funcionais, mais os serviços
+continuados após a publicação:
+1. Site de vendas (vitrine e compra de ingressos).
+2. Área do cliente (cadastro, dados, "Meus ingressos").
+3. Emissão de ingressos digitais com QR Code único.
+4. Módulo de validação de ingressos na entrada dos eventos.
+5. Painel administrativo (eventos, promoters, pedidos, relatórios, usuários).
+6. Serviços continuados: hospedagem, manutenção, backup e suporte técnico (Anexo II).
+1.4 Modelo comercial que impacta o sistema
+Papel 	Empresa 	CNPJ 	Contato
+CONTRATANTE 58.471.403
+Bernardo Peixoto
+Fortes
+Bittencourt
+(marca PartyX),
+São Gabriel/RS
+58.471.403/0001-
+07
+bbittencourt085@gmail.com ·
+(55) 9939-4600
+CONTRATADA 	57.971.378 Arthur
+Zanon de
+Andrade (Zanon
+de Andrade
+Softwares),
+Faxinal do
+Soturno/RS
+57.971.378/0001-
+50
+zanondea@gmail.com · Suporte
+WhatsApp +55 55 9958-7217
+Item 	Condição 	Impacto técnico
+Implementação 	Sem cobrança (Cl. 3ª) 	Nenhum
+Mensalidade 	R$ 150,00, vencimento dia 10,
+primeira em 10/10/2026 (Cl. 6.1 e
+6.6)
+Controle de cobrança externo
+ao sistema
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 2 of 32
+
+-- 2 of 32 --
+
+2. Premissas contratuais do desenvolvimento
+O prazo de 20/10/2026 só corre depois da assinatura e do recebimento de todos os
+insumos do cliente, e fica suspenso sempre que houver atraso dele. Por isso, cada
+pendência do cliente deve ser registrada por escrito com data.
+2.1 Regras de prazo
+Item 	Condição 	Impacto técnico
+Taxa por ingresso 	R$ 1,00 por ingresso com
+pagamento aprovado, mesmo se
+depois cancelado, reembolsado
+ou estornado (Cl. 6.2 e 6.3)
+O sistema precisa gerar o
+Relatório mensal de ingressos
+vendidos com essa regra exata
+(Cl. 6.4 e 12.1.F)
+Prazo mínimo 	12 meses da publicação (Cl. 19.1) 	Registrar formalmente a data de
+publicação em produção
+Pagamentos dos
+ingressos
+Direto na conta da
+CONTRATANTE no gateway (Cl.
+14.4)
+A CONTRATADA nunca recebe
+nem repassa valores;
+credenciais são da conta do
+cliente
+Regra 	Cláusula Como aplicar na prática
+Início condicionado à assinatura +
+dados, materiais, informações dos
+eventos e acesso ao gateway
+3.3 	Enviar o checklist da Etapa 0 no dia da
+assinatura; registrar a data do último
+insumo recebido
+Entrega para testes até 20/10/2026 	4.1 	Marco "Entrega para homologação"
+com comunicação formal por e-mail e
+WhatsApp
+Suspensão por atraso do cliente,
+mudança solicitada, indisponibilidade
+do gateway, integração não prevista,
+caso fortuito ou força maior
+4.2 	Registrar em log de ocorrências: data
+de início, data de fim, motivo
+Prorrogação proporcional mediante
+comunicação da CONTRATADA
+4.3 	Enviar comunicação escrita com a
+nova data sempre que houver
+suspensão
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 3 of 32
+
+-- 3 of 32 --
+
+2.2 Registros obrigatórios durante o projeto
+2.3 Canais formais
+Comunicações contratuais vão aos contatos da qualificação (Cl. 21.6): e-mail
+bbittencourt085@gmail.com e telefone (55) 9939-4600 do cliente. Suporte técnico pelo
+WhatsApp +55 55 9958-7217, de segunda a sexta, das 9h às 17h (horário de Brasília),
+exceto feriados.
+Regra 	Cláusula Como aplicar na prática
+Cliente tem 5 dias úteis para responder
+cada versão enviada para validação
+4.3 	Cada envio de validação vira um item
+datado; após 5 dias úteis sem
+resposta, conta como atraso do
+cliente
+Testes: 10 dias corridos após a
+comunicação da entrega
+5.2 	Enviar roteiro de testes junto com a
+comunicação
+Prazo de correção informado em até 2
+dias úteis após descrição suficiente do
+erro
+5.3 	Responder cada chamado de
+homologação com estimativa em até 2
+dias úteis
+Aceite tácito: silêncio no prazo,
+autorização de produção ou uso real
+para vender ingressos
+5.4 	Registrar a data do primeiro ingresso
+vendido em produção
+Preferências estéticas e ideias novas
+não impedem o aceite
+5.5 	Classificar cada apontamento como
+"erro", "divergência do Anexo I" ou
+"evolução"
+Garantia de 30 dias a partir da
+publicação em produção
+5.6 	Controlar a data de fim da garantia
+Data de assinatura do contrato.
+Data de recebimento de cada insumo da Etapa 0 e do último deles (início efetivo).
+Log de suspensões e prorrogações (Cl. 4.2 e 4.3).
+Log de versões enviadas para validação e datas de resposta do cliente.
+Data da comunicação formal de entrega para homologação.
+Lista de apontamentos de homologação com classificação e prazo informado.
+Data do aceite (expresso ou tácito) e motivo.
+Data de publicação em produção (início dos 12 meses e dos 30 dias de garantia).
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 4 of 32
+
+-- 4 of 32 --
+
+3. Cronograma e marcos
+Com assinatura e insumos até 03/10/2026, a entrega para homologação cabe em 20/10, os
+testes terminam em 30/10 e a publicação em produção pode ocorrer em 31/10. Só a data de
+20/10 é contratual; as etapas internas são uma proposta que se ajusta às suspensões.
+A partir da publicação correm os 12 meses de prazo mínimo (Cl. 19.1) e os 30 dias de
+garantia (Cl. 5.6). Se a publicação for em 31/10/2026, o prazo mínimo vai até 31/10/2027 e a
+manifestação de renovação deve chegar até 01/10/2027 (Cl. 19.3).
+4. Etapa 0 — Insumos e pré-requisitos da CONTRATANTE
+O desenvolvimento só começa oficialmente quando todos os itens abaixo estiverem
+recebidos (Cl. 3.3). Enviar esta lista ao cliente no dia da assinatura, com prazo de resposta
+de 5 dias úteis.
+cronograma proposto · 30/09 a 30/11/2026
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 5 of 32
+
+-- 5 of 32 --
+
+4.1 Checklist de insumos
+# 	Insumo 	Base 	Necessário
+para
+Recebido
+em
+1 	Contrato assinado (Gov.br, ZapSign ou
+Clicksign)
+3.3, 21.5 	Início
+2 	Logotipo em alta resolução (SVG ou
+PNG transparente)
+13.1.A 	Layout
+3 	Cores, fontes e demais materiais de
+identidade visual
+13.1.A 	Layout
+4 	Dados cadastrais e contatos da PartyX
+para rodapé e e-mails
+13.1.A 	Site, e-mails
+5 	Escolha do gateway de pagamento
+entre as opções indicadas pela
+CONTRATADA
+Anexo I,
+11
+Integração
+6 	Conta do gateway aberta em nome da
+CONTRATANTE, aprovada para Pix e
+cartão
+13.1.C,
+14.4
+Integração
+7 	Credenciais do gateway: sandbox e
+produção (chaves de API, segredo de
+webhook)
+13.1.C 	Integração
+8 	Domínio próprio comprado em nome da
+CONTRATANTE e acesso ao painel DNS
+13.1.G,
+14.1
+Publicação
+9 	Termos de Uso 	13.1.D 	Cadastro
+10 	Política de Privacidade 	13.1.D 	Cadastro,
+LGPD
+11 	Política de cancelamento, troca e
+reembolso
+13.1.D 	Compra
+12 	Regras de meia-entrada e benefícios
+legais a exibir
+13.1.D 	Vitrine
+13 	Dados de pelo menos 1 evento real ou
+de exemplo: nome, data, horário, local,
+descrição, atrações, classificação
+etária, banner
+13.1.B,
+13.1.F
+Vitrine, testes
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 6 of 32
+
+-- 6 of 32 --
+
+4.2 Decisões a tomar com o cliente na reunião de kickoff
+1. Gateway escolhido e forma de parcelamento no cartão (se houver).
+2. Tempo de reserva temporária no checkout (sugestão: 10 minutos).
+3. Se meia-entrada será um tipo de ingresso separado (ex.: "Pista — Meia") — a
+verificação do documento é do cliente (Cl. 13.2).
+4. Se o CPF do comprador será exibido no ingresso ou só o nome (o Anexo I exige nome do
+comprador).
+5. Endereço público da plataforma (domínio ou subdomínio).
+6. Datas das próximas aberturas de vendas e eventos, para evitar manutenções nesses
+períodos (Anexo II, 1).
+4.3 Critério de conclusão da Etapa 0
+Todos os itens 1 a 14 recebidos. Os itens 15 a 19 podem chegar durante o desenvolvimento,
+mas o atraso deles suspende o prazo (Cl. 4.2) e deve ser comunicado por escrito.
+5. Arquitetura e stack técnica
+Uma única aplicação web atende comprador, validador e administrador pelo navegador,
+sem aplicativo nativo (excluído pelo Anexo I, item 12). O servidor concentra as regras
+críticas — estoque, reserva, emissão e validação — e é o único que fala com o gateway.
+# 	Insumo 	Base 	Necessário
+para
+Recebido
+em
+14 	Tipos de ingresso por evento: nome,
+valor, quantidade, período de vendas
+13.1.B 	Compra
+15 	Limite de ingressos por compra 	Anexo I,
+3
+Compra
+16 	Lista inicial de promoters: nome e
+código de cupom desejado
+Anexo I,
+6
+Promoters
+17 	Lista de usuários da equipe: nome, e-
+mail, perfil (administrador ou validador)
+Anexo I,
+8
+Permissões
+18 	E-mail remetente desejado (ex.:
+ingressos@dominio)
+Anexo I,
+3
+E-mails
+19 	Situações de uso para testes (compra
+múltipla, esgotamento, cancelamento)
+13.1.F 	Homologação
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 7 of 32
+
+-- 7 of 32 --
+
+O dinheiro das vendas vai do gateway direto para a conta da PartyX; a PLATAFORMA só
+recebe a confirmação do pagamento (Cl. 14.4).
+5.1 Stack sugerida
+arquitetura · 3 perfis, 4 componentes internos, 3 serviços externos
+Camada 	Tecnologia sugerida 	Motivo
+Linguagem 	TypeScript 	Mesma linguagem no front e no
+back, menos erros de tipo
+Aplicação web e
+API
+Next.js (React) com rotas de API 	Um só projeto, renderização
+rápida no celular, bom SEO para
+páginas de eventos
+Banco de dados 	PostgreSQL gerenciado 	Transações e bloqueio de linha
+para não vender acima da
+capacidade
+Acesso ao banco 	Prisma ou Drizzle 	Migrações versionadas e
+consultas tipadas
+Estilos 	Tailwind CSS 	Layout responsivo rápido de
+construir
+Leitura de QR 	Biblioteca de leitura por câmera
+no navegador (ex.: html5-qrcode
+ou ZXing)
+Funciona sem instalar aplicativo
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 8 of 32
+
+-- 8 of 32 --
+
+A escolha final de ferramentas é da CONTRATADA; o contrato não fixa tecnologia.
+Qualquer custo extra de licença ou infraestrutura acima do previsto exige autorização do
+cliente (Cl. 8.3).
+6. Modelo de dados
+O banco relacional terá 14 tabelas principais; a regra central é que cada unidade comprada
+vira um registro em tickets com código único e estado próprio. Nomes em inglês no
+banco, rótulos em português na interface.
+6.1 Entidades
+Camada 	Tecnologia sugerida 	Motivo
+Geração de QR e
+PDF
+Biblioteca de QR + gerador de
+PDF no servidor
+Ingresso em PDF para download
+E-mail 	Serviço transacional (ex.: Resend,
+Amazon SES, Brevo)
+Entregabilidade e registro de
+envios
+Hospedagem 	Provedor de nuvem com deploy
+automático e HTTPS
+Administrado pela CONTRATADA
+(Anexo II, 1)
+Arquivos 	Armazenamento de objetos
+(bucket)
+Banners dos eventos
+Monitoramento 	Checagem de disponibilidade +
+captura de erros (ex.: Sentry)
+Suporte crítico em até 4 horas
+úteis
+Tabela 	Finalidade 	Campos principais 	Anexo
+I
+users 	Todos os logins (cliente,
+validador, administrador)
+id, name, email (único), cpf
+(único, clientes), phone,
+password_hash, role, is_active,
+created_at, last_login_at
+1, 8
+password_resets Tokens de recuperação de
+senha
+id, user_id, token_hash,
+expires_at, used_at
+1
+consents 	Aceite de termos e política
+de privacidade
+id, user_id, terms_version,
+privacy_version, accepted_at,
+ip, user_agent
+1, 9
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 9 of 32
+
+-- 9 of 32 --
+
+Tabela 	Finalidade 	Campos principais 	Anexo
+I
+events 	Eventos da PartyX 	id, slug, name, starts_at, venue,
+address, description,
+attractions, age_rating,
+banner_url, status (rascunho,
+publicado, encerrado),
+is_featured
+2, 6
+ticket_types 	Pista, VIP, Camarote e
+outros por evento
+id, event_id, name,
+price_cents, quantity_total,
+quantity_sold, sales_start_at,
+sales_end_at, is_active
+2, 6
+promoters 	Promoters com cupom
+exclusivo
+id, name, coupon_code
+(único), phone, is_active
+3, 6, 7
+reservations 	Reserva temporária no
+checkout
+id, order_id, ticket_type_id,
+quantity, expires_at, status
+3
+orders 	Pedido do comprador 	id, user_id, event_id,
+promoter_id (opcional),
+total_cents, status (pendente,
+pago, expirado, cancelado,
+estornado), payment_method,
+gateway_payment_id, paid_at,
+created_at
+3, 7
+order_items 	Linhas do pedido 	id, order_id, ticket_type_id,
+quantity, unit_price_cents
+3
+tickets 	Um registro por unidade
+adquirida
+id, order_id, ticket_type_id,
+event_id, holder_name, code
+(aleatório, único), qr_payload,
+status (válido, utilizado,
+cancelado), issued_at,
+used_at, validated_by
+4, 5
+checkins 	Registro de cada tentativa
+de validação
+id, ticket_id (opcional),
+event_id, validator_id, result
+(válido, já utilizado, inválido),
+method (câmera, manual),
+created_at
+5, 7
+payment_events 	Webhooks recebidos do
+gateway, para
+idempotência e auditoria
+id, gateway_event_id (único),
+order_id, type, payload_json,
+received_at, processed_at
+3, 10
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 10 of 32
+
+-- 10 of 32 --
+
+6.2 Regras de integridade
+Valores monetários sempre em centavos (inteiro), nunca em ponto flutuante.
+tickets.code gerado com gerador criptográfico (mínimo 128 bits), índice único.
+quantity_sold só é alterado dentro de transação com bloqueio de linha ( SELECT …
+FOR UPDATE ) para evitar venda acima da capacidade.
+payment_events.gateway_event_id único: o mesmo webhook processado duas vezes
+não emite ingressos em dobro.
+A marcação de ingresso como utilizado é uma atualização condicional ( UPDATE …
+WHERE status = 'válido' ): só uma leitura vence, mesmo com dois validadores ao
+mesmo tempo.
+Exclusão lógica ( is_active , status ) em vez de apagar registros com histórico de
+vendas.
+6.3 Consulta do relatório de taxa (Cl. 6.3 e 6.4)
+Ingressos vendidos no mês = contagem de tickets cujo pedido teve paid_at dentro do
+mês, independentemente do status atual do ingresso ou do pedido. Cancelados,
+reembolsados e estornados continuam contando, conforme a Cláusula 6.3.
+7. Etapa 1 — Ambientes e infraestrutura
+Três ambientes separados — desenvolvimento, homologação e produção — ficam prontos
+nos primeiros 2 dias, com deploy automático e backup ativo antes de qualquer
+funcionalidade. A infraestrutura é contratada e administrada pela CONTRATADA (Anexo
+II, 1).
+Tabela 	Finalidade 	Campos principais 	Anexo
+I
+email_log 	E-mails transacionais
+enviados
+id, user_id, order_id, template,
+status, sent_at
+3
+audit_log 	Ações administrativas
+(cancelamentos, edições,
+permissões)
+id, actor_id, action, entity,
+entity_id, before_json,
+after_json, created_at
+7, 8, 9
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 11 of 32
+
+-- 11 of 32 --
+
+7.1 Ambientes
+7.2 Tarefas
+Ambiente 	Uso 	Gateway 	Endereço
+sugerido
+Dados
+Desenvolvimento Máquina local do
+desenvolvedor
+Sandbox 	localhost 	Fictícios
+Homologação 	Testes do cliente
+(Cl. 5ª)
+Sandbox 	homolog.dominio-
+partyx
+Fictícios, com
+eventos de
+exemplo do
+cliente
+Produção 	Venda real 	Produção
+(conta do
+cliente)
+dominio-partyx 	Reais
+Criar repositório Git privado da CONTRATADA (o código-fonte é propriedade dela, Cl.
+9.1).
+Definir padrão de branches: main (produção), develop (homologação), feature/* .
+Configurar projeto base (framework, TypeScript, lint, formatação, variáveis de
+ambiente).
+Provisionar banco PostgreSQL gerenciado para homologação e produção.
+Configurar armazenamento de arquivos para banners (bucket com URLs públicas só
+de leitura).
+Configurar serviço de e-mail transacional com domínio autenticado (SPF, DKIM,
+DMARC).
+Configurar pipeline de CI/CD: testes e lint em cada push; deploy automático de
+develop em homologação e de main em produção.
+Configurar migrações de banco versionadas.
+Configurar cofre de segredos (credenciais do gateway, chaves de e-mail, segredo de
+sessão) fora do repositório.
+Configurar DNS do domínio do cliente e certificado HTTPS automático.
+Ativar backup automático diário do banco com retenção mínima de 7 dias (Anexo II, 2).
+Configurar monitoramento de disponibilidade (checagem a cada 1 a 5 minutos) com
+alerta por e-mail ou celular.
+Configurar coleta de erros da aplicação (ex.: Sentry) e logs centralizados.
+Criar usuário administrador inicial.
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 12 of 32
+
+-- 12 of 32 --
+
+7.3 Critério de conclusão
+Uma página "olá" publicada em homologação com HTTPS, conectada ao banco, com deploy
+automático funcionando e o primeiro backup concluído.
+8. Etapa 2 — Desenvolvimento dos módulos (Anexo I)
+São 8 módulos funcionais, desenvolvidos na ordem abaixo porque cada um depende do
+anterior: usuários, eventos, vitrine, compra, ingresso, validação, painel e design. Cada
+módulo lista requisitos (RF) e critérios de aceite (CA) usados na homologação.
+8.1 Módulo de usuários, cadastro e acesso (Anexo I, itens 1 e 8)
+Requisitos:
+RF-01 Cadastro de cliente com nome, e-mail, CPF, telefone e senha.
+RF-02 Validação de CPF (dígitos verificadores), e-mail único e CPF único.
+RF-03 Aceite obrigatório dos Termos de Uso e da Política de Privacidade no cadastro,
+com registro de versão, data e IP.
+RF-04 Login com e-mail e senha.
+RF-05 Recuperação de senha por e-mail com link de uso único e validade de 1 hora.
+RF-06 Área do cliente com edição de nome, telefone e senha (e-mail e CPF editáveis só
+pelo administrador, para evitar fraude).
+RF-07 Perfis: administrador, validador e cliente.
+RF-08 Administrador cadastra, edita, ativa e desativa usuários da equipe.
+RF-09 Cada rota do sistema verifica a permissão do perfil no servidor, não só na
+interface.
+RF-10 Limite de tentativas de login (ex.: 5 falhas em 15 minutos bloqueiam
+temporariamente).
+Critérios de aceite:
+CA-01 Um cliente se cadastra, recebe confirmação e faz login.
+CA-02 CPF inválido ou já cadastrado é recusado com mensagem clara.
+CA-03 Sem marcar o aceite dos termos, o cadastro não é concluído.
+CA-04 A recuperação de senha funciona e o link não funciona uma segunda vez.
+CA-05 Um validador não consegue abrir telas do administrador, nem digitando o
+endereço.
+CA-06 Um usuário desativado não consegue entrar.
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 13 of 32
+
+-- 13 of 32 --
+
+8.2 Módulo de gestão de eventos, ingressos e promoters (Anexo I, item 6)
+Requisitos:
+RF-11 Cadastro, edição, publicação e encerramento de eventos.
+RF-12 Campos: nome, data, horário, local, descrição, atrações, banner e classificação
+etária.
+RF-13 Upload de banner com redimensionamento automático e limite de tamanho.
+RF-14 Cadastro de tipos de ingresso por evento com nome, valor e quantidade
+disponível.
+RF-15 Período de vendas (início e fim) por tipo de ingresso.
+RF-16 Ativação e desativação de tipo de ingresso a qualquer momento.
+RF-17 Controle automático do estoque, encerrando as vendas ao atingir a capacidade.
+RF-18 Cadastro, edição e desativação de promoters, com código de cupom exclusivo.
+RF-19 Marcação de evento em destaque para a página inicial.
+Critérios de aceite:
+CA-07 Um evento em rascunho não aparece no site; ao publicar, aparece.
+CA-08 Um tipo de ingresso fora do período de vendas aparece como "vendas
+encerradas" ou "em breve".
+CA-09 Ao vender a última unidade, o tipo aparece como esgotado.
+CA-10 Dois promoters não podem ter o mesmo código.
+CA-11 Um evento encerrado sai da listagem de vendas.
+8.3 Módulo de vitrine de eventos (Anexo I, item 2)
+Requisitos:
+RF-20 Página inicial com eventos em destaque e próximos eventos.
+RF-21 Listagem dos eventos com ingressos disponíveis.
+RF-22 Busca por nome ou data.
+RF-23 Página do evento com banner, nome, data, horário, local, descrição, atrações e
+classificação etária.
+RF-24 Exibição dos tipos de ingresso com valores.
+RF-25 Indicação de esgotado ou vendas encerradas.
+RF-26 Botões de compartilhamento em redes sociais e WhatsApp, com imagem e título
+de pré-visualização (Open Graph).
+RF-27 Endereço amigável por evento (ex.: /eventos/nome-do-evento).
+Critérios de aceite:
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 14 of 32
+
+-- 14 of 32 --
+
+CA-12 A busca por parte do nome encontra o evento.
+CA-13 O link compartilhado no WhatsApp mostra banner e nome do evento.
+CA-14 A página funciona em celular, tablet e computador.
+8.4 Módulo de compra (Anexo I, item 3)
+Requisitos:
+RF-28 Seleção de tipo e quantidade, respeitando o limite por compra definido pelo
+cliente.
+RF-29 Compra exige login; se o visitante não tiver conta, é levado ao cadastro e volta ao
+carrinho.
+RF-30 Campo de cupom do promoter, que só vincula a venda ao promoter e não dá
+desconto (cupons de desconto estão fora do escopo, Anexo I, item 12).
+RF-31 Cupom inválido ou desativado é recusado com mensagem clara.
+RF-32 Resumo com tipos, quantidades e total antes do pagamento.
+RF-33 Reserva temporária do estoque ao iniciar o pagamento, com contador visível e
+liberação automática ao expirar.
+RF-34 Pagamento por Pix (QR Code e copia e cola) e cartão de crédito, via gateway
+(detalhes na Etapa 3).
+RF-35 Confirmação automática do pagamento e liberação imediata dos ingressos.
+RF-36 E-mail de confirmação com link para os ingressos.
+RF-37 Tela de pedido com status atualizado automaticamente (aguardando pagamento,
+pago, expirado).
+Critérios de aceite:
+CA-15 Não é possível comprar mais que o limite por compra.
+CA-16 Com 1 ingresso restante e dois compradores ao mesmo tempo, só um consegue
+reservar.
+CA-17 Pix não pago no prazo expira e o estoque volta.
+CA-18 Pagamento aprovado libera os ingressos sem ação manual, em poucos segundos.
+CA-19 A venda com cupom aparece no relatório do promoter correto.
+8.5 Módulo de ingresso digital (Anexo I, item 4)
+Requisitos:
+RF-38 Um ingresso individual por unidade adquirida.
+RF-39 QR Code único por ingresso, com código aleatório não sequencial e assinado
+(HMAC) para impedir falsificação.
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 15 of 32
+
+-- 15 of 32 --
+
+RF-40 O ingresso mostra nome do evento, data, horário, local, tipo, nome do comprador
+e código de identificação.
+RF-41 Download em PDF (um PDF por ingresso ou um PDF com todos do pedido).
+RF-42 Seção "Meus ingressos" com histórico de compras e acesso a qualquer
+momento.
+RF-43 Exibição em tela cheia no celular, com brilho e tamanho de QR adequados à
+leitura.
+Critérios de aceite:
+CA-20 Uma compra de 3 ingressos gera 3 QR Codes diferentes.
+CA-21 O PDF baixado contém todos os dados exigidos e o QR é lido pelo validador.
+CA-22 Alterar um caractere do código torna o ingresso inválido na leitura.
+8.6 Módulo de validação na entrada (Anexo I, item 5)
+Requisitos:
+RF-44 Acesso exclusivo para perfil validador (e administrador).
+RF-45 Seleção do evento em que o validador está trabalhando.
+RF-46 Leitura do QR pela câmera do celular ou tablet, direto no navegador, sem instalar
+aplicativo.
+RF-47 Verificação instantânea no servidor.
+RF-48 Resultado visual em tela cheia: verde (válido), amarelo (já utilizado, com horário
+e validador da primeira entrada) e vermelho (inválido ou cancelado), com sinal sonoro.
+RF-49 Exibição do tipo de ingresso (Pista, VIP, Camarote) para direcionar o público.
+RF-50 Bloqueio automático após a primeira validação.
+RF-51 Registro do horário e do validador.
+RF-52 Busca manual por código ou dados do comprador (nome, CPF, e-mail).
+RF-53 Contador de entradas do evento na tela.
+RF-54 Ingresso de outro evento é recusado com mensagem específica.
+Critérios de aceite:
+CA-23 Ler o mesmo QR duas vezes: primeira verde, segunda amarela.
+CA-24 Ingresso cancelado aparece vermelho.
+CA-25 Dois celulares lendo o mesmo ingresso ao mesmo tempo: só um fica verde.
+CA-26 A leitura funciona em Android (Chrome) e iPhone (Safari).
+CA-27 O contador aumenta a cada entrada válida.
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 16 of 32
+
+-- 16 of 32 --
+
+8.7 Módulo de painel administrativo e relatórios (Anexo I, item 7)
+Requisitos:
+RF-55 Visão geral: vendas do dia, do mês, por evento em andamento, ingressos
+restantes.
+RF-56 Lista de pedidos com filtro por evento, status e período, e situação de cada
+pagamento.
+RF-57 Lista de compradores e ingressos emitidos por evento.
+RF-58 Relatório de vendas por evento e por tipo de ingresso (quantidade e valor).
+RF-59 Contabilizador por promoter: quantidade de ingressos e valor total, filtrável por
+evento e período, com ranking. Apenas contagem — cálculo e pagamento de comissões
+estão fora do escopo.
+RF-60 Relatório mensal de ingressos vendidos para a taxa da Cláusula 6ª, com a regra
+do item 6.3.
+RF-61 Acompanhamento das entradas em tempo real (atualização automática a cada
+poucos segundos).
+RF-62 Cancelamento de ingressos com confirmação e registro em auditoria. O estorno
+financeiro é feito pelo cliente no gateway (Cl. 14.5).
+RF-63 Exportação de listas e relatórios em planilha (CSV ou XLSX).
+RF-64 Exportação prévia da lista de ingressos emitidos por evento, para contingência
+(Anexo II, 6).
+Critérios de aceite:
+CA-28 O total do relatório de vendas bate com a soma dos pedidos pagos.
+CA-29 Um ingresso vendido e depois cancelado continua contando no relatório mensal
+da taxa.
+CA-30 O ranking de promoters ordena do maior para o menor.
+CA-31 A planilha exportada abre corretamente no Excel com acentos.
+8.8 Design e responsividade (Anexo I, item 11)
+Requisitos:
+RF-65 Layout responsivo para computador, tablet e celular, priorizando celular.
+RF-66 Identidade visual aplicada a partir dos materiais fornecidos ou aprovados pelo
+cliente.
+RF-67 E-mails transacionais com a identidade da PartyX.
+RF-68 Páginas públicas de Termos de Uso, Política de Privacidade e Política de
+Cancelamento com os textos fornecidos pelo cliente.
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 17 of 32
+
+-- 17 of 32 --
+
+Critérios de aceite:
+CA-32 Nenhuma tela exige rolagem horizontal em celular de 360 px de largura.
+CA-33 O cliente aprovou a proposta visual por escrito antes da homologação (validação
+com prazo de 5 dias úteis, Cl. 4.3).
+9. Etapa 3 — Integração de pagamento
+A integração é com 1 gateway escolhido pelo cliente, em conta dele, para Pix e cartão de
+crédito (Anexo I, item 11; Cl. 14.4). O ingresso nunca é emitido pela tela do navegador: só o
+servidor, após confirmar o pagamento com o gateway, libera os ingressos.
+O passo "verifica e reconsulta" protege contra webhooks falsos: a API confere a
+assinatura e consulta o pagamento direto na API do gateway antes de emitir.
+9.1 Escolha do gateway
+Apresentar ao cliente de 2 a 4 opções tecnicamente compatíveis (ex.: Mercado Pago,
+Asaas, Pagar.me, PagBank) com Pix, cartão, webhooks e sandbox. As taxas e prazos de
+recebimento são assunto entre o cliente e o gateway (Cl. 14.5); a decisão é dele.
+9.2 Tarefas técnicas
+fluxo de pagamento · 7 passos, 1 decisão
+Criar módulo de pagamento isolado (uma interface interna), para trocar de gateway no
+futuro sem reescrever o sistema.
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 18 of 32
+
+-- 18 of 32 --
+
+9.3 Critérios de aceite
+CA-P1 Pix e cartão aprovados em sandbox liberam os ingressos automaticamente.
+CA-P2 Cartão recusado não gera ingresso e devolve o estoque.
+CA-P3 Webhook repetido não duplica ingressos.
+CA-P4 Webhook com assinatura inválida é ignorado e registrado.
+CA-P5 Estorno feito no painel do gateway cancela os ingressos na PLATAFORMA.
+10. Segurança e LGPD (Anexo I, item 9; Cláusulas 15ª e 16ª)
+A PLATAFORMA nunca armazena dados de cartão, guarda senhas só como hash e gera
+ingressos impossíveis de adivinhar ou falsificar. Na LGPD, a PartyX é Controladora e a
+CONTRATADA é Operadora, tratando dados apenas para executar o contrato.
+10.1 Controles técnicos obrigatórios
+Criar cobrança Pix com QR Code e código copia e cola, com expiração igual à da
+reserva.
+Criar cobrança por cartão com tokenização no navegador (o número do cartão não
+passa pelo servidor) ou checkout hospedado do gateway.
+Endpoint de webhook com verificação de assinatura, resposta rápida (200) e
+processamento idempotente.
+Reconsulta automática de pedidos pendentes a cada poucos minutos, para o caso de
+webhook perdido.
+Tratamento dos status: aprovado, recusado, expirado, estornado, contestado
+(chargeback).
+Pagamento aprovado depois de a reserva expirar: emitir se ainda houver estoque; se
+esgotado, marcar para o cliente estornar no gateway e avisar o administrador.
+Estorno ou chargeback informado pelo gateway: marcar pedido e ingressos como
+cancelados, que passam a ser recusados na portaria (e seguem contando na taxa, Cl.
+6.3).
+Registrar todo webhook em payment_events para auditoria.
+Testes completos em sandbox antes de trocar para as credenciais de produção.
+Controle 	Implementação 	Base
+HTTPS em todas as páginas 	Certificado automático, redirecionamento de
+HTTP para HTTPS, cabeçalho HSTS
+Anexo I,
+9
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 19 of 32
+
+-- 19 of 32 --
+
+10.2 LGPD — responsabilidades
+Controle 	Implementação 	Base
+Senhas criptografadas 	Hash com bcrypt ou Argon2, nunca texto
+puro nem reversível
+Anexo I,
+9
+Dados de cartão fora da
+plataforma
+Checkout transparente com tokenização do
+gateway ou checkout hospedado; o número
+do cartão nunca passa pelo servidor
+Anexo I,
+9
+Ingressos à prova de
+falsificação
+Código aleatório de 128 bits + assinatura
+HMAC; validação sempre no servidor
+Anexo I,
+9
+Sessões 	Cookies HttpOnly , Secure , SameSite ;
+expiração por inatividade no painel
+12.1.C
+Proteção contra ataques
+comuns
+Consultas parametrizadas (SQL injection),
+escape de saída (XSS), token CSRF, limite de
+requisições em login, cadastro e validação
+12.1.C
+Webhooks autênticos 	Verificação da assinatura do gateway e
+reconsulta do pagamento na API antes de
+liberar ingressos
+12.1.C
+Segredos 	Credenciais em cofre ou variáveis de
+ambiente, nunca no repositório
+12.1.C
+Controle de acesso 	Permissão checada no servidor em cada rota;
+menor privilégio por perfil
+Anexo I, 8
+Auditoria 	Registro de cancelamentos, alterações de
+usuários e permissões
+12.1.C
+Dependências 	Atualização periódica e verificação
+automática de vulnerabilidades
+Anexo II,
+4
+Tema 	PartyX (Controladora) 	Zanon de Andrade Softwares
+(Operadora)
+Base legal e avisos de
+privacidade
+Define e fornece os textos 	Exibe os textos e registra o
+aceite
+Direitos dos titulares 	Atende os pedidos 	Fornece exportação ou
+exclusão técnica quando
+solicitado
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 20 of 32
+
+-- 20 of 32 --
+
+10.3 Minimização de dados
+Coletar apenas os campos do Anexo I, item 1: nome, e-mail, CPF, telefone e senha.
+Mascarar o CPF nas telas do validador (ex.: *.456.789-).
+Não registrar CPF, senha ou token em logs de aplicação.
+Manter plano de resposta a incidentes documentado: identificar, conter, avaliar,
+comunicar a PartyX, corrigir, registrar.
+11. Etapa 4 — Testes e qualidade
+Antes de comunicar a entrega, todos os critérios de aceite (CA-01 a CA-33) precisam
+passar em homologação, incluindo um teste de carga e um teste real de portaria. O
+contrato exige testes funcionais de compra, emissão e validação (Anexo I, item 11).
+11.1 Tipos de teste
+Tema 	PartyX (Controladora) 	Zanon de Andrade Softwares
+(Operadora)
+Incidente de
+segurança
+Comunica à ANPD e aos
+titulares quando exigido
+Avisa a PartyX sem demora
+indevida, com as informações
+disponíveis (Cl. 15.4)
+Uso dos dados 	Finalidades definidas por ela 	Somente para executar o
+contrato, sem finalidade
+própria (Cl. 15.3)
+Acesso 	Administra usuários da equipe e
+credenciais (Cl. 13.1.J)
+Limita acesso interno às
+pessoas necessárias
+Fim do contrato 	Solicita exportação em até 30
+dias
+Exporta em CSV e depois
+exclui (Anexo II, 5)
+Tipo 	O que cobre 	Ferramenta sugerida
+Unitário 	Regras de negócio: estoque, reserva,
+geração de código, cálculo de relatório da
+taxa
+Vitest ou Jest
+Integração 	Rotas da API com banco real de teste;
+webhook do gateway
+Vitest + banco de teste
+Ponta a ponta 	Cadastro → compra → pagamento
+sandbox → ingresso → validação
+Playwright
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 21 of 32
+
+-- 21 of 32 --
+
+11.2 Roteiro de testes essenciais
+1. Cadastro com CPF válido, inválido e repetido.
+2. Login, logout e recuperação de senha.
+3. Criação de evento com três tipos de ingresso e períodos de venda diferentes.
+4. Compra de 1 ingresso via Pix aprovado em sandbox.
+5. Compra de 3 ingressos via cartão aprovado em sandbox.
+6. Compra com cartão recusado: pedido não pago, estoque liberado.
+7. Pix não pago até expirar: estoque liberado.
+8. Compra com cupom de promoter válido e com cupom inválido.
+9. Tentativa de comprar acima do limite por compra.
+10. Esgotamento: última unidade disputada por dois compradores.
+11. Webhook recebido duas vezes: ingressos não duplicados.
+12. E-mail de confirmação recebido com link para os ingressos.
+13. Download do PDF e exibição no celular.
+14. Validação: válido, já utilizado, cancelado, de outro evento, código adulterado.
+15. Busca manual pelo nome e pelo código.
+16. Contador de entradas e acompanhamento em tempo real no painel.
+17. Cancelamento de ingresso pelo administrador e leitura posterior (vermelho).
+18. Relatórios: vendas por evento, por tipo, por promoter, mensal da taxa.
+19. Exportação de planilhas.
+20. Validador tentando acessar o painel administrativo.
+Tipo 	O que cobre 	Ferramenta sugerida
+Concorrência 	Última unidade disputada; mesmo
+ingresso lido em dois aparelhos
+Script com requisições
+paralelas
+Carga 	Abertura de vendas com muitos acessos
+simultâneos
+k6
+Compatibilidade Chrome Android, Safari iPhone, Chrome e
+Edge no computador
+Aparelhos reais
+Segurança 	Acesso indevido entre perfis, QR
+adulterado, força bruta no login
+Testes manuais + OWASP
+ZAP
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 22 of 32
+
+-- 22 of 32 --
+
+11.3 Teste de carga
+Simular a abertura de vendas de um evento grande: meta sugerida de 200 usuários
+simultâneos na página do evento e 50 compras por minuto sem erro e sem venda acima do
+estoque. Ajustar a meta ao público real que a PartyX informar.
+11.4 Teste de portaria
+Um ensaio com 2 celulares de validação e 30 ingressos de teste, no local de um evento ou
+em ambiente semelhante, medindo o tempo por leitura (meta: menos de 2 segundos com
+internet 4G).
+11.5 Critério de conclusão
+Todos os CA aprovados internamente, nenhum erro crítico aberto, roteiro de testes do
+cliente pronto para envio.
+12. Etapa 5 — Entrega, homologação e aceite (Cláusula 5ª)
+A entrega é um ato formal: uma mensagem escrita que abre os 10 dias corridos de testes
+do cliente. O aceite acontece de forma expressa ou tácita e encerra a etapa de
+desenvolvimento.
+12.1 Passo a passo
+1. Publicar a versão final em homologação e rodar novamente o roteiro da seção 11.2.
+2. Enviar a comunicação formal de entrega por e-mail e WhatsApp contendo: endereço
+de homologação, usuários de teste (administrador, validador, cliente), roteiro de testes,
+forma de reportar problemas e a data final dos 10 dias corridos.
+3. Fazer a orientação remota básica (Anexo I, item 11): videochamada de cerca de 1 hora
+cobrindo painel, cadastro de evento, promoters, relatórios e validação.
+4. Receber apontamentos por escrito, com descrição e, se possível, imagem ou vídeo (Cl.
+5.2).
+5. Classificar cada apontamento em até 2 dias úteis e informar o prazo de correção (Cl.
+5.3).
+6. Corrigir erros e divergências, publicar em homologação e avisar o cliente.
+7. Registrar o aceite: expresso (mensagem do cliente), tácito por silêncio após os 10 dias,
+autorização de produção ou primeira venda real (Cl. 5.4).
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 23 of 32
+
+-- 23 of 32 --
+
+12.2 Classificação de apontamentos
+12.3 Modelo de comunicação de entrega
+Prezado Bernardo, comunicamos a entrega da PLATAFORMA PartyX para testes e
+homologação, nos termos da Cláusula 5ª. Endereço: [link]. Acessos de teste:
+[usuários]. O prazo de 10 dias corridos para testes vai até [data]. Apontamentos
+devem ser enviados por escrito, com descrição e, se possível, imagem ou vídeo.
+Segue em anexo o roteiro de testes.
+12.4 Critério de conclusão
+Aceite registrado com data e forma (expresso ou tácito).
+13. Etapa 6 — Publicação em produção e go-live
+A data de publicação em produção é o marco mais importante do contrato: ela inicia os 12
+meses de prazo mínimo (Cl. 19.1) e os 30 dias de garantia (Cl. 5.6). Registrar essa data por
+escrito ao cliente.
+13.1 Checklist pré-publicação
+Classe 	Definição 	Tratamento 	Impede o aceite?
+Erro 	Algo previsto no Anexo I
+que não funciona
+Corrigir no prazo
+informado
+Sim, se objetivo e
+bem descrito
+Divergência Funciona diferente do
+descrito no Anexo I
+Ajustar ao Anexo I 	Sim
+Estética 	Preferência de cor,
+tamanho, texto, posição
+Ajustar se simples;
+senão, vira evolução
+Não (Cl. 5.5)
+Evolução 	Funcionalidade ou regra
+nova
+Análise de viabilidade
+pela Cl. 8ª
+Não (Cl. 5.5)
+Aceite registrado ou autorização expressa de produção.
+Credenciais de produção do gateway configuradas e webhook de produção
+cadastrado.
+Uma compra real de baixo valor feita e estornada pelo cliente no gateway, para testar o
+fluxo de ponta a ponta.
+Domínio apontado, HTTPS ativo, redirecionamentos corretos.
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 24 of 32
+
+-- 24 of 32 --
+
+13.2 Dia da publicação
+1. Publicar fora de horário de vendas e de eventos informados pelo cliente.
+2. Rodar o teste rápido pós-publicação: página inicial, cadastro, compra Pix, ingresso,
+validação.
+3. Comunicar ao cliente por escrito: "A PLATAFORMA foi publicada em produção em
+[data]. A garantia de 30 dias vai até [data] e o período mínimo de 12 meses até [data]."
+4. Acompanhar logs e erros com atenção redobrada nas primeiras 72 horas.
+13.3 Primeiro evento real
+14. Etapa 7 — Operação continuada (Anexo II)
+Depois da publicação, a mensalidade de R$ 150,00 cobre hospedagem, monitoramento
+básico, backup, manutenção corretiva e preventiva, atualizações de segurança e suporte.
+Evoluções seguem a Cláusula 8ª.
+14.1 Suporte técnico
+E-mails saindo do domínio correto e chegando na caixa de entrada (não no spam).
+Textos legais publicados (Termos, Privacidade, Cancelamento).
+Banco de produção limpo de dados de teste.
+Usuários reais da equipe criados com perfis corretos; senhas temporárias trocadas no
+primeiro acesso.
+Backup automático de produção ativo e uma restauração de teste feita.
+Monitoramento e alertas ativos.
+Plano de retorno (rollback) definido: versão anterior pronta para republicar.
+Confirmar com o cliente a data de abertura de vendas e a expectativa de público
+(Anexo II, 1: aviso de 15 dias para volumes acima do habitual).
+Lembrar o cliente de exportar a lista de ingressos antes do evento (contingência).
+Recomendar teste do módulo de validação no local antes da abertura dos portões
+(Anexo II, 6).
+Ficar de sobreaviso no horário do evento, mesmo que fora do horário de suporte
+contratado (boa prática, não obrigação contratual).
+Categoria Situação 	Primeira resposta
+Crítico 	PLATAFORMA totalmente indisponível 	Até 4 horas úteis
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 25 of 32
+
+-- 25 of 32 --
+
+Canal: WhatsApp +55 55 9958-7217, segunda a sexta, 9h às 17h (Brasília), exceto feriados.
+Chamados fora do horário contam a partir do próximo período. O suporte é para a equipe
+da PartyX, não para compradores.
+14.2 Rotina operacional
+14.3 Backup
+Backup automático diário do banco, com retenção definida conforme o ambiente de
+hospedagem (Anexo II, 2).
+Backup dos arquivos (banners) no armazenamento com versionamento.
+Restauração iniciada conforme a gravidade; não há garantia de recuperar alterações
+posteriores à última cópia.
+Categoria Situação 	Primeira resposta
+Falha
+leve
+Problema parcial que não impede o
+funcionamento geral
+Até 2 dias úteis
+Alteração Pedido de mudança ou nova funcionalidade Análise e estimativa em até 5
+dias úteis
+Frequência 	Tarefa
+Contínua 	Monitoramento de disponibilidade e erros com
+alertas
+Diária 	Verificar se o backup do dia foi concluído
+Semanal 	Revisar logs de erro e webhooks não
+processados
+Mensal (até o dia 5) 	Gerar o relatório de ingressos vendidos no mês
+anterior e emitir boleto de mensalidade + taxa
+com vencimento no dia 10 (Cl. 6.4 e 6.6)
+Mensal 	Aplicar atualizações de segurança de
+dependências e sistema
+Trimestral 	Testar restauração de backup em ambiente
+separado
+Antes de cada abertura de vendas
+grande
+Revisar capacidade da infraestrutura (aviso do
+cliente com 15 dias)
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 26 of 32
+
+-- 26 of 32 --
+
+14.4 Manutenção
+14.5 Cobrança e inadimplência
+Boleto mensal com mensalidade + taxa por ingresso, enviado aos contatos do cliente
+(Cl. 6.7).
+Divergência na taxa deve ser contestada por escrito até o vencimento; a parte não
+contestada é paga (Cl. 6.5).
+Atraso: multa de 10%, juros de 1% ao mês pro rata, IPCA e honorários de 10% (Cl. 7.1).
+Após 10 dias corridos de atraso, com notificação prévia, a hospedagem pode ser
+suspensa (Cl. 7.2). Nunca suspender sem notificação e evitar suspensão em dia de
+evento sem avaliar o impacto.
+Restabelecimento em até 1 dia útil após quitação integral (Cl. 7.4).
+14.6 Fim do contrato
+15. Contingência nos eventos (Anexo II, item 6)
+A PLATAFORMA precisa permitir exportar a lista de ingressos antes do evento; o
+procedimento de contingência na portaria é responsabilidade da PartyX. Entregar ao
+cliente o guia abaixo junto com a orientação remota.
+Tipo 	Escopo 	Custo
+Corretiva 	Erros atribuíveis à PLATAFORMA 	Incluída
+Preventiva Segurança, otimizações, preservação do
+funcionamento
+Incluída
+Evolutiva 	Melhorias e alterações 	Cláusula 8ª (análise
+prévia)
+Aos 11 meses, lembrar o cliente de que a renovação exige manifestação com 30 dias de
+antecedência (Cl. 19.3).
+Sem novo contrato, oferecer exportação dos dados em CSV, disponível por 30 dias
+após o encerramento (Anexo II, 5).
+Após os 30 dias, excluir os dados, respeitando a rotação dos backups e eventual
+obrigação legal de retenção.
+Não entregar código-fonte (Cl. 9.4).
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 27 of 32
+
+-- 27 of 32 --
+
+15.1 O que o sistema entrega
+Exportação da lista de ingressos emitidos por evento em planilha e PDF imprimível,
+com código, tipo, nome do comprador e CPF mascarado.
+Busca manual por código ou dados do comprador na tela do validador.
+15.2 Guia de portaria para a PartyX
+1. Na véspera: exportar e imprimir a lista de ingressos do evento.
+2. Chegar cedo: testar a leitura em cada celular ou tablet no local, com a internet do local
+(Anexo II, 6).
+3. Ter internet de reserva (chip 4G de outra operadora ou roteador móvel).
+4. Carregar os aparelhos e levar carregadores ou baterias externas.
+5. Se a leitura falhar: usar a busca manual por código ou nome.
+6. Se o sistema ou a internet cair: conferir pela lista impressa e riscar o nome de quem
+entrou.
+7. Avisar o suporte pelo WhatsApp em caso de indisponibilidade total.
+15.3 Limites de responsabilidade
+Equipamentos, internet do local, orientação dos funcionários e controle físico de acesso
+são da PartyX (Cl. 13.1.E e 13.2; Anexo I, item 12).
+16. Fora do escopo e gestão de mudanças
+Tudo o que não está no Anexo I é tratado como evolução pela Cláusula 8ª: pedido formal,
+análise técnica e estimativa em até 5 dias úteis. Os itens abaixo são os mais prováveis de
+serem pedidos e estão expressamente excluídos (Anexo I, item 12).
+16.1 Itens excluídos que costumam gerar confusão
+Pedido provável 	Por que está
+fora
+Observação para o desenvolvimento
+Cupom de desconto 	Excluído 	O cupom do promoter só rastreia a
+venda, sem desconto
+Cálculo ou pagamento de comissão
+a promoters
+Excluído 	O painel mostra quantidade e valor
+por promoter; o cálculo da comissão
+é do cliente
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 28 of 32
+
+-- 28 of 32 --
+
+16.2 Fluxo de pedido de mudança
+1. Cliente envia o pedido por escrito.
+2. CONTRATADA confirma o recebimento e pede detalhes se necessário.
+3. Em até 5 dias úteis após informações suficientes: análise de viabilidade, impacto e
+estimativa de prazo (Cl. 8.2).
+4. Se houver custo de terceiros (licença, API, infraestrutura), só contratar com
+autorização expressa (Cl. 8.3).
+5. Valores e condições formalizados por escrito; se alterar o contrato, por termo aditivo
+(Cl. 21.3).
+6. Se o pedido ocorrer durante o desenvolvimento, comunicar a prorrogação do prazo (Cl.
+4.2 e 4.3).
+Pedido provável 	Por que está
+fora
+Observação para o desenvolvimento
+Virada automática de lotes 	Excluída 	O cliente pode criar "1º lote", "2º
+lote" como tipos com períodos
+diferentes, ativando manualmente
+Cortesias e lista de convidados 	Excluídas 	Não criar ingresso de valor zero
+Transferência de titularidade 	Excluída 	Nome no ingresso é o do comprador
+Assentos numerados ou mapa 	Excluídos 	—
+Venda presencial, bilheteria,
+máquina de cartão, POS
+Excluídas 	—
+Aplicativo Android ou iOS 	Excluído 	Tudo roda no navegador
+Notas fiscais e integrações fiscais 	Excluídas 	—
+SMS ou WhatsApp automático 	Excluído 	Só e-mail
+Mais de um gateway 	Excluído 	Um gateway apenas
+Cashless, consumação, produtos 	Excluídos 	—
+Atendimento aos compradores 	Excluído 	A PartyX atende; suporte é só para a
+equipe
+Domínio, logotipo, identidade visual
+completa, textos jurídicos
+Excluídos 	O cliente fornece
+Migração de outras plataformas 	Excluída 	—
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 29 of 32
+
+-- 29 of 32 --
+
+17. Riscos e pontos de atenção
+O maior risco é o prazo: de 30/09 a 20/10/2026 são 20 dias corridos para todo o escopo, e a
+aprovação da conta no gateway pode levar vários dias. Os demais riscos vêm de lacunas
+entre o contrato e a operação real de eventos.
+17.1 Riscos do projeto
+Risco 	Probabilidade Impacto Resposta
+Conta do gateway demorar a
+ser aprovada
+Alta 	Alto 	Pedir abertura no dia da
+assinatura; desenvolver em
+sandbox; registrar suspensão
+do prazo se atrasar (Cl. 4.2)
+Atraso do cliente em logotipo,
+textos legais ou dados de
+eventos
+Média 	Alto 	Checklist da Etapa 0 com
+datas; comunicação formal de
+suspensão
+Venda acima da capacidade
+em pico de acesso
+Baixa 	Alto 	Transação com bloqueio de
+linha, reserva temporária,
+teste de concorrência
+Webhook perdido ou
+duplicado
+Média 	Alto 	Idempotência, reconsulta
+periódica de pedidos
+pendentes na API do gateway
+E-mails caindo no spam 	Média 	Médio 	SPF, DKIM e DMARC;
+ingressos sempre disponíveis
+em "Meus ingressos"
+Câmera não abrir em algum
+navegador
+Média 	Médio 	Testar em aparelhos reais;
+busca manual como
+alternativa
+Internet ruim na portaria 	Alta 	Alto 	Guia de contingência; lista
+impressa; internet de reserva
+Evento à noite ou no fim de
+semana fora do horário de
+suporte
+Alta 	Alto 	Ver 17.2, item 3
+Pedidos de escopo durante a
+homologação
+Alta 	Médio 	Classificação da seção 12.2;
+Cláusula 8ª
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 30 of 32
+
+-- 30 of 32 --
+
+17.2 Pontos do contrato para conferir com atenção
+Estes pontos não são aconselhamento jurídico; vale confirmar com um advogado antes da
+assinatura.
+1. Mensalidade antes da entrega: a primeira mensalidade vence em 10/10/2026 (Cl. 6.6),
+antes da entrega para testes em 20/10/2026, enquanto o prazo mínimo de 12 meses
+conta da publicação (Cl. 19.1). Pode gerar questionamento do cliente sobre pagar
+hospedagem de um sistema ainda não publicado.
+2. Quantidade de mensalidades no "período inicial": a Cl. 6.9 fala em 12 meses de valores
+fixos, mas a cobrança começa antes da publicação. Não fica claro se o período inicial
+conta da primeira mensalidade ou da publicação.
+3. Suporte x horário dos eventos: o suporte é de segunda a sexta, das 9h às 17h, mas
+festas costumam ser à noite e nos fins de semana. Uma falha crítica num sábado à
+noite só teria resposta na segunda. Vale alinhar essa expectativa com o cliente por
+escrito ou prever plantão pago para eventos.
+4. Suspensão por inadimplência em dia de evento: a Cl. 7.2 permite suspender após 10
+dias de atraso, o que pode derrubar vendas e portaria. Avaliar sempre o momento da
+suspensão.
+5. Meia-entrada: o cliente deve observar as regras (Cl. 13.1.D), mas o sistema não verifica
+documentos. Deixar claro que meia será um tipo de ingresso comum e a conferência é
+feita na portaria.
+6. Cupom do promoter x cupom de desconto: o Anexo I usa a palavra "cupom" nos dois
+sentidos. Explicar ao cliente no kickoff que o cupom do promoter não dá desconto.
+7. Relatório da taxa: a regra de contar ingressos cancelados e estornados (Cl. 6.3) deve
+ser explicada ao cliente e visível no relatório, para evitar contestação mensal.
+18. Rastreabilidade e checklist final de entrega
+Cada item do Anexo I está ligado a requisitos e critérios de aceite deste documento; a
+entrega só é comunicada quando todas as linhas estiverem aprovadas em homologação.
+18.1 Matriz Anexo I → requisitos
+Anexo
+I
+Tema 	Requisitos 	Critérios de aceite
+1 	Cadastro e acesso dos
+clientes
+RF-01 a RF-06, RF-10 	CA-01 a CA-04
+2 	Vitrine de eventos 	RF-20 a RF-27 	CA-12 a CA-14
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 31 of 32
+
+-- 31 of 32 --
+
+18.2 Entregáveis do projeto
+Anexo
+I
+Tema 	Requisitos 	Critérios de aceite
+3 	Compra de ingressos 	RF-28 a RF-37 + Etapa
+3
+CA-15 a CA-19
+4 	Ingresso digital com QR Code RF-38 a RF-43 	CA-20 a CA-22
+5 	Validação na entrada 	RF-44 a RF-54 	CA-23 a CA-27
+6 	Gestão de eventos e
+ingressos
+RF-11 a RF-19 	CA-07 a CA-11
+7 	Painel administrativo 	RF-55 a RF-64 	CA-28 a CA-31
+8 	Usuários e permissões 	RF-07 a RF-09 	CA-05, CA-06
+9 	Segurança e proteção de
+dados
+Seção 10 	Roteiro 11.2, itens 14 e
+20
+10 	Integração do fluxo de venda
+e acesso
+Etapa 3 + RF-35, RF-
+50, RF-61
+CA-18, CA-23, roteiro
+11.2 item 16
+11 	Design, publicação e
+entregáveis
+RF-65 a RF-68, Etapas
+5 e 6
+CA-32, CA-33
+12 	Itens não incluídos 	Seção 16 	—
+PLATAFORMA publicada em homologação e depois em produção.
+Integração com 1 gateway (Pix e cartão).
+Perfis e permissões configurados com os usuários iniciais.
+Roteiro de testes para o cliente.
+Orientação remota básica realizada.
+Guia de portaria e contingência entregue.
+Comunicação formal de entrega (início dos 10 dias).
+Aceite registrado.
+Comunicação da data de publicação em produção (início dos 12 meses e da garantia de
+30 dias).
+Monitoramento, backup e suporte em operação.
+PartyX — Documentação de Desenvolvimento da Plataforma de Venda de Ingressos
+Page 32 of 32
+
+-- 32 of 32 --
+

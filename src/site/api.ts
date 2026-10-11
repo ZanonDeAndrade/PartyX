@@ -1,0 +1,542 @@
+/** Cliente da API da vitrine e da compra. Tipos espelham `server/src/vitrine/service.ts` e `server/src/orders/`. */
+export type SaleKind = 'open' | 'soon' | 'out' | 'held' | 'closed' | 'ended';
+export type TypeState = 'a_venda' | 'em_breve' | 'encerrada' | 'esgotado' | 'reservado' | 'indisponivel';
+
+export interface EventCard {
+  slug: string;
+  name: string;
+  startsAt: string;
+  venue: string;
+  ageRating: string;
+  bannerUrl: string | null;
+  isFeatured: boolean;
+  sale: { kind: SaleKind; label: string; minPriceCents: number | null; startsAt: string | null };
+}
+
+export interface TicketTypeView {
+  id: string;
+  name: string;
+  priceCents: number;
+  state: TypeState;
+  label: string;
+  note: string;
+  canBuy: boolean;
+}
+
+export interface EventDetail extends EventCard {
+  address: string;
+  description: string;
+  attractions: string[];
+  shareImageUrl: string | null;
+  ticketTypes: TicketTypeView[];
+}
+
+export interface SiteInfo {
+  environment: 'local' | 'homologacao' | 'producao';
+  provisionalTheme: boolean;
+  maxTicketsPerOrder: number;
+  salesOpen: boolean;
+  /** Chave pública do Turnstile; nula quando o desafio não está ligado. */
+  turnstileSiteKey: string | null;
+}
+
+export interface FieldProblem {
+  campo: string;
+  mensagem: string;
+}
+
+/** Erro da API no formato `{ erro: { codigo, mensagem, detalhes } }`. */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly details: unknown;
+  constructor(status: number, message: string, code = 'erro', details?: unknown) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+  /** Mensagens por campo, quando a API devolveu `detalhes` de validação. */
+  get fields(): Record<string, string> {
+    const out: Record<string, string> = {};
+    if (Array.isArray(this.details)) {
+      for (const d of this.details as FieldProblem[]) if (d && typeof d.campo === 'string') out[d.campo] = d.mensagem;
+    }
+    return out;
+  }
+}
+
+let csrfToken = '';
+export const setCsrfToken = (token: string) => {
+  csrfToken = token;
+};
+
+/** Chamada à API. Alterações levam o token CSRF da sessão; o token fica só em memória, nunca em localStorage. */
+export async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (body !== undefined) headers['content-type'] = 'application/json';
+  if (method !== 'GET' && csrfToken) headers['x-csrf-token'] = csrfToken;
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers,
+      signal,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'AbortError') throw e;
+    throw new ApiError(0, 'Sem conexão. Verifique a internet e tente de novo.', 'sem_conexao');
+  }
+  if (res.status === 204) return undefined as T;
+  const data = (await res.json().catch(() => null)) as {
+    erro?: { codigo?: string; mensagem?: string; detalhes?: unknown };
+  } | null;
+  if (!res.ok) {
+    throw new ApiError(
+      res.status,
+      data?.erro?.mensagem ?? 'Não foi possível concluir a ação.',
+      data?.erro?.codigo,
+      data?.erro?.detalhes,
+    );
+  }
+  return data as T;
+}
+
+const get = <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, signal);
+
+export interface SessionUser {
+  id: string;
+  name: string;
+  email: string;
+  /** Já mascarado pelo servidor (***.***.***-00). */
+  cpf?: string | null;
+  phone?: string | null;
+  role: 'cliente' | 'validador' | 'administrador';
+  mustChangePassword: boolean;
+}
+
+export interface OrderLine {
+  ticketTypeId: string;
+  name: string;
+  quantity: number;
+  unitPriceCents: number;
+  subtotalCents: number;
+}
+
+export interface Summary {
+  event: { slug: string; name: string; startsAt: string; venue: string };
+  items: OrderLine[];
+  totalCents: number;
+  units: number;
+  coupon: { code: string } | null;
+}
+
+export type OrderStatus =
+  'pendente' | 'pago' | 'expirado' | 'nao_concluido' | 'cancelado' | 'estornado' | 'contestado' | 'pago_sem_estoque';
+
+export interface OrderView {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  event: { slug: string; name: string; startsAt: string; venue: string };
+  items: OrderLine[];
+  totalCents: number;
+  coupon: { code: string } | null;
+  paymentMethod: 'pix' | 'cartao' | null;
+  reservation: { status: string; expiresAt: string; serverNow: string; secondsLeft: number } | null;
+}
+
+export interface PaymentView {
+  method: 'pix' | 'cartao';
+  status: string;
+  pix: { copyPaste: string; qrCodeImage: string | null; expiresAt: string } | null;
+  redirectUrl: string | null;
+}
+
+export interface TicketSummary {
+  id: string;
+  orderId: string;
+  orderNumber: number;
+  event: { slug: string; name: string; startsAt: string; venue: string; address: string; ageRating: string };
+  typeName: string;
+  holderName: string;
+  shortCode: string;
+  status: 'valido' | 'utilizado' | 'cancelado';
+  usedAt: string | null;
+}
+/** Detalhe: o conteúdo do QR só vem aqui, e nunca para ingresso cancelado. */
+export interface TicketDetail extends TicketSummary {
+  qrPayload: string | null;
+}
+export interface OrderRow {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  totalCents: number;
+  createdAt: string;
+  paidAt: string | null;
+  eventSlug: string;
+  eventName: string;
+  eventStartsAt: string;
+  ticketCount: number;
+}
+
+export type GateResultKind = 'valido' | 'ja_utilizado' | 'invalido' | 'cancelado' | 'outro_evento';
+export interface GateOutcome {
+  result: GateResultKind;
+  message: string;
+  ticket: { id: string; shortCode: string; typeName: string; holderName: string } | null;
+  firstEntry: { at: string; validatorName: string } | null;
+  otherEvent: { name: string } | null;
+  counter: { entered: number; total: number };
+  method: 'camera' | 'manual';
+}
+export interface GateEvent {
+  id: string;
+  name: string;
+  slug: string;
+  startsAt: string;
+  venue: string;
+  entered: number;
+  total: number;
+}
+export interface GateHit {
+  ticketId: string;
+  shortCode: string;
+  typeName: string;
+  holderName: string;
+  cpf: string | null;
+  email: string;
+  status: 'valido' | 'utilizado' | 'cancelado';
+  usedAt: string | null;
+}
+
+export interface Bucket {
+  orders: number;
+  tickets: number;
+  cents: number;
+}
+export interface SalesGroup {
+  paid: Bucket;
+  refunded: Bucket;
+  contested: Bucket;
+  withoutStock: Bucket;
+}
+export interface AdminOverview {
+  today: string;
+  month: string;
+  day: SalesGroup;
+  monthSales: SalesGroup;
+  daily: { day: string; orders: number; tickets: number; cents: number }[];
+  events: {
+    id: string;
+    name: string;
+    slug: string;
+    startsAt: string;
+    types: {
+      id: string;
+      name: string;
+      capacity: number;
+      sold: number;
+      reserved: number;
+      remaining: number;
+      isActive: boolean;
+    }[];
+    totals: { capacity: number; sold: number; reserved: number; remaining: number };
+  }[];
+  attention: { paidWithoutStock: number };
+}
+export interface AdminOrderRow {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  situation: string;
+  paymentMethod: 'pix' | 'cartao' | null;
+  totalCents: number;
+  createdAt: string;
+  paidAt: string | null;
+  event: { id: string; name: string };
+  buyer: { name: string; email: string; cpf: string | null };
+  tickets: number;
+  cancelledTickets: number;
+  coupon: string | null;
+}
+export interface Paged<T> {
+  page: number;
+  pageSize: number;
+  total: number;
+  rows: T[];
+}
+export interface AdminTicketRow {
+  id: string;
+  shortCode: string;
+  status: 'valido' | 'utilizado' | 'cancelado';
+  typeName: string;
+  holderName: string;
+  buyerEmail: string;
+  buyerCpf: string | null;
+  orderId: string;
+  orderNumber: number;
+  usedAt: string | null;
+  validatorName: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+}
+export interface AdminBuyerRow {
+  id: string;
+  name: string;
+  email: string;
+  cpf: string | null;
+  orders: number;
+  tickets: number;
+  cancelled: number;
+  entered: number;
+  paidCents: number;
+}
+export interface LiveEntries {
+  event: { id: string; name: string; status: string };
+  counter: { entered: number; total: number };
+  byType: { typeName: string; entered: number; total: number }[];
+  attempts: Record<string, number>;
+  byValidator: { name: string; entered: number }[];
+  recent: {
+    at: string;
+    result: string;
+    method: string;
+    shortCode: string | null;
+    typeName: string | null;
+    holderName: string | null;
+    validator: string;
+  }[];
+  serverTime: string;
+}
+export interface AdminOrderDetail {
+  id: string;
+  number: number;
+  status: OrderStatus;
+  situation: string;
+  paymentMethod: string | null;
+  gatewayPaymentId: string | null;
+  totalCents: number;
+  createdAt: string;
+  paidAt: string | null;
+  event: { id: string; name: string };
+  buyer: { id: string; name: string; email: string; phone: string | null; cpf: string | null };
+  items: { name: string; quantity: number; unitPriceCents: number; subtotalCents: number }[];
+  tickets: {
+    id: string;
+    shortCode: string;
+    status: 'valido' | 'utilizado' | 'cancelado';
+    typeName: string;
+    holderName: string;
+    usedAt: string | null;
+    cancelledAt: string | null;
+    cancelReason: string | null;
+  }[];
+  trail: { action: string; entity: string; at: string; actor: string | null; reason: string | null }[];
+  gatewayEvents: {
+    type: string;
+    receivedAt: string;
+    processedAt: string | null;
+    error: string | null;
+    attempts: number;
+  }[];
+}
+export interface AdminEventRow {
+  id: string;
+  name: string;
+  slug: string;
+  startsAt: string;
+  status: 'rascunho' | 'publicado' | 'encerrado';
+  venue: string;
+}
+
+export interface SalesReport {
+  criterion: string;
+  period: { from: string | null; to: string | null };
+  lines: { eventId: string; eventName: string; typeId: string; typeName: string; tickets: number; cents: number }[];
+  byEvent: { eventId: string; eventName: string; tickets: number; cents: number }[];
+  totals: { tickets: number; cents: number };
+  reconciliation: { ok: boolean | null; ordersCents: number; itemsCents: number; orders: number };
+  daily: { day: string; tickets: number; cents: number }[];
+  reversals: { refunded: Bucket; contested: Bucket; grossCents: number; netCents: number };
+  exceptions: { paidWithoutStock: Bucket };
+  notes: string[];
+}
+export interface PromoterRanking {
+  metric: 'qtd' | 'valor';
+  criterion: string;
+  ranking: {
+    position: number;
+    id: string;
+    name: string;
+    code: string;
+    isActive: boolean;
+    tickets: number;
+    cents: number;
+    orders: number;
+  }[];
+  withoutPromoter: { tickets: number; cents: number; orders: number };
+}
+export interface FeeReport {
+  month: string;
+  criterion: string;
+  feePerTicketCents: number;
+  units: number;
+  feeCents: number;
+  originOrders: number;
+  byCurrentStatus: { label: string; units: number }[];
+  byEvent: { eventId: string; eventName: string; units: number; feeCents: number }[];
+  reconciliation: {
+    expectedUnits: number;
+    issuedUnits: number;
+    ok: boolean;
+    anomalies: { orderId: string; number: number; status: string; expectedUnits: number }[];
+  };
+  exceptions: { paidWithoutStock: { orderId: string; number: number; units: number }[]; note: string };
+  revenue: { grossCents: number; refundedCents: number; contestedCents: number; netCents: number };
+  page: number;
+  pageSize: number;
+  total: number;
+  units_detail: {
+    ticketId: string;
+    shortCode: string;
+    orderId: string;
+    orderNumber: number;
+    eventName: string;
+    paidAt: string;
+    current: string;
+  }[];
+}
+
+export interface CartItem {
+  ticketTypeId: string;
+  quantity: number;
+}
+
+export const api = {
+  site: (signal?: AbortSignal) => get<SiteInfo>('/public/site', signal),
+  legalDocument: async (kind: LegalKind, signal?: AbortSignal) =>
+    (await get<{ document: LegalDocument }>(`/public/legal/${kind}`, signal)).document,
+  home: (signal?: AbortSignal) => get<{ featured: EventCard[]; upcoming: EventCard[] }>('/public/home', signal),
+  events: (q: string, date: string, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (date) params.set('date', date);
+    const s = params.toString();
+    return get<{ events: EventCard[]; filtering: boolean }>(`/public/events${s ? `?${s}` : ''}`, signal);
+  },
+  event: async (slug: string, signal?: AbortSignal) =>
+    (await get<{ event: EventDetail }>(`/public/events/${encodeURIComponent(slug)}`, signal)).event,
+
+  me: (signal?: AbortSignal) => get<{ user: SessionUser; csrfToken: string }>('/auth/me', signal),
+  login: (email: string, password: string) =>
+    request<{ user: SessionUser }>('POST', '/auth/login', { email, password }),
+  register: (body: Record<string, unknown>) => request<{ user: SessionUser }>('POST', '/auth/register', body),
+  logout: () => request<void>('POST', '/auth/logout'),
+  forgotPassword: (email: string, captchaToken?: string | null) =>
+    request<{ mensagem: string }>('POST', '/auth/password/forgot', { email, captchaToken: captchaToken ?? undefined }),
+  checkResetToken: (token: string) =>
+    request<{ estado: 'valido' | 'expirado' | 'utilizado' | 'invalido' }>('POST', '/auth/password/check', {
+      token,
+    }).then(r => r.estado),
+  resetPassword: (token: string, password: string) =>
+    request<{ mensagem: string }>('POST', '/auth/password/reset', { token, password }),
+  legal: () => get<{ terms: string; privacy: string; ready: boolean; provisional: boolean }>('/legal/versions'),
+
+  quote: (eventSlug: string, items: CartItem[], couponCode?: string) =>
+    request<{ summary: Summary }>('POST', '/checkout/quote', {
+      eventSlug,
+      items,
+      couponCode: couponCode || null,
+    }).then(r => r.summary),
+  createOrder: (eventSlug: string, items: CartItem[], couponCode: string | undefined, expectedTotalCents: number) =>
+    request<{ order: OrderView }>('POST', '/orders', {
+      eventSlug,
+      items,
+      couponCode: couponCode || null,
+      expectedTotalCents,
+    }).then(r => r.order),
+  order: (id: string, signal?: AbortSignal) =>
+    get<{ order: OrderView }>(`/orders/${encodeURIComponent(id)}`, signal).then(r => r.order),
+  cancelOrder: (id: string) =>
+    request<{ order: OrderView }>('POST', `/orders/${encodeURIComponent(id)}/cancel`).then(r => r.order),
+  startPayment: (id: string, method: 'pix' | 'cartao') =>
+    request<{ payment: PaymentView }>('POST', `/orders/${encodeURIComponent(id)}/payment`, { method }).then(
+      r => r.payment,
+    ),
+  tickets: (signal?: AbortSignal) => get<{ tickets: TicketSummary[] }>('/tickets', signal).then(r => r.tickets),
+  ticket: (id: string, signal?: AbortSignal) =>
+    get<{ ticket: TicketDetail }>(`/tickets/${encodeURIComponent(id)}`, signal).then(r => r.ticket),
+  orders: (signal?: AbortSignal) => get<{ orders: OrderRow[] }>('/orders', signal).then(r => r.orders),
+  gateEvents: (signal?: AbortSignal) => get<{ events: GateEvent[] }>('/gate/events', signal).then(r => r.events),
+  gateCounter: (id: string, signal?: AbortSignal) =>
+    get<{
+      counter: { entered: number; total: number };
+      byType: { typeName: string; entered: number; total: number }[];
+    }>(`/gate/events/${encodeURIComponent(id)}/counter`, signal),
+  gateScan: (eventId: string, qr: string) => request<GateOutcome>('POST', '/gate/scan', { eventId, qr }),
+  gateSearch: (eventId: string, q: string) =>
+    request<{ kind: string; hits: GateHit[] }>('POST', '/gate/search', { eventId, q }),
+  gateAdmit: (eventId: string, ticketId: string) => request<GateOutcome>('POST', '/gate/admit', { eventId, ticketId }),
+  updateProfile: (name: string, phone: string) => request<{ user: SessionUser }>('PATCH', '/me', { name, phone }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ mensagem: string }>('POST', '/me/password', { currentPassword, newPassword }),
+  admin: {
+    overview: (month?: string, signal?: AbortSignal) =>
+      get<AdminOverview>(`/admin/overview${month ? `?month=${month}` : ''}`, signal),
+    events: (signal?: AbortSignal) => get<{ events: AdminEventRow[] }>('/admin/events', signal).then(r => r.events),
+    orders: (query: string, signal?: AbortSignal) =>
+      get<{ page: number; pageSize: number; total: number; orders: AdminOrderRow[] }>(
+        `/admin/orders?${query}`,
+        signal,
+      ).then(r => ({ ...r, rows: r.orders })),
+    order: (id: string, signal?: AbortSignal) =>
+      get<{ order: AdminOrderDetail }>(`/admin/orders/${id}`, signal).then(r => r.order),
+    buyers: (eventId: string, query: string, signal?: AbortSignal) =>
+      get<{ page: number; pageSize: number; total: number; buyers: AdminBuyerRow[] }>(
+        `/admin/events/${eventId}/buyers?${query}`,
+        signal,
+      ).then(r => ({ ...r, rows: r.buyers })),
+    tickets: (eventId: string, query: string, signal?: AbortSignal) =>
+      get<{ page: number; pageSize: number; total: number; tickets: AdminTicketRow[] }>(
+        `/admin/events/${eventId}/tickets?${query}`,
+        signal,
+      ).then(r => ({ ...r, rows: r.tickets })),
+    entries: (eventId: string, signal?: AbortSignal) => get<LiveEntries>(`/admin/events/${eventId}/entries`, signal),
+    salesReport: (query: string, signal?: AbortSignal) => get<SalesReport>(`/admin/reports/sales?${query}`, signal),
+    promoterRanking: (query: string, signal?: AbortSignal) =>
+      get<PromoterRanking>(`/admin/reports/promoters?${query}`, signal),
+    feeReport: (query: string, signal?: AbortSignal) => get<FeeReport>(`/admin/reports/fee?${query}`, signal),
+    cancelTicket: (id: string, reason: string) =>
+      request<{ cancelled: number; alreadyCancelled: number; used: number; guidance: string }>(
+        'POST',
+        `/admin/tickets/${id}/cancel`,
+        { reason, confirm: true },
+      ),
+    cancelOrderTickets: (id: string, reason: string) =>
+      request<{ cancelled: number; alreadyCancelled: number; used: number; guidance: string }>(
+        'POST',
+        `/admin/orders/${id}/cancel-tickets`,
+        { reason, confirm: true },
+      ),
+  },
+  /** Só no ambiente local, com o gateway fictício: a rota não existe em homologação nem em produção. */
+  devSimulate: (id: string, status: 'aprovado' | 'recusado' | 'expirado' | 'estornado') =>
+    request<{ status: string; outcome: string | null }>(
+      'POST',
+      `/dev/mock-gateway/${encodeURIComponent(id)}/${status}`,
+    ),
+  payment: (id: string, signal?: AbortSignal) =>
+    get<{ payment: PaymentView | null }>(`/orders/${encodeURIComponent(id)}/payment`, signal).then(r => r.payment),
+};
+
+export type LegalKind = 'termos-de-uso' | 'privacidade' | 'cancelamento' | 'meia-entrada';
+export interface LegalDocument {
+  kind: LegalKind;
+  title: string;
+  status: 'oficial' | 'homologacao' | 'pendente';
+  version: string | null;
+  blocks: { type: 'heading' | 'paragraph'; text: string }[];
+}

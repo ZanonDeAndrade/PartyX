@@ -1,0 +1,31 @@
+name: Deploy em homologação
+
+# Só a branch `develop` vai para homologação. A produção (branch `main`, protegida) é outro fluxo,
+# criado no Prompt 28, com aprovação manual.
+on:
+  push:
+    branches: [develop]
+
+concurrency:
+  group: deploy-homologacao
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write   # autenticação sem chave, por Workload Identity Federation
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: homologacao
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build, migração e deploy
+        env:
+          TAG: ${{ github.sha }}
+        run: ./infra/homologacao/deploy.sh

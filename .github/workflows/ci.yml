@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: partyx
+          POSTGRES_PASSWORD: partyx_test_only
+          POSTGRES_DB: postgres
+        ports: ['55432:5432']
+        options: >-
+          --health-cmd "pg_isready -U partyx" --health-interval 2s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://partyx:partyx_test_only@127.0.0.1:55432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # poppler: os testes do PDF rasterizam a página e leem o QR; sem ele esses testes são pulados (e a CI não prova CA-21).
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run check:migrations   # regra expand/contract das migrações (rollback seguro)
+      - run: npm test        # suíte principal + testes de papéis do PostgreSQL (passo separado); inclui integração (TEST_DATABASE_URL definido)
+      - run: npm run build
+      - name: Auditoria de dependências
+        run: npm audit --omit=dev --audit-level=high

@@ -1,0 +1,379 @@
+import { and, asc, eq, sql } from 'drizzle-orm';
+import type { Db } from '../db/client';
+import { writeAudit } from '../db/audit';
+import { checkins, events, orders, ticketTypes, tickets, users } from '../db/schema';
+import { maskCpf, onlyDigits } from '../domain/cpf';
+import { AppError } from '../domain/errors';
+import { logger } from '../logger';
+import type { Clock } from '../providers/clock';
+import { lookupByQr } from '../tickets/service';
+import type { QrKeys } from '../domain/ticketCode';
+
+/**
+ * Portaria (RF-44 a RF-54). A verificação e a marcação de uso acontecem **no servidor**: o aparelho só mostra o resultado.
+ * Sem internet o aparelho não confirma nada sozinho (não existe validação local): a orientação é a lista impressa (seção 15).
+ */
+
+export interface GateDeps {
+  db: Db;
+  clock: Clock;
+  keys: QrKeys;
+}
+export interface Validator {
+  id: string;
+  name: string;
+}
+
+export type GateResult = 'valido' | 'ja_utilizado' | 'invalido' | 'cancelado' | 'outro_evento';
+
+export interface Counter {
+  entered: number;
+  total: number;
+}
+
+export interface GateOutcome {
+  result: GateResult;
+  /** Texto curto para a tela cheia. */
+  message: string;
+  ticket: { id: string; shortCode: string; typeName: string; holderName: string } | null;
+  /** Amarelo: quem entrou primeiro e quando (RF-48). */
+  firstEntry: { at: string; validatorName: string } | null;
+  /** Vermelho "outro evento" (RF-54): de qual evento é o ingresso. */
+  otherEvent: { name: string } | null;
+  counter: Counter;
+  method: 'camera' | 'manual';
+}
+
+const MESSAGES: Record<GateResult, string> = {
+  valido: 'Entrada liberada',
+  ja_utilizado: 'Ingresso já utilizado',
+  invalido: 'Ingresso inválido',
+  cancelado: 'Ingresso cancelado',
+  outro_evento: 'Ingresso de outro evento',
+};
+
+async function loadEvent(db: Db, eventId: string) {
+  const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+  if (!event) throw new AppError(404, 'nao_encontrado', 'Evento não encontrado.');
+  if (event.status !== 'publicado') {
+    throw new AppError(409, 'evento_indisponivel', 'Este evento não está aberto para a portaria.');
+  }
+  return event;
+}
+
+/** Entradas do evento (ingressos usados) e total de ingressos que ainda valem ou já entraram (cancelados ficam de fora). */
+export async function counterOf(db: Db, eventId: string): Promise<Counter> {
+  const [row] = await db
+    .select({
+      entered: sql<number>`count(*) filter (where ${tickets.status} = 'utilizado')::int`,
+      total: sql<number>`count(*) filter (where ${tickets.status} in ('valido', 'utilizado'))::int`,
+    })
+    .from(tickets)
+    .where(eq(tickets.eventId, eventId));
+  return { entered: row?.entered ?? 0, total: row?.total ?? 0 };
+}
+
+/** Entradas por tipo (Pista, VIP, Camarote), para direcionar o público (RF-49) e acompanhar. */
+export async function counterByType(db: Db, eventId: string) {
+  return db
+    .select({
+      typeName: ticketTypes.name,
+      entered: sql<number>`count(*) filter (where ${tickets.status} = 'utilizado')::int`,
+      total: sql<number>`count(*) filter (where ${tickets.status} in ('valido', 'utilizado'))::int`,
+    })
+    .from(tickets)
+    .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+    .where(eq(tickets.eventId, eventId))
+    .groupBy(ticketTypes.name)
+    .orderBy(asc(ticketTypes.name));
+}
+
+/** Eventos que a portaria pode abrir (publicados), com o contador de cada um (RF-45). */
+export async function gateEvents(db: Db) {
+  return db
+    .select({
+      id: events.id,
+      name: events.name,
+      slug: events.slug,
+      startsAt: events.startsAt,
+      venue: events.venue,
+      // Subconsultas com nome de tabela explícito: dentro de sql`` o Drizzle não qualifica as colunas e o `id` ficaria ambíguo.
+      entered: sql<number>`(select count(*) from tickets t where t.event_id = "events"."id" and t.status = 'utilizado')::int`,
+      total: sql<number>`(select count(*) from tickets t where t.event_id = "events"."id" and t.status in ('valido', 'utilizado'))::int`,
+    })
+    .from(events)
+    .where(eq(events.status, 'publicado'))
+    .orderBy(asc(events.startsAt), asc(events.id));
+}
+
+type TicketRow = {
+  id: string;
+  shortCode: string;
+  typeName: string;
+  holderName: string;
+  eventId: string;
+  status: 'valido' | 'utilizado' | 'cancelado';
+  usedAt: Date | null;
+};
+
+async function ticketById(db: Db, id: string): Promise<TicketRow | null> {
+  const [row] = await db
+    .select({
+      id: tickets.id,
+      shortCode: tickets.shortCode,
+      typeName: ticketTypes.name,
+      holderName: tickets.holderName,
+      eventId: tickets.eventId,
+      status: tickets.status,
+      usedAt: tickets.usedAt,
+    })
+    .from(tickets)
+    .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+    .where(eq(tickets.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+async function record(
+  db: Db,
+  v: Validator,
+  eventId: string,
+  result: GateResult,
+  method: 'camera' | 'manual',
+  ticketId: string | null,
+  presented: string | null,
+  at: Date,
+) {
+  await db.insert(checkins).values({
+    ticketId,
+    eventId,
+    validatorId: v.id,
+    result,
+    method,
+    codePresented: presented?.slice(0, 64) ?? null,
+    createdAt: at,
+  });
+}
+
+async function outcome(
+  deps: GateDeps,
+  eventId: string,
+  result: GateResult,
+  method: 'camera' | 'manual',
+  ticket: TicketRow | null,
+  extra: { firstEntry?: GateOutcome['firstEntry']; otherEvent?: string | null } = {},
+): Promise<GateOutcome> {
+  return {
+    result,
+    message: MESSAGES[result],
+    ticket:
+      ticket && result !== 'invalido'
+        ? { id: ticket.id, shortCode: ticket.shortCode, typeName: ticket.typeName, holderName: ticket.holderName }
+        : null,
+    firstEntry: extra.firstEntry ?? null,
+    otherEvent: extra.otherEvent ? { name: extra.otherEvent } : null,
+    counter: await counterOf(deps.db, eventId),
+    method,
+  };
+}
+
+/**
+ * Marca o ingresso como usado **de forma atômica** (RF-50, RF-51, CA-25): `UPDATE ... WHERE status = 'valido'` numa transação
+ * com o registro da entrada. Se dois aparelhos leem o mesmo ingresso ao mesmo tempo, o segundo `UPDATE` espera o primeiro, não
+ * encontra mais "valido" e vira "já utilizado". Mesmo que algo falhasse, o índice único parcial de `checkins` (uma entrada
+ * válida por ingresso) impede a segunda.
+ */
+async function admit(
+  deps: GateDeps,
+  v: Validator,
+  eventId: string,
+  ticketId: string,
+  method: 'camera' | 'manual',
+): Promise<GateOutcome> {
+  const now = deps.clock.now();
+  const won = await deps.db.transaction(async tx => {
+    const rows = await tx
+      .update(tickets)
+      .set({ status: 'utilizado', usedAt: now, validatedBy: v.id })
+      .where(and(eq(tickets.id, ticketId), eq(tickets.status, 'valido'), eq(tickets.eventId, eventId)))
+      .returning({ id: tickets.id });
+    if (rows.length === 0) return false;
+    await tx
+      .insert(checkins)
+      .values({ ticketId, eventId, validatorId: v.id, result: 'valido', method, createdAt: now });
+    return true;
+  });
+  const ticket = (await ticketById(deps.db, ticketId))!;
+  if (won) return outcome(deps, eventId, 'valido', method, ticket);
+
+  // Perdeu a disputa, ou o ingresso já tinha sido usado ou cancelado: mostra o estado real.
+  if (ticket.status === 'cancelado') {
+    await record(deps.db, v, eventId, 'cancelado', method, ticketId, null, now);
+    return outcome(deps, eventId, 'cancelado', method, ticket);
+  }
+  const [first] = await deps.db
+    .select({ at: checkins.createdAt, validatorName: users.name })
+    .from(checkins)
+    .innerJoin(users, eq(users.id, checkins.validatorId))
+    .where(and(eq(checkins.ticketId, ticketId), eq(checkins.result, 'valido')))
+    .limit(1);
+  await record(deps.db, v, eventId, 'ja_utilizado', method, ticketId, null, now);
+  return outcome(deps, eventId, 'ja_utilizado', method, ticket, {
+    firstEntry: {
+      at: (first?.at ?? ticket.usedAt ?? now).toISOString(),
+      validatorName: first?.validatorName ?? 'validador',
+    },
+  });
+}
+
+/** Leitura de um QR (RF-46 a RF-51, RF-54). Todo resultado fica registrado, inclusive as tentativas inválidas. */
+export async function scan(deps: GateDeps, v: Validator, input: { eventId: string; qr: string }): Promise<GateOutcome> {
+  await loadEvent(deps.db, input.eventId);
+  const now = deps.clock.now();
+  const found = await lookupByQr(deps, input.qr);
+  if (!found.ok) {
+    // Só o começo do que foi lido (prefixo e versão), nunca o suficiente para reconstituir um código.
+    await record(deps.db, v, input.eventId, 'invalido', 'camera', null, input.qr.slice(0, 24), now);
+    return outcome(deps, input.eventId, 'invalido', 'camera', null);
+  }
+  const ticket = (await ticketById(deps.db, found.ticket.id))!;
+  if (ticket.eventId !== input.eventId) {
+    const [other] = await deps.db.select({ name: events.name }).from(events).where(eq(events.id, ticket.eventId));
+    await record(deps.db, v, input.eventId, 'outro_evento', 'camera', ticket.id, null, now);
+    return outcome(deps, input.eventId, 'outro_evento', 'camera', ticket, { otherEvent: other?.name ?? null });
+  }
+  if (ticket.status === 'cancelado') {
+    await record(deps.db, v, input.eventId, 'cancelado', 'camera', ticket.id, null, now);
+    return outcome(deps, input.eventId, 'cancelado', 'camera', ticket);
+  }
+  return admit(deps, v, input.eventId, ticket.id, 'camera');
+}
+
+/** Entrada manual de um ingresso encontrado na busca (RF-52). Registrada como `manual`. */
+export async function admitManually(
+  deps: GateDeps,
+  v: Validator,
+  input: { eventId: string; ticketId: string },
+): Promise<GateOutcome> {
+  await loadEvent(deps.db, input.eventId);
+  const ticket = await ticketById(deps.db, input.ticketId);
+  if (!ticket) throw new AppError(404, 'nao_encontrado', 'Ingresso não encontrado.');
+  const now = deps.clock.now();
+  if (ticket.eventId !== input.eventId) {
+    const [other] = await deps.db.select({ name: events.name }).from(events).where(eq(events.id, ticket.eventId));
+    await record(deps.db, v, input.eventId, 'outro_evento', 'manual', ticket.id, null, now);
+    return outcome(deps, input.eventId, 'outro_evento', 'manual', ticket, { otherEvent: other?.name ?? null });
+  }
+  if (ticket.status === 'cancelado') {
+    await record(deps.db, v, input.eventId, 'cancelado', 'manual', ticket.id, null, now);
+    return outcome(deps, input.eventId, 'cancelado', 'manual', ticket);
+  }
+  return admit(deps, v, input.eventId, ticket.id, 'manual');
+}
+
+// ---------- busca manual (RF-52) ----------
+
+const maskEmail = (email: string): string => {
+  const [local = '', domain = ''] = email.split('@');
+  return `${local.slice(0, 1)}${'*'.repeat(Math.max(2, Math.min(local.length - 1, 6)))}@${domain}`;
+};
+
+/** Minúsculas e sem acento, igual dos dois lados da comparação. */
+const FROM = 'áàâãäéèêëíìîïóòôõöúùûüçñ';
+const TO = 'aaaaaeeeeiiiiooooouuuucn';
+export const foldName = (s: string): string =>
+  [...s.toLowerCase().normalize('NFC')].map(ch => (FROM.includes(ch) ? TO[FROM.indexOf(ch)]! : ch)).join('');
+
+export type SearchKind = 'cpf' | 'codigo' | 'email' | 'nome';
+export function classifyQuery(raw: string): { kind: SearchKind; value: string } | null {
+  const q = raw.trim();
+  if (q.length < 3 || q.length > 100) return null;
+  const digits = onlyDigits(q);
+  if (/^[\d.\-\s]+$/.test(q)) return digits.length === 11 ? { kind: 'cpf', value: digits } : null; // CPF só inteiro: evita varredura por pedaços
+  if (/^px-/i.test(q)) return q.length >= 6 ? { kind: 'codigo', value: q.toUpperCase().replace(/\s+/g, '') } : null;
+  if (q.includes('@')) return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(q) ? { kind: 'email', value: q.toLowerCase() } : null; // e-mail inteiro
+  return { kind: 'nome', value: foldName(q).replace(/\s+/g, ' ') };
+}
+
+export interface SearchHit {
+  ticketId: string;
+  shortCode: string;
+  typeName: string;
+  holderName: string;
+  cpf: string | null;
+  email: string;
+  status: 'valido' | 'utilizado' | 'cancelado';
+  usedAt: string | null;
+}
+
+/**
+ * Busca em ingressos do evento selecionado, por código, nome, CPF ou e-mail. Acesso limitado: no máximo 20 resultados;
+ * CPF e e-mail só por correspondência inteira; resultado com CPF mascarado e e-mail parcialmente oculto. A consulta em si
+ * não é gravada (pode ser um CPF): a trilha guarda só o tipo de busca e quantos resultados voltaram.
+ */
+export async function searchTickets(
+  deps: GateDeps,
+  v: Validator,
+  input: { eventId: string; q: string },
+): Promise<{ kind: SearchKind; hits: SearchHit[] }> {
+  await loadEvent(deps.db, input.eventId);
+  const parsed = classifyQuery(input.q);
+  if (!parsed) {
+    throw new AppError(
+      422,
+      'busca_invalida',
+      'Digite o código do ingresso (PX-...), o nome (3 letras ou mais), o CPF completo ou o e-mail completo.',
+    );
+  }
+  const cond =
+    parsed.kind === 'cpf'
+      ? eq(users.cpf, parsed.value)
+      : parsed.kind === 'email'
+        ? eq(users.email, parsed.value)
+        : parsed.kind === 'codigo'
+          ? sql`${tickets.shortCode} like ${parsed.value.replace(/[%_\\]/g, '') + '%'}`
+          : sql`translate(lower(${tickets.holderName}), ${FROM}, ${TO}) like ${'%' + parsed.value.replace(/[%_\\]/g, '') + '%'}`;
+  const rows = await deps.db
+    .select({
+      ticketId: tickets.id,
+      shortCode: tickets.shortCode,
+      typeName: ticketTypes.name,
+      holderName: tickets.holderName,
+      cpf: users.cpf,
+      email: users.email,
+      status: tickets.status,
+      usedAt: tickets.usedAt,
+    })
+    .from(tickets)
+    .innerJoin(orders, eq(orders.id, tickets.orderId))
+    .innerJoin(users, eq(users.id, orders.userId))
+    .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+    .where(and(eq(tickets.eventId, input.eventId), cond))
+    .orderBy(asc(tickets.holderName), asc(tickets.shortCode))
+    .limit(20);
+  await deps.db.transaction(tx =>
+    writeAudit(tx, {
+      actorId: v.id,
+      action: 'portaria.busca',
+      entity: 'event',
+      entityId: input.eventId,
+      before: null,
+      after: { tipo: parsed.kind, resultados: rows.length },
+      at: deps.clock.now(),
+    }),
+  );
+  logger.info('busca manual na portaria', { eventId: input.eventId, kind: parsed.kind, results: rows.length });
+  return {
+    kind: parsed.kind,
+    hits: rows.map(r => ({
+      ticketId: r.ticketId,
+      shortCode: r.shortCode,
+      typeName: r.typeName,
+      holderName: r.holderName,
+      cpf: r.cpf ? maskCpf(r.cpf) : null,
+      email: maskEmail(r.email),
+      status: r.status,
+      usedAt: r.usedAt?.toISOString() ?? null,
+    })),
+  };
+}

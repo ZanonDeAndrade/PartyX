@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>PartyX · E-mails, PDF e compartilhamento</title>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>body{margin:0;background:#E9E9EF;font-family:'Archivo',Arial,sans-serif;color:#0B0B10}*{box-sizing:border-box}a{color:#7C3AED}a:hover{color:#5B21B6}</style>
+</helmet>
+<div style="padding:40px;display:flex;flex-direction:column;gap:48px">
+  <header style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap">
+    <div>
+      <div style="font-weight:900;font-stretch:118%;font-size:24px;letter-spacing:-0.03em">Party<span style="color:#7C3AED">X</span> <span style="font-size:12px;font-weight:600;font-stretch:100%;letter-spacing:0;font-family:'IBM Plex Mono',monospace;color:#5B5B6E">wordmark provisório</span></div>
+      <h1 style="margin:8px 0 4px;font-size:40px;font-weight:900;font-stretch:110%;letter-spacing:-0.02em">E-mails, PDF e compartilhamento</h1>
+      <p style="margin:0;color:#5B5B6E;font-size:16px">E01 a E05 e lista de contingência. Somente e-mail transacional: sem SMS, WhatsApp automático ou marketing. Dados demonstrativos.</p>
+    </div>
+    <div style="display:flex;gap:10px"><a href="PartyX Protótipo.dc.html" style="font-weight:700">Protótipo</a><a href="PartyX Documentação.dc.html" style="font-weight:700">Documentação</a></div>
+  </header>
+
+  <section style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+    <sc-for list="{{ emails }}" as="m" hint-placeholder-count="3">
+      <div id="{{ m.id }}" style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:8px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;background:#0B0B10;color:#fff;padding:4px 8px;border-radius:6px">{{ m.id }}</span><b>{{ m.name }}</b></div>
+        <div style="width:600px;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(11,11,16,.08)">
+          <div style="background:#F7F7FA;border-bottom:1px solid #E4E4EC;padding:10px 16px;font-size:13px;color:#3F3F50;line-height:1.6"><b>De:</b> PartyX &lt;remetente a definir&gt;<br><b>Assunto:</b> {{ m.subject }}</div>
+          <div style="background:#0B0B10;padding:22px 32px"><span style="font-weight:900;font-stretch:118%;font-size:26px;letter-spacing:-0.03em;color:#fff">Party<span style="color:#8B5CF6">X</span></span></div>
+          <div style="padding:32px;display:flex;flex-direction:column;gap:16px">
+            <h2 style="margin:0;font-size:26px;line-height:1.15;font-weight:900;font-stretch:108%">{{ m.title }}</h2>
+            <p style="margin:0;font-size:16px;line-height:1.6;color:#3F3F50">{{ m.p1 }}</p>
+            <sc-if value="{{ m.hasOrder }}">
+              <table style="width:100%;border-collapse:collapse;font-size:15px;border:1px solid #E4E4EC;border-radius:8px">
+                <tbody>
+                  <tr><td colspan="2" style="padding:14px 16px;background:#F7F7FA"><b style="font-size:17px">Noite Neon</b><br><span style="color:#5B5B6E">Sábado, 17/10/2026 · 23:00 · Galpão Aurora</span></td></tr>
+                  <tr><td style="padding:10px 16px;border-top:1px solid #EEEEF3">2 × Pista 2º lote</td><td style="padding:10px 16px;border-top:1px solid #EEEEF3;text-align:right">R$ 160,00</td></tr>
+                  <tr><td style="padding:10px 16px;border-top:1px solid #EEEEF3">1 × VIP</td><td style="padding:10px 16px;border-top:1px solid #EEEEF3;text-align:right">R$ 150,00</td></tr>
+                  <tr><td style="padding:12px 16px;border-top:1px solid #E4E4EC"><b>Total pago (Pix)</b></td><td style="padding:12px 16px;border-top:1px solid #E4E4EC;text-align:right"><b>R$ 310,00</b></td></tr>
+                </tbody>
+              </table>
+            </sc-if>
+            <sc-if value="{{ m.hasCta }}"><a href="#" style="align-self:flex-start;display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 22px;border-radius:10px">{{ m.cta }}</a></sc-if>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#5B5B6E">{{ m.p2 }}</p>
+          </div>
+          <div style="border-top:1px solid #E4E4EC;padding:20px 32px;font-size:12px;line-height:1.6;color:#5B5B6E">PartyX · razão social e CNPJ a fornecer · atendimento ao comprador: contato a fornecer pela PartyX.<br>Você recebeu este e-mail por causa de uma ação na sua conta. Não é uma mensagem promocional.</div>
+        </div>
+      </div>
+    </sc-for>
+  </section>
+
+  <section id="E04" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;gap:8px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;background:#0B0B10;color:#fff;padding:4px 8px;border-radius:6px">E04</span><b>Ingresso em PDF: individual (A4) e agrupado por pedido</b></div>
+    <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+      <div style="width:595px;height:842px;background:#fff;box-shadow:0 1px 2px rgba(11,11,16,.1);padding:44px;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0B0B10;padding-bottom:14px"><span style="font-weight:900;font-stretch:118%;font-size:24px;letter-spacing:-0.03em">Party<span style="color:#7C3AED">X</span></span><span style="font-size:13px;font-weight:600">Ingresso 1 de 3 · Pedido PX-10184</span></div>
+        <div><div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#5B5B6E">EVENTO</div><div style="font-size:40px;font-weight:900;font-stretch:112%;line-height:1">Noite Neon</div></div>
+        <div style="display:flex;gap:28px;align-items:center">
+          <div style="width:260px;height:260px;padding:18px;border:1px solid #0B0B10;flex:none"><svg viewBox="-2 -2 29 29" width="100%" height="100%" style="display:block"><rect x="-2" y="-2" width="29" height="29" fill="#fff"></rect><path d="{{ qr1 }}" fill="#000"></path></svg></div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div><div style="font-size:12px;font-weight:700;color:#5B5B6E">TIPO</div><div style="font-size:26px;font-weight:900">Pista 2º lote</div></div>
+            <div><div style="font-size:12px;font-weight:700;color:#5B5B6E">CÓDIGO</div><div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600">PX-7K4M-2Q9D</div></div>
+            <div><div style="font-size:12px;font-weight:700;color:#5B5B6E">COMPRADOR</div><div style="font-size:18px;font-weight:700">Marina Costa</div></div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;border-top:1px solid #D4D4DE;border-bottom:1px solid #D4D4DE;padding:14px 0">
+          <div><div style="font-size:12px;font-weight:700;color:#5B5B6E">DATA</div><div style="font-size:16px;font-weight:700">17/10/2026</div></div>
+          <div><div style="font-size:12px;font-weight:700;color:#5B5B6E">HORÁRIO</div><div style="font-size:16px;font-weight:700">23:00</div></div>
+          <div><div style="font-size:12px;font-weight:700;color:#5B5B6E">CLASSIFICAÇÃO</div><div style="font-size:16px;font-weight:700">18 anos</div></div>
+          <div style="grid-column:1 / -1"><div style="font-size:12px;font-weight:700;color:#5B5B6E">LOCAL</div><div style="font-size:16px;font-weight:700">Galpão Aurora · Rua das Acácias, 480, Centro, São Gabriel/RS</div></div>
+        </div>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:#3F3F50">
+          <li>Apresente este QR na entrada, impresso ou na tela do celular. Cada código permite uma única entrada.</li>
+          <li>Leve documento com foto. Meia-entrada exige o documento que dá direito ao benefício.</li>
+          <li>Não compartilhe este QR: a primeira leitura bloqueia o ingresso.</li>
+        </ul>
+        <div style="margin-top:auto;font-size:11px;color:#5B5B6E;display:flex;justify-content:space-between;gap:10px"><span>Emitido em 05/10/2026 14:22 · QR demonstrativo, sem validade real</span><span>PartyX · contato a fornecer</span></div>
+      </div>
+      <div style="width:595px;background:#fff;box-shadow:0 1px 2px rgba(11,11,16,.1);padding:36px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0B0B10;padding-bottom:12px"><span style="font-weight:900;font-stretch:118%;font-size:22px;letter-spacing:-0.03em">Party<span style="color:#7C3AED">X</span></span><span style="font-size:13px;font-weight:600">Pedido PX-10184 · 3 ingressos</span></div>
+        <div style="font-size:14px;color:#3F3F50">Noite Neon · 17/10/2026 · 23:00 · Galpão Aurora. Cada ingresso tem um código diferente; no PDF agrupado, cada um ocupa uma página ao imprimir.</div>
+        <sc-for list="{{ group }}" as="k" hint-placeholder-count="3">
+          <div style="border:1px solid #0B0B10;display:flex;gap:18px;padding:16px;align-items:center">
+            <div style="width:140px;height:140px;padding:10px;border:1px solid #D4D4DE;flex:none"><svg viewBox="-2 -2 29 29" width="100%" height="100%" style="display:block"><rect x="-2" y="-2" width="29" height="29" fill="#fff"></rect><path d="{{ k.qr }}" fill="#000"></path></svg></div>
+            <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+              <span style="font-size:12px;font-weight:700;color:#5B5B6E">INGRESSO {{ k.pos }}</span>
+              <b style="font-size:22px">{{ k.type }}</b>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600">{{ k.code }}</span>
+              <span style="font-size:14px">Marina Costa</span>
+            </div>
+          </div>
+        </sc-for>
+        <div style="font-size:11px;color:#5B5B6E">QRs demonstrativos, sem validade real. Na implementação, o conteúdo é o código assinado (HMAC) gerado no servidor.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="contingencia" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;gap:8px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;background:#0B0B10;color:#fff;padding:4px 8px;border-radius:6px">ADM23</span><b>PDF imprimível da lista de contingência</b></div>
+    <div style="width:842px;background:#fff;box-shadow:0 1px 2px rgba(11,11,16,.1);padding:36px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #0B0B10;padding-bottom:12px;gap:16px">
+        <div><span style="font-weight:900;font-stretch:118%;font-size:20px;letter-spacing:-0.03em">Party<span style="color:#7C3AED">X</span></span><div style="font-size:24px;font-weight:900;margin-top:4px">Lista de ingressos · Noite Neon</div><div style="font-size:13px;color:#3F3F50">17/10/2026 · 23:00 · Galpão Aurora</div></div>
+        <div style="text-align:right;font-size:12px;line-height:1.5"><b>Exportado em 17/10/2026 às 18:05</b><br>por Carla Menezes<br>Retrato deste momento: vendas, entradas ou cancelamentos posteriores não aparecem.</div>
+      </div>
+      <div style="font-size:12px;color:#3F3F50">Uso: sem internet, confira código e nome e risque a linha de quem entrou. Ingressos cancelados até a exportação já estão marcados.</div>
+      <div style="display:grid;grid-template-columns:36px 1.2fr 1.3fr 1.6fr 1.1fr .8fr;font-size:12px;border:1px solid #0B0B10">
+        <sc-for list="{{ headCells }}" as="h" hint-placeholder-count="6"><div style="padding:7px 8px;font-weight:800;background:#EEEEF3;border-bottom:1px solid #0B0B10">{{ h }}</div></sc-for>
+        <sc-for list="{{ contRows }}" as="r" hint-placeholder-count="10">
+          <div style="padding:6px 8px;border-bottom:1px solid #D4D4DE"><span style="display:inline-block;width:14px;height:14px;border:1.5px solid #0B0B10"></span></div>
+          <div style="padding:6px 8px;border-bottom:1px solid #D4D4DE;font-family:'IBM Plex Mono',monospace;text-decoration:{{ r.strike }}">{{ r.code }}</div>
+          <div style="padding:6px 8px;border-bottom:1px solid #D4D4DE">{{ r.type }}</div>
+          <div style="padding:6px 8px;border-bottom:1px solid #D4D4DE">{{ r.name }}</div>
+          <div style="padding:6px 8px;border-bottom:1px solid #D4D4DE;font-family:'IBM Plex Mono',monospace">{{ r.cpf }}</div>
+          <div style="padding:6px 8px;border-bottom:1px solid #D4D4DE;font-weight:700">{{ r.st }}</div>
+        </sc-for>
+      </div>
+      <div style="font-size:11px;color:#5B5B6E;display:flex;justify-content:space-between"><span>Página 1 de 9 · 214 ingressos válidos · 3 cancelados · dados demonstrativos</span><span>CPF mascarado conforme minimização de dados</span></div>
+    </div>
+  </section>
+
+  <section id="E05" style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;gap:8px;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;background:#0B0B10;color:#fff;padding:4px 8px;border-radius:6px">E05</span><b>Pré-visualização de compartilhamento (Open Graph)</b></div>
+    <div style="display:flex;gap:32px;flex-wrap:wrap;align-items:flex-start">
+      <div style="width:380px;background:#DCD5CC;border-radius:18px;padding:18px;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <span style="font-size:11px;color:#5B5B6E;align-self:center;background:#ffffffaa;padding:3px 8px;border-radius:6px">app de mensagens (genérico)</span>
+        <div style="width:300px;background:#D9FDD3;border-radius:10px;padding:5px;box-shadow:0 1px 1px rgba(0,0,0,.1)">
+          <div style="background:#F0F2F5;border-radius:7px;overflow:hidden">
+            <div style="aspect-ratio:1.91/1;background:repeating-linear-gradient(135deg,#1F1838 0 10px,#2A2050 10px 20px);display:flex;align-items:flex-end;padding:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#D4D4DE">og:image · banner 1200 × 630</span></div>
+            <div style="padding:8px 10px"><div style="font-weight:700;font-size:14px">Noite Neon · 17/10/2026 · PartyX</div><div style="font-size:12px;color:#3F3F50;margin-top:2px">Galpão Aurora, São Gabriel/RS. Ingressos online na PartyX.</div><div style="font-size:11px;color:#5B5B6E;margin-top:4px">dominio-partyx</div></div>
+          </div>
+          <div style="font-size:14px;padding:6px 6px 2px;color:#0B0B10;overflow-wrap:anywhere">https://dominio-partyx/eventos/noite-neon</div>
+        </div>
+      </div>
+      <div style="width:420px;background:#fff;border-radius:12px;padding:16px;font-size:13px;line-height:1.6;box-shadow:0 1px 2px rgba(11,11,16,.08)">
+        <b style="font-size:15px">Tags por página de evento</b>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;background:#F7F7FA;border-radius:8px;padding:10px;margin-top:8px;overflow-wrap:anywhere">og:title = Noite Neon · 17/10/2026 · PartyX<br>og:description = local + chamada curta<br>og:image = banner do evento (1200 × 630, gerado no upload)<br>og:url = /eventos/noite-neon<br>twitter:card = summary_large_image</div>
+        <p style="margin:10px 0 0;color:#3F3F50">Compartilhamento é iniciado pelo usuário (WhatsApp, redes sociais ou copiar link). Não há envio automático de mensagens.</p>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+function pxQR(seed) {
+  const n = 25; let h = 2166136261;
+  for (const c of String(seed)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  const rnd = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1000) / 1000; };
+  const m = []; for (let y = 0; y < n; y++) { m[y] = []; for (let x = 0; x < n; x++) m[y][x] = rnd() < 0.5; }
+  const fi = (ox, oy) => { for (let y = -1; y < 8; y++) for (let x = -1; x < 8; x++) { const X = ox + x, Y = oy + y; if (X < 0 || Y < 0 || X >= n || Y >= n) continue; const ins = x >= 0 && y >= 0 && x < 7 && y < 7; const d = Math.max(Math.abs(x - 3), Math.abs(y - 3)); m[Y][X] = ins && (d === 3 || d <= 1); } };
+  fi(0, 0); fi(n - 7, 0); fi(0, n - 7);
+  for (let i = 8; i < n - 8; i++) { m[6][i] = i % 2 === 0; m[i][6] = i % 2 === 0; }
+  for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) { const d = Math.max(Math.abs(x), Math.abs(y)); m[18 + y][18 + x] = d !== 1; }
+  let d = ''; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (m[y][x]) d += 'M' + x + ' ' + y + 'h1v1h-1z';
+  return d;
+}
+class Component extends DCLogic {
+  renderVals() {
+    const codes = [['PX-7K4M-2Q9D', 'Pista 2º lote'], ['PX-3HF8-Q2LA', 'Pista 2º lote'], ['PX-9TQ3-HW7E', 'VIP']];
+    const names = ['Ana Souza', 'Beatriz Lopes', 'Camila Duarte', 'Diego Carvalho', 'Felipe Rocha', 'Gabriel Nunes', 'Isabela Farias', 'Larissa Freitas', 'Lucas Andrade', 'Marina Costa', 'Marina Costa', 'Marina Costa', 'Matheus Cardoso', 'Pedro Santos', 'Pedro Santos'];
+    const tps = ['Pista 2º lote', 'VIP', 'Pista Meia-entrada 2º lote', 'Camarote', 'Pista 1º lote'];
+    const cps = ['***.184.522-**', '***.903.117-**', '***.456.789-**', '***.771.240-**', '***.338.605-**', '***.612.094-**'];
+    const cr = names.map((nm, i) => { const canc = i === 4; const code = nm === 'Marina Costa' ? codes[i - 9][0] : 'PX-' + ['A7QK', 'B2MN', 'C9RT', 'D4HX', 'E8PL', 'F3WZ', 'G6JC', 'H2KD', 'J5NV', 'K8TB', 'L3QF', 'M7RS'][i % 12] + '-' + ['2Q4X', '9TJ7', 'H3LM', 'Z8PK', 'W4CN', 'R6FD'][i % 6]; return { code, type: nm === 'Marina Costa' ? codes[i - 9][1] : tps[i % tps.length], name: nm, cpf: nm === 'Marina Costa' ? '***.456.789-**' : cps[i % cps.length], st: canc ? 'CANCELADO' : '', strike: canc ? 'line-through' : 'none' }; });
+    return {
+      qr1: pxQR(codes[0][0]),
+      group: codes.map(([c, t], i) => ({ code: c, type: t, pos: (i + 1) + ' de 3', qr: pxQR(c) })),
+      headCells: ['Entrou', 'Código', 'Tipo', 'Comprador', 'CPF', 'Situação'],
+      contRows: cr,
+      emails: [
+        { id: 'E01', name: 'Confirmação de cadastro', subject: 'Sua conta PartyX foi criada', title: 'Sua conta foi criada, Marina', p1: 'Agora você pode comprar ingressos dos eventos da PartyX e acessar tudo em Meus ingressos. Não é preciso confirmar este e-mail para usar a conta.', hasOrder: false, hasCta: true, cta: 'Ver eventos', p2: 'Se você não criou esta conta, fale com o atendimento da PartyX.' },
+        { id: 'E02', name: 'Recuperação de senha', subject: 'Criar nova senha na PartyX', title: 'Crie uma nova senha', p1: 'Recebemos um pedido para redefinir a senha da sua conta. Use o botão abaixo para criar uma nova senha.', hasOrder: false, hasCta: true, cta: 'Criar nova senha', p2: 'O link vale por 1 hora e só pode ser usado uma vez. Se você não fez este pedido, ignore este e-mail: sua senha continua a mesma.' },
+        { id: 'E03', name: 'Compra confirmada', subject: 'Compra confirmada · Noite Neon · Pedido PX-10184', title: 'Seus ingressos estão prontos', p1: 'Pagamento aprovado em 05/10/2026 às 14:22. Emitimos 3 ingressos em nome de Marina Costa, um para cada unidade, cada um com seu próprio QR Code.', hasOrder: true, hasCta: true, cta: 'Acessar meus ingressos', p2: 'O botão abre Meus ingressos; é preciso entrar na sua conta para ver os QR Codes. Cancelamentos e reembolsos seguem a Política de Cancelamento da PartyX.' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

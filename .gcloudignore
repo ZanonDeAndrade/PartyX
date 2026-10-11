@@ -1,0 +1,12 @@
+/node_modules
+/dist
+/dist-server
+/reference
+/docs
+/infra
+/.git
+.env
+.env.*
+!.env.example
+.data
+/assets-originais

@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-server
+reference
+docs
+.git
+.env
+.env.*
+!.env.example
+*.md
+.data
+
+# Originais da marca (vídeo .MOV e PNG da logo): não entram na imagem
+assets-originais

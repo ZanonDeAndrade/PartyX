@@ -1,0 +1,4 @@
+[
+  {"name": "manter-3-ultimas", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 3}},
+  {"name": "apagar-o-resto", "action": {"type": "Delete"}, "condition": {"olderThan": "86400s"}}
+]

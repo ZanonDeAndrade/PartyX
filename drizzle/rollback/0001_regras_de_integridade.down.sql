@@ -1,0 +1,21 @@
+-- Reverte 0001_regras_de_integridade.
+DROP TRIGGER IF EXISTS "audit_log_no_delete" ON "audit_log";
+DROP TRIGGER IF EXISTS "audit_log_no_update" ON "audit_log";
+DROP FUNCTION IF EXISTS "audit_log_append_only"();
+DROP TRIGGER IF EXISTS "promoters_forbid_delete" ON "promoters";
+DROP TRIGGER IF EXISTS "users_forbid_delete" ON "users";
+DROP TRIGGER IF EXISTS "ticket_types_forbid_delete" ON "ticket_types";
+DROP TRIGGER IF EXISTS "events_forbid_delete" ON "events";
+DROP TRIGGER IF EXISTS "payment_events_forbid_delete" ON "payment_events";
+DROP TRIGGER IF EXISTS "checkins_forbid_delete" ON "checkins";
+DROP TRIGGER IF EXISTS "tickets_forbid_delete" ON "tickets";
+DROP TRIGGER IF EXISTS "order_items_forbid_delete" ON "order_items";
+DROP TRIGGER IF EXISTS "orders_forbid_delete" ON "orders";
+DROP FUNCTION IF EXISTS "forbid_delete"();
+DROP TRIGGER IF EXISTS "orders_paid_at_immutable" ON "orders";
+DROP FUNCTION IF EXISTS "orders_paid_at_immutable"();
+DROP TRIGGER IF EXISTS "orders_set_updated_at" ON "orders";
+DROP TRIGGER IF EXISTS "ticket_types_set_updated_at" ON "ticket_types";
+DROP TRIGGER IF EXISTS "events_set_updated_at" ON "events";
+DROP TRIGGER IF EXISTS "users_set_updated_at" ON "users";
+DROP FUNCTION IF EXISTS "set_updated_at"();

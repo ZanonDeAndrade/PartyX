@@ -1,0 +1,228 @@
+Desenvolvimento de Sites & Software 1	Página
+A R T H U R Z A N O N
+D e s e n v o l v i m e n t o d e S i t e s & S o f t w a r e
+ORÇAMENTO COMERCIAL
+Cliente: PartyX
+Prestador de serviços: Zanon de Andrade Softwares
+CNPJ: 57.971.378/0001-50
+Projeto: Desenvolvimento de plataforma de venda de ingressos
+Data: 30/09/2026
+Validade da proposta: 05/10/2026
+01 APRESENTAÇÃO
+Esta proposta apresenta as condições para o desenvolvimento de uma plataforma web de venda de
+ingressos para a PartyX, permitindo que o público encontre os eventos, adquira seus ingressos de forma
+online e receba um ingresso digital com QR Code para acesso ao evento.
+A solução contemplará toda a jornada do cliente, desde o cadastro e a escolha do evento até o
+pagamento e o download do ingresso, além de ferramentas para que a equipe da PartyX gerencie seus
+eventos, acompanhe as vendas e valide os ingressos na entrada de forma rápida e segura.
+A plataforma será construída com foco em uma utilização simples, intuitiva e otimizada para celulares,
+reforçando a identidade visual da PartyX e proporcionando autonomia na gestão das vendas, sem
+depender de plataformas de terceiros para a comercialização dos ingressos.
+02 OBJETIVOS DO PROJETO
+• Disponibilizar um canal próprio de venda de ingressos online para os eventos da PartyX;
+• Permitir que o público crie sua conta, escolha o evento e o tipo de ingresso e finalize a compra com
+praticidade;
+• Automatizar a emissão de ingressos digitais com QR Code exclusivo para cada ingresso vendido;
+• Agilizar e dar segurança ao controle de acesso na entrada, com validação instantânea dos ingressos;
+• Reduzir fraudes, duplicidades e a reutilização de ingressos;
+• Centralizar a gestão de eventos, vendas e entradas em um único painel administrativo;
+• Disponibilizar uma experiência responsiva e de fácil utilização em computador, tablet e celular.
+
+-- 1 of 6 --
+
+ARTHUR ZANON · ORÇAMENTO COMERCIAL
+Desenvolvimento de Sites & Software 2	Página
+03 VISÃO GERAL DA SOLUÇÃO
+A plataforma será composta por três frentes integradas: o site de venda de ingressos, utilizado pelos
+clientes; o módulo de validação de ingressos, utilizado pelos funcionários na entrada dos eventos; e o
+painel administrativo, utilizado pela equipe da PartyX para gerenciar eventos, ingressos, vendas e
+usuários.
+O sistema contará com acesso autenticado e diferentes níveis de permissão, garantindo que cada
+usuário visualize e execute apenas as funções correspondentes ao seu perfil.
+Os pagamentos serão processados por meio de uma plataforma de pagamento (intermediadora)
+integrada ao sistema, com confirmação automática da compra e emissão imediata dos ingressos após a
+aprovação.
+A estrutura será desenvolvida de forma modular, permitindo futuras melhorias, novas integrações e
+expansão de funcionalidades mediante análise técnica, sem comprometer o funcionamento das
+funcionalidades previstas nesta proposta.
+04 ESCOPO FUNCIONAL
+4.1 Cadastro e acesso dos clientes
+• Criação de conta com nome, e-mail, CPF, telefone e senha;
+• Login com e-mail e senha para clientes já cadastrados;
+• Recuperação de senha por e-mail;
+• Área do cliente com edição dos dados cadastrais;
+• Seção “Meus ingressos”, com o histórico de compras e os ingressos adquiridos;
+• Aceite dos termos de uso e da política de privacidade no momento do cadastro.
+4.2 Vitrine de eventos
+• Página inicial com eventos em destaque e próximos eventos;
+• Listagem dos eventos com ingressos disponíveis para venda;
+• Busca de eventos por nome ou data;
+• Página individual de cada evento, com banner, nome, data, horário, local, descrição, atrações e
+classificação etária;
+• Exibição dos tipos de ingresso disponíveis, como Pista, VIP e Camarote, com os respectivos valores;
+• Indicação de ingressos esgotados ou com vendas encerradas;
+• Compartilhamento do evento em redes sociais e WhatsApp.
+4.3 Compra de ingressos
+• Seleção do tipo de ingresso (Pista, VIP, Camarote ou outros cadastrados) e da quantidade desejada;
+• Limite de ingressos por compra, conforme definido pela PartyX;
+• Resumo do pedido com tipos, quantidades e valor total antes do pagamento;
+• Reserva temporária dos ingressos durante a finalização da compra, evitando vendas acima da
+capacidade;
+• Pagamento online via Pix e cartão de crédito, por meio da plataforma de pagamento integrada;
+• Confirmação automática do pagamento e liberação imediata dos ingressos;
+• Envio de e-mail de confirmação da compra com acesso aos ingressos.
+
+-- 2 of 6 --
+
+ARTHUR ZANON · ORÇAMENTO COMERCIAL
+Desenvolvimento de Sites & Software 3	Página
+4.4 Ingresso digital com QR Code
+• Emissão de um ingresso individual para cada unidade adquirida;
+• QR Code único e exclusivo por ingresso, gerado de forma segura;
+• Ingresso contendo nome do evento, data, horário, local, tipo de ingresso, nome do comprador e código
+de identificação;
+• Download do ingresso em PDF;
+• Acesso aos ingressos a qualquer momento pela área “Meus ingressos”;
+• Apresentação do ingresso diretamente pelo celular, sem necessidade de impressão.
+4.5 Validação de ingressos na entrada
+• Acesso exclusivo para funcionários com perfil de validação;
+• Leitura do QR Code pela câmera do celular ou tablet, diretamente pelo navegador;
+• Verificação instantânea da validade do ingresso;
+• Sinalização visual clara do resultado: ingresso válido, ingresso já utilizado ou ingresso
+inválido/cancelado;
+• Exibição do tipo de ingresso (Pista, VIP ou Camarote) para orientar o direcionamento do público;
+• Bloqueio automático do ingresso após a primeira validação, impedindo a reutilização;
+• Registro do horário de entrada e do funcionário responsável pela validação;
+• Busca manual do ingresso pelo código ou pelos dados do comprador, em caso de dificuldade na
+leitura;
+• Contador de entradas realizadas por evento.
+4.6 Gestão de eventos e ingressos
+• Cadastro, edição, publicação e encerramento de eventos;
+• Definição de nome, data, horário, local, descrição, atrações, banner e classificação etária;
+• Cadastro dos tipos de ingresso de cada evento, com valor e quantidade disponível;
+• Definição do período de vendas de cada tipo de ingresso;
+• Controle automático da quantidade disponível, com encerramento das vendas ao atingir a capacidade;
+• Ativação e desativação de tipos de ingresso a qualquer momento.
+4.7 Painel administrativo
+• Visão geral das vendas e dos eventos em andamento;
+• Consulta dos pedidos realizados e da situação de cada pagamento;
+• Lista de compradores e ingressos emitidos por evento;
+• Relatório de vendas por evento e por tipo de ingresso;
+• Acompanhamento das entradas em tempo real durante o evento;
+• Cancelamento de ingressos, quando necessário;
+• Exportação de listas e relatórios em planilha.
+4.8 Usuários e permissões
+• Login individual e acesso protegido ao sistema;
+• Perfis de acesso para administrador, validador (entrada) e cliente;
+• Cadastro, edição, ativação e desativação dos usuários da equipe;
+• Controle de permissões conforme a função de cada usuário.
+4.9 Segurança e proteção de dados
+• Conexão segura (HTTPS) em todas as páginas da plataforma;
+• Senhas armazenadas de forma criptografada;
+
+-- 3 of 6 --
+
+ARTHUR ZANON · ORÇAMENTO COMERCIAL
+Desenvolvimento de Sites & Software 4	Página
+• Dados de cartão processados exclusivamente pela plataforma de pagamento, sem armazenamento no
+sistema;
+• Códigos dos ingressos gerados de forma aleatória e protegidos contra falsificação;
+• Estrutura técnica preparada para o tratamento de dados pessoais em conformidade com a LGPD (Lei
+nº 13.709/2018), em conjunto com as políticas definidas pela PartyX.
+4.10 Integração do fluxo de venda e acesso
+Quando o cliente finaliza uma compra e o pagamento é aprovado, o sistema emite automaticamente os
+ingressos, cada um com seu QR Code exclusivo, e os disponibiliza na área do cliente e por e-mail.
+Simultaneamente, a venda é registrada no painel administrativo, atualizando a quantidade de ingressos
+disponíveis e os relatórios da PartyX.
+No dia do evento, os funcionários realizam a leitura do QR Code na entrada. O sistema confere a validade
+do ingresso em tempo real e, após a validação, marca o ingresso como utilizado, impedindo uma nova
+entrada com o mesmo código. As entradas registradas ficam disponíveis para acompanhamento imediato
+no painel administrativo.
+Dessa forma, venda, emissão e controle de acesso funcionam de maneira integrada, reduzindo controles
+paralelos, filas na entrada e riscos de fraude.
+05 ENTREGÁVEIS
+• Site responsivo de venda de ingressos com a identidade visual da PartyX;
+• Área do cliente com cadastro, login e acesso aos ingressos adquiridos;
+• Fluxo de compra com integração à plataforma de pagamento (Pix e cartão de crédito);
+• Emissão automática de ingressos digitais com QR Code, disponíveis para download em PDF;
+• Módulo de validação de ingressos para utilização pelos funcionários na entrada dos eventos;
+• Painel administrativo para gestão de eventos, tipos de ingresso, vendas, compradores, entradas e
+usuários;
+• Configuração inicial dos perfis de acesso e permissões;
+• Publicação da versão final da plataforma em ambiente de produção;
+• Testes funcionais das principais rotinas previstas no escopo, incluindo compra, emissão e validação de
+ingressos;
+• Orientação remota básica para utilização das funcionalidades entregues;
+• Suporte recorrente, correções e manutenção conforme as condições previstas na mensalidade
+contratada.
+06 RESPONSABILIDADES DA PARTYX
+Para o desenvolvimento e a implantação do projeto, a contratante deverá fornecer:
+• Logotipo, cores e materiais da identidade visual da PartyX;
+• Dados cadastrais e informações de contato da empresa;
+• Informações de cada evento, como nome, data, horário, local, descrição, atrações, classificação etária
+e banners de divulgação;
+• Tipos de ingresso, valores, quantidades disponíveis e regras de venda de cada evento;
+• Abertura e manutenção de conta própria, em nome da PartyX, na plataforma de pagamento escolhida,
+bem como os acessos necessários para a integração;
+• Termos de uso, política de privacidade e política de cancelamento, troca e reembolso de ingressos;
+• Registro ou acesso ao domínio a ser utilizado pela plataforma, quando aplicável;
+
+-- 4 of 6 --
+
+ARTHUR ZANON · ORÇAMENTO COMERCIAL
+Desenvolvimento de Sites & Software 5	Página
+• Celulares ou tablets com câmera e conexão estável com a internet no local dos eventos, para a
+validação dos ingressos;
+• Informações e exemplos de eventos para testes e homologação;
+• Retornos, validações e aprovações dentro dos prazos previamente combinados, evitando impactos no
+cronograma de desenvolvimento.
+A PartyX será a única responsável pela organização e realização dos eventos, pela definição de preços e
+regras de venda, pelos valores recebidos e pelo atendimento aos compradores, incluindo cancelamentos,
+reembolsos, adiamentos e alterações de eventos. A Zanon de Andrade Softwares atua exclusivamente
+como fornecedora da tecnologia, não participando da intermediação financeira das vendas.
+07 PRAZO ESTIMADO
+Prazo estimado: até 60 dias após a assinatura do contrato e o recebimento de todos os materiais,
+informações e acessos necessários para o desenvolvimento do projeto, incluindo a conta ativa na
+plataforma de pagamento.
+O prazo poderá ser revisto caso ocorram atrasos no envio de informações, demora nas validações e
+aprovações, indisponibilidade de serviços externos, necessidade de integrações adicionais ou solicitações
+que alterem o escopo originalmente aprovado.
+08 INVESTIMENTO
+Item Periodicidade Valor
+Mensalidade — hospedagem, manutenção,
+suporte e operação técnica Mensal R$ 150,00
+Taxa de serviço por ingresso vendido Por ingresso R$ 1,00
+Considera-se ingresso vendido cada ingresso emitido com pagamento aprovado. As taxas cobradas pela plataforma de
+pagamento sobre cada transação (Pix, cartão de crédito e parcelamentos) não estão incluídas nos valores acima e
+seguem as condições do provedor contratado pela PartyX.
+09 FORMA DE PAGAMENTO
+• R$ 150,00 mensais a partir da disponibilização da plataforma em produção, por boleto bancário com
+vencimento no dia 05 de cada mês;
+• R$ 1,00 por ingresso vendido, apurado com base nas vendas do mês anterior e cobrado no mesmo
+boleto da mensalidade;
+• O relatório de ingressos vendidos ficará disponível no painel administrativo para conferência da PartyX.
+10 MENSALIDADE E SUPORTE
+A mensalidade contempla a hospedagem e manutenção da plataforma em ambiente compatível com a
+operação contratada, incluindo monitoramento técnico, backups periódicos, manutenção corretiva,
+atualizações de segurança e suporte para dúvidas relacionadas ao funcionamento da plataforma.
+Também estão incluídos ajustes técnicos necessários para manter o sistema disponível e operacional,
+bem como correções de eventuais falhas identificadas nas funcionalidades previstas no escopo
+contratado.
+
+-- 5 of 6 --
+
+ARTHUR ZANON · ORÇAMENTO COMERCIAL
+Desenvolvimento de Sites & Software 6	Página
+Eventos com previsão de volume de acessos significativamente superior ao habitual deverão ser
+comunicados com antecedência, para que a infraestrutura seja dimensionada adequadamente. Eventuais
+custos adicionais de infraestrutura serão apresentados previamente para aprovação.
+Novas funcionalidades, integrações, alterações estruturais ou solicitações que representem ampliação do
+escopo original poderão ser avaliadas separadamente e, quando necessário, apresentadas mediante
+orçamento adicional.
+ARTHUR ZANON
+Zanon de Andrade Softwares · CNPJ 57.971.378/0001-50
+Desenvolvimento de Sites & Software
+WhatsApp: (55) 9 9906-1027 · E-mail: zanondea@gmail.com · Instagram: @arthurzanon.dev
+
+-- 6 of 6 --
+

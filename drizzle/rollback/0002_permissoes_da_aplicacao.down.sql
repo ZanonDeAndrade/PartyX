@@ -1,0 +1,12 @@
+-- Reverte 0002_permissoes_da_aplicacao.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'partyx_app') THEN
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE USAGE, SELECT ON SEQUENCES FROM partyx_app;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT, INSERT, UPDATE ON TABLES FROM partyx_app;
+    REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM partyx_app;
+    REVOKE ALL ON ALL TABLES IN SCHEMA public FROM partyx_app;
+    REVOKE USAGE ON SCHEMA public FROM partyx_app;
+  END IF;
+END
+$$;

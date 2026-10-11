@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>PartyX · Fundamentos e componentes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+body{margin:0;background:#F7F7FA;color:#0B0B10;font-family:'Archivo',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#7C3AED}a:hover{color:#5B21B6}
+@keyframes pxpulse{0%,100%{opacity:1}50%{opacity:.45}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div style="min-height:100vh">
+  <header style="background:#0B0B10;color:#fff;padding:40px clamp(20px,5vw,64px) 48px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-weight:900;font-stretch:118%;font-size:28px;letter-spacing:-0.03em">Party<span style="color:#8B5CF6">X</span></div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;border:1px solid #2C2C3A;color:#A6A6BA;padding:4px 8px;border-radius:6px">wordmark provisório</span>
+    </div>
+    <h1 style="font-size:clamp(34px,5vw,56px);line-height:1.02;font-weight:850;font-stretch:112%;letter-spacing:-0.03em;margin:28px 0 12px;max-width:900px;text-wrap:pretty">Fundamentos e componentes</h1>
+    <p style="color:#A6A6BA;font-size:18px;line-height:1.5;max-width:720px;margin:0">Biblioteca única para site público, checkout, área do cliente, administração e portaria. As áreas mudam de superfície, não de tema.</p>
+    <nav style="display:flex;flex-wrap:wrap;gap:8px;margin-top:28px">
+      <a href="#cores" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Cores</a>
+      <a href="#tipografia" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Tipografia</a>
+      <a href="#espacos" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Espaço, grid e raios</a>
+      <a href="#botoes" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Botões</a>
+      <a href="#campos" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Campos</a>
+      <a href="#cards" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Cards</a>
+      <a href="#dados" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Tabelas e status</a>
+      <a href="#nav" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Navegação</a>
+      <a href="#feedback" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Feedback</a>
+      <a href="#especificos" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Pix, reserva e QR</a>
+      <a href="#portaria" style="color:#fff;text-decoration:none;border:1px solid #2C2C3A;padding:8px 12px;border-radius:8px;font-size:14px">Resultados da portaria</a>
+      <a href="PartyX Protótipo.dc.html" style="color:#fff;text-decoration:none;background:#7C3AED;padding:8px 12px;border-radius:8px;font-size:14px;font-weight:600">Abrir protótipo</a>
+      <a href="PartyX Documentação.dc.html" style="color:#fff;text-decoration:none;border:1px solid #8B5CF6;padding:8px 12px;border-radius:8px;font-size:14px">Documentação</a>
+    </nav>
+  </header>
+
+  <main style="padding:0 clamp(20px,5vw,64px) 96px;max-width:1440px;margin:0 auto">
+
+    <section id="cores" style="padding-top:56px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 6px">Cores</h2>
+      <p style="color:#5B5B6E;margin:0 0 24px;max-width:720px;line-height:1.5">Preto, branco e roxo formam a marca. Verde, amarelo e vermelho são exclusivamente semânticos e nunca aparecem como decoração.</p>
+      <h3 style="font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:#5B5B6E;margin:0 0 12px">Marca e superfícies</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+        <sc-for list="{{ brandColors }}" as="c" hint-placeholder-count="10">
+          <div style="background:#fff;border:1px solid #E4E4EC;border-radius:12px;overflow:hidden">
+            <div style="height:84px;background:{{ c.hex }};border-bottom:1px solid #E4E4EC"></div>
+            <div style="padding:12px">
+              <div style="font-weight:700;font-size:14px">{{ c.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5B5B6E;margin-top:2px">{{ c.token }} · {{ c.hex }}</div>
+              <div style="font-size:12px;color:#5B5B6E;margin-top:6px;line-height:1.4">{{ c.use }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <h3 style="font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:#5B5B6E;margin:32px 0 12px">Semânticas</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px">
+        <sc-for list="{{ semColors }}" as="c" hint-placeholder-count="9">
+          <div style="background:#fff;border:1px solid #E4E4EC;border-radius:12px;overflow:hidden">
+            <div style="height:64px;background:{{ c.hex }};color:{{ c.on }};display:flex;align-items:flex-end;padding:10px 12px;font-weight:700;font-size:14px">{{ c.sample }}</div>
+            <div style="padding:12px">
+              <div style="font-weight:700;font-size:14px">{{ c.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5B5B6E;margin-top:2px">{{ c.token }} · {{ c.hex }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:24px">
+        <div style="background:#0B0B10;color:#fff;border-radius:12px;padding:20px">
+          <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#A6A6BA">Site público</div>
+          <div style="font-weight:700;margin-top:8px">Base #0B0B10, cartões #15151E, texto branco, ação roxa.</div>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:12px;padding:20px">
+          <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#5B5B6E">Checkout e área do cliente</div>
+          <div style="font-weight:700;margin-top:8px">Branco sobre #F7F7FA, cabeçalho preto, roxo apenas em ações.</div>
+        </div>
+        <div style="background:#F7F7FA;border:1px solid #E4E4EC;border-radius:12px;padding:20px;display:flex;gap:12px">
+          <div style="width:28px;border-radius:6px;background:#0B0B10;flex:none"></div>
+          <div>
+            <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#5B5B6E">Administração</div>
+            <div style="font-weight:700;margin-top:8px">Fundo claro, sidebar preta, destaque #EDE9FE.</div>
+          </div>
+        </div>
+        <div style="background:#000;color:#fff;border-radius:12px;padding:20px">
+          <div style="font-size:12px;font-family:'IBM Plex Mono',monospace;color:#A6A6BA">Portaria</div>
+          <div style="font-weight:700;margin-top:8px">Preto puro, texto grande, resultados em tela cheia verde, amarelo ou vermelho.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tipografia" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 6px">Tipografia</h2>
+      <p style="color:#5B5B6E;margin:0 0 24px;max-width:720px;line-height:1.5">Archivo (variável em peso e largura) para toda a interface; títulos usam largura expandida. IBM Plex Mono para códigos de pedido, ingresso e Pix. Tamanho mínimo de leitura: 14 px; 12 px só para metadados.</p>
+      <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px">
+        <sc-for list="{{ typeScale }}" as="t" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:minmax(120px,200px) minmax(0,1fr);gap:16px;padding:18px 20px;border-bottom:1px solid #EEEEF3;align-items:baseline">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5B5B6E;line-height:1.5">{{ t.name }}<br>{{ t.spec }}</div>
+            <div style="font-size:{{ t.size }};font-weight:{{ t.weight }};font-stretch:{{ t.stretch }};letter-spacing:{{ t.ls }};line-height:1.15;font-family:{{ t.family }};overflow-wrap:anywhere">{{ t.sample }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section id="espacos" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 24px">Espaço, grid, raios e sombras</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:20px">
+          <div style="font-weight:700;margin-bottom:12px">Espaçamento (base 4)</div>
+          <sc-for list="{{ spaces }}" as="s" hint-placeholder-count="8">
+            <div style="display:flex;align-items:center;gap:12px;margin:6px 0">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;width:64px;color:#5B5B6E">{{ s.token }}</span>
+              <span style="height:12px;width:{{ s.px }};background:#8B5CF6;border-radius:2px"></span>
+              <span style="font-size:12px;color:#5B5B6E">{{ s.px }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:20px">
+          <div style="font-weight:700;margin-bottom:12px">Grid e larguras</div>
+          <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.45">
+            <div><b>390 px</b> · 4 colunas, margem 16, gutter 12. Referência do comprador e da portaria.</div>
+            <div><b>360 px</b> · mesmo grid, sem rolagem horizontal; tabelas viram cards.</div>
+            <div><b>768 px</b> · 8 colunas, margem 24, gutter 16. Admin com menu em gaveta.</div>
+            <div><b>1440 px</b> · 12 colunas, conteúdo máx. 1200, gutter 24. Admin com sidebar fixa de 248.</div>
+            <div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:6px">
+              <sc-for list="{{ twelve }}" as="g" hint-placeholder-count="12"><div style="height:40px;background:#EDE9FE;border-radius:3px"></div></sc-for>
+            </div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:20px">
+          <div style="font-weight:700;margin-bottom:12px">Raios e elevação</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">
+            <div style="border:1px solid #E4E4EC;border-radius:6px;padding:14px;font-size:12px"><b>r-sm 6</b><br>badges, chips</div>
+            <div style="border:1px solid #E4E4EC;border-radius:10px;padding:14px;font-size:12px"><b>r-md 10</b><br>botões, campos</div>
+            <div style="border:1px solid #E4E4EC;border-radius:16px;padding:14px;font-size:12px"><b>r-lg 16</b><br>cards, modais</div>
+            <div style="border:1px solid #E4E4EC;border-radius:999px;padding:14px;font-size:12px;text-align:center"><b>pill</b></div>
+            <div style="border-radius:16px;padding:14px;font-size:12px;box-shadow:0 1px 2px rgba(11,11,16,.06),0 1px 1px rgba(11,11,16,.04)"><b>sombra-1</b><br>cards claros</div>
+            <div style="border-radius:16px;padding:14px;font-size:12px;box-shadow:0 12px 32px rgba(11,11,16,.18)"><b>sombra-2</b><br>modais, drawers</div>
+          </div>
+          <div style="font-size:12px;color:#5B5B6E;margin-top:12px;line-height:1.5">Foco: anel 2 px #8B5CF6 com afastamento 2 px, visível em fundo claro e escuro. Movimento: 120–200 ms, desativado com redução de movimento.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="botoes" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 6px">Botões</h2>
+      <p style="color:#5B5B6E;margin:0 0 24px;line-height:1.5">Altura 48 no mobile e em ações de compra, 40 em tabelas do admin. Alvo de toque mínimo 44 × 44.</p>
+      <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;overflow-x:auto">
+        <div style="display:grid;grid-template-columns:140px repeat(6,minmax(128px,1fr));min-width:960px">
+          <div style="padding:14px;font-size:12px;color:#5B5B6E;border-bottom:1px solid #EEEEF3"></div>
+          <sc-for list="{{ btnStates }}" as="s" hint-placeholder-count="6"><div style="padding:14px;font-size:12px;color:#5B5B6E;border-bottom:1px solid #EEEEF3;font-family:'IBM Plex Mono',monospace">{{ s }}</div></sc-for>
+          <sc-for list="{{ btnRows }}" as="r" hint-placeholder-count="4">
+            <div style="padding:14px;font-weight:700;font-size:14px;border-bottom:1px solid #EEEEF3;display:flex;align-items:center">{{ r.name }}</div>
+            <sc-for list="{{ r.cells }}" as="b" hint-placeholder-count="6">
+              <div style="padding:14px;border-bottom:1px solid #EEEEF3;display:flex;align-items:center">
+                <span style="display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 16px;border-radius:10px;font-weight:600;font-size:15px;background:{{ b.bg }};color:{{ b.fg }};border:{{ b.border }};box-shadow:{{ b.ring }};opacity:{{ b.op }};white-space:nowrap">
+                  <sc-if value="{{ b.loading }}" hint-placeholder-val="{{ false }}"><span style="width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;display:inline-block"></span></sc-if>{{ b.label }}</span>
+              </div>
+            </sc-for>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:16px;background:#0B0B10;border-radius:16px;padding:20px">
+        <span style="display:inline-flex;align-items:center;height:48px;padding:0 20px;border-radius:10px;background:#7C3AED;color:#fff;font-weight:600">Comprar ingressos</span>
+        <span style="display:inline-flex;align-items:center;height:48px;padding:0 20px;border-radius:10px;border:1px solid #3A3A4C;color:#fff;font-weight:600">Compartilhar</span>
+        <span style="display:inline-flex;align-items:center;height:48px;padding:0 12px;color:#C4B5FD;font-weight:600;text-decoration:underline;text-underline-offset:3px">Ver todos os eventos</span>
+        <span style="display:inline-flex;align-items:center;height:48px;padding:0 20px;border-radius:10px;background:#2A2A38;color:#8A8A9E;font-weight:600">Esgotado</span>
+      </div>
+    </section>
+
+    <section id="campos" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 6px">Campos</h2>
+      <p style="color:#5B5B6E;margin:0 0 24px;line-height:1.5;max-width:760px">Label sempre visível acima do campo, ajuda abaixo, erro junto ao campo com ícone e texto. Placeholder só exemplifica o formato.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:18px">
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:14px;font-weight:600">E-mail</span>
+            <input value="marina.costa@exemplo.com" style="height:48px;border:1px solid #D4D4DE;border-radius:10px;padding:0 14px;font:inherit;font-size:16px;color:#0B0B10">
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:14px;font-weight:600">Senha</span>
+            <span style="display:flex;align-items:center;border:2px solid #8B5CF6;border-radius:10px;height:48px;padding:0 4px 0 12px;box-shadow:0 0 0 3px #EDE9FE">
+              <input type="{{ pwType }}" value="festa2026" style="border:0;outline:0;flex:1;font:inherit;font-size:16px;min-width:0">
+              <button onClick="{{ togglePw }}" style="height:40px;border:0;background:transparent;color:#5B21B6;font:inherit;font-weight:600;font-size:14px;padding:0 10px;cursor:pointer">{{ pwLabel }}</button>
+            </span>
+            <span style="font-size:12px;color:#5B5B6E">Foco: borda roxa e halo suave.</span>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:14px;font-weight:600">CPF</span>
+            <input value="123.456.789-00" style="height:48px;border:2px solid #DC2626;border-radius:10px;padding:0 14px;font:inherit;font-size:16px">
+            <span style="font-size:13px;color:#B91C1C;display:flex;gap:6px;align-items:flex-start"><span style="font-weight:800">!</span>CPF inválido. Confira os números digitados.</span>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:14px;font-weight:600">Telefone com DDD</span>
+            <input placeholder="(55) 99999-9999" style="height:48px;border:1px solid #D4D4DE;border-radius:10px;padding:0 14px;font:inherit;font-size:16px">
+            <span style="font-size:12px;color:#5B5B6E">Máscara aplicada durante a digitação.</span>
+          </label>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:18px">
+          <label style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:14px;font-weight:600">Status</span>
+            <span style="display:flex;align-items:center;justify-content:space-between;height:48px;border:1px solid #D4D4DE;border-radius:10px;padding:0 14px;font-size:16px">Publicado <span style="color:#5B5B6E">▾</span></span>
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:14px;font-weight:600">Data</span>
+              <span style="display:flex;align-items:center;height:48px;border:1px solid #D4D4DE;border-radius:10px;padding:0 14px;font-size:16px">17/10/2026</span>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:14px;font-weight:600">Horário</span>
+              <span style="display:flex;align-items:center;height:48px;border:1px solid #D4D4DE;border-radius:10px;padding:0 14px;font-size:16px">23:00</span>
+            </label>
+          </div>
+          <label style="display:flex;gap:12px;align-items:flex-start;cursor:pointer">
+            <span onClick="{{ toggleAccept }}" style="width:24px;height:24px;flex:none;border-radius:6px;border:2px solid {{ acceptBorder }};background:{{ acceptBg }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;margin-top:1px">{{ acceptMark }}</span>
+            <span style="font-size:14px;line-height:1.45">Li e aceito os <a href="#">Termos de Uso</a> e a <a href="#">Política de Privacidade</a>.</span>
+          </label>
+          <div style="font-size:12px;color:#5B5B6E;margin-top:-10px">Começa desmarcado. Clique para testar.</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:14px;font-weight:600">Quantidade · Pista 2º lote</span>
+            <div style="display:flex;align-items:center;gap:0;border:1px solid #D4D4DE;border-radius:10px;width:max-content">
+              <button onClick="{{ dec }}" aria-label="Diminuir" style="width:48px;height:48px;border:0;background:transparent;font-size:22px;cursor:pointer;color:{{ decColor }}">−</button>
+              <span style="width:40px;text-align:center;font-weight:700;font-size:18px">{{ qty }}</span>
+              <button onClick="{{ inc }}" aria-label="Aumentar" style="width:48px;height:48px;border:0;background:transparent;font-size:22px;cursor:pointer;color:{{ incColor }}">+</button>
+            </div>
+            <span style="font-size:12px;color:#5B5B6E">{{ qtyHint }}</span>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px">
+          <span style="font-size:14px;font-weight:600">Banner do evento</span>
+          <div style="border:2px dashed #C9C9D6;border-radius:12px;padding:20px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center">
+            <span style="font-weight:700">Arraste a imagem ou selecione um arquivo</span>
+            <span style="font-size:12px;color:#5B5B6E">Proporção recomendada 16:9. Formatos e tamanho máximo conforme configuração do servidor.</span>
+            <span style="margin-top:6px;display:inline-flex;align-items:center;height:40px;padding:0 14px;border:1px solid #D4D4DE;border-radius:10px;font-weight:600;font-size:14px">Selecionar arquivo</span>
+          </div>
+          <div style="border:1px solid #E4E4EC;border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center">
+            <div style="width:64px;height:36px;border-radius:6px;background:repeating-linear-gradient(135deg,#EDE9FE 0 6px,#E4DCFD 6px 12px);flex:none"></div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:600">banner-noite-neon.jpg</div>
+              <div style="height:6px;background:#EEEEF3;border-radius:6px;margin-top:6px"><div style="height:6px;width:64%;background:#7C3AED;border-radius:6px"></div></div>
+              <div style="font-size:12px;color:#5B5B6E;margin-top:4px">Enviando 64%</div>
+            </div>
+          </div>
+          <div style="border:1px solid #FECACA;background:#FEF2F2;border-radius:12px;padding:12px;font-size:13px;color:#991B1B;line-height:1.45"><b>Não foi possível usar este arquivo.</b> Envie uma imagem JPG, PNG ou WebP dentro do tamanho permitido.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="cards" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 24px">Cards de evento, pedido e ingresso</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start">
+        <div style="background:#0B0B10;border-radius:20px;padding:16px">
+          <div style="background:#15151E;border-radius:16px;overflow:hidden;color:#fff">
+            <div style="aspect-ratio:16/9;background:repeating-linear-gradient(135deg,#1E1A2E 0 10px,#241E38 10px 20px);display:flex;align-items:flex-end;padding:10px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#A6A6BA">banner do evento 16:9</span></div>
+            <div style="padding:16px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:13px;color:#C4B5FD;font-weight:600">SÁB, 17 OUT · 23:00</div>
+              <div style="font-size:20px;font-weight:800;font-stretch:108%;letter-spacing:-0.01em">Noite Neon</div>
+              <div style="font-size:14px;color:#A6A6BA">Galpão Aurora · São Gabriel/RS</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+                <span style="font-size:14px"><span style="color:#A6A6BA">a partir de</span> <b>R$ 40,00</b></span>
+                <span style="height:40px;display:inline-flex;align-items:center;padding:0 14px;border-radius:10px;background:#7C3AED;font-weight:600;font-size:14px">Comprar</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5B5B6E">Pedido PX-10421</div>
+              <div style="font-weight:700;font-size:17px;margin-top:2px">Noite Neon</div>
+            </div>
+            <span style="font-size:12px;font-weight:700;padding:4px 8px;border-radius:6px;background:#DCFCE7;color:#14532D">Pago</span>
+          </div>
+          <div style="font-size:14px;color:#5B5B6E">05/10/2026 · 3 ingressos · Pix</div>
+          <div style="display:flex;justify-content:space-between;border-top:1px solid #EEEEF3;padding-top:10px;font-size:15px"><span>Total</span><b>R$ 310,00</b></div>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;overflow:hidden">
+          <div style="background:#0B0B10;color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:700">VIP</span>
+            <span style="font-size:12px;font-weight:700;padding:4px 8px;border-radius:6px;background:#DCFCE7;color:#14532D">Válido</span>
+          </div>
+          <div style="padding:16px;display:flex;gap:14px;align-items:center">
+            <div style="width:88px;height:88px;background:#fff;border:1px solid #E4E4EC;border-radius:8px;padding:4px;flex:none">
+              <svg viewBox="-2 -2 29 29" width="100%" height="100%" style="display:block"><rect x="-2" y="-2" width="29" height="29" fill="#fff"></rect><path d="{{ qrA }}" fill="#000"></path></svg>
+            </div>
+            <div style="min-width:0">
+              <div style="font-weight:700">Noite Neon</div>
+              <div style="font-size:13px;color:#5B5B6E;margin-top:2px">17/10/2026 · 23:00</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;margin-top:6px">PX-7K4M-2Q9D</div>
+              <div style="font-size:12px;color:#5B5B6E;margin-top:2px">Marina Costa</div>
+            </div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;overflow:hidden;opacity:1">
+          <div style="background:#EEEEF3;color:#3F3F50;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:700">Pista 2º lote</span>
+            <span style="font-size:12px;font-weight:700;padding:4px 8px;border-radius:6px;background:#FEE2E2;color:#991B1B">Cancelado</span>
+          </div>
+          <div style="padding:16px;display:flex;gap:14px;align-items:center">
+            <div style="width:88px;height:88px;border:1px dashed #C9C9D6;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;color:#5B5B6E;padding:6px">QR indisponível</div>
+            <div style="font-size:13px;color:#5B5B6E;line-height:1.45">Este ingresso foi cancelado pela PartyX e não permite entrada.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="dados" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 6px">Status, tabelas, filtros, abas e paginação</h2>
+      <p style="color:#5B5B6E;margin:0 0 24px;line-height:1.5;max-width:760px">Pedido, pagamento e ingresso têm vocabulários separados. Todo badge combina cor, texto e, quando crítico, ícone.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+        <sc-for list="{{ badgeGroups }}" as="g" hint-placeholder-count="4">
+          <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:16px">
+            <div style="font-weight:700;margin-bottom:10px">{{ g.name }}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <sc-for list="{{ g.items }}" as="b" hint-placeholder-count="5"><span style="font-size:12px;font-weight:700;padding:5px 9px;border-radius:6px;background:{{ b.bg }};color:{{ b.fg }}">{{ b.label }}</span></sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;margin-top:16px;overflow:hidden">
+        <div style="display:flex;gap:4px;padding:0 16px;border-bottom:1px solid #E4E4EC;overflow-x:auto">
+          <span style="padding:14px 10px;font-weight:700;font-size:14px;border-bottom:2px solid #7C3AED;color:#0B0B10;white-space:nowrap">Todos 12</span>
+          <span style="padding:14px 10px;font-weight:600;font-size:14px;color:#5B5B6E;white-space:nowrap">Rascunho 1</span>
+          <span style="padding:14px 10px;font-weight:600;font-size:14px;color:#5B5B6E;white-space:nowrap">Publicado 4</span>
+          <span style="padding:14px 10px;font-weight:600;font-size:14px;color:#5B5B6E;white-space:nowrap">Encerrado 7</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px;align-items:center">
+          <span style="flex:1 1 220px;display:flex;align-items:center;height:40px;border:1px solid #D4D4DE;border-radius:10px;padding:0 12px;color:#5B5B6E;font-size:14px">Buscar por nome ou número</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:999px;background:#EDE9FE;color:#5B21B6;font-size:13px;font-weight:600">Evento: Noite Neon ×</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:999px;background:#EDE9FE;color:#5B21B6;font-size:13px;font-weight:600">Status: Pago ×</span>
+          <span style="font-size:13px;font-weight:600;color:#5B21B6;text-decoration:underline">Limpar filtros</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;min-width:640px">
+            <thead><tr style="background:#F7F7FA;text-align:left;color:#5B5B6E;font-size:12px;text-transform:uppercase;letter-spacing:.04em">
+              <th style="padding:10px 16px;font-weight:600">Pedido</th><th style="padding:10px 16px;font-weight:600">Comprador</th><th style="padding:10px 16px;font-weight:600">Qtd.</th><th style="padding:10px 16px;font-weight:600;text-align:right">Valor</th><th style="padding:10px 16px;font-weight:600">Pagamento</th><th style="padding:10px 16px;font-weight:600">Emissão</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-top:1px solid #EEEEF3"><td style="padding:12px 16px;font-family:'IBM Plex Mono',monospace">PX-10421</td><td style="padding:12px 16px">Marina Costa</td><td style="padding:12px 16px">3</td><td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums">R$ 310,00</td><td style="padding:12px 16px"><span style="font-size:12px;font-weight:700;padding:4px 8px;border-radius:6px;background:#DCFCE7;color:#14532D">Aprovado</span></td><td style="padding:12px 16px"><span style="font-size:12px;font-weight:700;padding:4px 8px;border-radius:6px;background:#DCFCE7;color:#14532D">Emitidos 3/3</span></td></tr>
+              <tr style="border-top:1px solid #EEEEF3;background:#FAFAFC"><td style="padding:12px 16px;font-family:'IBM Plex Mono',monospace">PX-10433</td><td style="padding:12px 16px">Lucas Andrade</td><td style="padding:12px 16px">2</td><td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums">R$ 160,00</td><td style="padding:12px 16px"><span style="font-size:12px;font-weight:700;padding:4px 8px;border-radius:6px;background:#FEF3C7;color:#854D0E">Aguardando</span></td><td style="padding:12px 16px"><span style="font-size:12px;font-weight:700;padding:4px 8px;border-radius:6px;background:#EEEEF3;color:#3F3F50">Não emitido</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid #EEEEF3;flex-wrap:wrap;font-size:14px;color:#5B5B6E">
+          <span>1–10 de 124</span>
+          <div style="display:flex;gap:6px">
+            <span style="width:40px;height:40px;border:1px solid #D4D4DE;border-radius:10px;display:flex;align-items:center;justify-content:center">‹</span>
+            <span style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#0B0B10;color:#fff;font-weight:700">1</span>
+            <span style="width:40px;height:40px;border:1px solid #D4D4DE;border-radius:10px;display:flex;align-items:center;justify-content:center">2</span>
+            <span style="width:40px;height:40px;border:1px solid #D4D4DE;border-radius:10px;display:flex;align-items:center;justify-content:center">›</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:#5B5B6E;margin-top:10px">Abaixo de 768 px, cada linha vira um card com número, comprador, valor e badges; o detalhe abre ao tocar.</div>
+    </section>
+
+    <section id="nav" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 24px">Navegação</h2>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="background:#0B0B10;border-radius:16px;padding:0 20px;height:64px;display:flex;align-items:center;gap:20px;color:#fff;overflow:hidden">
+          <span style="font-weight:900;font-stretch:118%;font-size:22px;letter-spacing:-0.03em">Party<span style="color:#8B5CF6">X</span></span>
+          <span style="font-size:15px;font-weight:600">Eventos</span>
+          <span style="flex:1;max-width:360px;height:40px;border-radius:10px;background:#15151E;border:1px solid #2C2C3A;display:flex;align-items:center;padding:0 12px;color:#8A8A9E;font-size:14px">Buscar evento</span>
+          <span style="margin-left:auto;font-size:15px;font-weight:600">Meus ingressos</span>
+          <span style="width:36px;height:36px;border-radius:50%;background:#2A2A38;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px">MC</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+          <div style="background:#0B0B10;border-radius:16px;padding:16px;color:#fff;display:flex;flex-direction:column;gap:4px">
+            <span style="font-weight:900;font-stretch:118%;font-size:20px;letter-spacing:-0.03em;padding:4px 8px 14px">Party<span style="color:#8B5CF6">X</span> <span style="font-size:11px;font-weight:600;font-stretch:100%;letter-spacing:0;color:#A6A6BA">Admin</span></span>
+            <span style="padding:10px 12px;border-radius:8px;font-size:14px;color:#D4D4DE">Visão geral</span>
+            <span style="padding:10px 12px;border-radius:8px;font-size:14px;background:#7C3AED1F;color:#fff;font-weight:700;box-shadow:inset 3px 0 0 #8B5CF6">Eventos</span>
+            <span style="padding:10px 12px;border-radius:8px;font-size:14px;color:#D4D4DE">Pedidos</span>
+            <span style="padding:10px 12px;border-radius:8px;font-size:14px;color:#D4D4DE">Relatórios ▾</span>
+            <span style="padding:6px 12px 6px 24px;font-size:13px;color:#A6A6BA">Vendas · Promoters · Taxa mensal</span>
+          </div>
+          <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div style="font-weight:700">Área do cliente</div>
+            <div style="display:flex;gap:4px;border-bottom:1px solid #E4E4EC;overflow-x:auto">
+              <span style="padding:10px;font-size:14px;font-weight:700;border-bottom:2px solid #7C3AED;white-space:nowrap">Meus ingressos</span>
+              <span style="padding:10px;font-size:14px;color:#5B5B6E;white-space:nowrap">Minhas compras</span>
+              <span style="padding:10px;font-size:14px;color:#5B5B6E;white-space:nowrap">Minha conta</span>
+            </div>
+            <div style="font-size:13px;color:#5B5B6E;line-height:1.5">No celular, as mesmas três seções ficam em uma barra inferior fixa com ícone e texto; Sair fica em Minha conta.</div>
+          </div>
+          <div style="background:#000;border-radius:16px;padding:14px;color:#fff;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <div style="min-width:0"><div style="font-size:12px;color:#A6A6BA">Validando</div><div style="font-weight:800;font-size:17px">Noite Neon · 17/10</div></div>
+              <span style="height:44px;display:inline-flex;align-items:center;padding:0 12px;border:1px solid #3A3A4C;border-radius:10px;font-size:14px;font-weight:600">Trocar</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <span style="flex:1;height:48px;border-radius:10px;background:#7C3AED;display:flex;align-items:center;justify-content:center;font-weight:700">Câmera</span>
+              <span style="flex:1;height:48px;border-radius:10px;border:1px solid #3A3A4C;display:flex;align-items:center;justify-content:center;font-weight:700">Busca manual</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="feedback" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 24px">Feedback: alertas, toasts, modais, drawers, skeleton e vazio</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="border:1px solid #BBF7D0;background:#F0FDF4;color:#14532D;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.45"><b>Alterações salvas.</b> O evento foi atualizado.</div>
+          <div style="border:1px solid #FDE68A;background:#FFFBEB;color:#854D0E;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.45"><b>A disponibilidade mudou.</b> Restam 1 ingresso VIP. Ajuste a quantidade para continuar.</div>
+          <div style="border:1px solid #FECACA;background:#FEF2F2;color:#991B1B;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.45"><b>Código não encontrado.</b> Confira o código do promoter.</div>
+          <div style="border:1px solid #DDD6FE;background:#F5F3FF;color:#4C1D95;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.45"><b>Informação.</b> O código do promoter não altera o valor do pedido.</div>
+          <div style="background:#0B0B10;color:#fff;border-radius:12px;padding:12px 14px;font-size:14px;display:flex;justify-content:space-between;gap:12px;box-shadow:0 12px 32px rgba(11,11,16,.18)"><span>Link copiado</span><span style="color:#C4B5FD;font-weight:600">Fechar</span></div>
+        </div>
+        <div style="background:rgba(11,11,16,.55);border-radius:16px;padding:24px;display:flex;align-items:center;justify-content:center">
+          <div style="background:#fff;border-radius:16px;padding:20px;max-width:360px;box-shadow:0 12px 32px rgba(11,11,16,.18)">
+            <div style="font-weight:800;font-size:18px">Cancelar este ingresso?</div>
+            <p style="font-size:14px;color:#3F3F50;line-height:1.5;margin:8px 0 16px">O acesso de PX-7K4M-2Q9D será invalidado. Isso não faz estorno: o reembolso, se houver, é feito pela PartyX no gateway.</p>
+            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+              <span style="height:44px;display:inline-flex;align-items:center;padding:0 14px;border:1px solid #D4D4DE;border-radius:10px;font-weight:600;font-size:14px">Voltar</span>
+              <span style="height:44px;display:inline-flex;align-items:center;padding:0 14px;background:#DC2626;color:#fff;border-radius:10px;font-weight:600;font-size:14px">Cancelar ingresso</span>
+            </div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="font-weight:700">Skeleton</div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <div style="width:72px;height:48px;border-radius:8px;background:#EEEEF3;animation:pxpulse 1.4s ease-in-out infinite"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <div style="height:12px;width:70%;border-radius:6px;background:#EEEEF3;animation:pxpulse 1.4s ease-in-out infinite"></div>
+              <div style="height:12px;width:45%;border-radius:6px;background:#EEEEF3;animation:pxpulse 1.4s ease-in-out infinite"></div>
+            </div>
+          </div>
+          <div style="border-top:1px solid #EEEEF3;padding-top:16px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center">
+            <div style="width:48px;height:48px;border-radius:12px;background:#EDE9FE;display:flex;align-items:center;justify-content:center;color:#5B21B6;font-weight:800">0</div>
+            <div style="font-weight:700">Nenhum promoter cadastrado</div>
+            <div style="font-size:14px;color:#5B5B6E">Cadastre um promoter para rastrear vendas por código.</div>
+            <span style="margin-top:6px;height:40px;display:inline-flex;align-items:center;padding:0 14px;background:#7C3AED;color:#fff;border-radius:10px;font-weight:600;font-size:14px">Cadastrar promoter</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="especificos" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 6px">Pix, resumo, reserva e QR do ingresso</h2>
+      <p style="color:#5B5B6E;margin:0 0 24px;line-height:1.5;max-width:760px">O QR do Pix vive dentro de um bloco roxo com a palavra “Pagamento”. O QR do ingresso vive em um cartão branco com código e tipo. Os dois nunca aparecem juntos na mesma tela.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start">
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><b>Resumo do pedido</b><span style="font-size:12px;color:#5B5B6E">Noite Neon</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px"><span>2 × Pista 2º lote</span><span>R$ 160,00</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px"><span>1 × VIP</span><span>R$ 150,00</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:#5B5B6E"><span>Promoter</span><span>DUDA · sem alteração de valor</span></div>
+          <div style="display:flex;justify-content:space-between;border-top:1px solid #EEEEF3;padding-top:12px;font-size:18px"><b>Total</b><b>R$ 310,00</b></div>
+        </div>
+        <div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="color:#4C1D95">Reserva ativa</b><span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:20px;color:#4C1D95">09:41</span></div>
+          <div style="height:6px;background:#DDD6FE;border-radius:6px"><div style="height:6px;width:82%;background:#7C3AED;border-radius:6px"></div></div>
+          <div style="font-size:13px;color:#4C1D95;line-height:1.45">Seus ingressos ficam reservados até o fim do prazo. Depois disso, voltam para venda.</div>
+          <div style="border:1px solid #FDE68A;background:#FFFBEB;color:#854D0E;border-radius:10px;padding:10px 12px;font-size:13px">Com menos de 2 minutos o contador fica amarelo.</div>
+        </div>
+        <div style="background:#7C3AED;border-radius:16px;padding:16px;color:#fff;display:flex;flex-direction:column;gap:12px;align-items:center">
+          <div style="align-self:stretch;display:flex;justify-content:space-between;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase"><span>Pagamento Pix</span><span>R$ 310,00</span></div>
+          <div style="background:#fff;border-radius:12px;padding:10px;width:200px;height:200px;position:relative">
+            <svg viewBox="-2 -2 29 29" width="100%" height="100%" style="display:block"><rect x="-2" y="-2" width="29" height="29" fill="#fff"></rect><path d="{{ qrPix }}" fill="#0B0B10"></path></svg>
+            <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;padding:4px 6px;border-radius:4px;font-weight:900;font-size:13px;color:#5B21B6">Pix</span>
+          </div>
+          <div style="font-size:12px;opacity:.9">QR de pagamento. Não é o seu ingresso.</div>
+        </div>
+        <div style="background:#fff;border:1px solid #E4E4EC;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;align-items:center">
+          <div style="align-self:stretch;display:flex;justify-content:space-between;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase"><span>Ingresso · VIP</span><span style="color:#15803D">Válido</span></div>
+          <div style="background:#fff;padding:16px;border:1px solid #E4E4EC;border-radius:8px;width:216px;height:216px">
+            <svg viewBox="-2 -2 29 29" width="100%" height="100%" style="display:block"><rect x="-2" y="-2" width="29" height="29" fill="#fff"></rect><path d="{{ qrB }}" fill="#000"></path></svg>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600">PX-9TQ3-HW7E</div>
+          <div style="font-size:12px;color:#5B5B6E">QR demonstrativo · sem validade real</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="portaria" style="padding-top:64px">
+      <h2 style="font-size:28px;font-weight:800;font-stretch:110%;letter-spacing:-0.02em;margin:0 0 6px">Resultados da portaria</h2>
+      <p style="color:#5B5B6E;margin:0 0 24px;line-height:1.5;max-width:760px">Cor, ícone, palavra e som. Sem cor, a mensagem continua compreensível. Sem resposta do servidor, nunca verde nem vermelho.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+        <sc-for list="{{ results }}" as="r" hint-placeholder-count="5">
+          <div style="background:{{ r.bg }};color:{{ r.fg }};border-radius:16px;padding:20px;min-height:220px;display:flex;flex-direction:column;gap:10px">
+            <div style="width:56px;height:56px;border-radius:50%;border:3px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900">{{ r.icon }}</div>
+            <div style="font-size:24px;font-weight:850;font-stretch:108%;line-height:1.05">{{ r.title }}</div>
+            <div style="font-size:14px;line-height:1.4;font-weight:500">{{ r.sub }}</div>
+            <div style="margin-top:auto;font-family:'IBM Plex Mono',monospace;font-size:12px">{{ r.sound }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+function pxQR(seed, clearCenter) {
+  const n = 25; let h = 2166136261;
+  for (const c of String(seed)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  const rnd = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1000) / 1000; };
+  const m = [];
+  for (let y = 0; y < n; y++) { m[y] = []; for (let x = 0; x < n; x++) m[y][x] = rnd() < 0.5; }
+  const finder = (ox, oy) => { for (let y = -1; y < 8; y++) for (let x = -1; x < 8; x++) { const X = ox + x, Y = oy + y; if (X < 0 || Y < 0 || X >= n || Y >= n) continue; const inside = x >= 0 && y >= 0 && x < 7 && y < 7; const d = Math.max(Math.abs(x - 3), Math.abs(y - 3)); m[Y][X] = inside && (d === 3 || d <= 1); } };
+  finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+  for (let i = 8; i < n - 8; i++) { m[6][i] = i % 2 === 0; m[i][6] = i % 2 === 0; }
+  for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) { const d = Math.max(Math.abs(x), Math.abs(y)); m[18 + y][18 + x] = d !== 1; }
+  if (clearCenter) for (let y = 10; y < 15; y++) for (let x = 9; x < 16; x++) m[y][x] = false;
+  let d = ''; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (m[y][x]) d += `M${x} ${y}h1v1h-1z`;
+  return d;
+}
+class Component extends DCLogic {
+  state = { pw: false, accept: false, qty: 2 };
+  renderVals() {
+    const s = this.state, max = 6;
+    const btn = (bg, fg, border, label, extra = {}) => ({ bg, fg, border, label, ring: 'none', op: 1, loading: false, ...extra });
+    const row = (name, base, hover, press, label, fg, border, disBg, disFg) => ({ name, cells: [
+      btn(base, fg, border, label), btn(hover, fg, border, label), btn(base, fg, border, label, { ring: '0 0 0 2px #fff, 0 0 0 4px #8B5CF6' }),
+      btn(press, fg, border, label), btn(disBg, disFg, border === 'none' ? 'none' : '1px solid #E4E4EC', label), btn(base, fg, border, 'Aguarde', { loading: true })] });
+    return {
+      pwType: s.pw ? 'text' : 'password', pwLabel: s.pw ? 'Ocultar' : 'Mostrar', togglePw: () => this.setState({ pw: !s.pw }),
+      acceptBg: s.accept ? '#7C3AED' : '#fff', acceptBorder: s.accept ? '#7C3AED' : '#8A8A9E', acceptMark: s.accept ? '✓' : '', toggleAccept: () => this.setState({ accept: !s.accept }),
+      qty: s.qty, dec: () => this.setState({ qty: Math.max(0, s.qty - 1) }), inc: () => this.setState({ qty: Math.min(max, s.qty + 1) }),
+      decColor: s.qty === 0 ? '#C9C9D6' : '#0B0B10', incColor: s.qty >= max ? '#C9C9D6' : '#0B0B10',
+      qtyHint: s.qty >= max ? 'Limite de 6 ingressos por compra atingido (premissa).' : 'Até 6 ingressos por compra (premissa a confirmar).',
+      qrA: pxQR('PX-7K4M-2Q9D'), qrB: pxQR('PX-9TQ3-HW7E'), qrPix: pxQR('pix-demo-000201', true),
+      twelve: Array.from({ length: 12 }, (_, i) => i),
+      brandColors: [
+        { name: 'Preto principal', token: 'ink', hex: '#0B0B10', use: 'Fundo do site público, sidebar, texto principal em fundo claro.' },
+        { name: 'Superfície escura', token: 'surface', hex: '#15151E', use: 'Cards e campos no site público.' },
+        { name: 'Superfície elevada', token: 'surface-2', hex: '#1E1E2A', use: 'Hover e blocos sobre surface.' },
+        { name: 'Divisória escura', token: 'line-dark', hex: '#2C2C3A', use: 'Bordas no escuro.' },
+        { name: 'Branco', token: 'white', hex: '#FFFFFF', use: 'Texto no escuro, cards claros, fundo do QR.' },
+        { name: 'Fundo operacional', token: 'bg', hex: '#F7F7FA', use: 'Checkout, cliente e admin.' },
+        { name: 'Divisória clara', token: 'line', hex: '#E4E4EC', use: 'Bordas, tabelas.' },
+        { name: 'Texto secundário', token: 'text-2', hex: '#5B5B6E', use: 'Apoio em fundo claro (7,0:1).' },
+        { name: 'Texto secundário escuro', token: 'text-2-dark', hex: '#A6A6BA', use: 'Apoio em fundo escuro (8,4:1).' },
+        { name: 'Roxo principal', token: 'purple', hex: '#7C3AED', use: 'Ação primária, seleção. Branco sobre ele 5,7:1.' },
+        { name: 'Roxo hover', token: 'purple-700', hex: '#6D28D9', use: 'Hover e pressionado.' },
+        { name: 'Roxo de destaque', token: 'purple-accent', hex: '#8B5CF6', use: 'Foco, detalhes no escuro, wordmark.' },
+        { name: 'Roxo suave', token: 'purple-soft', hex: '#EDE9FE', use: 'Chips, item ativo no admin, reserva.' },
+        { name: 'Roxo texto', token: 'purple-ink', hex: '#5B21B6', use: 'Texto sobre roxo suave e links.' }
+      ],
+      semColors: [
+        { name: 'Sucesso', token: 'success', hex: '#15803D', on: '#fff', sample: 'Pago' },
+        { name: 'Sucesso suave', token: 'success-soft', hex: '#DCFCE7', on: '#14532D', sample: 'Válido' },
+        { name: 'Portaria verde', token: 'gate-green', hex: '#0E7A37', on: '#fff', sample: 'Entrada liberada' },
+        { name: 'Atenção', token: 'warning', hex: '#EAB308', on: '#0B0B10', sample: 'Aguardando' },
+        { name: 'Atenção suave', token: 'warning-soft', hex: '#FEF3C7', on: '#854D0E', sample: 'Pendente' },
+        { name: 'Portaria amarelo', token: 'gate-yellow', hex: '#FACC15', on: '#0B0B10', sample: 'Já utilizado' },
+        { name: 'Erro', token: 'danger', hex: '#DC2626', on: '#fff', sample: 'Cancelar' },
+        { name: 'Erro suave', token: 'danger-soft', hex: '#FEE2E2', on: '#991B1B', sample: 'Cancelado' },
+        { name: 'Portaria vermelho', token: 'gate-red', hex: '#B91C1C', on: '#fff', sample: 'Entrada recusada' }
+      ],
+      typeScale: [
+        { name: 'Display', spec: '56/1.02 · 850 · wdth 112', size: 'clamp(36px,5vw,56px)', weight: 850, stretch: '112%', ls: '-0.03em', family: "'Archivo'", sample: 'Noite Neon' },
+        { name: 'Título 1', spec: '40 · 800 · wdth 110', size: '40px', weight: 800, stretch: '110%', ls: '-0.02em', family: "'Archivo'", sample: 'Meus ingressos' },
+        { name: 'Título 2', spec: '28 · 800 · wdth 110', size: '28px', weight: 800, stretch: '110%', ls: '-0.02em', family: "'Archivo'", sample: 'Próximos eventos' },
+        { name: 'Título 3', spec: '20 · 700', size: '20px', weight: 700, stretch: '100%', ls: '-0.01em', family: "'Archivo'", sample: 'Resumo do pedido' },
+        { name: 'Corpo', spec: '16/1.5 · 400', size: '16px', weight: 400, stretch: '100%', ls: '0', family: "'Archivo'", sample: 'Seus ingressos serão disponibilizados após a confirmação do pagamento.' },
+        { name: 'Pequeno', spec: '14/1.45 · 400–600', size: '14px', weight: 500, stretch: '100%', ls: '0', family: "'Archivo'", sample: 'Sábado, 17/10/2026 · 23:00' },
+        { name: 'Metadado', spec: '12/1.35 · 600', size: '12px', weight: 600, stretch: '100%', ls: '0.02em', family: "'Archivo'", sample: 'VENDAS ENCERRADAS' },
+        { name: 'Código', spec: 'Plex Mono 15 · 500', size: '15px', weight: 500, stretch: '100%', ls: '0.02em', family: "'IBM Plex Mono'", sample: 'PX-7K4M-2Q9D · Pedido PX-10421' },
+        { name: 'Portaria', spec: '44 · 900 · wdth 115', size: '44px', weight: 900, stretch: '115%', ls: '-0.02em', family: "'Archivo'", sample: 'Entrada liberada' }
+      ],
+      spaces: [4, 8, 12, 16, 24, 32, 48, 64].map((p, i) => ({ token: 's-' + (i + 1), px: p + 'px' })),
+      btnStates: ['default', 'hover', 'foco', 'pressionado', 'desabilitado', 'carregando'],
+      btnRows: [
+        row('Primário', '#7C3AED', '#6D28D9', '#5B21B6', 'Comprar ingressos', '#fff', 'none', '#E4E4EC', '#8A8A9E'),
+        row('Secundário', '#fff', '#F5F3FF', '#EDE9FE', 'Baixar PDF', '#0B0B10', '1px solid #D4D4DE', '#fff', '#A6A6BA'),
+        row('Texto', 'transparent', '#F5F3FF', '#EDE9FE', 'Esqueci minha senha', '#5B21B6', 'none', 'transparent', '#A6A6BA'),
+        row('Destrutivo', '#DC2626', '#B91C1C', '#991B1B', 'Cancelar ingresso', '#fff', 'none', '#F3D5D5', '#9E6B6B')
+      ],
+      badgeGroups: [
+        { name: 'Pedido', items: [
+          { label: 'Aguardando pagamento', bg: '#FEF3C7', fg: '#854D0E' }, { label: 'Pago', bg: '#DCFCE7', fg: '#14532D' }, { label: 'Expirado', bg: '#EEEEF3', fg: '#3F3F50' },
+          { label: 'Não concluído', bg: '#FEE2E2', fg: '#991B1B' }, { label: 'Cancelado', bg: '#FEE2E2', fg: '#991B1B' }, { label: 'Estornado', bg: '#E0E7FF', fg: '#3730A3' }, { label: 'Contestado', bg: '#FFE4E6', fg: '#9F1239' }] },
+        { name: 'Pagamento', items: [
+          { label: 'Aguardando', bg: '#FEF3C7', fg: '#854D0E' }, { label: 'Processando', bg: '#EDE9FE', fg: '#5B21B6' }, { label: 'Aprovado', bg: '#DCFCE7', fg: '#14532D' }, { label: 'Recusado', bg: '#FEE2E2', fg: '#991B1B' }, { label: 'Expirado', bg: '#EEEEF3', fg: '#3F3F50' }, { label: 'Estornado', bg: '#E0E7FF', fg: '#3730A3' }, { label: 'Contestado', bg: '#FFE4E6', fg: '#9F1239' }] },
+        { name: 'Ingresso', items: [
+          { label: 'Em emissão', bg: '#EDE9FE', fg: '#5B21B6' }, { label: 'Válido', bg: '#DCFCE7', fg: '#14532D' }, { label: 'Utilizado', bg: '#EEEEF3', fg: '#3F3F50' }, { label: 'Cancelado', bg: '#FEE2E2', fg: '#991B1B' }] },
+        { name: 'Evento e tipo', items: [
+          { label: 'Rascunho', bg: '#EEEEF3', fg: '#3F3F50' }, { label: 'Publicado', bg: '#DCFCE7', fg: '#14532D' }, { label: 'Encerrado', bg: '#E4E4EC', fg: '#0B0B10' }, { label: 'À venda', bg: '#DCFCE7', fg: '#14532D' }, { label: 'Esgotado', bg: '#FEE2E2', fg: '#991B1B' }, { label: 'Em breve', bg: '#EDE9FE', fg: '#5B21B6' }, { label: 'Vendas encerradas', bg: '#EEEEF3', fg: '#3F3F50' }, { label: 'Inativo', bg: '#EEEEF3', fg: '#3F3F50' }] }
+      ],
+      results: [
+        { bg: '#0E7A37', fg: '#fff', icon: '✓', title: 'Entrada liberada', sub: 'VIP · Marina Costa · 23:41', sound: 'som: bipe curto agudo' },
+        { bg: '#FACC15', fg: '#0B0B10', icon: '!', title: 'Ingresso já utilizado', sub: 'Primeira entrada 23:12 por Joana Prado', sound: 'som: dois bipes graves' },
+        { bg: '#B91C1C', fg: '#fff', icon: '×', title: 'Ingresso cancelado', sub: 'Cancelado pela PartyX. Não liberar.', sound: 'som: bipe longo grave' },
+        { bg: '#B91C1C', fg: '#fff', icon: '×', title: 'Outro evento', sub: 'Este ingresso pertence a outro evento.', sound: 'som: bipe longo grave' },
+        { bg: '#2A2A38', fg: '#fff', icon: '?', title: 'Não foi possível confirmar', sub: 'Sem resposta do servidor. Não libere pela tela.', sound: 'som: nenhum' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

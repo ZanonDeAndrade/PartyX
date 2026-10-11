@@ -1,0 +1,98 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #d9d9e2;
+  color: #0b0b10;
+  font-family: 'Archivo', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+}
+
+/* Abertura em vídeo (public/intro/gate.js): o fundo já nasce preto, sem piscar claro antes do JavaScript carregar. */
+html[data-px-intro],
+html[data-px-intro] body {
+  background: #0b0b10;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: #7c3aed;
+}
+
+a:hover {
+  color: #5b21b6;
+}
+
+button {
+  font-family: inherit;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+}
+
+@keyframes pxpulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes pxspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pxscan {
+  0% {
+    top: 12%;
+  }
+  50% {
+    top: 84%;
+  }
+  100% {
+    top: 12%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Páginas de documentação */
+body[data-doc='documentation'] a {
+  color: #5b21b6;
+}
+
+body[data-doc='documentation'] a:hover {
+  color: #7c3aed;
+}
+
+#root:has(> [data-doc-root]) {
+  height: auto;
+}

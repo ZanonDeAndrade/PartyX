@@ -1,0 +1,4 @@
+[
+  {"name": "manter-5-ultimas", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 5}},
+  {"name": "apagar-antigas", "action": {"type": "Delete"}, "condition": {"olderThan": "604800s"}}
+]
