@@ -1,16 +1,15 @@
 # PostgreSQL descartável para testes de integração (não é o Neon).
-# Sobe em memória (tmpfs), na porta 55432. `npm run db:test:up` e `npm run db:test:down`.
-name: partyx-test
+# Sobe em memória (tmpfs), na porta 55432 por padrão.
+# Os scripts npm usam o projeto Compose partyx-test.
 services:
-  postgres:
+  postgres-test:
     image: postgres:16-alpine
-    container_name: partyx-test-postgres
     environment:
       POSTGRES_USER: partyx
       POSTGRES_PASSWORD: partyx_test_only
       POSTGRES_DB: postgres
     ports:
-      - '127.0.0.1:55432:5432'
+      - '127.0.0.1:${PARTYX_TEST_DB_PORT:-55432}:5432'
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:

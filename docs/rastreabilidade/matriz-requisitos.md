@@ -12,6 +12,19 @@ Gerada em 01/10/2026 a partir de `reference/docs/documentacao.txt` (versão 1.0,
 
 Totais: 68 requisitos (RF-01 a RF-68), 33 critérios de aceite (CA-01 a CA-33) e 5 critérios de pagamento (CA-P1 a CA-P5).
 
+## Verificação com PostgreSQL em 10/10/2026
+
+O [registro da execução](../registros/testes-postgresql-2026-10-10.md) comprova 744 testes aprovados, zero pulados e zero falhos com banco, contra 204 aprovados e 540 pulados antes (536 da suíte principal e 4 de papéis). As migrações 0000–0004 foram aplicadas, revertidas e reaplicadas; os gatilhos de `paid_at` e `audit_log` foram verificados. Três repetições consecutivas dos testes de concorrência e idempotência tiveram 205 aprovados cada, sem intermitência observada.
+
+| Requisitos e critérios revalidados | Evidência |
+|---|---|
+| RF-17, RF-33, CA-16, CA-17: estoque, reserva e expiração | `server/src/api/checkout.integration.test.ts`, `server/src/api/stock.integration.test.ts` |
+| RF-35, RF-38, CA-P3: webhook e emissão idempotente | `server/src/api/reconcile.integration.test.ts`, `server/src/api/tickets.integration.test.ts` |
+| RF-50, CA-25: primeira entrada atômica | `server/src/api/gate.integration.test.ts` |
+| RF-60, CA-29: taxa após cancelamento e estorno | `server/src/api/reports.integration.test.ts`, `server/src/api/reconcile.integration.test.ts` |
+
+Esta verificação é local com PostgreSQL e gateway fictício. Os critérios que dependem de sandbox do gateway real, aparelhos reais ou decisões da PartyX mantêm as pendências indicadas abaixo.
+
 ## Requisitos funcionais (RF-01 a RF-68)
 
 | ID | Requisito (texto da documentação) | Módulo | Anexo I | Implementar em | Testar em | Design (telas) | Situação do design | Implementação real | Evidência |

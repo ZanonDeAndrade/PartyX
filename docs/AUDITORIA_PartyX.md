@@ -235,6 +235,8 @@ Controles positivos verificados no código: Argon2id para senha (`server/src/pro
 
 A cópia temporária usada nos comandos acima fica em `/tmp/partyx-audit-Ueu9qslU` e não constitui entrega. Não foram rodados gateway sandbox, Chromium nesta rodada, teste físico, `check:migrations` isolado ou `npm audit` isolado. Portanto, não são “aprovados” por esta auditoria.
 
+**Verificação posterior, 10/10/2026:** os testes antes pulados por falta de PostgreSQL foram executados. A suíte principal aprovou 740/740 e a suíte de papéis 4/4; três repetições dos cenários de concorrência e idempotência aprovaram 205/205 cada. A reversão e reaplicação das migrações 0000–0004 também passou. Evidência e limite do ambiente local: [`registros/testes-postgresql-2026-10-10.md`](registros/testes-postgresql-2026-10-10.md).
+
 ## 9. Insumos e decisões pendentes do cliente
 
 Fonte: PDF §4.1–4.2 e `docs/registros/insumos-etapa-0.md:1`. “Sem registro” significa falta de comprovação nesta cópia, não afirma que o cliente não enviou. Os itens 1–14 condicionam a Etapa 0; 15–19 podem chegar durante o desenvolvimento, mas atraso pode afetar prazo. O quadro antigo diz “0 de 14 recebidos” (`docs/registros/insumos-etapa-0.md:35`), porém o próprio item 2 foi atualizado como recebido em 10/10; esse total está desatualizado.
