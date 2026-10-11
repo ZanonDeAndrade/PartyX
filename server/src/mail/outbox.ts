@@ -8,7 +8,15 @@ import { formatInEventZone, formatEventDateTime } from '../domain/time';
 import { logger } from '../logger';
 import type { Clock } from '../providers/clock';
 import type { EmailSender, EmailTemplate, OutgoingEmail } from '../providers/email';
-import { composeCadastro, composeCompra, composeRecuperacao, type Composed, type MailContext } from './templates';
+import {
+  composeCadastro,
+  composeCompra,
+  composePagamentoSemEstoque,
+  composeRecuperacao,
+  type Composed,
+  type MailContext,
+} from './templates';
+import { formatBRL } from '../domain/money';
 import { createPasswordResetLink } from '../auth/reset';
 import { writeAudit } from '../db/audit';
 import { enqueueEmailSafely, type TaskQueue } from '../payments/taskQueue';
@@ -89,7 +97,7 @@ async function compose(
 ): Promise<(Composed & { to: string; data: Record<string, string> }) | Skip> {
   if (!row.userId) return { skip: 'sem_usuario' };
   const [user] = await deps.db
-    .select({ name: users.name, email: users.email, isActive: users.isActive })
+    .select({ name: users.name, email: users.email, isActive: users.isActive, role: users.role })
     .from(users)
     .where(eq(users.id, row.userId))
     .limit(1);
@@ -105,6 +113,40 @@ async function compose(
     // Link novo a cada tentativa: nenhum token fica guardado, e o anterior deixa de valer.
     const link = await createPasswordResetLink(deps, row.userId);
     return { ...composeRecuperacao({ name, link }, ctx), to: user.email, data: { name, link } };
+  }
+
+  if (row.template === 'pagamento_sem_estoque') {
+    // Só para quem ainda é administrador, e só enquanto o pedido continua nessa exceção.
+    if (user.role !== 'administrador') return { skip: 'nao_e_administrador' };
+    if (!row.orderId) return { skip: 'sem_pedido' };
+    const [o] = await deps.db
+      .select({
+        number: orders.number,
+        status: orders.status,
+        totalCents: orders.totalCents,
+        paidAt: orders.paidAt,
+        gatewayPaymentId: orders.gatewayPaymentId,
+        eventName: events.name,
+        buyerName: users.name,
+        buyerEmail: users.email,
+      })
+      .from(orders)
+      .innerJoin(events, eq(events.id, orders.eventId))
+      .innerJoin(users, eq(users.id, orders.userId))
+      .where(eq(orders.id, row.orderId))
+      .limit(1);
+    if (!o || o.status !== 'pago_sem_estoque') return { skip: 'pedido_fora_da_excecao' };
+    const data = {
+      orderNumber: `PX-${o.number}`,
+      eventName: o.eventName,
+      buyerName: o.buyerName,
+      buyerEmail: o.buyerEmail,
+      amount: formatBRL(o.totalCents),
+      paidAt: o.paidAt ? formatEventDateTime(o.paidAt).replace(' ', ' às ') : 'não informado',
+      gatewayRef: o.gatewayPaymentId ?? 'não informada',
+    };
+    // Só o número do pedido vai para os metadados da mensagem (nada do comprador).
+    return { ...composePagamentoSemEstoque(data, ctx), to: user.email, data: { orderNumber: data.orderNumber } };
   }
 
   // compra_confirmada

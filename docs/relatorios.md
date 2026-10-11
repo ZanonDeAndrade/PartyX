@@ -26,7 +26,7 @@ O que o relatório mostra, como a documentação pede ("explicar ao cliente e vi
 - **Situação atual** das unidades apuradas: Válido, Utilizado, Cancelado (administrador), Cancelado (estorno), Cancelado (contestação). Todas somam o total.
 - **Por evento** e **detalhe por unidade** (código, pedido, evento, data de aprovação, situação atual), paginado.
 - **Conciliação:** quantas unidades os itens dos pedidos aprovados no mês previam, contra quantos ingressos existem. Pedido aprovado **sem nenhum ingresso** que não seja "pago sem estoque" é divergência a investigar antes de cobrar (a recuperação de ingressos do Prompt 13 a resolve, e a conciliação passa a fechar: testado).
-- **Exceções:** pagamento aprovado **sem estoque** não gera ingresso, **não conta** e é listado para análise (o cliente estorna no gateway). É exceção, não venda inventada (D-54).
+- **Exceções para análise** (seção própria desde 10/10/2026): pagamento aprovado **sem estoque** não gera ingresso, **não conta** e é listado à parte com pedido, unidades pagas, valor, data, referência no gateway e se o caso já foi marcado como tratado no painel, mais os totais. A fórmula da taxa **não mudou** e marcar como tratado não altera nada nela. É exceção, não venda inventada; a leitura contratual segue pendente (D-54). O extrato `ops:fee` traz a mesma tabela.
 - **Receita separada da taxa:** bruta, estornada, contestada e líquida do mês. A taxa é por unidade emitida, não sobre a receita.
 - Cobrança e boleto acontecem **fora** do sistema.
 

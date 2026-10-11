@@ -172,6 +172,8 @@ export interface ReconcileRunOptions {
   /** Só pega pedidos cuja última conferência foi há mais que isto. Duas execuções simultâneas não pegam os mesmos. */
   minIntervalSeconds?: number;
   limit?: number;
+  /** Só pedidos criados nas últimas N horas (pelo relógio da aplicação). Padrão: 72 (a rotina diária). A varredura usa 24. */
+  windowHours?: number;
 }
 
 export interface RunSummary {
@@ -182,7 +184,7 @@ export interface RunSummary {
 
 /**
  * Conciliação agendada (para webhook perdido): reconsulta no gateway os pedidos com cobrança que ainda podem mudar
- * (pendentes; e vencidos ou não concluídos nos últimos 3 dias, porque uma aprovação pode chegar atrasada).
+ * (pendentes, vencidos ou não concluídos, criados dentro da janela, porque uma aprovação pode chegar atrasada).
  *
  * **Segura com execuções simultâneas:** os pedidos são "reservados" para a execução (`FOR UPDATE SKIP LOCKED` e carimbo
  * de `updated_at`), então duas execuções pegam lotes diferentes; e mesmo que pegassem o mesmo, a conciliação é idempotente.
@@ -190,6 +192,7 @@ export interface RunSummary {
 export async function runReconciliation(deps: ReconcileDeps, options: ReconcileRunOptions = {}): Promise<RunSummary> {
   const minInterval = options.minIntervalSeconds ?? 60;
   const limit = options.limit ?? 100;
+  const since = new Date(deps.clock.now().getTime() - (options.windowHours ?? 72) * 3_600_000);
 
   const expired = await expireOverdue(deps);
   const events = await retryPendingEvents(deps);
@@ -199,7 +202,8 @@ export async function runReconciliation(deps: ReconcileDeps, options: ReconcileR
      where id in (
        select id from orders
         where gateway_payment_id is not null
-          and (status = 'pendente' or (status in ('expirado', 'nao_concluido') and created_at > now() - interval '3 days'))
+          and status in ('pendente', 'expirado', 'nao_concluido')
+          and created_at > ${since}
           and updated_at <= now() - make_interval(secs => ${minInterval})
         order by updated_at asc
         limit ${limit}

@@ -82,7 +82,15 @@ export function renderFeeStatement(s: FeeStatement, opts: { generatedAt: Date; m
     '',
     s.exceptions.paidWithoutStock.length === 0
       ? 'Nenhum pagamento aprovado sem estoque.'
-      : s.exceptions.paidWithoutStock.map(o => `- Pedido ${o.number}: ${o.units} unidade(s) pagas sem estoque.`).join('\n'),
+      : [
+          '| Pedido | Unidades | Valor pago | Referência no gateway | Situação |',
+          '|---|---|---|---|---|',
+          ...s.exceptions.paidWithoutStock.map(
+            o =>
+              `| ${o.number} | ${o.units} unidade(s) pagas sem estoque | ${brl(o.totalCents)} | ${o.gatewayRef ?? 'não informada'} | ${o.treated ? 'tratado' : 'em aberto'} |`,
+          ),
+          `| **Total** | ${s.exceptions.totals.units} | ${brl(s.exceptions.totals.cents)} | | ${s.exceptions.totals.open} em aberto |`,
+        ].join('\n'),
     '',
     s.exceptions.note,
     '',

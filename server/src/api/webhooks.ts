@@ -16,8 +16,10 @@ import type { JobAuthenticator } from '../payments/jobsAuth';
 import type { MockGateway } from '../payments/mockGateway';
 import type { ReconcileDeps, TicketIssuer } from '../payments/reconcile';
 import { BACKOFF_MINUTES as EMAIL_RETRIES } from '../mail/outbox';
-import { RECONCILE_MAX_ATTEMPTS, type TaskQueue } from '../payments/taskQueue';
+import type { TaskQueue } from '../payments/taskQueue';
 import { handleReconcileTask } from '../payments/reconcileTask';
+import { finalAttempt } from '../domain/reconcileSchedule';
+import { acquireLease, releaseLease } from '../db/jobLease';
 import type { Clock } from '../providers/clock';
 import type { EmailSender } from '../providers/email';
 import { handleEmailTask, processOutbox, type OutboxDeps } from '../mail/outbox';
@@ -78,7 +80,10 @@ export function webhookRoutes(deps: WebhookDeps) {
     return c.json({ status: result.status, outcome: result.outcome ?? null });
   });
 
-  /** Conciliação agendada. Só o Cloud Scheduler (token OIDC da conta de serviço configurada) chama. */
+  /**
+   * Rotina diária de segurança (Cloud Scheduler, de madrugada): fila de e-mails, conciliação ampla (pedidos de até 3 dias) e ingressos
+   * que faltarem. Só o Cloud Scheduler (token OIDC da conta de serviço configurada) chama.
+   */
   app.post('/internal/jobs/reconcile-payments', async c => {
     if (!deps.jobAuth)
       throw new AppError(503, 'rotinas_nao_configuradas', 'As rotinas internas não estão configuradas.');
@@ -101,6 +106,39 @@ export function webhookRoutes(deps: WebhookDeps) {
   });
 
   /**
+   * Varredura de pagamentos ainda sem decisão (Cloud Scheduler, a cada 5 minutos): depois das verificações sob demanda, olha os pedidos
+   * com cobrança criados nas últimas `RECONCILE_SWEEP_WINDOW_HOURS` horas (padrão 24) que ainda podem mudar (pendente, vencido, não
+   * concluído), vence as reservas e reprocessa notificações pendentes. Uma execução por vez (trava com prazo em `job_leases`); a que
+   * chega com outra em andamento responde 200 "em_execucao" para o Scheduler não repetir. Cada pedido também é reservado para uma só
+   * execução (`FOR UPDATE SKIP LOCKED`) e a confirmação é idempotente.
+   */
+  app.post('/internal/jobs/reconcile-pending', async c => {
+    if (!deps.jobAuth)
+      throw new AppError(503, 'rotinas_nao_configuradas', 'As rotinas internas não estão configuradas.');
+    if (!(await deps.jobAuth.verify(c.req.header('authorization'))))
+      throw new AppError(401, 'nao_autenticado', 'Não autenticado.');
+    if (!deps.gateway) return c.json({ status: 'sem_gateway' });
+    const schedule = deps.config.reconcile;
+    const lease = await acquireLease(deps.db, 'reconcile-pending', schedule.sweepLockSeconds);
+    if (!lease) return c.json({ status: 'em_execucao' });
+    try {
+      const summary = await runReconciliation(reconcileDeps(deps.gateway), {
+        windowHours: schedule.sweepWindowHours,
+        limit: schedule.sweepBatch,
+      });
+      if (summary.orders.checked > 0 || summary.expired.orders > 0 || summary.events.tried > 0)
+        logger.info('varredura de pagamentos pendentes executada', {
+          checked: summary.orders.checked,
+          failed: summary.orders.failed,
+          expiredOrders: summary.expired.orders,
+        });
+      return c.json({ status: 'ok', summary });
+    } finally {
+      await releaseLease(deps.db, 'reconcile-pending', lease);
+    }
+  });
+
+  /**
    * Verificação de UM pedido, agendada pelo Cloud Tasks (conciliação sob demanda). Autenticada por OIDC como as rotinas do Scheduler.
    * 200 quando tratou (inclusive reagendar ou marcar para revisão); 503 em falha de rede com o gateway, para o Cloud Tasks repetir.
    */
@@ -110,12 +148,20 @@ export function webhookRoutes(deps: WebhookDeps) {
     if (!(await deps.jobAuth.verify(c.req.header('authorization'))))
       throw new AppError(401, 'nao_autenticado', 'Não autenticado.');
     if (!deps.gateway) return c.json({ status: 'sem_gateway' });
+    const schedule = deps.config.reconcile;
     const parsed = z
-      .object({ orderId: z.uuid(), attempt: z.number().int().min(1).max(RECONCILE_MAX_ATTEMPTS) })
+      .object({
+        orderId: z.uuid(),
+        attempt: z.number().int().min(1).max(finalAttempt(schedule.taskOffsetsSeconds)),
+        chargedAt: z.iso.datetime().optional(),
+      })
       .safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) throw new AppError(422, 'dados_invalidos', 'Tarefa inválida.');
     try {
-      const result = await handleReconcileTask({ ...reconcileDeps(deps.gateway), queue: deps.taskQueue }, parsed.data);
+      const result = await handleReconcileTask(
+        { ...reconcileDeps(deps.gateway), queue: deps.taskQueue, schedule },
+        parsed.data,
+      );
       return c.json({ status: 'ok', ...result });
     } catch (error) {
       logger.error('falha ao conciliar o pedido sob demanda', {

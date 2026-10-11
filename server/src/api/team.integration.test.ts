@@ -138,6 +138,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
       // Entradas de máquina, com autenticação própria (assinatura do gateway; token OIDC do Scheduler). Testadas em payments.*.test.ts.
       'POST /api/webhooks/payments',
       'POST /api/internal/jobs/reconcile-payments',
+      'POST /api/internal/jobs/reconcile-pending',
       'POST /api/internal/jobs/purge-retention',
       'POST /api/internal/tasks/reconcile-order',
       'POST /api/internal/tasks/send-email',

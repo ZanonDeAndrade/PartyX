@@ -145,6 +145,8 @@ export interface OrderView {
   coupon: { code: string } | null;
   paymentMethod: 'pix' | 'cartao' | null;
   reservation: { status: string; expiresAt: string; serverNow: string; secondsLeft: number } | null;
+  /** Contato de atendimento da PartyX, só no pedido pago sem estoque. Nulo: a PartyX ainda não forneceu (mensagem neutra). */
+  support?: { email: string | null; whatsapp: string | null } | null;
 }
 
 export interface PaymentView {
@@ -245,7 +247,27 @@ export interface AdminOverview {
     }[];
     totals: { capacity: number; sold: number; reserved: number; remaining: number };
   }[];
-  attention: { paidWithoutStock: number };
+  /** `paidWithoutStock`: casos ainda não tratados (alerta persistente). */
+  attention: { paidWithoutStock: number; paidWithoutStockTreated?: number };
+}
+
+export interface PaidWithoutStockCase {
+  orderId: string;
+  number: number;
+  totalCents: number;
+  paidAt: string | null;
+  paymentMethod: 'pix' | 'cartao' | null;
+  event: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerCpf: string | null;
+  gatewayRef: string | null;
+  treated: { at: string; reason: string; by: string | null } | null;
+}
+export interface PaymentExceptions {
+  semEstoque: PaidWithoutStockCase[];
+  abertos: number;
+  orientacao: string;
 }
 export interface AdminOrderRow {
   id: string;
@@ -394,7 +416,20 @@ export interface FeeReport {
     ok: boolean;
     anomalies: { orderId: string; number: number; status: string; expectedUnits: number }[];
   };
-  exceptions: { paidWithoutStock: { orderId: string; number: number; units: number }[]; note: string };
+  exceptions: {
+    title: string;
+    paidWithoutStock: {
+      orderId: string;
+      number: number;
+      units: number;
+      totalCents: number;
+      paidAt: string;
+      gatewayRef: string | null;
+      treated: boolean;
+    }[];
+    totals: { orders: number; units: number; cents: number; open: number };
+    note: string;
+  };
   revenue: { grossCents: number; refundedCents: number; contestedCents: number; netCents: number };
   page: number;
   pageSize: number;
@@ -509,6 +544,13 @@ export const api = {
     promoterRanking: (query: string, signal?: AbortSignal) =>
       get<PromoterRanking>(`/admin/reports/promoters?${query}`, signal),
     feeReport: (query: string, signal?: AbortSignal) => get<FeeReport>(`/admin/reports/fee?${query}`, signal),
+    paymentExceptions: (signal?: AbortSignal) => get<PaymentExceptions>('/admin/payments/exceptions', signal),
+    treatException: (orderId: string, reason: string) =>
+      request<{ orderId: string; treated: { at: string; reason: string } }>(
+        'POST',
+        `/admin/payments/exceptions/${encodeURIComponent(orderId)}/treat`,
+        { reason },
+      ),
     cancelTicket: (id: string, reason: string) =>
       request<{ cancelled: number; alreadyCancelled: number; used: number; guidance: string }>(
         'POST',

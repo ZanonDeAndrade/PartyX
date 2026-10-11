@@ -299,4 +299,51 @@ describe('loadConfig', () => {
       expect(() => loadConfig({ GATEWAY_ENVIRONMENT: 'teste' })).toThrow(/GATEWAY_ENVIRONMENT/);
     });
   });
+  describe('cadência da conciliação e contato da PartyX', () => {
+    it('padrão: 1, 2, 4 e 8 minutos, margem de 2 min, varredura de 24 h com trava de 4 min; sem contato configurado', () => {
+      const c = loadConfig({});
+      expect(c.reconcile).toEqual({
+        taskOffsetsSeconds: [60, 120, 240, 480],
+        taskMarginSeconds: 120,
+        sweepWindowHours: 24,
+        sweepLockSeconds: 240,
+        sweepBatch: 100,
+      });
+      expect(c.partyxSupport).toBeNull();
+    });
+    it('tudo configurável pelo ambiente', () => {
+      const c = loadConfig({
+        RECONCILE_TASK_OFFSETS_SECONDS: '30, 90,300',
+        RECONCILE_TASK_MARGIN_SECONDS: '0',
+        RECONCILE_SWEEP_WINDOW_HOURS: '12',
+        RECONCILE_SWEEP_LOCK_SECONDS: '120',
+        RECONCILE_SWEEP_BATCH: '20',
+      });
+      expect(c.reconcile).toEqual({
+        taskOffsetsSeconds: [30, 90, 300],
+        taskMarginSeconds: 0,
+        sweepWindowHours: 12,
+        sweepLockSeconds: 120,
+        sweepBatch: 20,
+      });
+    });
+    it('lista de esperas inválida é recusada (fora de ordem, repetida, fora da faixa, vazia, texto)', () => {
+      for (const bad of ['120,60', '60,60', '5', '60,4000', ',', 'a,b', '1,2,3,4,5,6,7,8,9,10,11'])
+        expect(() => loadConfig({ RECONCILE_TASK_OFFSETS_SECONDS: bad }), bad).toThrow(/RECONCILE_TASK_OFFSETS_SECONDS/);
+      expect(() => loadConfig({ RECONCILE_SWEEP_LOCK_SECONDS: '5' })).toThrow(/RECONCILE_SWEEP_LOCK_SECONDS/);
+    });
+    it('contato da PartyX: e-mail e WhatsApp validados; qualquer um sozinho basta', () => {
+      expect(loadConfig({ PARTYX_SUPPORT_EMAIL: 'atendimento@partyx.example' }).partyxSupport).toEqual({
+        email: 'atendimento@partyx.example',
+        whatsapp: null,
+      });
+      expect(loadConfig({ PARTYX_SUPPORT_WHATSAPP: '+55 (11) 91234-5678' }).partyxSupport).toEqual({
+        email: null,
+        whatsapp: '+55 (11) 91234-5678',
+      });
+      expect(() => loadConfig({ PARTYX_SUPPORT_EMAIL: 'nao-e-email' })).toThrow(/PARTYX_SUPPORT_EMAIL/);
+      for (const bad of ['123', 'whatsapp', '+55 11 9<script>'])
+        expect(() => loadConfig({ PARTYX_SUPPORT_WHATSAPP: bad }), bad).toThrow(/PARTYX_SUPPORT_WHATSAPP/);
+    });
+  });
 });

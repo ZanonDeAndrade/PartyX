@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { writeAudit, type Tx } from '../db/audit';
-import { orderItems, orders, reservations, tickets, ticketTypes } from '../db/schema';
+import { orderItems, orders, reservations, tickets, ticketTypes, users } from '../db/schema';
 import { AppError } from '../domain/errors';
 import { approvalOutcome, canTransition, type OrderStatus } from '../domain/orderState';
 import { checkSnapshotAgainstOrder, intentFor, type PaymentSnapshot } from '../domain/payment';
@@ -108,8 +108,9 @@ export async function reconcilePayment(
       return { outcome: 'aguardando', orderId: order.id };
     case 'confirmar': {
       const outcome = await applyApproval(deps, order.id, snapshot);
-      // E-mail de compra: já está na fila (gravado na transação da confirmação). Tenta entregar agora sem segurar a resposta.
-      if ((outcome === 'confirmado' || outcome === 'confirmado_tardio') && deps.mail)
+      // E-mail de compra (ou o aviso aos administradores, no caso sem estoque): já está na fila, gravado na mesma transação.
+      // Tenta entregar agora sem segurar a resposta.
+      if ((outcome === 'confirmado' || outcome === 'confirmado_tardio' || outcome === 'sem_estoque') && deps.mail)
         await processSoon(deps.mail, { orderId: order.id });
       return { outcome, orderId: order.id };
     }
@@ -235,8 +236,27 @@ async function applyApproval(
           'Pagamento aprovado depois da reserva vencer, sem estoque. Nenhum ingresso emitido; o cliente deve estornar no gateway.',
         at: now,
       });
-      // O alerta é este log (severidade e campo `alert` fixos, para o Cloud Monitoring) mais a lista do painel.
-      logger.error('pagamento aprovado sem estoque: estornar no gateway', { orderId, alert: 'pago_sem_estoque' });
+      // Aviso por e-mail a cada administrador ativo, na mesma transação (outbox): existe se, e somente se, o caso foi registrado.
+      // Repetir a notificação não duplica (chave por pedido e administrador). Procedimento provisório até a decisão D-13.
+      const admins = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.role, 'administrador'), eq(users.isActive, true)))
+        .orderBy(asc(users.id));
+      for (const admin of admins) {
+        await enqueueEmail(tx, deps.clock, {
+          userId: admin.id,
+          orderId,
+          template: 'pagamento_sem_estoque',
+          idempotencyKey: `sem_estoque:${orderId}:${admin.id}`,
+        });
+      }
+      // O alerta é este log (severidade e campo `alert` fixos, para o Cloud Monitoring), o e-mail acima e a lista do painel.
+      logger.error('pagamento aprovado sem estoque: estornar no gateway', {
+        orderId,
+        admins: admins.length,
+        alert: 'pago_sem_estoque',
+      });
       return 'sem_estoque';
     }
 

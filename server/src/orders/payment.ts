@@ -3,7 +3,9 @@ import { orders, reservations, users } from '../db/schema';
 import { AppError } from '../domain/errors';
 import { looksLikeCardNumber, type PaymentMethod } from '../domain/payment';
 import { logger } from '../logger';
+import { delayUntil, nextCheck } from '../domain/reconcileSchedule';
 import { GatewayError, GatewayRejectedError, type CreatedPayment, type PaymentGateway } from '../payments/gateway';
+import { enqueueSafely } from '../payments/taskQueue';
 import { expireOverdue, type OrdersDeps } from './service';
 
 export interface PaymentDeps extends OrdersDeps {
@@ -261,7 +263,21 @@ export async function startPayment(
     .set({ gatewayPaymentId: created.gatewayPaymentId, updatedAt: now })
     .where(and(eq(orders.id, orderId), isNull(orders.gatewayPaymentId)))
     .returning({ id: orders.id });
-  if (saved.length === 0) {
+  if (saved.length > 0) {
+    // Rede de segurança contra webhook perdido ou atrasado: verificações só deste pedido, contadas desta cobrança (1, 2, 4 e 8 min e
+    // a última no fim da reserva mais a margem). Agenda só a primeira; cada uma agenda a seguinte se o pagamento seguir pendente.
+    // Nunca derruba a criação da cobrança (falha vira alerta e a varredura agendada cobre).
+    const schedule = deps.config.reconcile;
+    const deadline = new Date(reservation.expiresAt.getTime() + schedule.taskMarginSeconds * 1000);
+    const first = nextCheck({ attempt: 0, chargedAt: now, deadline, now }, schedule.taskOffsetsSeconds);
+    if (first)
+      await enqueueSafely(deps.taskQueue, {
+        orderId,
+        attempt: first.attempt,
+        delaySeconds: delayUntil(first.at, now),
+        chargedAt: now.toISOString(),
+      });
+  } else {
     const [current] = await deps.db
       .select({ gatewayPaymentId: orders.gatewayPaymentId })
       .from(orders)

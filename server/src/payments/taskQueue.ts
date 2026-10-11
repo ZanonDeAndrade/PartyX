@@ -2,16 +2,18 @@ import { GoogleAuth } from 'google-auth-library';
 import { logger } from '../logger';
 
 /**
- * Fila de tarefas sob demanda (Cloud Tasks): conciliação de pagamento e reenvio de e-mail. No lugar de uma rotina periódica que mantém o banco acordado o tempo todo,
- * cada pedido pendente agenda uma verificação própria: a primeira 10 minutos depois de criado. Se o pagamento seguir pendente,
- * a verificação se reagenda com espera crescente, até {@link RECONCILE_MAX_ATTEMPTS}; depois disso o pedido é marcado para
- * revisão manual. O webhook do gateway continua sendo o caminho principal; isto é a rede de segurança para webhook perdido.
+ * Fila de tarefas sob demanda (Cloud Tasks): conciliação de pagamento e reenvio de e-mail. Cada cobrança criada agenda verificações
+ * próprias, contadas da criação da cobrança (padrão: 1, 2, 4 e 8 minutos, e a última no fim da reserva mais a margem; ver
+ * `domain/reconcileSchedule.ts`). Depois disso, a varredura do Cloud Scheduler (a cada 5 minutos, pedidos de até 24 horas) continua.
+ * O webhook do gateway segue sendo o caminho principal; isto é a rede de segurança para webhook perdido ou atrasado.
  */
 export interface ReconcileTask {
   orderId: string;
-  /** 1 a {@link RECONCILE_MAX_ATTEMPTS}. */
+  /** 1 a `offsets.length + 1` (a última é a do limite). */
   attempt: number;
   delaySeconds: number;
+  /** Instante da criação da cobrança (ISO). Base das esperas. Ausente em tarefas antigas: usa-se a criação do pedido. */
+  chargedAt?: string;
 }
 
 /** Reenvio de um e-mail que falhou. `attempt` é o número da retentativa (1 a 3). */
@@ -30,12 +32,6 @@ export interface TaskQueue {
 
 export const RECONCILE_TASK_PATH = '/api/internal/tasks/reconcile-order';
 export const EMAIL_TASK_PATH = '/api/internal/tasks/send-email';
-
-export const RECONCILE_MAX_ATTEMPTS = 3;
-/** Espera até a primeira verificação, contada da criação do pedido. */
-export const RECONCILE_FIRST_DELAY_SECONDS = 600;
-/** Espera até a verificação seguinte, depois de a tentativa N ter achado o pagamento ainda pendente (N = 1, 2). */
-export const RECONCILE_BACKOFF_SECONDS: Record<number, number> = { 1: 900, 2: 1800 };
 
 /** Fila em memória: testes e desenvolvimento local. Não executa nada sozinha. */
 export class MemoryTaskQueue implements TaskQueue {
@@ -75,7 +71,7 @@ export interface CloudTasksConfig {
  * Cloud Tasks pela API REST, com as credenciais da própria conta de serviço do Cloud Run (sem chave em arquivo).
  * O nome da tarefa é determinístico (`reconcile-<pedido>-<tentativa>`): agendar duas vezes a mesma tentativa não duplica
  * (o Cloud Tasks responde 409 e isso é tratado como sucesso). Uma falha ao agendar **nunca** derruba a criação do pedido:
- * quem chama registra o alerta e a varredura diária cobre a lacuna.
+ * quem chama registra o alerta e a varredura agendada cobre a lacuna.
  */
 export function cloudTasksQueue(cfg: CloudTasksConfig): TaskQueue {
   const auth = cfg.client ? undefined : new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
@@ -114,7 +110,7 @@ export function cloudTasksQueue(cfg: CloudTasksConfig): TaskQueue {
       post(
         `reconcile-${task.orderId}-${task.attempt}`,
         RECONCILE_TASK_PATH,
-        { orderId: task.orderId, attempt: task.attempt },
+        { orderId: task.orderId, attempt: task.attempt, ...(task.chargedAt ? { chargedAt: task.chargedAt } : {}) },
         task.delaySeconds,
       ),
     enqueueEmail: task =>

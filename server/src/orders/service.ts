@@ -13,21 +13,17 @@ import {
 } from '../domain/checkout';
 import { AppError } from '../domain/errors';
 import { isCouponCodeValid, normalizeCouponCode } from '../domain/events';
-import type { Config } from '../config';
+import type { Config, SupportContact } from '../config';
 import { reservedByType } from '../events/service';
 import type { Clock } from '../providers/clock';
 import { salesBlockers } from '../legal/documents';
 import { logger } from '../logger';
-import {
-  enqueueSafely,
-  RECONCILE_FIRST_DELAY_SECONDS,
-  type TaskQueue,
-} from '../payments/taskQueue';
+import type { TaskQueue } from '../payments/taskQueue';
 
 export interface OrdersDeps {
   db: Db;
   clock: Clock;
-  /** Agenda a verificação do pedido 10 minutos depois de criado. Opcional. */
+  /** Agenda as verificações do pagamento quando a cobrança é criada (conciliação sob demanda). Opcional. */
   taskQueue?: TaskQueue;
   config: Pick<
     Config,
@@ -39,6 +35,8 @@ export interface OrdersDeps {
     | 'legalContentDir'
     | 'cancellationVersion'
     | 'visualApproved'
+    | 'reconcile'
+    | 'partyxSupport'
   >;
 }
 
@@ -207,9 +205,19 @@ export interface OrderView {
   /** Reserva do pedido. O contador usa `serverNow`, não o relógio do aparelho. */
   reservation: { status: string; expiresAt: string; serverNow: string; secondsLeft: number } | null;
   createdAt: string;
+  /**
+   * Contato de atendimento **da PartyX** (configuração `PARTYX_SUPPORT_*`), só no pedido pago sem estoque. Nulo quando a PartyX ainda
+   * não forneceu: a tela mostra uma mensagem neutra. Nunca há contato da contratada aqui.
+   */
+  support: SupportContact | null;
 }
 
-async function view(db: Db | Tx, orderId: string, now: Date): Promise<OrderView> {
+async function view(
+  db: Db | Tx,
+  orderId: string,
+  now: Date,
+  support: SupportContact | null = null,
+): Promise<OrderView> {
   const [order] = await db
     .select({ o: orders, eventSlug: events.slug, eventName: events.name, eventStartsAt: events.startsAt, eventVenue: events.venue })
     .from(orders)
@@ -265,6 +273,7 @@ async function view(db: Db | Tx, orderId: string, now: Date): Promise<OrderView>
         }
       : null,
     createdAt: order.o.createdAt.toISOString(),
+    support: order.o.status === 'pago_sem_estoque' ? support : null,
   };
 }
 
@@ -414,12 +423,8 @@ export async function createOrder(deps: OrdersDeps, userId: string, input: Check
     }
     return order!.id;
   });
-  // Rede de segurança contra webhook perdido: uma verificação só deste pedido, daqui a 10 minutos. Nunca derruba a criação.
-  await enqueueSafely(deps.taskQueue, {
-    orderId,
-    attempt: 1,
-    delaySeconds: RECONCILE_FIRST_DELAY_SECONDS,
-  });
+  // As verificações do pagamento (Cloud Tasks) começam quando a cobrança é criada (`startPayment`). Sem cobrança, nada é cobrado:
+  // a reserva vence sozinha (a contagem ignora reserva vencida) e o estado é acertado na leitura e pela varredura.
   return view(deps.db, orderId, now);
 }
 
@@ -432,7 +437,7 @@ export async function getOrder(deps: OrdersDeps, userId: string, orderId: string
     .limit(1);
   if (!own) throw new AppError(404, 'nao_encontrado', 'Pedido não encontrado.');
   await expireOverdue(deps, { orderId });
-  return view(deps.db, orderId, deps.clock.now());
+  return view(deps.db, orderId, deps.clock.now(), deps.config.partyxSupport);
 }
 
 /** O comprador desiste antes de pagar: a reserva é liberada na hora. Repetir não faz mal. */

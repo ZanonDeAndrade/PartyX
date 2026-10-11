@@ -33,5 +33,11 @@ export const checkinResult = pgEnum('checkin_result', [
   'outro_evento',
 ]);
 export const checkinMethod = pgEnum('checkin_method', ['camera', 'manual']);
-export const emailTemplate = pgEnum('email_template', ['cadastro', 'recuperacao_senha', 'compra_confirmada']);
+/** `pagamento_sem_estoque`: aviso aos administradores ativos de um pagamento aprovado sem ingresso disponível (D-13, provisório). */
+export const emailTemplate = pgEnum('email_template', [
+  'cadastro',
+  'recuperacao_senha',
+  'compra_confirmada',
+  'pagamento_sem_estoque',
+]);
 export const emailStatus = pgEnum('email_status', ['pendente', 'enviado', 'falhou']);

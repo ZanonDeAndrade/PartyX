@@ -1,6 +1,13 @@
 import { useEffect } from 'react';
 import './site.css';
-import { AdminEventPage, AdminEventsPage, AdminOrderPage, AdminOrdersPage, AdminOverviewPage } from './adminPages';
+import {
+  AdminEventPage,
+  AdminEventsPage,
+  AdminExceptionsPage,
+  AdminOrderPage,
+  AdminOrdersPage,
+  AdminOverviewPage,
+} from './adminPages';
 import { GateEventsPage, GatePage } from './gatePages';
 import { FeeReportPage, PromoterReportPage, SalesReportPage } from './reportPages';
 import { FirstAccessPage, ForgotPasswordPage, LegalPage, LoginPage, ResetPasswordPage, SignupPage } from './authPages';
@@ -28,6 +35,7 @@ function Routes() {
   if (loc.path === '/admin') return <AdminOverviewPage />;
   if (loc.path === '/admin/pedidos') return <AdminOrdersPage />;
   if (loc.path === '/admin/eventos') return <AdminEventsPage />;
+  if (loc.path === '/admin/excecoes') return <AdminExceptionsPage />;
   if (loc.path === '/admin/relatorios/vendas') return <SalesReportPage />;
   if (loc.path === '/admin/relatorios/promoters') return <PromoterReportPage />;
   if (loc.path === '/admin/relatorios/taxa-mensal') return <FeeReportPage />;

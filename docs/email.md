@@ -11,6 +11,7 @@ Implementado em 01/10/2026 (Prompt 14): RF-36, RF-67 (parte) e a entrega do CA-0
 | E01 Cadastro | Ao criar a conta | "Sua conta foi criada". Não exige confirmar o e-mail (a conta já funciona). Botão para os eventos |
 | E02 Recuperação | Ao pedir nova senha | Link de uso único, válido por 1 hora |
 | E03 Compra confirmada | Pagamento confirmado | Evento, data, horário, local, pedido e ingressos por tipo. Botão para **Meus ingressos** |
+| Pagamento recebido sem ingresso disponível (interno, 10/10/2026) | Pagamento aprovado depois da reserva, sem estoque; um item por **administrador ativo** | Pedido, evento, comprador (nome e e-mail, sem CPF), valor, data da aprovação, referência no gateway e a orientação de estorno pela PartyX no gateway. Botão para **Exceções** no painel. Procedimento provisório até D-13 (`webhook-e-conciliacao.md`) |
 
 - **Sem QR e sem anexo.** O QR de um ingresso é credencial: o e-mail leva só ao Meus ingressos, onde é preciso entrar na conta (testado: nenhum código, QR ou imagem no corpo).
 - HTML com tabela e estilos em linha (compatível com clientes de e-mail), sempre com a versão em texto e pré-cabeçalho. Tudo que vem do banco é escapado no HTML e limpo de quebras de linha no assunto (**injeção de cabeçalho** testada, inclusive ponta a ponta no SMTP).

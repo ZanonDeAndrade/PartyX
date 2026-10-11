@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   composeCadastro,
   composeCompra,
+  composePagamentoSemEstoque,
   composeRecuperacao,
   EMAIL_LOGO_PATH,
   type MailContext,
@@ -105,5 +106,28 @@ describe('e-mails (RF-36, RF-67)', () => {
     expect(m.html).not.toMatch(/<style|<link |<script/i);
     expect(m.html).toMatch(/Se o botão não abrir/);
     expect(m.text.length).toBeGreaterThan(100);
+  });
+  it('pagamento sem estoque (aviso aos administradores): dados do caso, orientação de estorno pela PartyX e link do painel', () => {
+    const m = composePagamentoSemEstoque(
+      {
+        orderNumber: 'PX-10190',
+        eventName: 'Noite <Neon>',
+        buyerName: 'Marina "Costa"',
+        buyerEmail: 'marina@exemplo.test',
+        amount: 'R$ 180,00',
+        paidAt: '10/10/2026 às 12:11',
+        gatewayRef: 'mock_pay_123',
+      },
+      ctx,
+    );
+    expect(m.subject).toBe('Pagamento recebido sem ingresso disponível · Pedido PX-10190');
+    for (const piece of ['PX-10190', 'Marina "Costa"', 'marina@exemplo.test', 'R$ 180,00', 'mock_pay_123', '10/10/2026 às 12:11'])
+      expect(m.text).toContain(piece);
+    expect(m.text).toContain('o estorno deve ser feito pela PartyX no painel do gateway');
+    expect(m.text).toContain('A plataforma não estorna automaticamente');
+    expect(m.text).toContain('https://partyx.exemplo.test/admin/excecoes');
+    expect(m.html).toContain('Noite &lt;Neon&gt;'); // escapado
+    expect(m.html).not.toContain('<Neon>');
+    expect(`${m.subject}${m.text}${m.html}`).not.toMatch(/—/); // sem travessão
   });
 });

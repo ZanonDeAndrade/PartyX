@@ -163,4 +163,46 @@ export function composeCompra(data: PurchaseData, ctx: MailContext): Composed {
   };
 }
 
+export interface PaidWithoutStockData {
+  orderNumber: string;
+  eventName: string;
+  buyerName: string;
+  buyerEmail: string;
+  amount: string;
+  paidAt: string;
+  gatewayRef: string;
+}
+
+/**
+ * Aviso aos administradores ativos: pagamento aprovado depois de a reserva vencer, sem ingresso disponível (seção 10.1).
+ * Procedimento **provisório** (D-13 pendente): orienta o estorno pela PartyX no gateway; a plataforma não estorna nem promete prazo.
+ * Sem CPF. O botão leva à lista de exceções do painel, onde é preciso entrar como administrador.
+ */
+export function composePagamentoSemEstoque(data: PaidWithoutStockData, ctx: MailContext): Composed {
+  const l: Layout = {
+    preheader: `Pedido ${data.orderNumber}: pagamento aprovado sem ingresso emitido.`,
+    title: 'Pagamento recebido sem ingresso disponível',
+    paragraphs: [
+      `O gateway aprovou o pagamento do pedido ${data.orderNumber} depois do fim da reserva, quando as unidades já tinham sido vendidas. Nenhum ingresso foi emitido para este pedido.`,
+      'Orientação: o estorno deve ser feito pela PartyX no painel do gateway de pagamento, usando a referência abaixo. A plataforma não estorna automaticamente. Depois de tratar o caso, marque-o como tratado no painel, informando o motivo.',
+    ],
+    details: [
+      { label: 'Pedido', value: data.orderNumber },
+      { label: 'Evento', value: data.eventName },
+      { label: 'Comprador', value: data.buyerName },
+      { label: 'E-mail do comprador', value: data.buyerEmail },
+      { label: 'Valor', value: data.amount },
+      { label: 'Aprovado em', value: data.paidAt },
+      { label: 'Referência no gateway', value: data.gatewayRef },
+    ],
+    cta: { label: 'Abrir exceções no painel', url: `${ctx.baseUrl}/admin/excecoes` },
+    footnote: 'Você recebe este aviso por ser administrador ativo da PartyX.',
+  };
+  return {
+    subject: subjectWith(ctx, `Pagamento recebido sem ingresso disponível · Pedido ${data.orderNumber}`),
+    text: text(l, ctx),
+    html: html(l, ctx),
+  };
+}
+
 export type { EmailTemplate };

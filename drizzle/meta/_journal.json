@@ -36,6 +36,13 @@
       "when": 1791295263116,
       "tag": "0004_limites_globais",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791683749248,
+      "tag": "0005_excecoes_pagamento",
+      "breakpoints": true
     }
   ]
 }

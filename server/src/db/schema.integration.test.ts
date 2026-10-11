@@ -114,7 +114,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
   });
 
   describe('migrações', () => {
-    it('criam as 14 tabelas da documentação e as 3 técnicas', async () => {
+    it('criam as 14 tabelas da documentação e as 4 técnicas', async () => {
       const r = await q("select table_name from information_schema.tables where table_schema = 'public' order by 1");
       const tables = r.rows.map(x => x.table_name as string);
       const doc = [
@@ -134,15 +134,17 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
         'audit_log',
       ];
       expect(tables).toEqual(expect.arrayContaining(doc));
-      expect(tables).toEqual(expect.arrayContaining(['sessions', 'login_attempts', 'global_limit_counters']));
-      expect(tables).toHaveLength(17);
+      expect(tables).toEqual(
+        expect.arrayContaining(['sessions', 'login_attempts', 'global_limit_counters', 'job_leases']),
+      );
+      expect(tables).toHaveLength(18);
     });
 
     it('podem rodar de novo sem erro nem duplicar o histórico', async () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(5);
+      expect(r.rows[0].n).toBe(6);
     });
   });
 
@@ -592,7 +594,29 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag2 = '0002_permissoes_da_aplicacao';
       const tag3 = '0003_anonimizacao_lgpd';
       const tag4 = '0004_limites_globais';
+      const tag5 = '0005_excecoes_pagamento';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag4)).rejects.toThrow(/não é a última/);
+
+      // 0005 recusa reverter se já houver aviso de pagamento sem estoque (perderia o registro de que os administradores foram avisados).
+      const admin = (
+        await db.pool.query(
+          "insert into users (name,email,password_hash,role) values ('Adm','adm@x.test','h','administrador') returning id",
+        )
+      ).rows[0].id;
+      await db.pool.query(
+        "insert into email_log (user_id, template, idempotency_key) values ($1, 'pagamento_sem_estoque', 'sem_estoque:x')",
+        [admin],
+      );
+      await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/perderia esse registro/);
+      await db.pool.query('delete from email_log');
+      await db.pool.query("insert into email_log (user_id, template, idempotency_key) values ($1, 'cadastro', 'cadastro:x')", [admin]);
+      await rollbackLastMigration(db.url, tag5);
+      expect((await db.pool.query("select count(*)::int as n from information_schema.tables where table_name = 'job_leases'")).rows[0].n).toBe(0);
+      const values = (await db.pool.query("select unnest(enum_range(null::email_template))::text as v")).rows.map(r => r.v);
+      expect(values).toEqual(['cadastro', 'recuperacao_senha', 'compra_confirmada']);
+      expect((await db.pool.query('select template::text as t from email_log')).rows).toEqual([{ t: 'cadastro' }]); // dado preservado
+      await db.pool.query('delete from email_log');
 
       await expect(rollbackLastMigration(db.url, tag1)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag2)).rejects.toThrow(/não é a última/);
@@ -615,7 +639,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       r = await db.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'");
-      expect(r.rows[0].n).toBe(17);
+      expect(r.rows[0].n).toBe(18);
     } finally {
       await db.drop();
     }

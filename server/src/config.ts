@@ -2,6 +2,16 @@ import { createHmac } from 'node:crypto';
 import { z } from 'zod';
 import { parseQrKeys, type QrKeys } from './domain/ticketCode';
 
+/** Lê a lista de esperas da conciliação sob demanda. Nula se inválida (vazia, fora da faixa, fora de ordem). */
+export function parseOffsets(value: string): number[] | null {
+  const parts = value.split(',').map(p => p.trim());
+  if (parts.length < 1 || parts.length > 10 || parts.some(p => !/^\d+$/.test(p))) return null;
+  const nums = parts.map(Number);
+  if (nums.some(n => n < 10 || n > 3600)) return null;
+  if (nums.some((n, i) => i > 0 && n <= nums[i - 1]!)) return null;
+  return nums;
+}
+
 /**
  * Configuração lida do ambiente e validada na partida.
  * Segredos nunca têm valor padrão: ficam no Secret Manager (nuvem) ou em `.env` local fora do Git.
@@ -87,13 +97,41 @@ const schema = z
     GLOBAL_RECOVERIES_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(60),
     GATE_SCANS_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(3000),
     GATE_SEARCHES_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(400),
-    /** Fila do Cloud Tasks da conciliação sob demanda: `projects/<projeto>/locations/<região>/queues/<fila>`. Sem ela, só o webhook e a varredura diária conciliam. */
+    /** Fila do Cloud Tasks da conciliação sob demanda: `projects/<projeto>/locations/<região>/queues/<fila>`. Sem ela, só o webhook e as varreduras do Scheduler conciliam. */
     TASKS_QUEUE: z
       .string()
       .regex(/^projects\/[^/]+\/locations\/[^/]+\/queues\/[^/]+$/, 'formato projects/P/locations/L/queues/Q')
       .optional(),
     /** Conta de serviço com que o Cloud Tasks assina o token OIDC. Precisa estar também em JOBS_CALLER_EMAIL. */
     TASKS_INVOKER_EMAIL: z.email().optional(),
+    /**
+     * Conciliação sob demanda: segundos, contados da **criação da cobrança**, em que cada verificação do pedido roda (Cloud Tasks).
+     * Lista crescente separada por vírgula. Padrão `60,120,240,480` (1, 2, 4 e 8 minutos), para cumprir "a cada poucos minutos" (RF-35).
+     * Nenhuma verificação passa do prazo da reserva mais a margem abaixo; a última roda exatamente nesse limite.
+     */
+    RECONCILE_TASK_OFFSETS_SECONDS: z
+      .string()
+      .default('60,120,240,480')
+      .refine(v => parseOffsets(v) !== null, 'use de 1 a 10 números inteiros crescentes entre 10 e 3600, separados por vírgula'),
+    /** Margem depois do fim da reserva para a última verificação sob demanda, em segundos. */
+    RECONCILE_TASK_MARGIN_SECONDS: z.coerce.number().int().min(0).max(3600).default(120),
+    /** Varredura agendada (Cloud Scheduler): olha pedidos com cobrança criados nas últimas N horas e ainda não resolvidos. */
+    RECONCILE_SWEEP_WINDOW_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+    /** Prazo da trava da varredura, em segundos: impede duas varreduras ao mesmo tempo e se solta sozinho se a execução cair. */
+    RECONCILE_SWEEP_LOCK_SECONDS: z.coerce.number().int().min(30).max(3600).default(240),
+    /** Máximo de pedidos reconsultados por varredura. */
+    RECONCILE_SWEEP_BATCH: z.coerce.number().int().min(1).max(1000).default(100),
+    /**
+     * Contato de atendimento **da PartyX** mostrado ao comprador quando o pagamento foi aprovado sem ingresso disponível. Fornecido pela
+     * PartyX. Sem ele a tela mostra uma mensagem neutra, sem prazo. Nunca usar aqui o contato da contratada.
+     */
+    PARTYX_SUPPORT_EMAIL: z.email().optional(),
+    /** WhatsApp de atendimento da PartyX, com DDI e DDD (ex.: +55 11 91234-5678). */
+    PARTYX_SUPPORT_WHATSAPP: z
+      .string()
+      .regex(/^\+?[0-9][0-9 ()-]{7,22}$/, 'use só números, espaços, parênteses, hífen e o + inicial')
+      .refine(v => v.replace(/\D/g, '').length >= 10 && v.replace(/\D/g, '').length <= 15, 'de 10 a 15 dígitos com DDI')
+      .optional(),
     /** Chaves do HMAC dos QR Codes, "versão:chave" separados por vírgula (chave em base64url, 32+ bytes). Vêm do Secret Manager. Obrigatória fora do local. Para rotacionar, **acrescente** a versão nova e troque `QR_HMAC_CURRENT`: as antigas continuam valendo para ingressos já emitidos. */
     QR_HMAC_KEYS: z.string().min(1).optional(),
     /** Versão usada para assinar os ingressos novos. */
@@ -230,6 +268,13 @@ export type Config = Omit<
   | 'RETENTION_LOGIN_ATTEMPTS_DAYS'
   | 'RETENTION_SESSIONS_DAYS'
   | 'RETENTION_PASSWORD_RESETS_DAYS'
+  | 'RECONCILE_TASK_OFFSETS_SECONDS'
+  | 'RECONCILE_TASK_MARGIN_SECONDS'
+  | 'RECONCILE_SWEEP_WINDOW_HOURS'
+  | 'RECONCILE_SWEEP_LOCK_SECONDS'
+  | 'RECONCILE_SWEEP_BATCH'
+  | 'PARTYX_SUPPORT_EMAIL'
+  | 'PARTYX_SUPPORT_WHATSAPP'
 > & {
   /** Chaves de assinatura dos QR por versão, e a versão usada nos ingressos novos. */
   qr: { keys: QrKeys; currentVersion: number };
@@ -248,7 +293,26 @@ export type Config = Omit<
   visualApproved: boolean;
   /** Prazos de retenção dos dados técnicos, em dias. Indefinido = não apagar. */
   retention: { loginAttemptsDays?: number; sessionsDays?: number; passwordResetsDays?: number };
+  /** Cadência da conciliação: tarefas sob demanda e varredura agendada. */
+  reconcile: ReconcileSchedule;
+  /** Contato de atendimento da PartyX para o comprador. Nulo quando a PartyX ainda não forneceu nenhum. */
+  partyxSupport: SupportContact | null;
 };
+
+export interface ReconcileSchedule {
+  /** Esperas, em segundos desde a criação da cobrança, de cada verificação sob demanda. */
+  taskOffsetsSeconds: number[];
+  /** Margem depois do fim da reserva para a última verificação sob demanda. */
+  taskMarginSeconds: number;
+  sweepWindowHours: number;
+  sweepLockSeconds: number;
+  sweepBatch: number;
+}
+
+export interface SupportContact {
+  email: string | null;
+  whatsapp: string | null;
+}
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   // Variável presente e vazia (`NOME=` no .env) vale como ausente.
@@ -279,6 +343,13 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     RETENTION_LOGIN_ATTEMPTS_DAYS,
     RETENTION_SESSIONS_DAYS,
     RETENTION_PASSWORD_RESETS_DAYS,
+    RECONCILE_TASK_OFFSETS_SECONDS,
+    RECONCILE_TASK_MARGIN_SECONDS,
+    RECONCILE_SWEEP_WINDOW_HOURS,
+    RECONCILE_SWEEP_LOCK_SECONDS,
+    RECONCILE_SWEEP_BATCH,
+    PARTYX_SUPPORT_EMAIL,
+    PARTYX_SUPPORT_WHATSAPP,
     ...rest
   } = raw;
   const salesOpen = SALES_OPEN ? SALES_OPEN === 'true' : raw.APP_ENV !== 'producao';
@@ -316,5 +387,16 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       sessionsDays: RETENTION_SESSIONS_DAYS,
       passwordResetsDays: RETENTION_PASSWORD_RESETS_DAYS,
     },
+    reconcile: {
+      taskOffsetsSeconds: parseOffsets(RECONCILE_TASK_OFFSETS_SECONDS)!,
+      taskMarginSeconds: RECONCILE_TASK_MARGIN_SECONDS,
+      sweepWindowHours: RECONCILE_SWEEP_WINDOW_HOURS,
+      sweepLockSeconds: RECONCILE_SWEEP_LOCK_SECONDS,
+      sweepBatch: RECONCILE_SWEEP_BATCH,
+    },
+    partyxSupport:
+      PARTYX_SUPPORT_EMAIL || PARTYX_SUPPORT_WHATSAPP
+        ? { email: PARTYX_SUPPORT_EMAIL ?? null, whatsapp: PARTYX_SUPPORT_WHATSAPP ?? null }
+        : null,
   };
 }

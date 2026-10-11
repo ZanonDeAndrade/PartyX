@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import {
   api,
   ApiError,
+  type PaidWithoutStockCase,
   type AdminOrderDetail,
   type AdminTicketRow,
   type LiveEntries,
@@ -26,9 +27,36 @@ export function useAdmin(returnTo: string): 'espera' | 'ok' | 'negado' {
   return session.user?.role === 'administrador' ? 'ok' : 'negado';
 }
 
-export type AdminTab = 'geral' | 'pedidos' | 'eventos' | 'relatorios';
+export type AdminTab = 'geral' | 'pedidos' | 'eventos' | 'relatorios' | 'excecoes';
+
+/** Avisa o painel de que a lista de exceções mudou (um caso foi tratado), para o contador do alerta se atualizar. */
+const EXCEPTIONS_CHANGED = 'px-excecoes-mudaram';
+
+/**
+ * Casos de pagamento aprovado sem ingresso ainda não tratados. Alimenta o contador da aba e o alerta que fica em todas as páginas do
+ * painel até cada caso ser marcado como tratado. Falha ao buscar não bloqueia o painel (o alerta só não aparece).
+ */
+function useOpenExceptions(): number {
+  const [open, setOpen] = useState(0);
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setVersion(v => v + 1);
+    window.addEventListener(EXCEPTIONS_CHANGED, bump);
+    return () => window.removeEventListener(EXCEPTIONS_CHANGED, bump);
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    api.admin
+      .paymentExceptions(controller.signal)
+      .then(r => setOpen(r.abertos))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [version]);
+  return open;
+}
 
 function AdminShell({ children, active }: { children: ReactNode; active: AdminTab }) {
+  const open = useOpenExceptions();
   return (
     <Layout>
       <div className="px-wrap">
@@ -45,7 +73,22 @@ function AdminShell({ children, active }: { children: ReactNode; active: AdminTa
           <Link to="/admin/relatorios/vendas" aria-current={active === 'relatorios' ? 'page' : undefined}>
             Relatórios
           </Link>
+          <Link to="/admin/excecoes" aria-current={active === 'excecoes' ? 'page' : undefined}>
+            Exceções{' '}
+            {open > 0 ? (
+              <span className="px-badge px-badge-err" aria-label={`${open} em aberto`}>
+                {open}
+              </span>
+            ) : null}
+          </Link>
         </nav>
+        {open > 0 && active !== 'excecoes' ? (
+          <p className="px-notice px-notice-err" role="alert">
+            <b>{open}</b> {open === 1 ? 'pagamento aprovado' : 'pagamentos aprovados'} sem ingresso disponível{' '}
+            {open === 1 ? 'aguarda' : 'aguardam'} tratamento: o estorno é feito pela PartyX no gateway.{' '}
+            <Link to="/admin/excecoes">Ver exceções</Link>
+          </p>
+        ) : null}
         {children}
       </div>
     </Layout>
@@ -203,12 +246,7 @@ export function AdminOverviewPage() {
       <Loading state={state} retry={retry} />
       {data ? (
         <>
-          {data.attention.paidWithoutStock > 0 ? (
-            <p className="px-notice px-notice-err" role="alert">
-              <b>{data.attention.paidWithoutStock}</b> pagamento(s) aprovado(s) sem estoque: o cliente precisa estornar
-              no gateway. <Link to="/admin/pedidos?status=pago_sem_estoque">Ver pedidos</Link>
-            </p>
-          ) : null}
+          {/* O alerta de pagamento sem estoque fica no topo de todas as páginas do painel (AdminShell). */}
           <div className="px-kpis">
             <Kpi title={`Hoje (${data.today.split('-').reverse().join('/')})`} group={data.day} />
             <Kpi title={`Mês ${data.month.split('-').reverse().join('/')}`} group={data.monthSales} />
@@ -591,7 +629,7 @@ export function AdminOrderPage({ id }: { id: string }) {
           {o.status === 'pago_sem_estoque' ? (
             <p className="px-notice px-notice-err" role="note">
               Pagamento aprovado depois do prazo, sem estoque: nenhum ingresso foi emitido. O cliente precisa estornar
-              no painel do gateway. A plataforma não estorna sozinha.
+              no painel do gateway. A plataforma não estorna sozinha. <Link to="/admin/excecoes">Ver em Exceções</Link>
             </p>
           ) : null}
           {done ? (
@@ -1089,5 +1127,191 @@ export function AdminEventPage({ id }: { id: string }) {
       {tab === 'compradores' ? <BuyersPanel eventId={id} /> : null}
       {tab === 'contingencia' ? <ContingencyPanel eventId={id} /> : null}
     </Gate>
+  );
+}
+
+// ---------- exceções: pagamento aprovado sem ingresso disponível (seção 10.1; D-13 pendente) ----------
+
+export function AdminExceptionsPage() {
+  usePageTitle('Exceções de pagamento · PartyX');
+  const access = useAdmin('/admin/excecoes');
+  const [state, retry] = useFetch(s => api.admin.paymentExceptions(s), access === 'ok' ? 'excecoes' : 'espera');
+  const [target, setTarget] = useState<PaidWithoutStockCase | null>(null);
+  const [done, setDone] = useState('');
+  const data = state.status === 'ok' ? state.data : null;
+  const open = data?.semEstoque.filter(c => !c.treated) ?? [];
+  const treated = data?.semEstoque.filter(c => c.treated) ?? [];
+  return (
+    <Gate access={access} active="excecoes">
+      <h1 className="px-h1">Exceções de pagamento</h1>
+      <p>
+        Pagamentos aprovados pelo gateway depois do fim da reserva, quando os ingressos já tinham sido vendidos. Nenhum
+        ingresso foi emitido. O estorno é feito pela PartyX no painel do gateway; a plataforma não estorna. Depois de tratar,
+        marque o caso como tratado informando o motivo.
+      </p>
+      {done ? (
+        <p className="px-notice px-notice-info" role="status">
+          {done}
+        </p>
+      ) : null}
+      <Loading state={state} retry={retry} />
+      {data ? (
+        <>
+          <h2 className="px-h3">Em aberto ({open.length})</h2>
+          {open.length === 0 ? <p className="px-muted">Nenhum caso em aberto.</p> : null}
+          {open.length > 0 ? <ExceptionTable rows={open} onTreat={setTarget} /> : null}
+          {treated.length > 0 ? (
+            <>
+              <h2 className="px-h3">Tratados ({treated.length})</h2>
+              <ExceptionTable rows={treated} />
+            </>
+          ) : null}
+        </>
+      ) : null}
+      {target ? (
+        <TreatDialog
+          item={target}
+          onCancel={() => setTarget(null)}
+          onConfirm={async reason => {
+            await api.admin.treatException(target.orderId, reason);
+            setTarget(null);
+            setDone(`Pedido PX-${target.number} marcado como tratado.`);
+            window.dispatchEvent(new Event(EXCEPTIONS_CHANGED));
+            retry();
+          }}
+        />
+      ) : null}
+    </Gate>
+  );
+}
+
+function ExceptionTable({ rows, onTreat }: { rows: PaidWithoutStockCase[]; onTreat?: (c: PaidWithoutStockCase) => void }) {
+  return (
+    <TableWrap>
+      <table className="px-table">
+        <thead>
+          <tr>
+            <th>Pedido</th>
+            <th>Comprador</th>
+            <th>Valor</th>
+            <th>Aprovado em</th>
+            <th>Referência no gateway</th>
+            <th>{onTreat ? 'Ação' : 'Tratamento'}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(c => (
+            <tr key={c.orderId}>
+              <td>
+                <Link to={`/admin/pedidos/${c.orderId}`}>PX-{c.number}</Link>
+                <br />
+                <span className="px-small px-muted">{c.event}</span>
+              </td>
+              <td>
+                {c.buyerName}
+                <br />
+                <span className="px-small px-muted">{c.buyerEmail}</span>
+              </td>
+              <td>{brl(c.totalCents)}</td>
+              <td>{c.paidAt ? `${dateShort(c.paidAt)} ${timeOf(c.paidAt)}` : 'não informado'}</td>
+              <td>
+                <code>{c.gatewayRef ?? 'não informada'}</code>
+              </td>
+              <td>
+                {c.treated ? (
+                  <>
+                    {dateShort(c.treated.at)} {timeOf(c.treated.at)}
+                    {c.treated.by ? ` por ${c.treated.by}` : ''}
+                    <br />
+                    <span className="px-small px-muted">{c.treated.reason}</span>
+                  </>
+                ) : onTreat ? (
+                  <button type="button" className="px-btn" onClick={() => onTreat(c)}>
+                    Marcar como tratado
+                  </button>
+                ) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableWrap>
+  );
+}
+
+/** Marcação de "tratado": motivo obrigatório, que fica na trilha de auditoria. Não estorna nem muda o pedido. */
+function TreatDialog({
+  item,
+  onCancel,
+  onConfirm,
+}: {
+  item: PaidWithoutStockCase;
+  onCancel: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const first = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    first.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await onConfirm(reason.trim());
+    } catch (err) {
+      setError(err instanceof ApiError ? (err.fields.reason ?? err.message) : 'Não foi possível marcar como tratado.');
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="px-modal-bg" onClick={onCancel}>
+      <form
+        className="px-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="treat-title"
+        onSubmit={submit}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 id="treat-title" className="px-h3">
+          Marcar o pedido PX-{item.number} como tratado
+        </h2>
+        <p>
+          A marcação só registra que o caso foi tratado. O pedido continua como pago sem estoque, nenhum estorno é feito pela
+          plataforma e o relatório da taxa não muda.
+        </p>
+        <div className="px-field">
+          <label htmlFor="motivo-tratado">Motivo (fica na trilha de auditoria)</label>
+          <textarea
+            id="motivo-tratado"
+            ref={first}
+            rows={3}
+            maxLength={500}
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+          />
+        </div>
+        {error ? (
+          <p className="px-notice px-notice-err" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="px-actions">
+          <button type="button" className="px-btn" onClick={onCancel} disabled={busy}>
+            Voltar
+          </button>
+          <button type="submit" className="px-btn px-btn-pri" disabled={busy || reason.trim().length < 5}>
+            {busy ? 'Salvando…' : 'Marcar como tratado'}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }

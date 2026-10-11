@@ -48,6 +48,8 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
   };
 
   const fakeJobAuth: JobAuthenticator = { verify: async h => h === 'Bearer token-do-scheduler' };
+  /** E-mails entregues pelo app (captura em memória). Recriado a cada teste. */
+  let mailer = new MemoryEmailSender();
 
   const build = (
     gateway: PaymentGateway | undefined,
@@ -59,7 +61,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       auth: {
         db: createDrizzle(testDb.pool),
         hasher: argon2Hasher,
-        mailer: new MemoryEmailSender(),
+        mailer,
         gateway,
         taskQueue: extra.queue,
       },
@@ -68,7 +70,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
     });
   let app: ReturnType<typeof build>;
 
-  async function user(role: 'cliente' | 'administrador' = 'cliente', target = app) {
+  async function user(role: 'cliente' | 'administrador' | 'validador' = 'cliente', target = app) {
     const i = ++n;
     const email = `${role}${i}@exemplo.com`;
     await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5)', [
@@ -184,10 +186,11 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
   });
   beforeEach(async () => {
     await sql(
-      'truncate payment_events, checkins, tickets, reservations, order_items, orders, ticket_types, events, audit_log, sessions, login_attempts, users cascade',
+      'truncate payment_events, checkins, tickets, reservations, order_items, orders, ticket_types, events, audit_log, sessions, login_attempts, job_leases, users cascade',
     );
     clock.set('2026-10-10T15:00:00Z');
     breakIssuer = false;
+    mailer = new MemoryEmailSender();
     mock = createMockGateway(clock);
     app = build(mock);
   });
@@ -982,37 +985,56 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
     });
   });
 
-  describe('conciliação sob demanda (Cloud Tasks)', () => {
+  describe('conciliação sob demanda (Cloud Tasks): 1, 2, 4 e 8 min depois da cobrança e no fim da reserva + margem', () => {
     let queue: MemoryTaskQueue;
     let qapp: ReturnType<typeof build>;
     const TOKEN = { authorization: 'Bearer token-do-scheduler' };
-    const task = (orderId: string, attempt: number, headers: Record<string, string> = TOKEN, target = qapp) =>
+    const task = (
+      orderId: string,
+      attempt: number,
+      headers: Record<string, string> = TOKEN,
+      target = qapp,
+      chargedAt?: string,
+    ) =>
       target.request('/api/internal/tasks/reconcile-order', {
         method: 'POST',
         headers: { 'content-type': 'application/json', ...headers },
-        body: JSON.stringify({ orderId, attempt }),
+        body: JSON.stringify({ orderId, attempt, ...(chargedAt ? { chargedAt } : {}) }),
       });
-    const run = async (orderId: string, attempt: number) => json(await task(orderId, attempt));
+    const run = async (orderId: string, attempt: number, chargedAt?: string) =>
+      json(await task(orderId, attempt, TOKEN, qapp, chargedAt));
+    /** Executa a última tarefa agendada na hora marcada (avança o relógio pela espera), como o Cloud Tasks faria. */
+    const runNext = async () => {
+      const t = queue.tasks.at(-1)!;
+      clock.advance(t.delaySeconds * 1000);
+      return run(t.orderId, t.attempt, t.chargedAt);
+    };
     beforeEach(() => {
       queue = new MemoryTaskQueue();
       qapp = build(mock, { queue });
     });
 
-    it('criar o pedido agenda UMA verificação para daqui a 10 minutos, só daquele pedido', async () => {
+    it('criar o pedido não agenda nada; criar a cobrança agenda a 1ª verificação para 1 minuto depois, só daquele pedido', async () => {
       const e = await event();
       const a = await user('cliente', qapp);
       const created = await a.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.types[0]!, quantity: 2 }] });
       expect(created.status).toBe(201);
       const id = (await json(created)).order.id as string;
-      expect(queue.tasks).toEqual([{ orderId: id, attempt: 1, delaySeconds: 600 }]);
+      expect(queue.tasks).toEqual([]);
+      const charged = clock.now().toISOString();
+      expect((await a.post(`/orders/${id}/payment`, { method: 'pix' })).status).toBe(201);
+      expect(queue.tasks).toEqual([{ orderId: id, attempt: 1, delaySeconds: 60, chargedAt: charged }]);
+      // Repetir o pedido de pagamento (clique duplo) devolve a mesma cobrança e não agenda de novo.
+      expect((await a.post(`/orders/${id}/payment`, { method: 'pix' })).status).toBe(201);
+      expect(queue.tasks).toHaveLength(1);
     });
 
-    it('falha ao agendar nunca derruba a criação do pedido (a varredura diária cobre a lacuna)', async () => {
+    it('falha ao agendar nunca derruba a criação da cobrança (a varredura agendada cobre a lacuna)', async () => {
       const e = await event();
       const a = await user('cliente', qapp);
       queue.failNext = true;
-      const created = await a.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.types[0]!, quantity: 1 }] });
-      expect(created.status).toBe(201);
+      const p = await pay(a, e, [1]);
+      expect(p.paymentId).toBeTruthy();
       expect(queue.tasks).toHaveLength(0);
     });
 
@@ -1023,47 +1045,100 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       expect((await task(p.orderId, 1, {})).status).toBe(401);
       expect((await task(p.orderId, 1, { authorization: 'Bearer outro' })).status).toBe(401);
       expect((await task(p.orderId, 1, { cookie: 'x=1' })).status).toBe(401);
-      for (const bad of [{ orderId: 'nao-e-uuid', attempt: 1 }, { orderId: p.orderId, attempt: 0 }, { orderId: p.orderId, attempt: 4 }, {}]) {
+      for (const bad of [
+        { orderId: 'nao-e-uuid', attempt: 1 },
+        { orderId: p.orderId, attempt: 0 },
+        { orderId: p.orderId, attempt: 6 }, // padrão: 4 esperas + a do limite
+        { orderId: p.orderId, attempt: 1, chargedAt: 'ontem' },
+        {},
+      ]) {
         const res = await qapp.request('/api/internal/tasks/reconcile-order', {
           method: 'POST',
           headers: { 'content-type': 'application/json', ...TOKEN },
           body: JSON.stringify(bad),
         });
-        expect(res.status).toBe(422);
+        expect(res.status, JSON.stringify(bad)).toBe(422);
       }
       const off = build(mock, { jobAuth: undefined });
       expect((await task(p.orderId, 1, TOKEN, off)).status).toBe(503);
       expect((await order(p.orderId)).status).toBe('pendente'); // nada foi tocado
     });
 
-    it('webhook perdido: a tarefa acha o pagamento aprovado, confirma, emite os ingressos e não reagenda', async () => {
+    it('webhook perdido: a 1ª tarefa (1 min) acha o pagamento aprovado, confirma, emite os ingressos e não reagenda', async () => {
       const e = await event();
       const a = await user('cliente', qapp);
       const p = await pay(a, e, [3]);
       mock.simulate.setStatus(p.paymentId, 'aprovado'); // nenhum webhook chegou
-      expect(await run(p.orderId, 1)).toMatchObject({ status: 'ok', outcome: 'conciliado' });
+      expect(await runNext()).toMatchObject({ status: 'ok', outcome: 'conciliado' });
       expect((await order(p.orderId)).status).toBe('pago');
       expect(await ticketsOf(p.orderId)).toHaveLength(3);
       expect(await sold(e.types[0]!)).toBe(3);
       expect(queue.tasks.filter(t => t.attempt > 1)).toHaveLength(0);
     });
 
-    it('ainda pendente: reagenda com espera crescente (15 min, depois 30 min) e, na 3ª, marca revisão manual', async () => {
+    it('ainda pendente: verifica aos 1, 2, 4 e 8 min, a última no fim da reserva + margem (12 min); então expira e marca revisão', async () => {
       const e = await event();
       const a = await user('cliente', qapp);
+      const start = clock.now().getTime();
       const p = await pay(a, e, [1]); // Pix criado, ninguém pagou, gateway segue "pendente"
-      queue.tasks.length = 0;
-      expect(await run(p.orderId, 1)).toMatchObject({ outcome: 'reagendado' });
-      expect(queue.tasks).toEqual([{ orderId: p.orderId, attempt: 2, delaySeconds: 900 }]);
-      expect(await run(p.orderId, 2)).toMatchObject({ outcome: 'reagendado' });
-      expect(queue.tasks.at(-1)).toEqual({ orderId: p.orderId, attempt: 3, delaySeconds: 1800 });
-      expect(queue.tasks).toHaveLength(2);
-      expect(await run(p.orderId, 3)).toMatchObject({ outcome: 'revisao_manual' });
-      expect(queue.tasks).toHaveLength(2); // acabou: nenhuma tentativa nova
+      const at = () => (clock.now().getTime() - start) / 1000;
+      const seen: [number, number][] = [];
+      for (let i = 0; i < 4; i++) {
+        expect(await runNext()).toMatchObject({ outcome: 'reagendado' });
+        seen.push([queue.tasks.at(-2)!.attempt, at()]);
+      }
+      expect(seen).toEqual([
+        [1, 60],
+        [2, 120],
+        [3, 240],
+        [4, 480],
+      ]);
+      expect(queue.tasks.at(-1)).toMatchObject({ attempt: 5, delaySeconds: 240 }); // limite: 10 min de reserva + 2 de margem
+      expect(await runNext()).toMatchObject({ outcome: 'revisao_manual' });
+      expect(at()).toBe(720);
+      expect(queue.tasks).toHaveLength(5); // acabou: a varredura agendada continua daqui
       const rows = await audit('conciliacao.revisao_manual');
       expect(rows).toHaveLength(1);
       expect(rows[0].entity_id).toBe(p.orderId);
-      expect((await order(p.orderId)).status).toBe('pendente'); // nada foi inventado: só marcado para revisão
+      expect((await order(p.orderId)).status).toBe('expirado'); // o estado acompanha o prazo; nada foi inventado
+      expect(await resvOf(p.orderId)).toEqual(['expirada']);
+    });
+
+    it('a cadência vem do ambiente: esperas e margem configuradas', async () => {
+      const custom = build(mock, {
+        queue,
+        env: { RECONCILE_TASK_OFFSETS_SECONDS: '30,90', RECONCILE_TASK_MARGIN_SECONDS: '0' },
+      });
+      const e = await event();
+      const a = await user('cliente', custom);
+      const p = await pay(a, e, [1]);
+      expect(queue.tasks).toEqual([expect.objectContaining({ orderId: p.orderId, attempt: 1, delaySeconds: 30 })]);
+      const t = queue.tasks[0]!;
+      clock.advance(30_000);
+      await json(await task(p.orderId, 1, TOKEN, custom, t.chargedAt));
+      expect(queue.tasks.at(-1)).toMatchObject({ attempt: 2, delaySeconds: 60 });
+      clock.advance(60_000);
+      await json(await task(p.orderId, 2, TOKEN, custom, t.chargedAt));
+      // Lista acabou: a última é no limite (fim da reserva, margem zero), 10 min depois da cobrança.
+      expect(queue.tasks.at(-1)).toMatchObject({ attempt: 3, delaySeconds: 600 - 90 });
+      // Com 2 esperas configuradas, a tentativa 4 não existe.
+      expect((await task(p.orderId, 4, TOKEN, custom)).status).toBe(422);
+    });
+
+    it('aprovação tardia achada pela verificação do limite: com estoque emite (pedido já vencido na tela do comprador)', async () => {
+      const e = await event([{ total: 5 }]);
+      const a = await user('cliente', qapp);
+      const p = await pay(a, e, [2]);
+      const t = queue.tasks[0]!;
+      clock.advance(11 * 60_000);
+      await a.get(`/orders/${p.orderId}`); // o comprador vê "expirado"
+      expect((await order(p.orderId)).status).toBe('expirado');
+      mock.simulate.setStatus(p.paymentId, 'aprovado'); // aprovou junto com o vencimento; webhook perdido
+      clock.advance(60_000);
+      expect(await run(p.orderId, 5, t.chargedAt)).toMatchObject({ outcome: 'conciliado' });
+      expect((await order(p.orderId)).status).toBe('pago');
+      expect(await ticketsOf(p.orderId)).toHaveLength(2);
+      expect((await audit('pagamento.confirmado_tardio')).length).toBe(1);
     });
 
     it('a mesma tarefa entregue duas vezes não duplica nada (idempotência)', async () => {
@@ -1084,10 +1159,11 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       const a = await user('cliente', qapp);
       const p = await pay(a, e, [3]);
       mock.simulate.setStatus(p.paymentId, 'aprovado');
-      const res = await Promise.all(Array.from({ length: 6 }, () => task(p.orderId, 1)));
+      const res = await Promise.all(Array.from({ length: 6 }, (_, i) => task(p.orderId, (i % 5) + 1)));
       expect(res.every(r => r.status === 200)).toBe(true);
       expect(await ticketsOf(p.orderId)).toHaveLength(3);
       expect(await sold(e.types[0]!)).toBe(3);
+      expect((await audit('pagamento.confirmado')).length).toBe(1);
     });
 
     it('recusado e expirado no gateway são aplicados pela tarefa e devolvem o estoque', async () => {
@@ -1104,12 +1180,11 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       expect(await resvOf(pb.orderId)).toEqual(['expirada']);
     });
 
-    it('pedido sem cobrança: com reserva vencida expira e libera o estoque; com reserva viva reagenda', async () => {
+    it('tarefa antiga, de pedido sem cobrança: com reserva viva reagenda; com reserva vencida expira e libera o estoque', async () => {
       const e = await event([{ total: 1 }]);
       const a = await user('cliente', qapp);
       const created = await a.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.types[0]!, quantity: 1 }] });
       const id = (await json(created)).order.id as string;
-      queue.tasks.length = 0;
       expect(await run(id, 1)).toMatchObject({ outcome: 'reagendado' }); // ainda dentro dos 10 min de reserva
       clock.advance(11 * 60_000);
       expect(await run(id, 2)).toMatchObject({ outcome: 'expirado' });
@@ -1141,6 +1216,318 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       const noGateway = build(undefined, { queue });
       const res = await json(await task(p.orderId, 1, TOKEN, noGateway));
       expect(res.status).toBe('sem_gateway');
+    });
+  });
+
+  describe('varredura de pendentes (Cloud Scheduler a cada 5 min, pedidos de até 24 h)', () => {
+    const TOKEN = { authorization: 'Bearer token-do-scheduler' };
+    const sweep = (headers: Record<string, string> = TOKEN, target = app) =>
+      target.request('/api/internal/jobs/reconcile-pending', { method: 'POST', headers });
+    /** A varredura só pega pedido conferido há mais de 60 s (pelo relógio do banco). Envelhece o carimbo sem passar pelo gatilho. */
+    const age = (orderId: string) =>
+      sql(
+        `set session_replication_role = replica; update orders set updated_at = now() - interval '10 minutes' where id = '${orderId}'; set session_replication_role = origin`,
+      );
+
+    it('exige o token das rotinas: sem token 401, token errado 401; sem configuração 503; sem gateway não faz nada', async () => {
+      expect((await sweep({})).status).toBe(401);
+      expect((await sweep({ authorization: 'Bearer errado' })).status).toBe(401);
+      expect((await sweep(TOKEN, build(mock, { jobAuth: undefined }))).status).toBe(503);
+      expect(await json(await sweep(TOKEN, build(undefined)))).toEqual({ status: 'sem_gateway' });
+    });
+
+    it('sem webhook e sem tarefas: a varredura acha o pagamento aprovado e confirma', async () => {
+      const e = await event();
+      const a = await user();
+      const p = await pay(a, e, [2]);
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      await age(p.orderId);
+      const res = await json(await sweep());
+      expect(res).toMatchObject({ status: 'ok', summary: { orders: { checked: 1, outcomes: { confirmado: 1 } } } });
+      expect((await order(p.orderId)).status).toBe('pago');
+      expect(await ticketsOf(p.orderId)).toHaveLength(2);
+    });
+
+    it('janela de 24 h: pedido vencido há 23 h é reconsultado (aprovação tardia); com 25 h fica de fora', async () => {
+      const e = await event([{ total: 10 }]);
+      const [a, b] = [await user(), await user()];
+      const old = await pay(a, e, [1]);
+      clock.advance(2 * 3_600_000);
+      const recent = await pay(b, e, [1]);
+      clock.advance(23 * 3_600_000); // "old" tem 25 h; "recent", 23 h
+      await a.get(`/orders/${old.orderId}`); // os dois já aparecem vencidos (a expiração renova o carimbo de conferência)
+      await b.get(`/orders/${recent.orderId}`);
+      for (const p of [old, recent]) {
+        mock.simulate.setStatus(p.paymentId, 'aprovado');
+        await age(p.orderId);
+      }
+      const res = await json(await sweep());
+      expect(res.summary.orders.checked).toBe(1);
+      expect((await order(recent.orderId)).status).toBe('pago');
+      expect((await order(old.orderId)).status).toBe('expirado'); // fora da janela: fica para o webhook ou a rotina diária
+    });
+
+    it('a janela vem do ambiente (RECONCILE_SWEEP_WINDOW_HOURS)', async () => {
+      const narrow = build(mock, { env: { RECONCILE_SWEEP_WINDOW_HOURS: '2' } });
+      const e = await event();
+      const a = await user();
+      const p = await pay(a, e, [1]);
+      clock.advance(3 * 3_600_000);
+      await a.get(`/orders/${p.orderId}`);
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      await age(p.orderId);
+      expect((await json(await sweep(TOKEN, narrow))).summary.orders.checked).toBe(0);
+      expect((await json(await sweep(TOKEN, app))).summary.orders.checked).toBe(1);
+    });
+
+    it('trava: com outra varredura em andamento responde "em_execucao" sem tocar em nada; trava vencida é retomada e solta no fim', async () => {
+      const e = await event();
+      const a = await user();
+      const p = await pay(a, e, [1]);
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      await age(p.orderId);
+      await sql(
+        `insert into job_leases (name, holder, expires_at) values ('reconcile-pending', 'outra-execucao', now() + interval '2 minutes')`,
+      );
+      expect(await json(await sweep())).toEqual({ status: 'em_execucao' });
+      expect((await order(p.orderId)).status).toBe('pendente');
+      // A execução anterior caiu e o prazo venceu: a próxima assume.
+      await sql(`update job_leases set expires_at = now() - interval '1 second' where name = 'reconcile-pending'`);
+      expect((await json(await sweep())).status).toBe('ok');
+      expect((await order(p.orderId)).status).toBe('pago');
+      const lease = (await sql(`select expires_at <= now() as free from job_leases where name = 'reconcile-pending'`)).rows[0];
+      expect(lease.free).toBe(true); // soltou ao terminar
+    });
+
+    it('varreduras simultâneas: todas respondem 200, um pedido pago, ingressos uma vez', async () => {
+      const e = await event();
+      const buyers = [await user(), await user(), await user()];
+      const paid = [];
+      for (const b of buyers) paid.push(await pay(b, e, [2]));
+      for (const p of paid) {
+        mock.simulate.setStatus(p.paymentId, 'aprovado');
+        await age(p.orderId);
+      }
+      const res = await Promise.all(Array.from({ length: 5 }, () => sweep()));
+      expect(res.every(r => r.status === 200)).toBe(true);
+      const bodies = await Promise.all(res.map(r => json(r)));
+      expect(bodies.filter(b => b.status === 'ok').length).toBeGreaterThanOrEqual(1);
+      expect(await sold(e.types[0]!)).toBe(6);
+      expect((await sql('select count(*)::int as n from tickets')).rows[0].n).toBe(6);
+      expect((await audit('pagamento.confirmado')).length).toBe(3);
+    });
+  });
+
+  describe('pago sem estoque: aviso, painel, comprador e taxa (D-13 e D-54 pendentes: mínimo e reversível)', () => {
+    /** A paga tarde, com tudo vendido para B. Devolve os dois pedidos. */
+    async function paidWithoutStock(target = app) {
+      const e = await event([{ total: 2, price: 9000 }]);
+      const a = await user('cliente', target);
+      const b = await user('cliente', target);
+      const pa = await pay(a, e, [2]);
+      clock.advance(11 * 60_000);
+      const pb = await pay(b, e, [2]);
+      mock.simulate.setStatus(pb.paymentId, 'aprovado');
+      await hook(pb.paymentId, {}, target);
+      mock.simulate.setStatus(pa.paymentId, 'aprovado');
+      return { e, a, pa, pb };
+    }
+    const emailRows = async (orderId: string) =>
+      (
+        await sql(
+          `select e.user_id, e.status, u.email from email_log e join users u on u.id = e.user_id
+            where e.template = 'pagamento_sem_estoque' and e.order_id = $1 order by u.email`,
+          [orderId],
+        )
+      ).rows;
+
+    it('enfileira um e-mail para cada administrador ativo, uma vez, com pedido, comprador, valor, referência e orientação; sem CPF', async () => {
+      const adm1 = await user('administrador');
+      const adm2 = await user('administrador');
+      const inactive = await user('administrador');
+      await user('validador');
+      const inactiveEmail = (await json(await inactive.get('/auth/me'))).user.email as string;
+      await sql('update users set is_active = false where email = $1', [inactiveEmail]);
+      const { pa } = await paidWithoutStock();
+
+      expect((await json(await hook(pa.paymentId))).outcome).toBe('sem_estoque');
+      await hook(pa.paymentId); // notificação repetida
+      const rows = await emailRows(pa.orderId);
+      const adminEmails = [
+        (await json(await adm1.get('/auth/me'))).user.email,
+        (await json(await adm2.get('/auth/me'))).user.email,
+      ].sort();
+      expect(rows.map(r => r.email)).toEqual(adminEmails); // nem o inativo nem o validador
+      expect(rows.every(r => r.status === 'enviado')).toBe(true); // entregue logo, pela fila
+
+      const sent = mailer.sent.filter(m => m.template === 'pagamento_sem_estoque');
+      expect(sent.map(m => m.to).sort()).toEqual(adminEmails);
+      const msg = sent[0]!;
+      const number = (await sql('select number, total_cents from orders where id = $1', [pa.orderId])).rows[0];
+      const buyer = (await sql('select u.name, u.email, u.cpf from users u join orders o on o.user_id = u.id where o.id = $1', [pa.orderId])).rows[0];
+      expect(msg.subject).toContain('Pagamento recebido sem ingresso disponível');
+      expect(msg.subject).toContain(`PX-${number.number}`);
+      for (const piece of [
+        `PX-${number.number}`,
+        buyer.name,
+        buyer.email,
+        'R$\u00a0180,00', // Intl usa espaço não separável depois do símbolo
+        pa.paymentId,
+        'o estorno deve ser feito pela PartyX no painel do gateway',
+        'A plataforma não estorna automaticamente',
+        '/admin/excecoes',
+      ])
+        expect(msg.text, piece).toContain(piece);
+      expect(msg.text).not.toContain(buyer.cpf);
+      expect(msg.html).not.toContain(buyer.cpf);
+      expect(msg.text).not.toMatch(/—/);
+      expect(msg.data).toEqual({ orderNumber: `PX-${number.number}` }); // metadados sem dado do comprador
+    });
+
+    it('a varredura também detecta o caso (webhook perdido) e avisa os administradores', async () => {
+      await user('administrador');
+      const { a, pa } = await paidWithoutStock();
+      await a.get(`/orders/${pa.orderId}`); // já vencido
+      await sql(
+        `set session_replication_role = replica; update orders set updated_at = now() - interval '10 minutes' where id = '${pa.orderId}'; set session_replication_role = origin`,
+      );
+      const res = await json(
+        await app.request('/api/internal/jobs/reconcile-pending', {
+          method: 'POST',
+          headers: { authorization: 'Bearer token-do-scheduler' },
+        }),
+      );
+      expect(res.summary.orders.outcomes).toMatchObject({ sem_estoque: 1 });
+      expect((await order(pa.orderId)).status).toBe('pago_sem_estoque');
+      expect(await emailRows(pa.orderId)).toHaveLength(1);
+    });
+
+    it('nenhum estorno automático: o pedido fica pago sem estoque, sem ingresso, e o gateway não é chamado para devolver nada', async () => {
+      const { pa } = await paidWithoutStock();
+      await hook(pa.paymentId);
+      expect((await order(pa.orderId)).status).toBe('pago_sem_estoque');
+      expect(await ticketsOf(pa.orderId)).toEqual([]);
+      // Continua aprovado no gateway: a plataforma não tem (nem chama) operação de estorno; o estorno é da PartyX no gateway.
+      expect(mock.simulate.all().find(x => x.gatewayPaymentId === pa.paymentId)?.status).toBe('aprovado');
+    });
+
+    it('painel: alerta com contador; marcar como tratado exige motivo, grava na trilha, não muda o pedido e baixa o contador', async () => {
+      const admin = await user('administrador');
+      const { pa, a } = await paidWithoutStock();
+      await hook(pa.paymentId);
+
+      const before = await json(await admin.get('/admin/overview'));
+      expect(before.attention).toEqual({ paidWithoutStock: 1, paidWithoutStockTreated: 0 });
+      const list = await json(await admin.get('/admin/payments/exceptions'));
+      expect(list.abertos).toBe(1);
+      expect(list.semEstoque[0]).toMatchObject({
+        orderId: pa.orderId,
+        gatewayRef: pa.paymentId,
+        totalCents: 18000,
+        treated: null,
+      });
+      expect(list.semEstoque[0].buyerCpf).toMatch(/^\*\*\*\.\d{3}\.\d{3}-\*\*$/);
+
+      const treat = (s: Session, id: string, reason: unknown) =>
+        s.post(`/admin/payments/exceptions/${id}/treat`, { reason });
+      expect((await treat(admin, pa.orderId, '  ')).status).toBe(422);
+      expect((await treat(admin, pa.orderId, 'ok')).status).toBe(422);
+      expect((await treat(admin, pa.orderId, 'x'.repeat(601))).status).toBe(422);
+      expect((await treat(a, pa.orderId, 'Estornado no gateway')).status).toBe(403); // comprador não
+      expect((await treat(admin, 'nao-e-uuid', 'Estornado no gateway')).status).toBe(404);
+      const anon = await app.request(`/api/admin/payments/exceptions/${pa.orderId}/treat`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({ reason: 'Estornado no gateway' }),
+      });
+      expect(anon.status).toBe(401);
+      expect(await audit('pagamento.sem_estoque_tratado')).toHaveLength(0);
+
+      const ok = await treat(admin, pa.orderId, '  Estornado no gateway em 10/10,   protocolo 123  ');
+      expect(ok.status).toBe(200);
+      const trail = (
+        await sql(`select actor_id, reason, before_json, after_json from audit_log where action = 'pagamento.sem_estoque_tratado'`)
+      ).rows;
+      expect(trail).toHaveLength(1);
+      expect(trail[0].actor_id).toBeTruthy();
+      expect(trail[0].reason).toBe('Estornado no gateway em 10/10, protocolo 123');
+      expect(trail[0].after_json).toMatchObject({ tratado: true, status: 'pago_sem_estoque' });
+      expect((await order(pa.orderId)).status).toBe('pago_sem_estoque'); // reversível: nada além da marcação
+      expect(await ticketsOf(pa.orderId)).toEqual([]);
+
+      expect((await treat(admin, pa.orderId, 'De novo, por engano')).status).toBe(409);
+      expect(await audit('pagamento.sem_estoque_tratado')).toHaveLength(1);
+      const after = await json(await admin.get('/admin/overview'));
+      expect(after.attention).toEqual({ paidWithoutStock: 0, paidWithoutStockTreated: 1 });
+      const list2 = await json(await admin.get('/admin/payments/exceptions'));
+      expect(list2.abertos).toBe(0);
+      expect(list2.semEstoque[0].treated).toMatchObject({ reason: 'Estornado no gateway em 10/10, protocolo 123' });
+    });
+
+    it('só pedido em "pago sem estoque" pode ser marcado; dois administradores ao mesmo tempo gravam uma marcação só', async () => {
+      const [admin1, admin2] = [await user('administrador'), await user('administrador')];
+      const { pa, pb } = await paidWithoutStock();
+      await hook(pa.paymentId);
+      expect((await admin1.post(`/admin/payments/exceptions/${pb.orderId}/treat`, { reason: 'Pedido pago normal' })).status).toBe(409);
+      const both = await Promise.all(
+        [admin1, admin2].map(s => s.post(`/admin/payments/exceptions/${pa.orderId}/treat`, { reason: 'Estornado no gateway' })),
+      );
+      expect(both.map(r => r.status).sort()).toEqual([200, 409]);
+      expect(await audit('pagamento.sem_estoque_tratado')).toHaveLength(1);
+    });
+
+    it('comprador: com o contato da PartyX configurado, vê e-mail e WhatsApp; sem configuração, nenhum contato; pedido normal, nunca', async () => {
+      const configured = build(mock, {
+        env: { PARTYX_SUPPORT_EMAIL: 'atendimento@partyx.example', PARTYX_SUPPORT_WHATSAPP: '+55 11 91234-5678' },
+      });
+      const one = await paidWithoutStock(configured);
+      await hook(one.pa.paymentId, {}, configured);
+      const seen = (await json(await one.a.get(`/orders/${one.pa.orderId}`))).order;
+      expect(seen.status).toBe('pago_sem_estoque');
+      expect(seen.support).toEqual({ email: 'atendimento@partyx.example', whatsapp: '+55 11 91234-5678' });
+      const buyerB = (await sql('select user_id from orders where id = $1', [one.pb.orderId])).rows[0].user_id;
+      expect(buyerB).toBeTruthy();
+
+      // Sem configuração (o padrão): o servidor não manda contato nenhum; a tela mostra a mensagem neutra, sem prazo.
+      const two = await paidWithoutStock(app);
+      await hook(two.pa.paymentId);
+      const plain = (await json(await two.a.get(`/orders/${two.pa.orderId}`))).order;
+      expect(plain.status).toBe('pago_sem_estoque');
+      expect(plain.support).toBeNull();
+    });
+
+    it('comprador de pedido pago normalmente nunca recebe contato, mesmo configurado', async () => {
+      const configured = build(mock, { env: { PARTYX_SUPPORT_EMAIL: 'atendimento@partyx.example' } });
+      const e = await event();
+      const a = await user('cliente', configured);
+      const p = await pay(a, e, [1]);
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      await hook(p.paymentId, {}, configured);
+      const seen = (await json(await a.get(`/orders/${p.orderId}`))).order;
+      expect(seen.status).toBe('pago');
+      expect(seen.support).toBeNull();
+    });
+
+    it('taxa (D-54): a fórmula não muda; o caso aparece à parte em "Exceções para análise", com valor, referência e situação', async () => {
+      const admin = await user('administrador');
+      const { pa, pb } = await paidWithoutStock();
+      await hook(pa.paymentId);
+      const fee = async () => json(await admin.get('/admin/reports/fee?month=2026-10'));
+      const r = await fee();
+      expect(r.units).toBe(2); // só os ingressos de B
+      expect(r.feeCents).toBe(2 * r.feePerTicketCents);
+      expect(r.exceptions.title).toBe('Exceções para análise');
+      expect(r.exceptions.paidWithoutStock).toEqual([
+        expect.objectContaining({ orderId: pa.orderId, units: 2, totalCents: 18000, gatewayRef: pa.paymentId, treated: false }),
+      ]);
+      expect(r.exceptions.totals).toEqual({ orders: 1, units: 2, cents: 18000, open: 1 });
+      expect(r.reconciliation.ok).toBe(true);
+      await admin.post(`/admin/payments/exceptions/${pa.orderId}/treat`, { reason: 'Estornado no gateway' });
+      const r2 = await fee();
+      expect(r2.units).toBe(2); // marcar como tratado não mexe na taxa
+      expect(r2.exceptions.paidWithoutStock[0].treated).toBe(true);
+      expect(r2.exceptions.totals.open).toBe(0);
+      expect(pb.orderId).toBeTruthy();
     });
   });
 

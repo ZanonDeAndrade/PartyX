@@ -34,7 +34,7 @@ Decisão D-38: o webhook responde **depois** de processar (uma consulta e uma tr
 |---|---|
 | `aprovado`, reserva válida | `pendente → pago`; reserva `convertida`; `quantity_sold` sobe; ingressos emitidos (Prompt 13); `paid_at` = instante da aprovação informado pelo gateway |
 | `aprovado`, reserva vencida **com estoque** | Mesmo caminho, com as linhas dos tipos trancadas e a conta refeita (`confirmado_tardio`) |
-| `aprovado`, reserva vencida **sem estoque** | `pago_sem_estoque`: **nada é emitido**, `paid_at` é guardado, log `alert=pago_sem_estoque`, trilha `pagamento.sem_estoque`, e o pedido aparece em `GET /api/admin/payments/exceptions` para o **cliente estornar no gateway**. A plataforma não estorna sozinha. É tudo ou nada: se um só tipo faltar, o pedido inteiro fica sem estoque, sem emissão parcial |
+| `aprovado`, reserva vencida **sem estoque** | `pago_sem_estoque`: **nada é emitido**, `paid_at` é guardado, log `alert=pago_sem_estoque`, trilha `pagamento.sem_estoque`, **e-mail a cada administrador ativo** (ver abaixo) e o pedido aparece em `GET /api/admin/payments/exceptions` para o **cliente estornar no gateway**. A plataforma não estorna sozinha. É tudo ou nada: se um só tipo faltar, o pedido inteiro fica sem estoque, sem emissão parcial |
 | `recusado` (CA-P2) | `pendente → nao_concluido`; reserva liberada (o estoque volta na hora); sem ingresso |
 | `expirado` / `cancelado` | `expirado`; reserva `expirada` |
 | `estornado` / `contestado` (CA-P5) | `pago → estornado` ou `contestado`; ingressos ainda válidos `cancelados` (a portaria passa a recusar); **`paid_at` não muda** (a taxa mensal segue contando). Ingresso já usado fica `utilizado`. Estorno repetido não faz nada |
@@ -46,7 +46,13 @@ Eventos **fora de ordem** são inofensivos porque cada notificação reconsulta 
 
 ## Conciliação agendada (webhook perdido)
 
-> **Em produção (decisão de 05/10/2026) a conciliação é sob demanda**, não periódica: ao criar o pedido o servidor agenda uma tarefa no Cloud Tasks para +10 min que verifica só aquele pedido (`POST /api/internal/tasks/reconcile-order`, OIDC), reagenda em +15 e +30 min e na 3ª vez marca revisão manual. A rotina abaixo passa a rodar **uma vez por dia**. Ver `README-DEPLOY.md`.
+> **Cadência desde 10/10/2026** (antes: tarefa aos 10 min, depois 15 e 30, e varredura só diária, o que não cumpria "a cada poucos minutos" da documentação; achado da auditoria):
+>
+> 1. **Tarefas por pedido (Cloud Tasks)**, a partir da **criação da cobrança**: +1, +2, +4 e +8 min, e a última **no fim da reserva + margem** (padrão 2 min). Nenhuma passa desse limite. Cada tarefa só agenda a seguinte se o pagamento seguir sem decisão; pedido resolvido encerra a cadeia. Se a última ainda vê "pendente" no gateway, o pedido expira localmente e fica a trilha `conciliacao.revisao_manual` (alerta `conciliacao_revisao_manual`). Cálculo puro em `server/src/domain/reconcileSchedule.ts`; tarefa em `server/src/payments/reconcileTask.ts`; rota `POST /api/internal/tasks/reconcile-order` (OIDC).
+> 2. **Varredura de pendentes (Cloud Scheduler, a cada 5 min):** `POST /api/internal/jobs/reconcile-pending` reconsulta os pedidos com cobrança criados nas últimas 24 h que ainda podem mudar (pendente, vencido, não concluído), vence reservas e reprocessa notificações pendentes. **Uma execução por vez:** trava com prazo na tabela `job_leases` (sem `pg_advisory_lock` de sessão, que não é confiável na conexão pooled do Neon); quem chega com outra em andamento responde 200 `em_execucao`; uma execução que cai solta a trava quando o prazo vence.
+> 3. **Rotina diária** (`reconcile-payments`, 04:00): fila de e-mails, pedidos de até 3 dias e ingressos que faltarem.
+>
+> Tudo por variável de ambiente: `RECONCILE_TASK_OFFSETS_SECONDS` (`60,120,240,480`), `RECONCILE_TASK_MARGIN_SECONDS` (`120`), `RECONCILE_SWEEP_WINDOW_HOURS` (`24`), `RECONCILE_SWEEP_LOCK_SECONDS` (`240`), `RECONCILE_SWEEP_BATCH` (`100`); a agenda da varredura é `PENDING_SCHEDULE` nos scripts de infraestrutura. **Custo:** a varredura a cada 5 min mantém o Neon acordado (README-DEPLOY.md, seção 8). A idempotência não mudou: tarefas e varreduras simultâneas do mesmo pedido continuam sem duplicar nada (testado).
 
 `POST /api/internal/jobs/reconcile-payments`, chamado pelo **Cloud Scheduler** (na homologação a cada 2 minutos: `infra/homologacao/scheduler.sh`, **não executado**). Faz, nesta ordem: vence reservas, reprocessa eventos pendentes, reconsulta pedidos com cobrança que ainda podem mudar (pendentes; vencidos ou não concluídos nos últimos 3 dias, porque uma aprovação pode chegar atrasada).
 
@@ -73,6 +79,15 @@ O teste no navegador mostrou que respostas **privadas** (pedido, conta, painel) 
 - Scheduler real, token OIDC real e logs no Cloud Logging; o alerta no Cloud Monitoring não foi criado (D-41).
 - Carga (Prompt 24) e o comportamento do `SKIP LOCKED` na conexão **pooled** do Neon.
 - Emissão dos ingressos de verdade (Prompt 13): o teste usa um emissor de teste na mesma transação.
+
+## Pagamento aprovado sem ingresso disponível (procedimento provisório, 10/10/2026)
+
+A decisão D-13 (canal, responsável e prazo) segue **pendente**. Foi implementado só o mínimo e reversível; nada aqui é resposta da PartyX.
+
+- **Aviso por e-mail:** na mesma transação que grava `pago_sem_estoque`, a fila (`email_log`) recebe um item `pagamento_sem_estoque` para **cada administrador ativo** (chave `sem_estoque:<pedido>:<administrador>`, então notificação repetida não duplica). Modelo "Pagamento recebido sem ingresso disponível": número do pedido, evento, comprador (nome e e-mail, **sem CPF**), valor, data da aprovação, referência no gateway e a orientação "o estorno deve ser feito pela PartyX no painel do gateway; a plataforma não estorna automaticamente", com botão para `/admin/excecoes`. A entrega é tentada na hora e segue a política da fila (retentativas e alerta `email_falhou`). Quem deixou de ser administrador ou foi desativado não recebe.
+- **Painel:** aba **Exceções** com contador e alerta no topo de **todas** as páginas do painel enquanto houver caso em aberto. Cada caso pode ser **marcado como tratado** (`POST /api/admin/payments/exceptions/:pedido/treat`, só administrador, motivo obrigatório de 5 a 500 caracteres). A marcação é **só** uma linha `pagamento.sem_estoque_tratado` na trilha (com o administrador e o motivo): o pedido continua `pago_sem_estoque`, nada é estornado, nenhum estoque muda e a taxa não muda. Uma marcação por pedido (a segunda responde 409, inclusive com dois administradores ao mesmo tempo).
+- **Comprador:** a tela do pedido mostra o contato **da PartyX** se `PARTYX_SUPPORT_EMAIL` e/ou `PARTYX_SUPPORT_WHATSAPP` estiverem configurados (o servidor só manda o contato nesse estado de pedido). Sem configuração, mensagem neutra, sem prazo e sem promessa. Nunca há contato da contratada.
+- **Taxa (D-54):** a fórmula **não mudou**. O relatório mensal ganhou a seção **"Exceções para análise"** (pedido, unidades, valor, referência no gateway, tratado ou em aberto, totais), também no extrato `ops:fee`.
 
 ## Decisões abertas
 

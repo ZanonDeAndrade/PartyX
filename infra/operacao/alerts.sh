@@ -3,15 +3,15 @@
 # Cria uma métrica baseada em log por sinal e uma política de alerta por e-mail. Idempotente. Cria custo desprezível, mas altera o projeto.
 # Uso: PROJECT=<projeto> NOTIFY_EMAIL=<e-mail da equipe> ./infra/operacao/alerts.sh
 # Sinais (todos já existem em server/src; ver docs/operacao/README.md para o que fazer em cada um):
-#   pago_sem_estoque        crítico para o cliente estornar no gateway
+#   pago_sem_estoque        crítico para o cliente estornar no gateway (os administradores ativos também recebem e-mail pela fila)
 #   webhook_falhou          notificação de pagamento não processada
 #   reconciliacao_falhou    a rotina agendada não conseguiu consultar o gateway
 #   pagamento_divergente    valor, conta ou pedido diferentes do esperado
 #   estorno_fora_de_fluxo   estorno ou chargeback sem aprovação local
 #   email_falhou            e-mail transacional não entregue
-#   conciliacao_revisao_manual  pedido ainda pendente depois das 3 verificações sob demanda
+#   conciliacao_revisao_manual  pagamento ainda pendente no gateway depois das verificações sob demanda (fim da reserva + margem)
 #   fila_conciliacao_falhou     não foi possível agendar a verificação no Cloud Tasks
-#   fila_email_falhou           não foi possível agendar o reenvio de e-mail (a varredura diária cobre)
+#   fila_email_falhou           não foi possível agendar o reenvio de e-mail (a rotina diária cobre)
 #   limite_global_atingido      limite GLOBAL de cadastros ou de recuperações de senha por hora atingido (abuso em massa, ou evento: subir o limite)
 #   verificacao_humana_indisponivel  a Cloudflare (Turnstile) não respondeu: cadastro e recuperação ficam recusados (falha fechada)
 set -euo pipefail

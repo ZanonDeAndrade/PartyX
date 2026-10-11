@@ -151,3 +151,14 @@ export const globalLimitCounters = pgTable(
   },
   t => [primaryKey({ columns: [t.kind, t.bucket] }), check('global_limit_counters_count_nonneg', sql`${t.count} >= 0`)],
 );
+
+/**
+ * Travas de rotina com prazo (lease): impedem que duas execuções da mesma rotina agendada (ex.: a varredura de pagamentos a cada
+ * 5 minutos) rodem ao mesmo tempo. Não usa trava de sessão do PostgreSQL porque a conexão pooled do Neon não garante a mesma sessão.
+ * Uma linha por rotina; quem pega a trava grava o prazo, e uma execução que caiu no meio libera sozinha quando o prazo vence.
+ */
+export const jobLeases = pgTable('job_leases', {
+  name: text('name').primaryKey(),
+  holder: text('holder').notNull(),
+  expiresAt: instant('expires_at').notNull(),
+});

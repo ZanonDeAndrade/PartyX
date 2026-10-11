@@ -439,16 +439,56 @@ export function FeeReportPage() {
             </table>
           </TableWrap>
 
-          {r.exceptions.paidWithoutStock.length > 0 ? (
-            <Note tone="err">
-              <b>Exceção para análise.</b> {r.exceptions.note} Pedidos:{' '}
-              {r.exceptions.paidWithoutStock.map(o => (
-                <span key={o.orderId}>
-                  <Link to={`/admin/pedidos/${o.orderId}`}>PX-{o.number}</Link> ({o.units} un.){' '}
-                </span>
-              ))}
-            </Note>
-          ) : null}
+          <section aria-labelledby="excecoes">
+            <h2 id="excecoes" className="px-h3">
+              {r.exceptions.title}
+            </h2>
+            <p className="px-small px-muted">{r.exceptions.note}</p>
+            {r.exceptions.paidWithoutStock.length === 0 ? (
+              <p className="px-muted">Nenhum pagamento aprovado sem estoque neste mês.</p>
+            ) : (
+              <TableWrap>
+                <table className="px-table">
+                  <thead>
+                    <tr>
+                      <th>Pedido</th>
+                      <th>Unidades pagas</th>
+                      <th>Valor</th>
+                      <th>Aprovado em</th>
+                      <th>Referência no gateway</th>
+                      <th>Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.exceptions.paidWithoutStock.map(o => (
+                      <tr key={o.orderId}>
+                        <td>
+                          <Link to={`/admin/pedidos/${o.orderId}`}>PX-{o.number}</Link>
+                        </td>
+                        <td>{o.units}</td>
+                        <td>{brl(o.totalCents)}</td>
+                        <td>{dateShort(o.paidAt)}</td>
+                        <td>
+                          <code>{o.gatewayRef ?? 'não informada'}</code>
+                        </td>
+                        <td>{o.treated ? 'Tratado' : <Link to="/admin/excecoes">Em aberto</Link>}</td>
+                      </tr>
+                    ))}
+                    <tr className="px-total-row">
+                      <th scope="row">Total</th>
+                      <td>
+                        <b>{r.exceptions.totals.units}</b>
+                      </td>
+                      <td>
+                        <b>{brl(r.exceptions.totals.cents)}</b>
+                      </td>
+                      <td colSpan={3}>{r.exceptions.totals.open} em aberto</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </TableWrap>
+            )}
+          </section>
 
           <section aria-labelledby="rec">
             <h2 id="rec" className="px-h3">

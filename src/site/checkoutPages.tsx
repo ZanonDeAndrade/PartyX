@@ -153,7 +153,7 @@ function ResultCard({
   order?: number;
   title: string;
   children: ReactNode;
-  box?: { tone: 'neu' | 'warn'; title: string; text: string };
+  box?: { tone: 'neu' | 'warn'; title: string; text: ReactNode };
   actions: ReactNode;
 }) {
   return (
@@ -812,17 +812,46 @@ export function OrderPage({ id }: { id: string }) {
       </ResultCard>
     );
   } else if (order.status === 'pago_sem_estoque') {
+    // Contato SÓ da PartyX, vindo da configuração do servidor. Sem ele, mensagem neutra: nada de prazo nem promessa (D-13 pendente).
+    const support = order.support ?? null;
+    const whatsappDigits = support?.whatsapp?.replace(/\D/g, '') ?? '';
     body = (
       <ResultCard
         tone="warn"
         icon="!"
         order={order.number}
         title="Pagamento confirmado, mas os ingressos esgotaram"
-        box={{
-          tone: 'warn',
-          title: 'A PartyX foi avisada e vai resolver com você.',
-          text: 'O atendimento da PartyX entra em contato pelo e-mail ou telefone do seu cadastro. O estorno é feito pela PartyX no gateway de pagamento; o prazo depende do meio de pagamento. Contato de atendimento: a fornecer pela PartyX.',
-        }}
+        box={
+          support && (support.email || support.whatsapp)
+            ? {
+                tone: 'warn',
+                title: 'Fale com o atendimento da PartyX',
+                text: (
+                  <>
+                    Informe o número do pedido PX-{order.number}.{' '}
+                    {support.email ? (
+                      <>
+                        E-mail: <a href={`mailto:${support.email}`}>{support.email}</a>
+                      </>
+                    ) : null}
+                    {support.email && support.whatsapp ? ' · ' : null}
+                    {support.whatsapp ? (
+                      <>
+                        WhatsApp:{' '}
+                        <a href={`https://wa.me/${whatsappDigits}`} target="_blank" rel="noopener noreferrer">
+                          {support.whatsapp}
+                        </a>
+                      </>
+                    ) : null}
+                  </>
+                ),
+              }
+            : {
+                tone: 'warn',
+                title: 'Seu pagamento ficou registrado.',
+                text: 'O caso fica registrado com o número deste pedido para análise da PartyX. Guarde o número do pedido.',
+              }
+        }
         actions={
           <>
             <Link to="/minhas-compras" className="px-btn px-btn-pri px-btn-lg">

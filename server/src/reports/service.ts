@@ -3,6 +3,7 @@ import type { Db } from '../db/client';
 import { AppError } from '../domain/errors';
 import { EVENT_TIMEZONE } from '../domain/time';
 import { checkFilter } from '../panel/service';
+import { treatedSql } from '../payments/exceptions';
 
 /**
  * Relatórios (RF-58, RF-59, RF-60, CA-19, CA-28 a CA-30). Somente leitura; exportações são do Prompt 18.
@@ -270,8 +271,33 @@ export async function feeReport(deps: ReportDeps, month: string, page: number, p
       from orders o
      where ${inMonth} and not exists (select 1 from tickets t where t.order_id = o.id)
      order by o.number`);
-  const withoutStock = noTickets.rows.filter(o => o.status === 'pago_sem_estoque');
   const anomalies = noTickets.rows.filter(o => o.status !== 'pago_sem_estoque');
+  // Exceções para análise (D-54 pendente): pagamentos aprovados no mês sem ingresso disponível. Ficam FORA da fórmula da taxa, que
+  // continua contando só ingressos emitidos; aparecem à parte, com valor, referência no gateway e se o caso já foi tratado.
+  const withoutStock = await deps.db.execute<{
+    id: string;
+    number: number;
+    total_cents: number;
+    paid_at: Date;
+    gateway_payment_id: string | null;
+    qty: number;
+    treated: boolean;
+  }>(sql`
+    select o.id, o.number, o.total_cents, o.paid_at, o.gateway_payment_id,
+           (select sum(i.quantity) from order_items i where i.order_id = o.id)::int as qty,
+           ${treatedSql(sql`o.id`)} as treated
+      from orders o
+     where ${inMonth} and o.status = 'pago_sem_estoque'
+     order by o.paid_at, o.number`);
+  const exceptionRows = withoutStock.rows.map(o => ({
+    orderId: o.id,
+    number: num(o.number),
+    units: num(o.qty),
+    totalCents: num(o.total_cents),
+    paidAt: iso(o.paid_at),
+    gatewayRef: o.gateway_payment_id,
+    treated: Boolean(o.treated),
+  }));
 
   const revenue = await deps.db.execute<{ status: string; cents: string }>(sql`
     select o.status::text as status, coalesce(sum(o.total_cents), 0)::bigint as cents
@@ -315,8 +341,15 @@ export async function feeReport(deps: ReportDeps, month: string, page: number, p
       })),
     },
     exceptions: {
-      paidWithoutStock: withoutStock.map(o => ({ orderId: o.id, number: num(o.number), units: num(o.qty) })),
-      note: 'Pagamento aprovado sem estoque não gera ingresso e não entra na contagem: é exceção para análise (o cliente estorna no gateway), não venda.',
+      title: 'Exceções para análise',
+      paidWithoutStock: exceptionRows,
+      totals: {
+        orders: exceptionRows.length,
+        units: exceptionRows.reduce((t, o) => t + o.units, 0),
+        cents: exceptionRows.reduce((t, o) => t + o.totalCents, 0),
+        open: exceptionRows.filter(o => !o.treated).length,
+      },
+      note: 'Pagamento aprovado sem estoque não gera ingresso e não entra na contagem: é exceção para análise (o cliente estorna no gateway), não venda. O tratamento desses casos na taxa depende da decisão D-54; a fórmula acima não muda.',
     },
     // Receita separada da taxa: a taxa é devida sobre unidades emitidas; a receita líquida exclui o que foi estornado ou contestado.
     revenue: {

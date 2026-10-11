@@ -21,7 +21,7 @@ Implementado em 01/10/2026 (Prompt 16): RF-55 a RF-57, RF-61 e RF-62. Código em
 - **Venda = pedido pago**, pela data original da aprovação (`paid_at`), no **fuso do evento**: um pagamento às 23h30 de Brasília é do dia anterior, e a virada do mês também respeita o fuso (testado nos dois casos).
 - Estornados, contestados e pagos sem estoque aparecem **separados** das vendas pagas. Pendente, expirado e não concluído não são venda. Um pedido estornado continua com `paid_at` (a taxa mensal depende disso, Prompt 17), mas não conta como venda ativa.
 - Por evento publicado e por tipo: capacidade, **vendidos** (`quantity_sold`), **reservados agora** (só reservas ainda válidas) e **restantes** = capacidade − vendidos − reservados.
-- Aviso quando há pagamento aprovado sem estoque, com link para os pedidos.
+- Alerta persistente quando há pagamento aprovado sem estoque **ainda não tratado**, no topo de todas as páginas do painel, com contador na aba **Exceções** (`/admin/excecoes`). Lá cada caso mostra comprador, valor, data e referência no gateway e pode ser marcado como tratado com motivo obrigatório (fica na trilha; o pedido não muda e nada é estornado). Ver `webhook-e-conciliacao.md`.
 
 ## Pedidos (RF-56)
 

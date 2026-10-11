@@ -57,6 +57,23 @@ describe('cloudTasksQueue (API REST do Cloud Tasks)', () => {
     expect(when).toBeLessThanOrEqual(Date.now() + 901_000);
   });
 
+  it('leva o instante da cobrança no corpo (base das esperas 1, 2, 4 e 8 min), com o mesmo nome determinístico', async () => {
+    request.mockResolvedValue({ data: {} });
+    await cloudTasksQueue(CFG).enqueue({
+      orderId: '5f0c3e1e-6b0e-4f55-9c0f-1b9e6e6a8c11',
+      attempt: 3,
+      delaySeconds: 120,
+      chargedAt: '2026-10-10T15:00:00.000Z',
+    });
+    const t = request.mock.calls[0]![0].data.task;
+    expect(t.name).toBe(`${CFG.queuePath}/tasks/reconcile-5f0c3e1e-6b0e-4f55-9c0f-1b9e6e6a8c11-3`);
+    expect(JSON.parse(Buffer.from(t.httpRequest.body, 'base64').toString())).toEqual({
+      orderId: '5f0c3e1e-6b0e-4f55-9c0f-1b9e6e6a8c11',
+      attempt: 3,
+      chargedAt: '2026-10-10T15:00:00.000Z',
+    });
+  });
+
   it('e-mail: URL e corpo próprios, nome determinístico e o mesmo token OIDC', async () => {
     request.mockResolvedValue({ data: {} });
     await cloudTasksQueue(CFG).enqueueEmail({

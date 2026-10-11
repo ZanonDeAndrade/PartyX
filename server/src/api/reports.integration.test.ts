@@ -485,8 +485,21 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const adm = await session();
       const r = await fee(adm);
       expect(r.units).toBe(1);
-      expect(r.exceptions.paidWithoutStock).toEqual([{ orderId: sem.id, number: expect.any(Number), units: 3 }]);
+      expect(r.exceptions.title).toBe('Exceções para análise');
+      expect(r.exceptions.paidWithoutStock).toEqual([
+        {
+          orderId: sem.id,
+          number: expect.any(Number),
+          units: 3,
+          totalCents: expect.any(Number),
+          paidAt: expect.any(String),
+          gatewayRef: null,
+          treated: false,
+        },
+      ]);
+      expect(r.exceptions.totals).toMatchObject({ orders: 1, units: 3, open: 1 });
       expect(r.exceptions.note).toMatch(/não gera ingresso/);
+      expect(r.exceptions.note).toMatch(/D-54/);
       expect(r.reconciliation.ok).toBe(true); // exceção conhecida não é divergência
     });
 

@@ -1,15 +1,17 @@
 import { desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { requireAdmin } from '../auth/permissions';
 import type { AuthDeps, AuthVariables } from '../auth/types';
-import { auditLog, events, orders, users } from '../db/schema';
-import { maskCpf } from '../domain/cpf';
+import { auditLog, orders } from '../db/schema';
 import { AppError } from '../domain/errors';
+import { listPaidWithoutStock, markTreated } from '../payments/exceptions';
+import { parseJson } from './validate';
 import type { MockGateway } from '../payments/mockGateway';
 
 /**
- * Exceções de pagamento para o administrador agir (o painel completo é do Prompt 16):
- * pagamentos aprovados sem estoque (o cliente precisa estornar no gateway) e pagamentos que não conferem com o pedido.
+ * Exceções de pagamento para o administrador agir: pagamentos aprovados sem estoque (o cliente precisa estornar no gateway; o caso
+ * fica em aberto até um administrador marcá-lo como tratado, com motivo) e pagamentos que não conferem com o pedido.
  * A plataforma **não estorna sozinha** e não decide pelo cliente.
  */
 export function paymentAdminRoutes(deps: AuthDeps) {
@@ -17,23 +19,7 @@ export function paymentAdminRoutes(deps: AuthDeps) {
   app.use('/admin/*', requireAdmin);
 
   app.get('/admin/payments/exceptions', async c => {
-    const semEstoque = await deps.db
-      .select({
-        orderId: orders.id,
-        number: orders.number,
-        totalCents: orders.totalCents,
-        paidAt: orders.paidAt,
-        paymentMethod: orders.paymentMethod,
-        event: events.name,
-        buyerName: users.name,
-        buyerEmail: users.email,
-        buyerCpf: users.cpf,
-      })
-      .from(orders)
-      .innerJoin(events, eq(events.id, orders.eventId))
-      .innerJoin(users, eq(users.id, orders.userId))
-      .where(eq(orders.status, 'pago_sem_estoque'))
-      .orderBy(desc(orders.paidAt));
+    const semEstoque = await listPaidWithoutStock(deps.db);
 
     const divergencias = await deps.db
       .select({ orderId: auditLog.entityId, reason: auditLog.reason, at: auditLog.createdAt })
@@ -50,12 +36,22 @@ export function paymentAdminRoutes(deps: AuthDeps) {
       .limit(100);
 
     return c.json({
-      semEstoque: semEstoque.map(({ buyerCpf, ...o }) => ({ ...o, buyerCpf: buyerCpf ? maskCpf(buyerCpf) : null })),
+      semEstoque,
+      abertos: semEstoque.filter(x => !x.treated).length,
       divergencias,
       foraDeFluxo,
       orientacao:
-        'Pagamento sem estoque: o cliente estorna no painel do gateway. A PartyX não estorna nem decide pelo cliente.',
+        'Pagamento sem estoque: o cliente estorna no painel do gateway. A PartyX não estorna nem decide pelo cliente. Depois de tratar, marque o caso como tratado com o motivo.',
     });
+  });
+
+  /** Marca um caso de pagamento sem estoque como tratado (motivo obrigatório, na trilha). Não estorna nem muda o pedido. */
+  app.post('/admin/payments/exceptions/:orderId/treat', async c => {
+    const orderId = z.uuid().safeParse(c.req.param('orderId'));
+    if (!orderId.success) throw new AppError(404, 'nao_encontrado', 'Pedido não encontrado.');
+    const body = await parseJson(c, z.object({ reason: z.string().max(600) }));
+    const result = await markTreated(deps, { id: c.get('auth')!.user.id }, orderId.data, body.reason);
+    return c.json(result);
   });
 
   /**

@@ -7,6 +7,7 @@ import { AppError } from '../domain/errors';
 import { dateKeyInEventZone, EVENT_TIMEZONE } from '../domain/time';
 import { foldName } from '../gate/service';
 import type { Clock } from '../providers/clock';
+import { countUntreated } from '../payments/exceptions';
 
 /**
  * Painel administrativo (RF-55 a RF-57, RF-61, RF-62). Leitura e cancelamento de ingresso.
@@ -148,8 +149,8 @@ export async function overview(deps: PanelDeps, monthParam?: string) {
     byEvent.set(r.event_id, ev);
   }
 
-  const alerts = await deps.db.execute<{ n: number }>(sql`
-    select (select count(*) from orders where status = 'pago_sem_estoque')::int as n`);
+  // Alerta persistente: casos de pagamento sem estoque ainda não marcados como tratados.
+  const alerts = await countUntreated(deps.db);
 
   return {
     today,
@@ -158,7 +159,7 @@ export async function overview(deps: PanelDeps, monthParam?: string) {
     monthSales,
     daily: daily.rows.map(d => ({ day: d.day, orders: num(d.orders), tickets: num(d.tickets), cents: num(d.cents) })),
     events: [...byEvent.values()],
-    attention: { paidWithoutStock: num(alerts.rows[0]?.n) },
+    attention: { paidWithoutStock: alerts.open, paidWithoutStockTreated: alerts.treated },
   };
 }
 

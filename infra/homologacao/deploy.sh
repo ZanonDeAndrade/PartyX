@@ -47,6 +47,11 @@ vars=(NODE_ENV=production APP_ENV=homologacao ENABLE_PROTOTYPE=true DB_POOL_MAX=
 # O estado do fictício fica na memória: nesse modo, use UMA instância (MIN_INSTANCES=1 MAX_INSTANCES=1).
 [ "${HML_GATEWAY_FICTICIO:-false}" != "true" ] || vars+=(PAYMENT_GATEWAY=mock HOMOLOGACAO_GATEWAY_FICTICIO=true)
 [ -z "${EMAIL_FROM:-}" ] || vars+=("EMAIL_FROM=$EMAIL_FROM")
+# Cadência da conciliação e contato da PartyX: só entram se definidos (os padrões estão no código, server/src/config.ts).
+for v in RECONCILE_TASK_OFFSETS_SECONDS RECONCILE_TASK_MARGIN_SECONDS RECONCILE_SWEEP_WINDOW_HOURS RECONCILE_SWEEP_LOCK_SECONDS \
+         RECONCILE_SWEEP_BATCH PARTYX_SUPPORT_EMAIL PARTYX_SUPPORT_WHATSAPP; do
+  [ -z "${!v:-}" ] || vars+=("$v=${!v}")
+done
 joined="$(IFS='#'; echo "${vars[*]}")"
 secrets="DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,QR_HMAC_KEYS=qr-hmac-keys:latest,TURNSTILE_SECRET=turnstile-secret:latest"
 [ -z "$(gcloud secrets versions list smtp-url --project="$PROJECT" --limit=1 --format='value(name)' 2>/dev/null)" ] || secrets="$secrets,SMTP_URL=smtp-url:latest"
