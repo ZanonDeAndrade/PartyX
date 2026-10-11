@@ -300,14 +300,13 @@ describe('loadConfig', () => {
     });
   });
   describe('cadência da conciliação e contato da PartyX', () => {
-    it('padrão: 1, 2, 4 e 8 minutos, margem de 2 min, varredura de 24 h com trava de 4 min; sem contato configurado', () => {
+    it('padrão: 1, 2, 4 e 8 min, margem de 2 min, tardias de 15 min a 24 h, trava de 2 min; sem contato configurado', () => {
       const c = loadConfig({});
       expect(c.reconcile).toEqual({
         taskOffsetsSeconds: [60, 120, 240, 480],
         taskMarginSeconds: 120,
-        sweepWindowHours: 24,
-        sweepLockSeconds: 240,
-        sweepBatch: 100,
+        lateOffsetsSeconds: [900, 1800, 3600, 10800, 28800, 86400],
+        lockSeconds: 120,
       });
       expect(c.partyxSupport).toBeNull();
     });
@@ -315,22 +314,22 @@ describe('loadConfig', () => {
       const c = loadConfig({
         RECONCILE_TASK_OFFSETS_SECONDS: '30, 90,300',
         RECONCILE_TASK_MARGIN_SECONDS: '0',
-        RECONCILE_SWEEP_WINDOW_HOURS: '12',
-        RECONCILE_SWEEP_LOCK_SECONDS: '120',
-        RECONCILE_SWEEP_BATCH: '20',
+        RECONCILE_LATE_OFFSETS_SECONDS: '1200,7200,172800',
+        RECONCILE_LOCK_SECONDS: '60',
       });
       expect(c.reconcile).toEqual({
         taskOffsetsSeconds: [30, 90, 300],
         taskMarginSeconds: 0,
-        sweepWindowHours: 12,
-        sweepLockSeconds: 120,
-        sweepBatch: 20,
+        lateOffsetsSeconds: [1200, 7200, 172800],
+        lockSeconds: 60,
       });
     });
-    it('lista de esperas inválida é recusada (fora de ordem, repetida, fora da faixa, vazia, texto)', () => {
+    it('listas de esperas inválidas são recusadas (fora de ordem, repetida, fora da faixa, texto, longa demais)', () => {
       for (const bad of ['120,60', '60,60', '5', '60,4000', ',', 'a,b', '1,2,3,4,5,6,7,8,9,10,11'])
         expect(() => loadConfig({ RECONCILE_TASK_OFFSETS_SECONDS: bad }), bad).toThrow(/RECONCILE_TASK_OFFSETS_SECONDS/);
-      expect(() => loadConfig({ RECONCILE_SWEEP_LOCK_SECONDS: '5' })).toThrow(/RECONCILE_SWEEP_LOCK_SECONDS/);
+      for (const bad of ['30', '900,600', '900,300000', 'x'])
+        expect(() => loadConfig({ RECONCILE_LATE_OFFSETS_SECONDS: bad }), bad).toThrow(/RECONCILE_LATE_OFFSETS_SECONDS/);
+      expect(() => loadConfig({ RECONCILE_LOCK_SECONDS: '5' })).toThrow(/RECONCILE_LOCK_SECONDS/);
     });
     it('contato da PartyX: e-mail e WhatsApp validados; qualquer um sozinho basta', () => {
       expect(loadConfig({ PARTYX_SUPPORT_EMAIL: 'atendimento@partyx.example' }).partyxSupport).toEqual({

@@ -172,7 +172,7 @@ export interface ReconcileRunOptions {
   /** Só pega pedidos cuja última conferência foi há mais que isto. Duas execuções simultâneas não pegam os mesmos. */
   minIntervalSeconds?: number;
   limit?: number;
-  /** Só pedidos criados nas últimas N horas (pelo relógio da aplicação). Padrão: 72 (a rotina diária). A varredura usa 24. */
+  /** Só pedidos criados nas últimas N horas (pelo relógio da aplicação). Padrão: 72 (a rotina diária). */
   windowHours?: number;
 }
 
@@ -194,7 +194,6 @@ export async function runReconciliation(deps: ReconcileDeps, options: ReconcileR
   const limit = options.limit ?? 100;
   const since = new Date(deps.clock.now().getTime() - (options.windowHours ?? 72) * 3_600_000);
 
-  const expired = await expireOverdue(deps);
   const events = await retryPendingEvents(deps);
 
   const claimed = await deps.db.execute<{ gateway_payment_id: string }>(sql`
@@ -224,5 +223,9 @@ export async function runReconciliation(deps: ReconcileDeps, options: ReconcileR
       });
     }
   }
+  // Vence as reservas DEPOIS de reconsultar: a expiração renova o carimbo de conferência (`updated_at`), e vencer antes deixaria de
+  // fora desta execução justamente o pedido que ninguém abriu e cujas tarefas falharam. A aprovação de um pedido ainda "pendente" com
+  // reserva vencida já segue o caminho tardio (emite se houver estoque, senão "pago sem estoque").
+  const expired = await expireOverdue(deps);
   return { expired, events, orders: { checked: claimed.rows.length, failed, outcomes } };
 }

@@ -8,7 +8,7 @@ Este roteiro registra a preparação original e o primeiro deploy descrito na se
 ```
 navegador ──HTTPS──> Firebase Hosting (domínio próprio, CDN) ──rewrite "**"──> Cloud Run "partyx" (SP) ──pooler──> Neon (sa-east-1)
                                                                                   ^   ^
-        Cloud Tasks (1 pedido: 1, 2, 4 e 8 min após a cobrança e no fim da reserva) ─┘   └── Cloud Scheduler (pendentes a cada 5 min; rotina diária 04:00)
+  Cloud Tasks (por pedido: 1, 2, 4, 8 min, fim da reserva; 15 min a 24 h) ──────────┘   └── Cloud Scheduler (rotina diária 04:00 e backup 03:00)
 ```
 
 ## 1. Decisões e o que foi medido
@@ -21,7 +21,7 @@ navegador ──HTTPS──> Firebase Hosting (domínio próprio, CDN) ──rew
 | Cache dos estáticos | `/assets/*` (hash do Vite): `public, max-age=31536000, immutable`. `index.html` e rotas do app: `no-cache`. Outros (ícones): 1 h | `server/src/app.cache.test.ts` |
 | Corpo da requisição | Chega byte a byte igual ao enviado (importa para a assinatura do webhook) | **Medido**: SHA-256 idêntico dos dois lados |
 | `TRUSTED_PROXY_HOPS` | **2** atrás do Hosting (era 1 direto no Cloud Run) | Ver abaixo |
-| Conciliação | Sob demanda (Cloud Tasks aos 1, 2, 4 e 8 min da cobrança e no fim da reserva + margem) + varredura de pendentes a cada 5 min (até 24 h) + rotina diária. Mudou em 10/10/2026 para cumprir "a cada poucos minutos" (RF-35); **mantém o Neon acordado**, ver seção 8 | Seção 5 |
+| Conciliação | Só por pedido (Cloud Tasks): 1, 2, 4 e 8 min da cobrança e no fim da reserva + margem; tardias aos 15 min, 30 min, 1 h, 3 h, 8 h e 24 h. Uma única agenda fixa: a rotina diária. **Sem cron frequente**: sem pedido em aberto, o Neon dorme (D-78) | Seção 5 |
 | Neon | Plano pago **Launch** (só uso, sem mensalidade mínima), projeto de produção separado, dev com Postgres local | Seção 8 |
 | Front-end | Junto da API, atrás do Hosting. O Hosting tem só um `404.html` e o rewrite para o Cloud Run | `firebase.json` |
 
@@ -46,8 +46,12 @@ navegador ──HTTPS──> Firebase Hosting (domínio próprio, CDN) ──rew
 
 - Cookie `__session`; política de cache central em `server/src/app.ts`.
 - Conciliação sob demanda: `server/src/payments/taskQueue.ts` (Cloud Tasks por REST, nome determinístico `reconcile-<pedido>-<tentativa>`), `reconcileTask.ts` e a rota `POST /api/internal/tasks/reconcile-order` (token OIDC, `audience` = URL `run.app`).
-  - **Desde 10/10/2026:** ao **criar a cobrança** (não mais o pedido), agenda a 1ª tarefa para +1 min; cada tarefa que ainda encontra o pagamento pendente agenda a seguinte: +2, +4 e +8 min depois da cobrança e a última **no fim da reserva + margem** (padrão 2 min; nenhuma passa desse limite). Se a última ainda vê "pendente" no gateway, o pedido expira localmente e é marcado para **revisão manual** (trilha `conciliacao.revisao_manual`, alerta `conciliacao_revisao_manual`). Erro de rede com o gateway não gasta tentativa: devolve 503 e o Cloud Tasks repete. Falha ao agendar nunca derruba a criação da cobrança (alerta `fila_conciliacao_falhou`). Tudo configurável: `RECONCILE_TASK_OFFSETS_SECONDS` (padrão `60,120,240,480`) e `RECONCILE_TASK_MARGIN_SECONDS` (padrão `120`).
-  - Depois disso, a **varredura de pendentes** (`POST /api/internal/jobs/reconcile-pending`, Cloud Scheduler a cada 5 min, job `partyx-varredura-pendentes`) reconsulta os pedidos com cobrança criados nas últimas `RECONCILE_SWEEP_WINDOW_HOURS` (padrão 24) que ainda podem mudar (pendente, vencido, não concluído). Uma por vez: trava com prazo na tabela `job_leases` (`RECONCILE_SWEEP_LOCK_SECONDS`, padrão 240; quem chega com outra em andamento responde 200 `em_execucao`). Lote: `RECONCILE_SWEEP_BATCH` (padrão 100). A rotina diária das 04:00 continua (e-mails, pedidos de até 3 dias, ingressos que faltarem).
+  - **Desde 10/10/2026 (D-78):** ao **criar a cobrança** (não mais o pedido), agenda a 1ª tarefa para +1 min; cada tarefa que ainda encontra o pagamento sem decisão agenda a seguinte. Enquanto a reserva está ativa: +2, +4 e +8 min, e uma **no fim da reserva + margem** (padrão 2 min; nenhuma inicial passa desse limite). Depois, **tardias** para a aprovação que chega após o vencimento: 15 min, 30 min, 1 h, 3 h, 8 h e 24 h depois da cobrança. Tarefa atrasada pula as que ficaram para trás.
+  - No limite o pedido só **vence** (a reserva é liberada); as tardias seguem verificando. **Revisão manual** (trilha `conciliacao.revisao_manual`, alerta `conciliacao_revisao_manual`) só se, depois da **última** tardia, o gateway ainda não tiver estado conclusivo.
+  - Pedido já em estado final: a tarefa encerra **em silêncio** (sem log nem nova tarefa). Uma verificação por pedido de cada vez: trava com prazo em `job_leases` (`reconcile-order:<pedido>`); a confirmação continua idempotente.
+  - Erro de rede com o gateway não gasta tentativa: devolve 503 e o Cloud Tasks repete. Falha ao agendar nunca derruba a criação da cobrança nem a tarefa (alerta `fila_conciliacao_falhou`); a **rotina diária** pega o pedido.
+  - Variáveis: `RECONCILE_TASK_OFFSETS_SECONDS` (padrão `60,120,240,480`), `RECONCILE_TASK_MARGIN_SECONDS` (`120`), `RECONCILE_LATE_OFFSETS_SECONDS` (`900,1800,3600,10800,28800,86400`), `RECONCILE_LOCK_SECONDS` (`120`).
+  - **Rotina diária** (04:00, `POST /api/internal/jobs/reconcile-payments`), única agenda fixa: fila de e-mails, pedidos de até 3 dias que ainda podem mudar (reconsulta antes de vencer, para não pular o pedido que perdeu as tarefas), ingressos que faltarem e limpeza das travas vencidas há mais de 2 dias. Uma execução por vez (trava `reconcile-daily`).
 - `JOBS_CALLER_EMAIL` aceita mais de uma conta (Scheduler e Cloud Tasks). Novas variáveis: `TASKS_QUEUE`, `TASKS_INVOKER_EMAIL`.
 - `google-auth-library` passou a ser dependência direta (já era importada).
 - Já estavam atendidos: escala a zero, porta via `$PORT`, encerramento limpo no `SIGTERM`, `/api/health` sem banco, rate limit, logs sem corpo, migrações fora do boot, `.dockerignore`.
@@ -82,7 +86,7 @@ export PUBLIC_BASE_URL=https://seudominio.com.br        # antes do domínio: htt
 export TURNSTILE_SITE_KEY=<chave PÚBLICA do site no Turnstile>
 export BACKUP_DONE=sim NO_FICTITIOUS_DATA=sim           # SÓ depois de cumprir de verdade (ver seção 9)
 ./infra/producao/deploy.sh deploy                       # build + migração + Cloud Run + teste rápido (vendas FECHADAS)
-./infra/producao/deploy.sh varredura                    # rotina diária 04:00 + varredura de pendentes a cada 5 min (precisa do serviço no ar)
+./infra/producao/deploy.sh varredura                    # rotina diária 04:00 (precisa do serviço no ar); remove a varredura de 5 min, se existir
 ./infra/producao/deploy.sh hosting                      # publica o firebase.json
 NOTIFY_EMAIL=voce@exemplo.com ./infra/producao/deploy.sh alertas
 NOTIFY_EMAIL=voce@exemplo.com ./infra/producao/deploy.sh backup   # backup diário 03:00 (seção 10). Rode o job UMA vez logo depois (o alerta "backup ausente" dispara até o 1º backup)
@@ -92,13 +96,12 @@ Primeiro administrador: `npm run admin:bootstrap` (ver `docs/autenticacao.md`).
 
 **Ordem que importa:** `setup` → valores dos segredos → `roles` → `deploy` (migra) → `varredura`, `hosting`, `alertas`, `backup`. Em produção a configuração **recusa subir** sem `TURNSTILE_SECRET` e `TURNSTILE_SITE_KEY`.
 
-## 5. Conciliação sob demanda, varredura de pendentes e rotina diária
+## 5. Conciliação por pedido e rotina diária
 
-- **Webhook** é o caminho principal. As tarefas e a varredura só protegem contra webhook perdido ou atrasado.
-- **Cloud Tasks (por pedido):** a partir da criação da cobrança, +1, +2, +4 e +8 min e a última no fim da reserva + margem (`RECONCILE_TASK_*`). 1 fila (`partyx-conciliacao`), 3 tentativas de entrega, 5 despachos/s no máximo.
-- **Varredura de pendentes (Cloud Scheduler, a cada 5 min, `PENDING_SCHEDULE`):** pedidos com cobrança de até 24 h que ainda podem mudar; uma execução por vez (trava em `job_leases`). É ela que encontra a aprovação que chega depois do vencimento quando o webhook se perde, inclusive o caso "pago sem estoque".
-- **Rotina diária:** 04:00, que também envia e-mails que ficaram na fila, reconsulta pedidos de até 3 dias e emite ingressos que faltarem. **Limitação:** e-mail que falha de manhã só é reenviado na madrugada seguinte, se as 3 retentativas do Cloud Tasks também falharem. `ops:weekly` e o alerta `email_falhou` mostram.
-- **Custo:** com a varredura a cada 5 min, o Neon **não suspende mais** (antes acordava algumas dezenas de minutos por dia). Estimativa na seção 8.
+- **Webhook** é o caminho principal. As tarefas e a rotina diária só protegem contra webhook perdido ou atrasado.
+- **Cloud Tasks (por pedido, sem cron):** a partir da cobrança, +1, +2, +4 e +8 min e no fim da reserva + margem ("a cada poucos minutos" enquanto a reserva está ativa); depois +15 min, +30 min, +1 h, +3 h, +8 h e +24 h para a aprovação tardia. 1 fila (`partyx-conciliacao`), 3 tentativas de entrega, 5 despachos/s no máximo. Detalhes na seção 2.
+- **Rotina diária (Cloud Scheduler, 04:00):** única agenda fixa. Envia e-mails que ficaram na fila, reconsulta pedidos de até 3 dias (cobre tarefas que falharam) e emite ingressos que faltarem. **Limitação:** e-mail que falha de manhã e esgota as 3 retentativas do Cloud Tasks só sai na madrugada seguinte; pedido cujas tarefas não puderam ser agendadas só é reconsultado na madrugada (se o webhook também se perder). `ops:weekly` e os alertas `email_falhou` e `fila_conciliacao_falhou` mostram.
+- **Custo:** sem pedido em aberto, nada roda além da rotina diária e do backup: o Neon dorme. Estimativa na seção 8.
 
 ## 6. Novo deploy, migrações e rollback
 
@@ -124,7 +127,7 @@ Instância parada cobra CPU e memória em tarifa reduzida: cerca de **US$ 0,014 
 | Cloud Run | 2 mi requisições, 180 mil vCPU-s e 360 mil GiB-s grátis por mês; desconto calculado no Tier 1 e agregado **por conta de faturamento** | cerca de 55 mil requisições e 11 mil vCPU-s: **US$ 0** |
 | `evento-on` | idle US$ 0,0000025 por vCPU-s e por GiB-s (Tier 1) | 8 h/mês: cerca de **US$ 0,11** |
 | Cloud Tasks | 1 milhão de operações grátis; depois US$ 0,40 por milhão | alguns milhares: **US$ 0** |
-| Cloud Scheduler | 3 jobs grátis **por conta de faturamento** (compartilhado com seus outros projetos); depois US$ 0,10/job | 3 jobs (backup 03:00, rotina diária 04:00, varredura de pendentes a cada 5 min): **US$ 0** se a conta não tiver outros jobs; senão **US$ 0,10/mês** por job a mais |
+| Cloud Scheduler | 3 jobs grátis **por conta de faturamento** (compartilhado com seus outros projetos); depois US$ 0,10/job | 2 jobs (backup 03:00 e rotina diária 04:00): **US$ 0** se a conta não estiver cheia |
 | Secret Manager | 6 versões ativas grátis; extras cerca de US$ 0,06/mês cada; 10 mil acessos grátis | 6 a 8 versões: **US$ 0 a 0,12** |
 | Artifact Registry | 0,5 GiB grátis, depois cerca de US$ 0,10/GiB-mês | 3 imagens: **menos de US$ 0,1** |
 | Cloud Build | 2.500 min grátis por conta, manual | **US$ 0** |
@@ -135,18 +138,28 @@ Instância parada cobra CPU e memória em tarifa reduzida: cerca de **US$ 0,014 
 
 **Neon, como cheguei no número:** 0,25 CU enquanto desperto. Pior caso para 1.000 visitas espalhadas (banco acordado 5 min a cada uma): cerca de 83 h, ou 21 CU-h = US$ 2,2; picos de 2 eventos × 3 h a 1 CU = 6 CU-h = US$ 0,64; varredura diária 0,6 CU-h = US$ 0,07; armazenamento menor que 0,5 GB = cerca de US$ 0,2. **Não confirmei** o piso de autoescala do Launch nem o arredondamento da cobrança. Se o autosuspend fosse desligado (24 h por dia), seriam cerca de **US$ 19** por mês.
 
-**Custo extra da cadência de 10/10/2026 (RF-35, "a cada poucos minutos"), estimativa, não medido:**
+**Custo da cadência por pedido (D-78, 10/10/2026), estimativa, não medido.** Premissa de volume desta seção: cerca de 1.000 pedidos por mês, concentrados em 2 picos de 1 hora; a conta também vale para 10 mil.
 
-| Item | Conta | Extra por mês |
+*Tarefas por pedido no Cloud Tasks* (cada tarefa custa cerca de 2 operações: criar e entregar):
+
+| Caso | Tarefas | Operações |
 |---|---|---|
-| Cloud Tasks | até 5 tarefas por cobrança não paga (1, 2, 4, 8 min e o limite) e normalmente 1 por cobrança paga (a 1ª já encontra o pedido resolvido); cada tarefa são cerca de 2 operações. 10 mil pedidos ficariam abaixo de 100 mil operações, dentro do 1 milhão grátis | **US$ 0** |
-| Cloud Scheduler | +1 job (varredura de pendentes) | **US$ 0** com até 3 jobs na conta; **US$ 0,10** se passar |
-| Cloud Run | 8.640 chamadas da varredura por mês, menos de 1 s de CPU cada, dentro da franquia; logs só quando a varredura faz algo | **US$ 0** |
-| **Neon** | a suspensão automática do Neon é de 5 min sem atividade; uma varredura a cada 5 min chega antes disso, então o banco **não suspende mais**: 730 h × 0,25 CU = 182 CU-h × US$ 0,106 = cerca de **US$ 19** no mês, contra cerca de US$ 3 de computação estimados acima | **cerca de US$ 16 a 17** (cerca de R$ 90, câmbio R$ 5,50) |
+| Pago com webhook em segundos (o normal) | 1 (a de 1 min já encontra o pedido resolvido e encerra) | 2 |
+| Pago tarde, achado por uma tarefa | até a que achou | 2 a 22 |
+| Pix abandonado, gateway informa o vencimento | 5 ou 6 (1, 2, 4, 8 min, limite e talvez a de 15 min) | 10 a 12 |
+| Pior caso: gateway nunca dá estado conclusivo | 11 (até a de 24 h) e revisão manual | 22 |
 
-O custo extra é quase todo do Neon e **não aparece no orçamento de R$ 30 do Google**. Alternativas, se a PartyX quiser gastar menos (decisão dela, nada foi mudado): `PENDING_SCHEDULE="*/10 * * * *"` deixa o banco acordado pouco mais da metade do tempo (cerca de US$ 10 a 11 no total); `*/15` cerca de US$ 7; restringir a varredura ao horário de vendas também reduz. As tarefas de 1 a 8 min e o limite continuam valendo em qualquer caso: a varredura só cobre o que escapou delas. O preço do Neon é o registrado nesta seção (não reconferido em 10/10/2026).
+Mesmo no pior caso para todos os pedidos: 1.000 pedidos = 22 mil operações; 10 mil = 220 mil. A franquia é de **1 milhão por mês** (depois, US$ 0,40 por milhão): só passaria dela com uns 45 mil pedidos por mês, todos no pior caso. **Custo: US$ 0.** Os reenvios de e-mail usam a mesma fila e somam pouco.
 
-**Total estimado: cerca de US$ 2 a 5 por mês** antes da varredura a cada 5 min; **cerca de US$ 19 a 22 por mês** com ela (cerca de R$ 11 a 28 com câmbio de referência próximo de R$ 5,50). **Atenção:** o orçamento de **R$ 30** do Google cobre **só a parte do Google (cerca de R$ 1)**. O Neon é cobrado à parte, pelo próprio Neon, e **não entra** nesse alerta. O orçamento só avisa (50%, 90%, 100%): o teto real de gasto é `MAX_INSTANCES=3`. Domínio (cerca de R$ 40 por ano no Registro.br) e e-mail transacional ficam de fora.
+*Tempo de Neon acordado por pedido* (suspensão automática depois de 5 min sem atividade):
+
+- As tarefas de 1 a 12 min caem enquanto o comprador ainda está no checkout, com o banco já acordado: **0 extra**. A de 15 min também cai dentro dos 5 min de folga depois da última atividade.
+- Cada tardia isolada (30 min, 1 h, 3 h, 8 h, 24 h) acorda o banco por cerca de 5 min. Só roda se o pedido ainda não estiver resolvido: no caso normal (pago, ou vencido no gateway), **0 extra**; no pior caso, cerca de **25 min por pedido** (0,1 CU-h, cerca de US$ 0,011).
+- Pedidos de um mesmo pico compartilham as janelas: as tardias de um pico de 1 h acordam o banco em uns 5 intervalos de cerca de 1 h, por volta de 6 h e 1,5 CU-h (cerca de **US$ 0,16 por pico** no pior caso).
+- Limite superior, 1.000 pedidos espalhados e todos no pior caso: cerca de 100 CU-h, **US$ 10,6**. Realista (picos e gateway que informa o vencimento): **menos de US$ 0,50 por mês**.
+- Sem pedido em aberto: só a rotina diária (cerca de 5 min por dia, US$ 0,07 por mês, já na conta acima) e o backup. **Custo ocioso perto de zero**, contra cerca de US$ 16 a 17 por mês da varredura a cada 5 min, que foi descartada.
+
+**Total estimado: cerca de US$ 2 a 5 por mês**, como antes da mudança da cadência (cerca de R$ 11 a 28 com câmbio de referência próximo de R$ 5,50). **Atenção:** o orçamento de **R$ 30** do Google cobre **só a parte do Google (cerca de R$ 1)**. O Neon é cobrado à parte, pelo próprio Neon, e **não entra** nesse alerta. O orçamento só avisa (50%, 90%, 100%): o teto real de gasto é `MAX_INSTANCES=3`. Domínio (cerca de R$ 40 por ano no Registro.br) e e-mail transacional ficam de fora. O preço do Neon é o registrado nesta seção (não reconferido em 10/10/2026).
 
 ## 8b. Proteção contra abuso no cadastro e na recuperação de senha
 

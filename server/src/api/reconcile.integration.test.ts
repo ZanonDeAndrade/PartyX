@@ -985,10 +985,30 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
     });
   });
 
-  describe('conciliação sob demanda (Cloud Tasks): 1, 2, 4 e 8 min depois da cobrança e no fim da reserva + margem', () => {
+  /** A conciliação só pega pedido conferido há mais de 60 s (relógio do banco). Envelhece o carimbo sem passar pelo gatilho. */
+  const age = (orderId: string) =>
+    sql(
+      `set session_replication_role = replica; update orders set updated_at = now() - interval '10 minutes' where id = '${orderId}'; set session_replication_role = origin`,
+    );
+  const TOKEN = { authorization: 'Bearer token-do-scheduler' };
+  const daily = (target = app) =>
+    target.request('/api/internal/jobs/reconcile-payments', { method: 'POST', headers: TOKEN });
+  /** Captura o que o servidor escreveu no log (stdout e stderr) durante `fn`. */
+  async function logsOf(fn: () => Promise<unknown>) {
+    const out = vi.spyOn(process.stdout, 'write');
+    const err = vi.spyOn(process.stderr, 'write');
+    try {
+      await fn();
+      return [...out.mock.calls, ...err.mock.calls].map(c => String(c[0])).join('');
+    } finally {
+      out.mockRestore();
+      err.mockRestore();
+    }
+  }
+
+  describe('conciliação sob demanda (Cloud Tasks): poucos minutos com a reserva ativa, tardias até 24 h', () => {
     let queue: MemoryTaskQueue;
     let qapp: ReturnType<typeof build>;
-    const TOKEN = { authorization: 'Bearer token-do-scheduler' };
     const task = (
       orderId: string,
       attempt: number,
@@ -1029,15 +1049,6 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       expect(queue.tasks).toHaveLength(1);
     });
 
-    it('falha ao agendar nunca derruba a criação da cobrança (a varredura agendada cobre a lacuna)', async () => {
-      const e = await event();
-      const a = await user('cliente', qapp);
-      queue.failNext = true;
-      const p = await pay(a, e, [1]);
-      expect(p.paymentId).toBeTruthy();
-      expect(queue.tasks).toHaveLength(0);
-    });
-
     it('a rota só aceita o token das rotinas: sem token, token errado e corpo inválido', async () => {
       const e = await event();
       const a = await user('cliente', qapp);
@@ -1048,7 +1059,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       for (const bad of [
         { orderId: 'nao-e-uuid', attempt: 1 },
         { orderId: p.orderId, attempt: 0 },
-        { orderId: p.orderId, attempt: 6 }, // padrão: 4 esperas + a do limite
+        { orderId: p.orderId, attempt: 12 }, // padrão: 4 iniciais + o limite + 6 tardias = 11
         { orderId: p.orderId, attempt: 1, chargedAt: 'ontem' },
         {},
       ]) {
@@ -1076,69 +1087,136 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       expect(queue.tasks.filter(t => t.attempt > 1)).toHaveLength(0);
     });
 
-    it('ainda pendente: verifica aos 1, 2, 4 e 8 min, a última no fim da reserva + margem (12 min); então expira e marca revisão', async () => {
+    it('cadência completa sem decisão do gateway: 1, 2, 4, 8 min, limite aos 12 min, tardias até 24 h; revisão manual só no fim', async () => {
       const e = await event();
       const a = await user('cliente', qapp);
       const start = clock.now().getTime();
       const p = await pay(a, e, [1]); // Pix criado, ninguém pagou, gateway segue "pendente"
-      const at = () => (clock.now().getTime() - start) / 1000;
       const seen: [number, number][] = [];
-      for (let i = 0; i < 4; i++) {
-        expect(await runNext()).toMatchObject({ outcome: 'reagendado' });
-        seen.push([queue.tasks.at(-2)!.attempt, at()]);
+      let logged = '';
+      for (let i = 0; i < 10; i++) {
+        const t = queue.tasks.at(-1)!;
+        logged += await logsOf(async () => expect(await runNext()).toMatchObject({ outcome: 'reagendado' }));
+        seen.push([t.attempt, (clock.now().getTime() - start) / 1000]);
+        if (t.attempt === 5) {
+          // No limite (12 min) o pedido vence, mas NÃO vai para revisão: as tardias seguem verificando.
+          expect((await order(p.orderId)).status).toBe('expirado');
+          expect(await resvOf(p.orderId)).toEqual(['expirada']);
+        }
       }
       expect(seen).toEqual([
         [1, 60],
         [2, 120],
         [3, 240],
         [4, 480],
+        [5, 720],
+        [6, 900],
+        [7, 1800],
+        [8, 3600],
+        [9, 10800],
+        [10, 28800],
       ]);
-      expect(queue.tasks.at(-1)).toMatchObject({ attempt: 5, delaySeconds: 240 }); // limite: 10 min de reserva + 2 de margem
-      expect(await runNext()).toMatchObject({ outcome: 'revisao_manual' });
-      expect(at()).toBe(720);
-      expect(queue.tasks).toHaveLength(5); // acabou: a varredura agendada continua daqui
+      expect(await audit('conciliacao.revisao_manual')).toHaveLength(0);
+      expect(logged).not.toContain('conciliacao_revisao_manual');
+      expect(queue.tasks.at(-1)).toMatchObject({ attempt: 11, delaySeconds: 86400 - 28800 });
+
+      // Última tardia (24 h), gateway ainda sem estado conclusivo: agora sim, revisão manual (trilha e alerta), uma vez.
+      const last = await logsOf(async () => expect(await runNext()).toMatchObject({ outcome: 'revisao_manual' }));
+      expect((clock.now().getTime() - start) / 1000).toBe(86400);
+      expect(last).toContain('"alert":"conciliacao_revisao_manual"');
+      expect(queue.tasks).toHaveLength(11); // acabou: nada mais agendado
       const rows = await audit('conciliacao.revisao_manual');
       expect(rows).toHaveLength(1);
       expect(rows[0].entity_id).toBe(p.orderId);
-      expect((await order(p.orderId)).status).toBe('expirado'); // o estado acompanha o prazo; nada foi inventado
-      expect(await resvOf(p.orderId)).toEqual(['expirada']);
+      expect((await order(p.orderId)).status).toBe('expirado'); // nada foi inventado
     });
 
-    it('a cadência vem do ambiente: esperas e margem configuradas', async () => {
+    it('gateway diz "expirado" numa tardia (estado conclusivo): encerra a sequência, sem revisão', async () => {
+      const e = await event();
+      const a = await user('cliente', qapp);
+      const p = await pay(a, e, [1]);
+      for (let i = 0; i < 5; i++) await runNext(); // até o limite
+      mock.simulate.setStatus(p.paymentId, 'expirado');
+      expect(await runNext()).toMatchObject({ outcome: 'conciliado' }); // 15 min
+      expect(queue.tasks.at(-1)!.attempt).toBe(6); // nada novo depois dela
+      expect(await audit('conciliacao.revisao_manual')).toHaveLength(0);
+    });
+
+    it('aprovação tardia achada por uma tarefa tardia (3 h): com estoque emite e encerra a sequência', async () => {
+      const e = await event([{ total: 5 }]);
+      const a = await user('cliente', qapp);
+      const p = await pay(a, e, [2]);
+      for (let i = 0; i < 8; i++) await runNext(); // até a de 1 h
+      expect((await order(p.orderId)).status).toBe('expirado');
+      mock.simulate.setStatus(p.paymentId, 'aprovado'); // aprovou tarde; o webhook se perdeu
+      const t = queue.tasks.at(-1)!;
+      expect(t.attempt).toBe(9);
+      expect(await runNext()).toMatchObject({ outcome: 'conciliado' });
+      expect((await order(p.orderId)).status).toBe('pago');
+      expect(await ticketsOf(p.orderId)).toHaveLength(2);
+      expect((await audit('pagamento.confirmado_tardio')).length).toBe(1);
+      expect(queue.tasks.at(-1)).toBe(t); // nenhuma nova tarefa
+    });
+
+    it('pedido já em estado final: a tarefa encerra em silêncio (sem log, sem trava, sem agendar), em qualquer tentativa', async () => {
+      const e = await event();
+      const a = await user('cliente', qapp);
+      const p = await pay(a, e, [1]);
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      await hook(p.paymentId, {}, qapp); // o webhook resolveu
+      queue.tasks.length = 0;
+      for (const attempt of [1, 5, 7, 11]) {
+        const logged = await logsOf(async () => expect(await run(p.orderId, attempt)).toEqual({ status: 'ok', outcome: 'ja_resolvido' }));
+        expect(logged, `tentativa ${attempt}`).toBe('');
+      }
+      expect(queue.tasks).toHaveLength(0);
+      expect((await sql(`select count(*)::int as n from job_leases where name = $1`, [`reconcile-order:${p.orderId}`])).rows[0].n).toBe(0);
+    });
+
+    it('a cadência vem do ambiente: iniciais, margem e tardias configuradas', async () => {
       const custom = build(mock, {
         queue,
-        env: { RECONCILE_TASK_OFFSETS_SECONDS: '30,90', RECONCILE_TASK_MARGIN_SECONDS: '0' },
+        env: {
+          RECONCILE_TASK_OFFSETS_SECONDS: '30,90',
+          RECONCILE_TASK_MARGIN_SECONDS: '0',
+          RECONCILE_LATE_OFFSETS_SECONDS: '3600',
+        },
       });
       const e = await event();
       const a = await user('cliente', custom);
       const p = await pay(a, e, [1]);
       expect(queue.tasks).toEqual([expect.objectContaining({ orderId: p.orderId, attempt: 1, delaySeconds: 30 })]);
-      const t = queue.tasks[0]!;
-      clock.advance(30_000);
-      await json(await task(p.orderId, 1, TOKEN, custom, t.chargedAt));
+      const chargedAt = queue.tasks[0]!.chargedAt;
+      const step = async () => {
+        const t = queue.tasks.at(-1)!;
+        clock.advance(t.delaySeconds * 1000);
+        return json(await task(p.orderId, t.attempt, TOKEN, custom, chargedAt));
+      };
+      await step();
       expect(queue.tasks.at(-1)).toMatchObject({ attempt: 2, delaySeconds: 60 });
-      clock.advance(60_000);
-      await json(await task(p.orderId, 2, TOKEN, custom, t.chargedAt));
-      // Lista acabou: a última é no limite (fim da reserva, margem zero), 10 min depois da cobrança.
-      expect(queue.tasks.at(-1)).toMatchObject({ attempt: 3, delaySeconds: 600 - 90 });
-      // Com 2 esperas configuradas, a tentativa 4 não existe.
-      expect((await task(p.orderId, 4, TOKEN, custom)).status).toBe(422);
+      await step();
+      expect(queue.tasks.at(-1)).toMatchObject({ attempt: 3, delaySeconds: 600 - 90 }); // limite: fim da reserva, margem zero
+      await step();
+      expect(queue.tasks.at(-1)).toMatchObject({ attempt: 4, delaySeconds: 3600 - 600 }); // única tardia
+      expect(await step()).toMatchObject({ outcome: 'revisao_manual' });
+      expect((await task(p.orderId, 5, TOKEN, custom)).status).toBe(422); // a tentativa 5 não existe nessa configuração
     });
 
-    it('aprovação tardia achada pela verificação do limite: com estoque emite (pedido já vencido na tela do comprador)', async () => {
-      const e = await event([{ total: 5 }]);
+    it('trava por pedido (job_leases): com outra verificação em andamento encerra sem tocar em nada; trava vencida é retomada e solta', async () => {
+      const e = await event();
       const a = await user('cliente', qapp);
-      const p = await pay(a, e, [2]);
-      const t = queue.tasks[0]!;
-      clock.advance(11 * 60_000);
-      await a.get(`/orders/${p.orderId}`); // o comprador vê "expirado"
-      expect((await order(p.orderId)).status).toBe('expirado');
-      mock.simulate.setStatus(p.paymentId, 'aprovado'); // aprovou junto com o vencimento; webhook perdido
-      clock.advance(60_000);
-      expect(await run(p.orderId, 5, t.chargedAt)).toMatchObject({ outcome: 'conciliado' });
+      const p = await pay(a, e, [1]);
+      queue.tasks.length = 0;
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      const name = `reconcile-order:${p.orderId}`;
+      await sql(`insert into job_leases (name, holder, expires_at) values ($1, 'outra', now() + interval '1 minute')`, [name]);
+      expect(await run(p.orderId, 2)).toMatchObject({ outcome: 'em_execucao' });
+      expect((await order(p.orderId)).status).toBe('pendente');
+      expect(queue.tasks).toHaveLength(0);
+      await sql(`update job_leases set expires_at = now() - interval '1 second' where name = $1`, [name]); // a outra caiu
+      expect(await run(p.orderId, 2)).toMatchObject({ outcome: 'conciliado' });
       expect((await order(p.orderId)).status).toBe('pago');
-      expect(await ticketsOf(p.orderId)).toHaveLength(2);
-      expect((await audit('pagamento.confirmado_tardio')).length).toBe(1);
+      expect((await sql(`select expires_at <= now() as free from job_leases where name = $1`, [name])).rows[0].free).toBe(true);
     });
 
     it('a mesma tarefa entregue duas vezes não duplica nada (idempotência)', async () => {
@@ -1154,13 +1232,15 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       expect(await ticketsOf(p.orderId)).toHaveLength(2);
     });
 
-    it('seis tarefas simultâneas do mesmo pedido pendente que acabou de ser aprovado: um pedido pago, ingressos uma vez', async () => {
+    it('seis tarefas simultâneas (iniciais e tardias) do mesmo pedido aprovado: um pedido pago, ingressos uma vez', async () => {
       const e = await event();
       const a = await user('cliente', qapp);
       const p = await pay(a, e, [3]);
       mock.simulate.setStatus(p.paymentId, 'aprovado');
-      const res = await Promise.all(Array.from({ length: 6 }, (_, i) => task(p.orderId, (i % 5) + 1)));
+      const res = await Promise.all([1, 2, 5, 6, 9, 11].map(attempt => task(p.orderId, attempt)));
       expect(res.every(r => r.status === 200)).toBe(true);
+      const outcomes = (await Promise.all(res.map(r => json(r)))).map(b => b.outcome);
+      expect(outcomes.filter(o => o === 'conciliado').length).toBeGreaterThanOrEqual(1);
       expect(await ticketsOf(p.orderId)).toHaveLength(3);
       expect(await sold(e.types[0]!)).toBe(3);
       expect((await audit('pagamento.confirmado')).length).toBe(1);
@@ -1205,6 +1285,41 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       expect(await run(p.orderId, 1)).toMatchObject({ outcome: 'conciliado' }); // a repetição do Cloud Tasks resolve
     });
 
+    it('falha ao agendar na criação da cobrança: a cobrança sai normalmente e a rotina diária confirma depois', async () => {
+      const e = await event();
+      const a = await user('cliente', qapp);
+      queue.failNext = true;
+      const p = await pay(a, e, [2]);
+      expect(queue.tasks).toHaveLength(0); // nenhuma verificação agendada
+      mock.simulate.setStatus(p.paymentId, 'aprovado'); // e o webhook se perdeu
+      clock.advance(3 * 3_600_000);
+      await age(p.orderId);
+      const res = await json(await daily(qapp));
+      expect(res.summary.orders.outcomes).toMatchObject({ confirmado_tardio: 1 });
+      expect((await order(p.orderId)).status).toBe('pago');
+      expect(await ticketsOf(p.orderId)).toHaveLength(2);
+    });
+
+    it('falha ao agendar no meio da sequência: a tarefa avisa e a rotina diária pega o pedido (aprovação tardia sem estoque incluída)', async () => {
+      const e = await event();
+      const a = await user('cliente', qapp);
+      const p = await pay(a, e, [1]);
+      queue.failNext = true;
+      const t = queue.tasks.at(-1)!;
+      clock.advance(t.delaySeconds * 1000);
+      const logged = await logsOf(async () =>
+        expect(await run(p.orderId, 1, t.chargedAt)).toMatchObject({ outcome: 'sem_agendamento' }),
+      );
+      expect(logged).toContain('"alert":"fila_conciliacao_falhou"');
+      expect(queue.tasks).toHaveLength(1); // a sequência parou
+      clock.advance(5 * 3_600_000);
+      await a.get(`/orders/${p.orderId}`); // vencido
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      await age(p.orderId);
+      expect((await json(await daily(qapp))).summary.orders.checked).toBe(1);
+      expect((await order(p.orderId)).status).toBe('pago');
+    });
+
     it('pedido inexistente: encerra sem erro (a tarefa não fica reenfileirada para sempre)', async () => {
       expect(await run('00000000-0000-4000-8000-000000000000', 1)).toMatchObject({ outcome: 'sem_pedido' });
     });
@@ -1219,87 +1334,42 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
     });
   });
 
-  describe('varredura de pendentes (Cloud Scheduler a cada 5 min, pedidos de até 24 h)', () => {
-    const TOKEN = { authorization: 'Bearer token-do-scheduler' };
-    const sweep = (headers: Record<string, string> = TOKEN, target = app) =>
-      target.request('/api/internal/jobs/reconcile-pending', { method: 'POST', headers });
-    /** A varredura só pega pedido conferido há mais de 60 s (pelo relógio do banco). Envelhece o carimbo sem passar pelo gatilho. */
-    const age = (orderId: string) =>
-      sql(
-        `set session_replication_role = replica; update orders set updated_at = now() - interval '10 minutes' where id = '${orderId}'; set session_replication_role = origin`,
-      );
-
-    it('exige o token das rotinas: sem token 401, token errado 401; sem configuração 503; sem gateway não faz nada', async () => {
-      expect((await sweep({})).status).toBe(401);
-      expect((await sweep({ authorization: 'Bearer errado' })).status).toBe(401);
-      expect((await sweep(TOKEN, build(mock, { jobAuth: undefined }))).status).toBe(503);
-      expect(await json(await sweep(TOKEN, build(undefined)))).toEqual({ status: 'sem_gateway' });
+  describe('rotina diária (04:00): única agenda fixa, rede de segurança', () => {
+    it('não existe mais varredura de 5 min: a rota antiga responde 404', async () => {
+      const res = await app.request('/api/internal/jobs/reconcile-pending', { method: 'POST', headers: TOKEN });
+      expect(res.status).toBe(404);
     });
 
-    it('sem webhook e sem tarefas: a varredura acha o pagamento aprovado e confirma', async () => {
-      const e = await event();
-      const a = await user();
-      const p = await pay(a, e, [2]);
-      mock.simulate.setStatus(p.paymentId, 'aprovado');
-      await age(p.orderId);
-      const res = await json(await sweep());
-      expect(res).toMatchObject({ status: 'ok', summary: { orders: { checked: 1, outcomes: { confirmado: 1 } } } });
-      expect((await order(p.orderId)).status).toBe('pago');
-      expect(await ticketsOf(p.orderId)).toHaveLength(2);
-    });
-
-    it('janela de 24 h: pedido vencido há 23 h é reconsultado (aprovação tardia); com 25 h fica de fora', async () => {
-      const e = await event([{ total: 10 }]);
-      const [a, b] = [await user(), await user()];
-      const old = await pay(a, e, [1]);
-      clock.advance(2 * 3_600_000);
-      const recent = await pay(b, e, [1]);
-      clock.advance(23 * 3_600_000); // "old" tem 25 h; "recent", 23 h
-      await a.get(`/orders/${old.orderId}`); // os dois já aparecem vencidos (a expiração renova o carimbo de conferência)
-      await b.get(`/orders/${recent.orderId}`);
-      for (const p of [old, recent]) {
-        mock.simulate.setStatus(p.paymentId, 'aprovado');
-        await age(p.orderId);
-      }
-      const res = await json(await sweep());
-      expect(res.summary.orders.checked).toBe(1);
-      expect((await order(recent.orderId)).status).toBe('pago');
-      expect((await order(old.orderId)).status).toBe('expirado'); // fora da janela: fica para o webhook ou a rotina diária
-    });
-
-    it('a janela vem do ambiente (RECONCILE_SWEEP_WINDOW_HOURS)', async () => {
-      const narrow = build(mock, { env: { RECONCILE_SWEEP_WINDOW_HOURS: '2' } });
-      const e = await event();
-      const a = await user();
-      const p = await pay(a, e, [1]);
-      clock.advance(3 * 3_600_000);
-      await a.get(`/orders/${p.orderId}`);
-      mock.simulate.setStatus(p.paymentId, 'aprovado');
-      await age(p.orderId);
-      expect((await json(await sweep(TOKEN, narrow))).summary.orders.checked).toBe(0);
-      expect((await json(await sweep(TOKEN, app))).summary.orders.checked).toBe(1);
-    });
-
-    it('trava: com outra varredura em andamento responde "em_execucao" sem tocar em nada; trava vencida é retomada e solta no fim', async () => {
+    it('trava: com outra rotina em andamento responde "em_execucao" sem tocar em nada; trava vencida é retomada e solta no fim', async () => {
       const e = await event();
       const a = await user();
       const p = await pay(a, e, [1]);
       mock.simulate.setStatus(p.paymentId, 'aprovado');
       await age(p.orderId);
       await sql(
-        `insert into job_leases (name, holder, expires_at) values ('reconcile-pending', 'outra-execucao', now() + interval '2 minutes')`,
+        `insert into job_leases (name, holder, expires_at) values ('reconcile-daily', 'outra-execucao', now() + interval '2 minutes')`,
       );
-      expect(await json(await sweep())).toEqual({ status: 'em_execucao' });
+      expect(await json(await daily())).toEqual({ status: 'em_execucao' });
       expect((await order(p.orderId)).status).toBe('pendente');
-      // A execução anterior caiu e o prazo venceu: a próxima assume.
-      await sql(`update job_leases set expires_at = now() - interval '1 second' where name = 'reconcile-pending'`);
-      expect((await json(await sweep())).status).toBe('ok');
+      await sql(`update job_leases set expires_at = now() - interval '1 second' where name = 'reconcile-daily'`);
+      expect((await json(await daily())).status).toBe('ok');
       expect((await order(p.orderId)).status).toBe('pago');
-      const lease = (await sql(`select expires_at <= now() as free from job_leases where name = 'reconcile-pending'`)).rows[0];
-      expect(lease.free).toBe(true); // soltou ao terminar
+      const lease = (await sql(`select expires_at <= now() as free from job_leases where name = 'reconcile-daily'`)).rows[0];
+      expect(lease.free).toBe(true);
     });
 
-    it('varreduras simultâneas: todas respondem 200, um pedido pago, ingressos uma vez', async () => {
+    it('limpa as travas de pedido vencidas há mais de 2 dias e mantém as recentes', async () => {
+      await sql(`insert into job_leases (name, holder, expires_at) values
+        ('reconcile-order:antiga', 'x', now() - interval '3 days'),
+        ('reconcile-order:recente', 'x', now() - interval '1 hour')`);
+      const res = await json(await daily());
+      expect(res.leases).toBe(1);
+      const names = (await sql(`select name from job_leases order by name`)).rows.map(r => r.name);
+      expect(names).toContain('reconcile-order:recente');
+      expect(names).not.toContain('reconcile-order:antiga');
+    });
+
+    it('rotinas simultâneas: todas respondem 200 e nada se duplica', async () => {
       const e = await event();
       const buyers = [await user(), await user(), await user()];
       const paid = [];
@@ -1308,10 +1378,8 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
         mock.simulate.setStatus(p.paymentId, 'aprovado');
         await age(p.orderId);
       }
-      const res = await Promise.all(Array.from({ length: 5 }, () => sweep()));
+      const res = await Promise.all(Array.from({ length: 5 }, () => daily()));
       expect(res.every(r => r.status === 200)).toBe(true);
-      const bodies = await Promise.all(res.map(r => json(r)));
-      expect(bodies.filter(b => b.status === 'ok').length).toBeGreaterThanOrEqual(1);
       expect(await sold(e.types[0]!)).toBe(6);
       expect((await sql('select count(*)::int as n from tickets')).rows[0].n).toBe(6);
       expect((await audit('pagamento.confirmado')).length).toBe(3);
@@ -1384,21 +1452,19 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       expect(msg.data).toEqual({ orderNumber: `PX-${number.number}` }); // metadados sem dado do comprador
     });
 
-    it('a varredura também detecta o caso (webhook perdido) e avisa os administradores', async () => {
+    it('uma tarefa tardia (3 h) também detecta o caso com o webhook perdido e avisa os administradores', async () => {
       await user('administrador');
-      const { a, pa } = await paidWithoutStock();
-      await a.get(`/orders/${pa.orderId}`); // já vencido
-      await sql(
-        `set session_replication_role = replica; update orders set updated_at = now() - interval '10 minutes' where id = '${pa.orderId}'; set session_replication_role = origin`,
-      );
-      const res = await json(
-        await app.request('/api/internal/jobs/reconcile-pending', {
-          method: 'POST',
-          headers: { authorization: 'Bearer token-do-scheduler' },
-        }),
-      );
-      expect(res.summary.orders.outcomes).toMatchObject({ sem_estoque: 1 });
+      const { pa } = await paidWithoutStock();
+      const charged = new Date(clock.now().getTime() - 11 * 60_000).toISOString(); // a cobrança de A foi criada antes de B
+      clock.advance(3 * 3_600_000);
+      const res = await app.request('/api/internal/tasks/reconcile-order', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...TOKEN },
+        body: JSON.stringify({ orderId: pa.orderId, attempt: 9, chargedAt: charged }),
+      });
+      expect(await json(res)).toMatchObject({ outcome: 'conciliado' });
       expect((await order(pa.orderId)).status).toBe('pago_sem_estoque');
+      expect(await ticketsOf(pa.orderId)).toEqual([]);
       expect(await emailRows(pa.orderId)).toHaveLength(1);
     });
 

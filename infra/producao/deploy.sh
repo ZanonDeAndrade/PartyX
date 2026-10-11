@@ -3,7 +3,7 @@
 # NÃO FOI EXECUTADO. Idempotente onde dá. Uso: ./infra/producao/deploy.sh <comando>
 #
 #   setup        cria o projeto (opcional), APIs, contas de serviço, fila, buckets, segredos e orçamento
-#   varredura    cria a rotina diária das 04:00 e a varredura de pendentes a cada 5 min (Cloud Scheduler); rode depois do 1º deploy
+#   varredura    cria a rotina diária das 04:00 (Cloud Scheduler) e remove a varredura de 5 min, se existir; rode depois do 1º deploy
 #   roles        cria os papéis partyx_app (aplicação) e partyx_backup (só leitura) NO NEON e grava as URLs nos segredos. ANTES da 1ª migração
 #   backup       backup diário: imagem, job, agendamento às 03:00 e alertas (infra/backup/setup.sh). Depois de `roles` e do `setup`
 #   migrate      roda as migrações (Cloud Run Job com a conexão direta do Neon)
@@ -22,9 +22,8 @@
 #   PUBLIC_BASE_URL   endereço público em HTTPS (obrigatório no `deploy`): https://seudominio.com.br
 #   TRUSTED_PROXY_HOPS=2   MEDIDO atrás do Firebase Hosting em 05/10/2026 (ver README-DEPLOY.md). Direto no Cloud Run seria 1.
 #   MIN_INSTANCES=0  MAX_INSTANCES=3  NOTIFY_EMAIL=<e-mail dos alertas>
-#   PENDING_SCHEDULE="*/5 * * * *"   agenda da varredura de pendentes (ver o custo do Neon no README-DEPLOY.md, seção 8)
-#   RECONCILE_TASK_OFFSETS_SECONDS=60,120,240,480  RECONCILE_TASK_MARGIN_SECONDS=120  RECONCILE_SWEEP_WINDOW_HOURS=24
-#   RECONCILE_SWEEP_LOCK_SECONDS=240  RECONCILE_SWEEP_BATCH=100   (padrões do código; só passe para mudar)
+#   RECONCILE_TASK_OFFSETS_SECONDS=60,120,240,480  RECONCILE_TASK_MARGIN_SECONDS=120
+#   RECONCILE_LATE_OFFSETS_SECONDS=900,1800,3600,10800,28800,86400  RECONCILE_LOCK_SECONDS=120   (padrões do código; só passe para mudar)
 #   PARTYX_SUPPORT_EMAIL  PARTYX_SUPPORT_WHATSAPP   contato de atendimento DA PARTYX para o comprador (nunca o da contratada)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -38,7 +37,7 @@ QUEUE="partyx-conciliacao"
 REPO="partyx"
 JOB="partyx-migrate"
 SWEEP_JOB="partyx-varredura-diaria"
-PENDING_JOB="partyx-varredura-pendentes"
+OLD_PENDING_JOB="partyx-varredura-pendentes"   # varredura de 5 min de uma versão anterior deste script: removida (D-78)
 BANNERS="${PROJECT}-banners"
 BACKUPS="${PROJECT}-backups"
 APP_SA="partyx-app"; DEPLOY_SA="partyx-deploy"; SCHED_SA="partyx-scheduler"; TASKS_SA="partyx-tasks"
@@ -131,25 +130,24 @@ cmd_setup() {
   echo "ok. Falta: valores de database-url, database-url-direct e smtp-url; papel partyx_app no Neon ANTES da 1ª migração; deploy; hosting; varredura (comando 'varredura')."
 }
 
-# Duas agendas no Cloud Scheduler (rodar depois do primeiro deploy: precisa do serviço no ar):
-# 1) rotina DIÁRIA, de madrugada: rede de segurança para e-mails pendentes, pagamentos de até 3 dias e ingressos que faltarem;
-# 2) VARREDURA DE PENDENTES a cada 5 min (PENDING_SCHEDULE): depois das verificações sob demanda do Cloud Tasks (1, 2, 4 e 8 min e no
-#    fim da reserva + margem), olha os pedidos com cobrança de até 24 h. Uma por vez (trava em job_leases).
-# CUSTO: com a suspensão automática do Neon em 5 min, a varredura a cada 5 min mantém o banco acordado o tempo todo
-# (estimativa no README-DEPLOY.md, seção 8). O Scheduler cobra US$ 0,10/job/mês acima de 3 jobs POR CONTA DE FATURAMENTO.
+# UMA agenda fixa no Cloud Scheduler: a rotina diária, de madrugada, rede de segurança para e-mails pendentes, pagamentos de até 3 dias
+# (inclusive pedidos cujas tarefas no Cloud Tasks falharam) e ingressos que faltarem. A conciliação "a cada poucos minutos" e a da
+# aprovação tardia são tarefas POR PEDIDO no Cloud Tasks (1, 2, 4, 8 min, fim da reserva, e 15 min, 30 min, 1 h, 3 h, 8 h, 24 h), sem cron:
+# sem pedido em aberto, nada roda e o Neon dorme (D-78). Com o backup das 03:00, são 2 jobs no Scheduler. Rodar depois do 1º deploy.
 cmd_varredura() {
   : "${PUBLIC_BASE_URL:?informe PUBLIC_BASE_URL para o X-Forwarded-Host da varredura}"
   local url host; url="$(run_url)"; host="$(public_host)"
-  upsert_job() { # nome, agenda, caminho
-    local verb=create; exists g scheduler jobs describe "$1" --location="$REGION" && verb=update
-    g scheduler jobs "$verb" http "$1" --location="$REGION" --schedule="$2" --time-zone="America/Sao_Paulo" \
-      --uri="$url$3" --http-method=POST \
-      --headers="X-Forwarded-Host=$host" \
-      --oidc-service-account-email="$(sa $SCHED_SA)" --oidc-token-audience="$url" --attempt-deadline=120s --max-retry-attempts=1
-    echo "$1 ($verb): $2 (America/Sao_Paulo) -> $url$3"
-  }
-  upsert_job "$SWEEP_JOB" "0 4 * * *" /api/internal/jobs/reconcile-payments
-  upsert_job "$PENDING_JOB" "${PENDING_SCHEDULE:-*/5 * * * *}" /api/internal/jobs/reconcile-pending
+  local verb=create; exists g scheduler jobs describe "$SWEEP_JOB" --location="$REGION" && verb=update
+  g scheduler jobs "$verb" http "$SWEEP_JOB" --location="$REGION" --schedule="0 4 * * *" --time-zone="America/Sao_Paulo" \
+    --uri="$url/api/internal/jobs/reconcile-payments" --http-method=POST \
+    --headers="X-Forwarded-Host=$host" \
+    --oidc-service-account-email="$(sa $SCHED_SA)" --oidc-token-audience="$url" --attempt-deadline=120s --max-retry-attempts=1
+  echo "Rotina diária às 04:00 (America/Sao_Paulo) -> $url"
+  # A varredura de 5 min de uma versão anterior (nunca executada) manteria o Neon acordado: se alguém a criou, sai.
+  if exists g scheduler jobs describe "$OLD_PENDING_JOB" --location="$REGION"; then
+    g scheduler jobs delete "$OLD_PENDING_JOB" --location="$REGION" --quiet
+    echo "Removido o job $OLD_PENDING_JOB (varredura de 5 min)."
+  fi
 }
 
 # Papéis do banco: a migração 0002 ABORTA sem `partyx_app`. Criados por SQL com a conexão direta do DONO (nunca pela API do Neon, que
@@ -230,8 +228,8 @@ cmd_deploy() {
     "QR_HMAC_CURRENT=${QR_HMAC_CURRENT:-1}" "SALES_OPEN=$sales" "PAYMENT_GATEWAY=$gateway" "VISUAL_APPROVED=${VISUAL_APPROVED:-false}")
   for v in TERMS_VERSION PRIVACY_VERSION CANCELLATION_VERSION EMAIL_FROM EMAIL_REPLY_TO RESERVATION_MINUTES MAX_TICKETS_PER_ORDER \
            RETENTION_LOGIN_ATTEMPTS_DAYS RETENTION_SESSIONS_DAYS RETENTION_PASSWORD_RESETS_DAYS GATE_SCANS_PER_MINUTE GATE_SEARCHES_PER_MINUTE \
-           RECONCILE_TASK_OFFSETS_SECONDS RECONCILE_TASK_MARGIN_SECONDS RECONCILE_SWEEP_WINDOW_HOURS RECONCILE_SWEEP_LOCK_SECONDS \
-           RECONCILE_SWEEP_BATCH PARTYX_SUPPORT_EMAIL PARTYX_SUPPORT_WHATSAPP; do
+           RECONCILE_TASK_OFFSETS_SECONDS RECONCILE_TASK_MARGIN_SECONDS RECONCILE_LATE_OFFSETS_SECONDS RECONCILE_LOCK_SECONDS \
+           PARTYX_SUPPORT_EMAIL PARTYX_SUPPORT_WHATSAPP; do
     [ -z "${!v:-}" ] || vars+=("$v=${!v}")
   done
   [ "${TURNSTILE_ENABLED:-false}" != "true" ] || vars+=("TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY")

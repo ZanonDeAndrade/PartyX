@@ -70,6 +70,8 @@ describe.skipIf(!ADMIN_URL)('papel da aplicação e migração 0002 (integraçã
     expect(await can('DELETE', 'tickets')).toBe(false);
     expect(await can('UPDATE', 'audit_log')).toBe(false);
     expect(await can('DELETE', 'sessions')).toBe(true); // só dados temporários
+    expect(await can('SELECT', 'job_leases')).toBe(true);
+    expect(await can('DELETE', 'job_leases')).toBe(true); // travas vencidas, limpas pela rotina diária
     const attrs = (await d.pool.query("select rolsuper, rolcreatedb, rolcreaterole, rolbypassrls from pg_roles where rolname = $1", [APP_ROLE])).rows[0];
     expect(attrs).toEqual({ rolsuper: false, rolcreatedb: false, rolcreaterole: false, rolbypassrls: false });
     const member = await d.pool.query("select count(*)::int as n from pg_auth_members m join pg_roles r on r.oid = m.member where r.rolname = $1", [APP_ROLE]);

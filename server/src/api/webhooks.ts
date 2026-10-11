@@ -17,9 +17,9 @@ import type { MockGateway } from '../payments/mockGateway';
 import type { ReconcileDeps, TicketIssuer } from '../payments/reconcile';
 import { BACKOFF_MINUTES as EMAIL_RETRIES } from '../mail/outbox';
 import type { TaskQueue } from '../payments/taskQueue';
-import { handleReconcileTask } from '../payments/reconcileTask';
+import { handleReconcileTask, offsetsOf } from '../payments/reconcileTask';
 import { finalAttempt } from '../domain/reconcileSchedule';
-import { acquireLease, releaseLease } from '../db/jobLease';
+import { acquireLease, purgeOldLeases, releaseLease } from '../db/jobLease';
 import type { Clock } from '../providers/clock';
 import type { EmailSender } from '../providers/email';
 import { handleEmailTask, processOutbox, type OutboxDeps } from '../mail/outbox';
@@ -81,8 +81,9 @@ export function webhookRoutes(deps: WebhookDeps) {
   });
 
   /**
-   * Rotina diária de segurança (Cloud Scheduler, de madrugada): fila de e-mails, conciliação ampla (pedidos de até 3 dias) e ingressos
-   * que faltarem. Só o Cloud Scheduler (token OIDC da conta de serviço configurada) chama.
+   * Rotina diária de segurança (Cloud Scheduler, 04:00), a ÚNICA agenda fixa da conciliação: fila de e-mails, pedidos de até 3 dias
+   * que ainda podem mudar (pega os pedidos cujas tarefas no Cloud Tasks não puderam ser agendadas ou falharam) e ingressos que
+   * faltarem. Uma execução por vez (trava `job_leases`); limpa as travas vencidas há mais de 2 dias. Só o Scheduler (OIDC) chama.
    */
   app.post('/internal/jobs/reconcile-payments', async c => {
     if (!deps.jobAuth)
@@ -91,50 +92,24 @@ export function webhookRoutes(deps: WebhookDeps) {
       // Resposta igual para qualquer falha de autenticação.
       throw new AppError(401, 'nao_autenticado', 'Não autenticado.');
     }
-    // A fila de e-mails anda mesmo sem gateway: cadastro e recuperação de senha também dependem dela.
-    const emails = mail ? await processOutbox(mail, { limit: 50 }) : null;
-    if (!deps.gateway) return c.json({ status: 'sem_gateway', emails });
-    const summary = await runReconciliation(reconcileDeps(deps.gateway));
-    // Rede de segurança: pedido pago sem ingresso (pago antes do emissor existir) recebe o que falta. Idempotente.
-    const recovered = await backfillTickets({ db: deps.db, qr: deps.config.qr });
-    logger.info('conciliação de pagamentos executada', {
-      checked: summary.orders.checked,
-      failed: summary.orders.failed,
-      expiredOrders: summary.expired.orders,
-    });
-    return c.json({ status: 'ok', summary, tickets: recovered, emails });
-  });
-
-  /**
-   * Varredura de pagamentos ainda sem decisão (Cloud Scheduler, a cada 5 minutos): depois das verificações sob demanda, olha os pedidos
-   * com cobrança criados nas últimas `RECONCILE_SWEEP_WINDOW_HOURS` horas (padrão 24) que ainda podem mudar (pendente, vencido, não
-   * concluído), vence as reservas e reprocessa notificações pendentes. Uma execução por vez (trava com prazo em `job_leases`); a que
-   * chega com outra em andamento responde 200 "em_execucao" para o Scheduler não repetir. Cada pedido também é reservado para uma só
-   * execução (`FOR UPDATE SKIP LOCKED`) e a confirmação é idempotente.
-   */
-  app.post('/internal/jobs/reconcile-pending', async c => {
-    if (!deps.jobAuth)
-      throw new AppError(503, 'rotinas_nao_configuradas', 'As rotinas internas não estão configuradas.');
-    if (!(await deps.jobAuth.verify(c.req.header('authorization'))))
-      throw new AppError(401, 'nao_autenticado', 'Não autenticado.');
-    if (!deps.gateway) return c.json({ status: 'sem_gateway' });
-    const schedule = deps.config.reconcile;
-    const lease = await acquireLease(deps.db, 'reconcile-pending', schedule.sweepLockSeconds);
+    const lease = await acquireLease(deps.db, 'reconcile-daily', deps.config.reconcile.lockSeconds);
     if (!lease) return c.json({ status: 'em_execucao' });
     try {
-      const summary = await runReconciliation(reconcileDeps(deps.gateway), {
-        windowHours: schedule.sweepWindowHours,
-        limit: schedule.sweepBatch,
+      // A fila de e-mails anda mesmo sem gateway: cadastro e recuperação de senha também dependem dela.
+      const emails = mail ? await processOutbox(mail, { limit: 50 }) : null;
+      const leases = await purgeOldLeases(deps.db);
+      if (!deps.gateway) return c.json({ status: 'sem_gateway', emails, leases });
+      const summary = await runReconciliation(reconcileDeps(deps.gateway));
+      // Rede de segurança: pedido pago sem ingresso (pago antes do emissor existir) recebe o que falta. Idempotente.
+      const recovered = await backfillTickets({ db: deps.db, qr: deps.config.qr });
+      logger.info('conciliação de pagamentos executada', {
+        checked: summary.orders.checked,
+        failed: summary.orders.failed,
+        expiredOrders: summary.expired.orders,
       });
-      if (summary.orders.checked > 0 || summary.expired.orders > 0 || summary.events.tried > 0)
-        logger.info('varredura de pagamentos pendentes executada', {
-          checked: summary.orders.checked,
-          failed: summary.orders.failed,
-          expiredOrders: summary.expired.orders,
-        });
-      return c.json({ status: 'ok', summary });
+      return c.json({ status: 'ok', summary, tickets: recovered, emails, leases });
     } finally {
-      await releaseLease(deps.db, 'reconcile-pending', lease);
+      await releaseLease(deps.db, 'reconcile-daily', lease);
     }
   });
 
@@ -152,7 +127,7 @@ export function webhookRoutes(deps: WebhookDeps) {
     const parsed = z
       .object({
         orderId: z.uuid(),
-        attempt: z.number().int().min(1).max(finalAttempt(schedule.taskOffsetsSeconds)),
+        attempt: z.number().int().min(1).max(finalAttempt(offsetsOf(schedule))),
         chargedAt: z.iso.datetime().optional(),
       })
       .safeParse(await c.req.json().catch(() => null));

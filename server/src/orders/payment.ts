@@ -264,12 +264,15 @@ export async function startPayment(
     .where(and(eq(orders.id, orderId), isNull(orders.gatewayPaymentId)))
     .returning({ id: orders.id });
   if (saved.length > 0) {
-    // Rede de segurança contra webhook perdido ou atrasado: verificações só deste pedido, contadas desta cobrança (1, 2, 4 e 8 min e
-    // a última no fim da reserva mais a margem). Agenda só a primeira; cada uma agenda a seguinte se o pagamento seguir pendente.
-    // Nunca derruba a criação da cobrança (falha vira alerta e a varredura agendada cobre).
+    // Rede de segurança contra webhook perdido ou atrasado: verificações só deste pedido, contadas desta cobrança (1, 2, 4 e 8 min,
+    // no fim da reserva + margem e as tardias até 24 h). Agenda só a primeira; cada uma agenda a seguinte se o pagamento seguir sem
+    // decisão. Nunca derruba a criação da cobrança (falha vira alerta e a rotina diária cobre).
     const schedule = deps.config.reconcile;
     const deadline = new Date(reservation.expiresAt.getTime() + schedule.taskMarginSeconds * 1000);
-    const first = nextCheck({ attempt: 0, chargedAt: now, deadline, now }, schedule.taskOffsetsSeconds);
+    const first = nextCheck(
+      { attempt: 0, chargedAt: now, deadline, now },
+      { early: schedule.taskOffsetsSeconds, late: schedule.lateOffsetsSeconds },
+    );
     if (first)
       await enqueueSafely(deps.taskQueue, {
         orderId,

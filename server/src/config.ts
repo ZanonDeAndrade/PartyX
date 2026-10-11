@@ -2,12 +2,12 @@ import { createHmac } from 'node:crypto';
 import { z } from 'zod';
 import { parseQrKeys, type QrKeys } from './domain/ticketCode';
 
-/** Lê a lista de esperas da conciliação sob demanda. Nula se inválida (vazia, fora da faixa, fora de ordem). */
-export function parseOffsets(value: string): number[] | null {
+/** Lê uma lista de esperas da conciliação sob demanda (segundos). Nula se inválida (fora da faixa, fora de ordem, repetida). */
+export function parseOffsets(value: string, range: { min: number; max: number } = { min: 10, max: 3600 }): number[] | null {
   const parts = value.split(',').map(p => p.trim());
   if (parts.length < 1 || parts.length > 10 || parts.some(p => !/^\d+$/.test(p))) return null;
   const nums = parts.map(Number);
-  if (nums.some(n => n < 10 || n > 3600)) return null;
+  if (nums.some(n => n < range.min || n > range.max)) return null;
   if (nums.some((n, i) => i > 0 && n <= nums[i - 1]!)) return null;
   return nums;
 }
@@ -97,7 +97,7 @@ const schema = z
     GLOBAL_RECOVERIES_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(60),
     GATE_SCANS_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(3000),
     GATE_SEARCHES_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(400),
-    /** Fila do Cloud Tasks da conciliação sob demanda: `projects/<projeto>/locations/<região>/queues/<fila>`. Sem ela, só o webhook e as varreduras do Scheduler conciliam. */
+    /** Fila do Cloud Tasks da conciliação sob demanda: `projects/<projeto>/locations/<região>/queues/<fila>`. Sem ela, só o webhook e a rotina diária conciliam. */
     TASKS_QUEUE: z
       .string()
       .regex(/^projects\/[^/]+\/locations\/[^/]+\/queues\/[^/]+$/, 'formato projects/P/locations/L/queues/Q')
@@ -113,14 +113,22 @@ const schema = z
       .string()
       .default('60,120,240,480')
       .refine(v => parseOffsets(v) !== null, 'use de 1 a 10 números inteiros crescentes entre 10 e 3600, separados por vírgula'),
-    /** Margem depois do fim da reserva para a última verificação sob demanda, em segundos. */
+    /** Margem depois do fim da reserva para a verificação do limite, em segundos. */
     RECONCILE_TASK_MARGIN_SECONDS: z.coerce.number().int().min(0).max(3600).default(120),
-    /** Varredura agendada (Cloud Scheduler): olha pedidos com cobrança criados nas últimas N horas e ainda não resolvidos. */
-    RECONCILE_SWEEP_WINDOW_HOURS: z.coerce.number().int().min(1).max(168).default(24),
-    /** Prazo da trava da varredura, em segundos: impede duas varreduras ao mesmo tempo e se solta sozinho se a execução cair. */
-    RECONCILE_SWEEP_LOCK_SECONDS: z.coerce.number().int().min(30).max(3600).default(240),
-    /** Máximo de pedidos reconsultados por varredura. */
-    RECONCILE_SWEEP_BATCH: z.coerce.number().int().min(1).max(1000).default(100),
+    /**
+     * Verificações **tardias**, também por pedido no Cloud Tasks e contadas da criação da cobrança, para a aprovação que chega depois
+     * do vencimento (seção 10.1). Padrão: 15 min, 30 min, 1 h, 3 h, 8 h e 24 h. Só valem as que caem depois do limite da reserva.
+     * Depois da última, se o gateway seguir sem estado conclusivo, o pedido vai para revisão manual. Sem agenda fixa no Scheduler.
+     */
+    RECONCILE_LATE_OFFSETS_SECONDS: z
+      .string()
+      .default('900,1800,3600,10800,28800,86400')
+      .refine(
+        v => parseOffsets(v, { min: 60, max: 259200 }) !== null,
+        'use de 1 a 10 números inteiros crescentes entre 60 e 259200 (3 dias), separados por vírgula',
+      ),
+    /** Prazo da trava (`job_leases`) de cada verificação de pedido e da rotina diária, em segundos. Solta sozinha se a execução cair. */
+    RECONCILE_LOCK_SECONDS: z.coerce.number().int().min(30).max(3600).default(120),
     /**
      * Contato de atendimento **da PartyX** mostrado ao comprador quando o pagamento foi aprovado sem ingresso disponível. Fornecido pela
      * PartyX. Sem ele a tela mostra uma mensagem neutra, sem prazo. Nunca usar aqui o contato da contratada.
@@ -270,9 +278,8 @@ export type Config = Omit<
   | 'RETENTION_PASSWORD_RESETS_DAYS'
   | 'RECONCILE_TASK_OFFSETS_SECONDS'
   | 'RECONCILE_TASK_MARGIN_SECONDS'
-  | 'RECONCILE_SWEEP_WINDOW_HOURS'
-  | 'RECONCILE_SWEEP_LOCK_SECONDS'
-  | 'RECONCILE_SWEEP_BATCH'
+  | 'RECONCILE_LATE_OFFSETS_SECONDS'
+  | 'RECONCILE_LOCK_SECONDS'
   | 'PARTYX_SUPPORT_EMAIL'
   | 'PARTYX_SUPPORT_WHATSAPP'
 > & {
@@ -304,9 +311,10 @@ export interface ReconcileSchedule {
   taskOffsetsSeconds: number[];
   /** Margem depois do fim da reserva para a última verificação sob demanda. */
   taskMarginSeconds: number;
-  sweepWindowHours: number;
-  sweepLockSeconds: number;
-  sweepBatch: number;
+  /** Esperas das verificações tardias (aprovação depois do vencimento), em segundos desde a cobrança. */
+  lateOffsetsSeconds: number[];
+  /** Prazo da trava de cada verificação e da rotina diária. */
+  lockSeconds: number;
 }
 
 export interface SupportContact {
@@ -345,9 +353,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     RETENTION_PASSWORD_RESETS_DAYS,
     RECONCILE_TASK_OFFSETS_SECONDS,
     RECONCILE_TASK_MARGIN_SECONDS,
-    RECONCILE_SWEEP_WINDOW_HOURS,
-    RECONCILE_SWEEP_LOCK_SECONDS,
-    RECONCILE_SWEEP_BATCH,
+    RECONCILE_LATE_OFFSETS_SECONDS,
+    RECONCILE_LOCK_SECONDS,
     PARTYX_SUPPORT_EMAIL,
     PARTYX_SUPPORT_WHATSAPP,
     ...rest
@@ -390,9 +397,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     reconcile: {
       taskOffsetsSeconds: parseOffsets(RECONCILE_TASK_OFFSETS_SECONDS)!,
       taskMarginSeconds: RECONCILE_TASK_MARGIN_SECONDS,
-      sweepWindowHours: RECONCILE_SWEEP_WINDOW_HOURS,
-      sweepLockSeconds: RECONCILE_SWEEP_LOCK_SECONDS,
-      sweepBatch: RECONCILE_SWEEP_BATCH,
+      lateOffsetsSeconds: parseOffsets(RECONCILE_LATE_OFFSETS_SECONDS, { min: 60, max: 259200 })!,
+      lockSeconds: RECONCILE_LOCK_SECONDS,
     },
     partyxSupport:
       PARTYX_SUPPORT_EMAIL || PARTYX_SUPPORT_WHATSAPP

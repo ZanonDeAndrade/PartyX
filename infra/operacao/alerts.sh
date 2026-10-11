@@ -9,8 +9,8 @@
 #   pagamento_divergente    valor, conta ou pedido diferentes do esperado
 #   estorno_fora_de_fluxo   estorno ou chargeback sem aprovação local
 #   email_falhou            e-mail transacional não entregue
-#   conciliacao_revisao_manual  pagamento ainda pendente no gateway depois das verificações sob demanda (fim da reserva + margem)
-#   fila_conciliacao_falhou     não foi possível agendar a verificação no Cloud Tasks
+#   conciliacao_revisao_manual  pagamento sem estado conclusivo no gateway depois da última verificação tardia (24 h)
+#   fila_conciliacao_falhou     não foi possível agendar a verificação no Cloud Tasks (a rotina diária cobre)
 #   fila_email_falhou           não foi possível agendar o reenvio de e-mail (a rotina diária cobre)
 #   limite_global_atingido      limite GLOBAL de cadastros ou de recuperações de senha por hora atingido (abuso em massa, ou evento: subir o limite)
 #   verificacao_humana_indisponivel  a Cloudflare (Turnstile) não respondeu: cadastro e recuperação ficam recusados (falha fechada)
