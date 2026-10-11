@@ -149,6 +149,7 @@ em largura própria). Rotas com `:id` usam os dados fictícios de `infra/ui/seed
 | ADM24 | Conta do administrador | `/admin/conta` | conta do administrador | [390](antes/ADM24__conta-do-administrador__390.jpg) [1440](antes/ADM24__conta-do-administrador__1440.jpg) | [360](depois/ADM24__conta-do-administrador__360.jpg) [390](depois/ADM24__conta-do-administrador__390.jpg) [768](depois/ADM24__conta-do-administrador__768.jpg) [1440](depois/ADM24__conta-do-administrador__1440.jpg) | concluído |
 | G04 | Acesso negado | `/portaria` | acesso negado ao cliente | [390](antes/G04__acesso-negado-ao-cliente__390.jpg) [1440](antes/G04__acesso-negado-ao-cliente__1440.jpg) | [360](depois/G04__acesso-negado-ao-cliente__360.jpg) [390](depois/G04__acesso-negado-ao-cliente__390.jpg) [768](depois/G04__acesso-negado-ao-cliente__768.jpg) [1440](depois/G04__acesso-negado-ao-cliente__1440.jpg) | concluído |
 | G04 | Acesso negado | `/admin` | acesso negado ao validador | [390](antes/G04__acesso-negado-ao-validador__390.jpg) [1440](antes/G04__acesso-negado-ao-validador__1440.jpg) | [360](depois/G04__acesso-negado-ao-validador__360.jpg) [390](depois/G04__acesso-negado-ao-validador__390.jpg) [768](depois/G04__acesso-negado-ao-validador__768.jpg) [1440](depois/G04__acesso-negado-ao-validador__1440.jpg) | concluído |
+| G05 | Sessão expirada | `/meus-ingressos` | sessao expirada com retorno | novo | [360](depois/G05__sessao-expirada-com-retorno__360.jpg) [390](depois/G05__sessao-expirada-com-retorno__390.jpg) [768](depois/G05__sessao-expirada-com-retorno__768.jpg) [1440](depois/G05__sessao-expirada-com-retorno__1440.jpg) | concluído |
 | G07 | Menus e gavetas | `/` | menu do celular aberto | [390](antes/G07__menu-do-celular-aberto__390.jpg) [1440](antes/G07__menu-do-celular-aberto__1440.jpg) | [360](depois/G07__menu-do-celular-aberto__360.jpg) [390](depois/G07__menu-do-celular-aberto__390.jpg) [768](depois/G07__menu-do-celular-aberto__768.jpg) [1440](depois/G07__menu-do-celular-aberto__1440.jpg) | concluído |
 | G07 | Menus e gavetas | `/admin` | menu do painel no celular | [390](antes/G07__menu-do-painel-no-celular__390.jpg) [1440](antes/G07__menu-do-painel-no-celular__1440.jpg) | [360](depois/G07__menu-do-painel-no-celular__360.jpg) [390](depois/G07__menu-do-painel-no-celular__390.jpg) [768](depois/G07__menu-do-painel-no-celular__768.jpg) [1440](depois/G07__menu-do-painel-no-celular__1440.jpg) | concluído |
 | INTRO | Abertura em vídeo | `/` | abertura em video | [390](antes/INTRO__abertura-em-video__390.jpg) [1440](antes/INTRO__abertura-em-video__1440.jpg) | [360](depois/INTRO__abertura-em-video__360.jpg) [390](depois/INTRO__abertura-em-video__390.jpg) [768](depois/INTRO__abertura-em-video__768.jpg) [1440](depois/INTRO__abertura-em-video__1440.jpg) | concluído |
@@ -159,7 +160,7 @@ em largura própria). Rotas com `:id` usam os dados fictícios de `infra/ui/seed
 | E04 | PDF do ingresso | `/api/orders/ce0b9813-4463-4fbb-a07e-1811c251ed77/tickets/pdf` | pdf do pedido | [pdf](antes/E04__pdf-do-pedido-3.jpg) | [pdf](depois/E04__pdf-do-pedido-3.jpg) | concluído |
 | E05 | Compartilhamento | `/eventos/noite-roxa-warehouse` | compartilhar com pre-visualizacao | [390](antes/E05__compartilhar-com-pre-visualizacao__390.jpg) [1440](antes/E05__compartilhar-com-pre-visualizacao__1440.jpg) | [360](depois/E05__compartilhar-com-pre-visualizacao__360.jpg) [390](depois/E05__compartilhar-com-pre-visualizacao__390.jpg) [768](depois/E05__compartilhar-com-pre-visualizacao__768.jpg) [1440](depois/E05__compartilhar-com-pre-visualizacao__1440.jpg) | concluído |
 
-**152 de 152 estados concluídos.**
+**153 de 153 estados concluídos.**
 
 ## Itens do inventário cobertos por outra captura
 
@@ -170,6 +171,5 @@ em largura própria). Rotas com `:id` usam os dados fictícios de `infra/ui/seed
 | ADM23 | Exportações: links de CSV/XLSX nas listas e relatórios e a aba Contingência (CSV e PDF) |
 | G01, G03 | Estados "carregando" e "erro" de P01, P02, P03, U01, ADM01 e checkout |
 | G02 | Vazios: P01 sem eventos, P02 nenhum resultado, U01 sem ingressos, U02 sem compras, V04 nenhum resultado |
-| G05 | Sessão expirada: volta ao login com retorno (A01 "retorno ao checkout"); tela própria em `sugestoes-futuras.md` |
 | G06 | Manutenção: não existe no site real; registrado em `sugestoes-futuras.md` (depende de regra de servidor) |
 | G08 | Exportação em andamento, concluída ou com erro: componente `ExportLink` nas telas do painel |

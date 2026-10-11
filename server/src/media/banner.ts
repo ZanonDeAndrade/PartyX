@@ -16,7 +16,20 @@ export interface ShareImage {
   height: 630;
 }
 
+/**
+ * Larguras menores geradas junto com o banner, para o navegador escolher pelo tamanho da tela (`srcset`). A maior versão é o
+ * próprio banner (até `BANNER_MAX_WIDTH`). Só entram as menores que a imagem: nada é ampliado.
+ */
+export const BANNER_VARIANT_WIDTHS = [640, 1080] as const;
+
+export interface BannerVariant {
+  width: number;
+  data: Buffer;
+}
+
 export interface ProcessedBanner {
+  /** Versões menores em WebP, da menor para a maior. */
+  variants: BannerVariant[];
   data: Buffer;
   /** Versão 1200x630 em JPEG para pré-visualização em WhatsApp e redes sociais. */
   share: ShareImage;
@@ -55,7 +68,13 @@ export async function processBanner(input: Buffer): Promise<ProcessedBanner> {
       .resize({ width: BANNER_MAX_WIDTH, withoutEnlargement: true })
       .webp({ quality: 82 })
       .toBuffer({ resolveWithObject: true });
+    const variants: BannerVariant[] = [];
+    for (const w of BANNER_VARIANT_WIDTHS) {
+      if (w >= info.width) continue;
+      variants.push({ width: w, data: await resizeWebp(data, w) });
+    }
     return {
+      variants,
       data,
       share: await shareImage(input),
       contentType: 'image/webp',
@@ -89,3 +108,27 @@ async function shareImage(input: Buffer): Promise<ShareImage> {
 /** Endereço da imagem de pré-visualização, derivado do banner: `<hash>.webp` → `<hash>-og.jpg`. Gravada junto com o banner. */
 export const shareObjectName = (bannerObjectName: string): string => bannerObjectName.replace(/\.webp$/, '-og.jpg');
 export const shareImageUrl = (bannerUrl: string): string => bannerUrl.replace(/\.webp$/, '-og.jpg');
+
+/** Reduz um banner já processado (WebP limpo) para a largura pedida, também em WebP. Usado no envio e no script de versões. */
+export function resizeWebp(webp: Buffer, width: number): Promise<Buffer> {
+  return sharp(webp, { limitInputPixels: MAX_INPUT_PIXELS })
+    .resize({ width, withoutEnlargement: true })
+    .webp({ quality: 80 })
+    .toBuffer();
+}
+
+/** Nome do objeto de uma versão menor: `<hash>.webp` → `<hash>-w640.webp`. Gravada ao lado do banner. */
+export const variantObjectName = (bannerObjectName: string, width: number): string =>
+  bannerObjectName.replace(/\.webp$/, `-w${width}.webp`);
+export const variantUrl = (bannerUrl: string, width: number): string => bannerUrl.replace(/\.webp$/, `-w${width}.webp`);
+
+/**
+ * `srcset` do banner a partir das larguras registradas (a maior é a própria `bannerUrl`). Nulo sem larguras: banner anterior
+ * às versões menores, ou só uma largura (o `src` basta).
+ */
+export function bannerSrcSet(bannerUrl: string | null, widths: readonly number[]): string | null {
+  if (!bannerUrl || widths.length < 2 || !bannerUrl.endsWith('.webp')) return null;
+  const sorted = [...widths].sort((a, b) => a - b);
+  const largest = sorted[sorted.length - 1]!;
+  return sorted.map(w => `${w === largest ? bannerUrl : variantUrl(bannerUrl, w)} ${w}w`).join(', ');
+}

@@ -1311,6 +1311,23 @@ body.px-dark .px-event-side .px-fine {
 }
 
 /* ---------- abertura em vídeo (IntroSplash) ---------- */
+/* Camada estática do primeiro quadro (index.html): só existe na tela enquanto a abertura vai tocar e o vídeo ainda não montou. */
+.px-intro-static {
+  display: none;
+}
+html[data-px-intro] .px-intro-static {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  background: var(--px-ink);
+}
+.px-intro-static img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .px-intro {
   position: fixed;
   inset: 0;

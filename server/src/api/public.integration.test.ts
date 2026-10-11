@@ -180,6 +180,7 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
       expect(card.startsAt).toBe('2026-12-13T01:00:00.000Z');
       expect(Object.keys(card).sort()).toEqual([
         'ageRating',
+        'bannerSrcSet',
         'bannerUrl',
         'isFeatured',
         'name',
@@ -311,13 +312,86 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
 
     it('nada da API vai para cache compartilhado, nem a vitrine (decisão de produção atrás do Firebase Hosting)', async () => {
       await event({ name: 'Festa Cache' });
-      for (const path of ['/api/public/events', '/api/public/events/nao-existe', '/api/public/home', '/api/public/site'])
+      for (const path of [
+        '/api/public/events',
+        '/api/public/events/nao-existe',
+        '/api/public/home',
+        '/api/public/site',
+      ])
         expect((await get(path)).headers.get('cache-control'), path).toBe('private, no-store');
     });
 
     it('é pública: responde sem sessão e informa o tema provisório', async () => {
       const site = await json(await get('/api/public/site'));
-      expect(site).toEqual({ environment: 'local', provisionalTheme: true, maxTicketsPerOrder: 6, salesOpen: true, turnstileSiteKey: null });
+      expect(site).toEqual({
+        environment: 'local',
+        provisionalTheme: true,
+        maxTicketsPerOrder: 6,
+        salesOpen: true,
+        turnstileSiteKey: null,
+      });
+    });
+  });
+
+  describe('página inicial com a vitrine no HTML (LCP)', () => {
+    // Cada teste 10 minutos depois do anterior (e à frente dos outros testes): o cache de 60 s da página inicial nunca
+    // reaproveita a vitrine de outro teste.
+    let slot = 0;
+    const at = (offsetSeconds = 0) =>
+      new Date(Date.parse('2026-10-10T18:00:00Z') + slot * 600_000 + offsetSeconds * 1000).toISOString();
+    beforeEach(() => {
+      slot++;
+      clock.set(at());
+    });
+    const embedded = (html: string) =>
+      JSON.parse(/<script id="px-home-data" type="application\/json">([\s\S]*?)<\/script>/.exec(html)![1]!);
+
+    it('embute os mesmos dados da API e pré-carrega o banner do destaque nas larguras registradas', async () => {
+      const e = await event({ name: 'Noite Destaque', featured: true });
+      const banner = `https://banners.exemplo.test/events/${e.id}/${'b'.repeat(32)}.webp`;
+      await sql("update events set banner_url = $1, banner_widths = '{640,1080,1600}' where id = $2", [banner, e.id]);
+      const res = await get('/');
+      expect(res.status).toBe(200);
+      expect(res.headers.get('cache-control')).toBe('no-cache');
+      const html = await res.text();
+      expect(embedded(html)).toEqual(await json(await get('/api/public/home')));
+      const srcset = `${banner.replace('.webp', '-w640.webp')} 640w, ${banner.replace('.webp', '-w1080.webp')} 1080w, ${banner} 1600w`;
+      expect(html).toContain(
+        `<link rel="preload" as="image" href="${banner}" imagesrcset="${srcset}" imagesizes="100vw" fetchpriority="high" />`,
+      );
+      expect(embedded(html).featured[0].bannerSrcSet).toBe(srcset);
+    });
+
+    it('banner antigo (sem larguras) pré-carrega só o arquivo principal; sem destaque, não há preload', async () => {
+      const e = await event({ name: 'Antigo', featured: true });
+      const banner = `https://banners.exemplo.test/events/${e.id}/${'c'.repeat(32)}.webp`;
+      await sql('update events set banner_url = $1 where id = $2', [banner, e.id]);
+      const html = await (await get('/')).text();
+      expect(html).toContain(`<link rel="preload" as="image" href="${banner}" fetchpriority="high" />`);
+      expect(embedded(html).featured[0].bannerSrcSet).toBeNull();
+
+      clock.set(at(120));
+      await sql('update events set is_featured = false');
+      const plain = await (await get('/')).text();
+      expect(plain).not.toContain('rel="preload" as="image"');
+      expect(embedded(plain).featured).toEqual([]);
+    });
+
+    it('nome de evento com </script> não fecha o bloco de dados', async () => {
+      await event({ name: 'Festa </script><script>alert(1)</script>' });
+      const html = await (await get('/')).text();
+      expect(html).not.toContain('</script><script>alert(1)');
+      expect(embedded(html).upcoming[0].name).toBe('Festa </script><script>alert(1)</script>');
+    });
+
+    it('a consulta fica 60 s em cache; depois, a página traz os dados novos', async () => {
+      await event({ name: 'Primeiro Nome' });
+      expect(embedded(await (await get('/')).text()).upcoming[0].name).toBe('Primeiro Nome');
+      await sql("update events set name = 'Nome Novo'");
+      clock.set(at(59));
+      expect(embedded(await (await get('/')).text()).upcoming[0].name).toBe('Primeiro Nome');
+      clock.set(at(60));
+      expect(embedded(await (await get('/')).text()).upcoming[0].name).toBe('Nome Novo');
     });
   });
 

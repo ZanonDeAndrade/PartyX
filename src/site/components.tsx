@@ -312,13 +312,16 @@ export function Banner({
   step = 10,
   transitionName,
   eager = false,
+  sizes = '100vw',
 }: {
-  event: Pick<EventCard, 'name' | 'bannerUrl'>;
+  event: Pick<EventCard, 'name' | 'bannerUrl' | 'bannerSrcSet'>;
   className?: string;
   children?: ReactNode;
   step?: number;
   transitionName?: string;
   eager?: boolean;
+  /** Largura em que a imagem aparece, para o navegador escolher a versão (`srcset`). Padrão: a tela toda. */
+  sizes?: string;
 }) {
   return (
     <div
@@ -331,6 +334,8 @@ export function Banner({
       {event.bannerUrl ? (
         <img
           src={event.bannerUrl}
+          srcSet={event.bannerSrcSet ?? undefined}
+          sizes={event.bannerSrcSet ? sizes : undefined}
           alt=""
           loading={eager ? 'eager' : 'lazy'}
           fetchPriority={eager ? 'high' : undefined}
@@ -381,7 +386,11 @@ export function EventCardView({
     <m.li className="px-card" {...staggerIn(index, animate && !reduce)}>
       <Link to={eventPath(event.slug)} className="px-card-link" aria-label={`${event.name}, ${event.sale.label}`}>
         <div className="px-card-media">
-          <Banner event={event} transitionName={bannerTransitionName(event.slug)}>
+          <Banner
+            event={event}
+            transitionName={bannerTransitionName(event.slug)}
+            sizes="(min-width: 1024px) 66vw, (min-width: 640px) 50vw, 100vw"
+          >
             {open ? null : (
               <span className="px-banner-state">
                 <Badge kind={event.sale.kind}>{event.sale.label}</Badge>

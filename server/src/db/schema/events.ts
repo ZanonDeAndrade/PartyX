@@ -1,5 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, pgTable, text, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  pgTable,
+  smallint,
+  text,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { createdAt, instant, updatedAt } from './columns';
 import { eventStatus } from './enums';
 
@@ -21,6 +32,14 @@ export const events = pgTable(
       .default(sql`'{}'::text[]`),
     ageRating: text('age_rating').notNull(),
     bannerUrl: text('banner_url'),
+    /**
+     * Larguras (px) em que o banner existe, da menor à maior; a maior é a de `banner_url` e as outras ficam ao lado,
+     * como `<hash>-w640.webp`. Vazio: banner anterior às versões menores (o site usa só `banner_url`).
+     */
+    bannerWidths: smallint('banner_widths')
+      .array()
+      .notNull()
+      .default(sql`'{}'::smallint[]`),
     status: eventStatus('status').notNull().default('rascunho'),
     isFeatured: boolean('is_featured').notNull().default(false),
     /**

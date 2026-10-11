@@ -21,6 +21,11 @@
     <!--og:end-->
   </head>
   <body>
+    <!-- Primeiro quadro da abertura, desenhado já com o HTML (sem esperar o JavaScript). Só aparece quando intro/gate.js decide
+         tocar a abertura; o vídeo (src/site/IntroSplash.tsx) monta por cima e remove esta camada. -->
+    <div class="px-intro-static" aria-hidden="true">
+      <img src="/intro/partyx-intro-poster.jpg" alt="" width="1080" height="1080" loading="lazy" decoding="async" />
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

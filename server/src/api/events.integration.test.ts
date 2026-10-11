@@ -579,12 +579,29 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
       expect(res.status).toBe(200);
       const body = await json(res);
       expect(body.banner).toMatchObject({ width: 1600, height: 800 });
-      expect(storage.objects.size).toBe(2);
-      const [name, obj] = [...storage.objects].find(([k]) => k.endsWith('.webp'))!;
+      // Banner, pré-visualização e as versões menores (640 e 1080 px) para o celular.
+      expect(storage.objects.size).toBe(4);
+      const [name, obj] = [...storage.objects].find(([k]) => /\/[0-9a-f]{32}\.webp$/.test(k))!;
       expect(name).toMatch(new RegExp(`^events/${e.id}/[0-9a-f]{32}\\.webp$`));
       expect(obj.contentType).toBe('image/webp');
       expect(body.event.bannerUrl).toBe(`https://banners.exemplo.test/${name}`);
       expect((await sharp(obj.data).metadata()).format).toBe('webp');
+      for (const w of [640, 1080]) {
+        const variant = storage.objects.get(name.replace(/\.webp$/, `-w${w}.webp`))!;
+        expect(variant.contentType).toBe('image/webp');
+        expect((await sharp(variant.data).metadata()).width).toBe(w);
+      }
+      expect(body.event.bannerWidths).toEqual([640, 1080, 1600]);
+    });
+
+    it('imagem menor que 1080 px não é ampliada: só a versão de 640 px', async () => {
+      const a = await session();
+      const e = await newEvent(a);
+      const body = await json(await a.put(`/admin/events/${e.id}/banner`, upload(await image(900, 500))));
+      expect(body.event.bannerWidths).toEqual([640, 900]);
+      expect([...storage.objects.keys()].filter(k => /-w\d+\.webp$/.test(k))).toHaveLength(1);
+      const removed = await json(await a.del(`/admin/events/${e.id}/banner`));
+      expect(removed.event).toMatchObject({ bannerUrl: null, bannerWidths: [] });
     });
 
     it('o nome do arquivo e o tipo enviados pelo navegador não entram no caminho gravado', async () => {
@@ -596,7 +613,7 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
       );
       expect(res.status).toBe(200);
       for (const name of storage.objects.keys())
-        expect(name).toMatch(/^events\/[0-9a-f-]{36}\/[0-9a-f]{32}(\.webp|-og\.jpg)$/);
+        expect(name).toMatch(/^events\/[0-9a-f-]{36}\/[0-9a-f]{32}(\.webp|-og\.jpg|-w\d+\.webp)$/);
     });
 
     it('repetir o mesmo arquivo não cria objeto novo; arquivo diferente cria e a URL muda', async () => {
@@ -605,12 +622,12 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
       const first = await json(await a.put(`/admin/events/${e.id}/banner`, upload(await image(1200, 700))));
       const again = await json(await a.put(`/admin/events/${e.id}/banner`, upload(await image(1200, 700))));
       expect(again.event.bannerUrl).toBe(first.event.bannerUrl);
-      expect(storage.objects.size).toBe(2);
+      expect(storage.objects.size).toBe(4); // banner, pré-visualização, 640 e 1080 px
       const other = await json(
         await a.put(`/admin/events/${e.id}/banner`, upload(await image(1300, 700, 'png'), 'b.png', 'image/png')),
       );
       expect(other.event.bannerUrl).not.toBe(first.event.bannerUrl);
-      expect(storage.objects.size).toBe(4);
+      expect(storage.objects.size).toBe(8);
     });
 
     it('recusa arquivo que não é imagem aceita, mesmo com tipo e extensão de imagem', async () => {
@@ -678,7 +695,8 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
         const res = await other.put(`/admin/events/${e.id}/banner`, upload(await image()));
         expect(res.status, role).toBe(403);
       }
-      expect(storage.objects.size).toBe(2);
+      // Só os 4 arquivos do envio do administrador (banner, pré-visualização, 640 e 1080 px): os perfis recusados não gravam nada.
+      expect(storage.objects.size).toBe(4);
     });
   });
 

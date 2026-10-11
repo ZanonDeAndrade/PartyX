@@ -5,7 +5,7 @@ import { cpfInput, maskEmail, phoneInput } from './format';
 import { HumanCheck, type HumanState } from './HumanCheck';
 import { IconBack } from './icons';
 import { Link, useRouter } from './router';
-import { safeReturnPath, useSession } from './session';
+import { safeReturnPath, takeSessionExpired, useSession } from './session';
 import { useFetch } from './useFetch';
 
 function useReturnTo() {
@@ -162,6 +162,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [expired] = useState(takeSessionExpired);
 
   useEffect(() => {
     if (session.status === 'user') go(back);
@@ -193,9 +194,18 @@ export function LoginPage() {
   return (
     <Layout>
       <AuthCard>
-        {back !== '/' ? (
+        {expired ? (
+          <p className="px-notice px-notice-warn" role="alert">
+            <b>Sua sessão terminou.</b> Por segurança, entre de novo. Depois de entrar, você volta para onde estava
+            {back.startsWith('/checkout/') ? ', com a seleção de ingressos guardada' : ''}.
+          </p>
+        ) : back.startsWith('/checkout/') ? (
           <p className="px-notice px-notice-info" role="note">
             <b>Entre para continuar sua compra.</b> Sua seleção de ingressos continua guardada.
+          </p>
+        ) : back !== '/' ? (
+          <p className="px-notice px-notice-info" role="note">
+            <b>Entre para continuar.</b> Depois de entrar, você volta para a página que estava abrindo.
           </p>
         ) : null}
         <section className="px-authcard" aria-labelledby="auth-title">

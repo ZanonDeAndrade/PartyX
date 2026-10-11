@@ -144,7 +144,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(7);
+      expect(r.rows[0].n).toBe(8);
     });
   });
 
@@ -596,8 +596,21 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag4 = '0004_limites_globais';
       const tag5 = '0005_excecoes_pagamento';
       const tag6 = '0006_encerramento_do_evento';
+      const tag7 = '0007_banner_responsivo';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
+
+      // 0007: só a coluna das larguras do banner; reverter a apaga e o banner continua pela banner_url.
+      const widthsColumn = async () =>
+        (
+          await db.pool.query(
+            "select count(*)::int as n from information_schema.columns where table_name = 'events' and column_name = 'banner_widths'",
+          )
+        ).rows[0].n;
+      expect(await widthsColumn()).toBe(1);
+      await rollbackLastMigration(db.url, tag7);
+      expect(await widthsColumn()).toBe(0);
 
       // 0006: preenche closed_at dos encerrados a partir da trilha (ou de updated_at), sem mexer em updated_at.
       await rollbackLastMigration(db.url, tag6);
@@ -627,6 +640,8 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe a 0007 de volta: ela sai antes da 0006
+      await rollbackLastMigration(db.url, tag7);
       await rollbackLastMigration(db.url, tag6);
       expect(
         (

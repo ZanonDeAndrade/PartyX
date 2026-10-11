@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 const MARK = 'data-px-intro';
@@ -32,6 +32,12 @@ export function IntroSplash() {
   useEffect(() => {
     if (phase === 'done') document.documentElement.removeAttribute(MARK);
   }, [phase]);
+
+  // A camada estática do primeiro quadro (index.html) cobre a tela até aqui. Com o vídeo montado por cima (ou sem abertura),
+  // ela sai da página: não pode reaparecer durante o fade da abertura.
+  useLayoutEffect(() => {
+    document.querySelector('.px-intro-static')?.remove();
+  }, []);
 
   if (phase === 'done') return null;
   return createPortal(<IntroOverlay leaving={phase === 'leaving'} onLeave={leave} onClose={close} />, document.body);
@@ -81,7 +87,12 @@ function IntroOverlay({ leaving, onLeave, onClose }: { leaving: boolean; onLeave
   }, [onClose]);
 
   return (
-    <div className={`px-intro${leaving ? ' px-intro-out' : ''}`} role="dialog" aria-modal="true" aria-label="Abertura PartyX">
+    <div
+      className={`px-intro${leaving ? ' px-intro-out' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Abertura PartyX"
+    >
       <video
         ref={video}
         className="px-intro-video"

@@ -18,7 +18,8 @@ import { AppError } from './domain/errors';
 import { logger } from './logger';
 import { publicRoutes } from './api/public';
 import { eventMeta, injectMeta, SITE_DESCRIPTION, SITE_TITLE } from './vitrine/og';
-import { bySlug } from './vitrine/service';
+import { injectHome, type HomeData } from './vitrine/homeHtml';
+import { bySlug, home } from './vitrine/service';
 import type { Clock } from './providers/clock';
 import type { JobAuthenticator } from './payments/jobsAuth';
 import type { TicketIssuer } from './payments/reconcile';
@@ -176,10 +177,39 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
     else if (c.req.path === '/' || c.req.path.endsWith('.html')) c.header('Cache-Control', 'no-cache');
     else c.header('Cache-Control', 'public, max-age=3600');
   });
+  const readIndex = () => readFile(path.join(dist, 'index.html'), 'utf8');
+
+  // Página inicial (LCP): antes dos arquivos estáticos, que serviriam o `index.html` puro. O HTML leva os dados da vitrine e o
+  // `preload` do banner do destaque, para a tela não esperar a API. A consulta fica 60 s em memória por instância: a vitrine
+  // é só exibição (quem decide o estoque é o checkout) e a página do evento continua consultando na hora.
+  const HOME_TTL_MS = 60_000;
+  let homeCache: { at: number; data: HomeData } | null = null;
+  app.get('/', async c => {
+    let html: string;
+    try {
+      html = await readIndex();
+    } catch {
+      return c.text('Front-end não compilado. Rode `npm run build` ou use `npm run dev`.', 404);
+    }
+    c.header('Cache-Control', 'no-cache');
+    if (!auth) return c.html(html);
+    try {
+      const now = clock.now().getTime();
+      if (!homeCache || now - homeCache.at >= HOME_TTL_MS || now < homeCache.at)
+        homeCache = { at: now, data: await home({ db: auth.db, clock }) };
+      return c.html(injectHome(html, homeCache.data));
+    } catch (error) {
+      // Sem os dados, a página funciona como antes: o front-end busca a vitrine pela API.
+      logger.warn('página inicial sem dados embutidos', {
+        error: error instanceof Error ? error.name : 'desconhecido',
+      });
+      return c.html(html);
+    }
+  });
+
   app.use('*', serveStatic({ root: path.relative(process.cwd(), dist) || '.' }));
 
   const baseUrl = (requestUrl: string) => config.PUBLIC_BASE_URL ?? new URL(requestUrl).origin;
-  const readIndex = () => readFile(path.join(dist, 'index.html'), 'utf8');
 
   // Open Graph (RF-26, CA-13): o WhatsApp não executa JavaScript, então o servidor injeta título, descrição e imagem no HTML.
   app.get('/eventos/:slug', async c => {

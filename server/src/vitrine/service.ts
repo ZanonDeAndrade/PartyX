@@ -6,7 +6,7 @@ import { AppError } from '../domain/errors';
 import { dateKeyInEventZone } from '../domain/time';
 import { eventSale, searchKey, TYPE_LABEL, typeNote, VISIBLE_AFTER_START_MS, type EventSale } from '../domain/vitrine';
 import { reservedByType } from '../events/service';
-import { shareImageUrl } from '../media/banner';
+import { bannerSrcSet, shareImageUrl } from '../media/banner';
 import type { Clock } from '../providers/clock';
 
 export interface VitrineDeps {
@@ -24,6 +24,8 @@ export interface PublicEventCard {
   venue: string;
   ageRating: string;
   bannerUrl: string | null;
+  /** Versões do banner por largura (`srcset`), para o celular baixar a menor. Nulo: só `bannerUrl`. */
+  bannerSrcSet: string | null;
   isFeatured: boolean;
   sale: { kind: EventSale['kind']; label: string; minPriceCents: number | null; startsAt: string | null };
 }
@@ -98,6 +100,7 @@ function card(e: EventRow, types: ReturnType<typeof inputOf>[], now: Date): Publ
     venue: e.venue,
     ageRating: e.ageRating,
     bannerUrl: e.bannerUrl,
+    bannerSrcSet: bannerSrcSet(e.bannerUrl, e.bannerWidths),
     isFeatured: e.isFeatured,
     sale: {
       kind: sale.kind,

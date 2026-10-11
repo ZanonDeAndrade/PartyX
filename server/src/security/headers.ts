@@ -22,8 +22,9 @@ export function securityHeaders(
       defaultSrc: self,
       scriptSrc: [...self, ...turnstile],
       // Estilos em linha: o React usa o atributo `style` em alguns elementos.
-      styleSrc: [...self, "'unsafe-inline'", 'https://fonts.googleapis.com'],
-      fontSrc: [...self, 'https://fonts.gstatic.com'],
+      // Fontes servidas pelo próprio site (@fontsource): sem Google Fonts.
+      styleSrc: [...self, "'unsafe-inline'"],
+      fontSrc: [...self],
       imgSrc: [...self, 'data:', 'blob:', ...(bannerOrigin ? [bannerOrigin] : [])],
       mediaSrc: [...self, 'blob:'],
       connectSrc: [...self, ...turnstile],

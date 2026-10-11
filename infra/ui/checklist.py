@@ -29,7 +29,7 @@ NAMES = {
     'ADM24': 'Conta do administrador',
     'V01': 'Selecionar evento', 'V02': 'Leitor por câmera', 'V03': 'Busca manual', 'V04': 'Resultado da busca',
     'V05': 'Válido', 'V06': 'Já utilizado', 'V07': 'Inválido ou cancelado', 'V08': 'Outro evento', 'V09': 'Falha',
-    'G04': 'Acesso negado', 'G07': 'Menus e gavetas', 'INTRO': 'Abertura em vídeo',
+    'G04': 'Acesso negado', 'G05': 'Sessão expirada', 'G07': 'Menus e gavetas', 'INTRO': 'Abertura em vídeo',
     'E01': 'E-mail de cadastro', 'E02': 'E-mail de recuperação', 'E03': 'E-mail de compra', 'E04': 'PDF do ingresso',
     'E05': 'Compartilhamento',
 }
@@ -96,7 +96,6 @@ lines += [
     '| ADM23 | Exportações: links de CSV/XLSX nas listas e relatórios e a aba Contingência (CSV e PDF) |',
     '| G01, G03 | Estados "carregando" e "erro" de P01, P02, P03, U01, ADM01 e checkout |',
     '| G02 | Vazios: P01 sem eventos, P02 nenhum resultado, U01 sem ingressos, U02 sem compras, V04 nenhum resultado |',
-    '| G05 | Sessão expirada: volta ao login com retorno (A01 "retorno ao checkout"); tela própria em `sugestoes-futuras.md` |',
     '| G06 | Manutenção: não existe no site real; registrado em `sugestoes-futuras.md` (depende de regra de servidor) |',
     '| G08 | Exportação em andamento, concluída ou com erro: componente `ExportLink` nas telas do painel |',
     '',

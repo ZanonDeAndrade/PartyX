@@ -30,3 +30,10 @@ As 5 linhas de cada banco têm `created_at` iguais aos `when` de `0000_schema_in
 A 0005 não foi aplicada em nenhum banco real (só nos bancos descartáveis de teste). Por isso a edição feita nela no commit `7808059` (permissão de `DELETE` em `job_leases` para `partyx_app`) foi mantida e **não** foi criada uma `0006`. A 0005 entra no Neon de cada ambiente pelo próximo deploy (job de migração), que depende de autorização expressa.
 
 Observação: o driver `pg` emitiu um aviso sobre `sslmode=require` passar a ter a semântica do libpq na próxima versão principal. Não afeta a conexão atual, que continua sendo `verify-full`. Por decisão do responsável, as URLs **não** foram alteradas agora: o `pg` está travado na major 8 (`"pg": "^8.23.1"`, que aceita 8.x e recusa 9.0.0; instalado 8.23.1, com `pg-connection-string` 2.14.1), e o teste de `sslmode=verify-full` entrou nas pendências da infraestrutura de homologação (`../infraestrutura.md`), antes de qualquer upgrade major do `pg`, a replicar em produção no próximo deploy.
+
+## Atualização em 11/10/2026: migração 0007
+
+`0007_banner_responsivo` (coluna `events.banner_widths`, só expande, com reversão em `drizzle/rollback/`) foi criada e testada
+**só em bancos descartáveis de teste** (aplicada, revertida e reaplicada por `npm run check:migrations`). **Não foi aplicada
+no Neon** de homologação nem de produção; entra pelo próximo deploy, que depende de autorização expressa. Depois dela, os
+banners já enviados ganham as versões menores com `npm run banners:versoes` (primeiro sem `--executar`, para conferir).

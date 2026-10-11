@@ -198,12 +198,23 @@ export async function updateEvent(deps: EventsDeps, actor: Actor, id: string, in
 }
 
 /** Troca ou remove o banner. A URL vem do armazenamento, nunca do cliente. */
-export async function setEventBanner(deps: EventsDeps, actor: Actor, id: string, bannerUrl: string | null) {
+export async function setEventBanner(
+  deps: EventsDeps,
+  actor: Actor,
+  id: string,
+  bannerUrl: string | null,
+  /** Larguras em que o banner foi gravado (versões menores e a principal). Vazio ao remover. */
+  bannerWidths: number[] = [],
+) {
   const now = deps.clock.now();
   return deps.db.transaction(async tx => {
     const before = await lockEvent(tx, id);
     if (before.status === 'encerrado') throw closedError();
-    const [after] = await tx.update(events).set({ bannerUrl, updatedAt: now }).where(eq(events.id, id)).returning();
+    const [after] = await tx
+      .update(events)
+      .set({ bannerUrl, bannerWidths: bannerUrl ? bannerWidths : [], updatedAt: now })
+      .where(eq(events.id, id))
+      .returning();
     await writeAudit(tx, {
       actorId: actor.id,
       action: bannerUrl ? 'evento.banner' : 'evento.banner_remover',

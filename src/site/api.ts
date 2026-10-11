@@ -9,6 +9,8 @@ export interface EventCard {
   venue: string;
   ageRating: string;
   bannerUrl: string | null;
+  /** Versões do banner por largura (`srcset`); nula em banners antigos. */
+  bannerSrcSet?: string | null;
   isFeatured: boolean;
   sale: { kind: SaleKind; label: string; minPriceCents: number | null; startsAt: string | null };
 }
@@ -71,6 +73,18 @@ export const setCsrfToken = (token: string) => {
   csrfToken = token;
 };
 
+/**
+ * Sessão expirada (G05): uma chamada respondeu 401 `nao_autenticado` fora das rotas em que isso é normal (`/auth/me` de visitante,
+ * login e saída). Quem escuta (`SessionProvider`) encerra a sessão na tela; as páginas protegidas levam ao login com o retorno.
+ */
+type ExpiredListener = () => void;
+const expiredListeners = new Set<ExpiredListener>();
+export function onSessionExpired(listener: ExpiredListener): () => void {
+  expiredListeners.add(listener);
+  return () => expiredListeners.delete(listener);
+}
+const EXPECTED_401 = new Set(['/auth/me', '/auth/login', '/auth/logout']);
+
 /** Chamada à API. Alterações levam o token CSRF da sessão; o token fica só em memória, nunca em localStorage. */
 export async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = { accept: 'application/json' };
@@ -93,6 +107,8 @@ export async function request<T>(method: string, path: string, body?: unknown, s
     erro?: { codigo?: string; mensagem?: string; detalhes?: unknown };
   } | null;
   if (!res.ok) {
+    if (res.status === 401 && data?.erro?.codigo === 'nao_autenticado' && !EXPECTED_401.has(path))
+      expiredListeners.forEach(l => l());
     throw new ApiError(
       res.status,
       data?.erro?.mensagem ?? 'Não foi possível concluir a ação.',

@@ -23,7 +23,14 @@ import {
   updatePromoter,
   updateTicketType,
 } from '../events/service';
-import { BANNER_MAX_BYTES, BANNER_MAX_WIDTH, BANNER_MIN_WIDTH, processBanner, shareObjectName } from '../media/banner';
+import {
+  BANNER_MAX_BYTES,
+  BANNER_MAX_WIDTH,
+  BANNER_MIN_WIDTH,
+  processBanner,
+  shareObjectName,
+  variantObjectName,
+} from '../media/banner';
 import { previewById } from '../vitrine/service';
 import { parseJson } from './validate';
 
@@ -178,10 +185,13 @@ export function eventsRoutes(deps: AuthDeps) {
     const processed = await processBanner(Buffer.from(await file.arrayBuffer()));
     // Caminho gerado aqui: id do evento e hash do conteúdo. Nada do que o navegador mandou entra no nome.
     const objectName = `events/${id}/${processed.hash}.webp`;
-    // Primeiro a imagem de pré-visualização: se a segunda gravação falhar, o evento ainda não aponta para o banner novo.
+    // Primeiro a pré-visualização e as versões menores: se uma gravação falhar, o evento ainda não aponta para o banner novo.
     await deps.banners.put(shareObjectName(objectName), processed.share.data, processed.share.contentType);
+    for (const v of processed.variants)
+      await deps.banners.put(variantObjectName(objectName, v.width), v.data, processed.contentType);
     const url = await deps.banners.put(objectName, processed.data, processed.contentType);
-    const event = await setEventBanner(evDeps, actor(c), id, url);
+    const widths = [...processed.variants.map(v => v.width), processed.width];
+    const event = await setEventBanner(evDeps, actor(c), id, url, widths);
     return c.json({
       event,
       banner: { width: processed.width, height: processed.height, bytes: processed.data.length },

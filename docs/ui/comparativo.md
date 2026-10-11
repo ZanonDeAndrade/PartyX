@@ -1131,6 +1131,15 @@ Mesmos dados fictícios, mesmas rotas. Imagens completas em `antes/` e `depois/`
 | 390 | ![](antes/G04__acesso-negado-ao-validador__390.jpg) | ![](depois/G04__acesso-negado-ao-validador__390.jpg) |
 | 1440 | ![](antes/G04__acesso-negado-ao-validador__1440.jpg) | ![](depois/G04__acesso-negado-ao-validador__1440.jpg) |
 
+## G05 Sessão expirada
+
+**sessao expirada com retorno**
+
+| Largura | Antes | Depois |
+| --- | --- | --- |
+| 390 | (sem captura) | ![](depois/G05__sessao-expirada-com-retorno__390.jpg) |
+| 1440 | (sem captura) | ![](depois/G05__sessao-expirada-com-retorno__1440.jpg) |
+
 ## G07 Menus e gavetas
 
 **menu do celular aberto**

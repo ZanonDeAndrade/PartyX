@@ -11,7 +11,7 @@ describe.skipIf(!ADMIN_URL)('conferência da restauração do backup (integraç�
   let testDb: Awaited<ReturnType<typeof createTestDatabase>>;
   const sql = (text: string, params: unknown[] = []) => testDb.pool.query(text, params);
   const config = loadConfig({ APP_ENV: 'local', PAYMENT_GATEWAY: 'none' });
-  const JOURNAL = 7;
+  const JOURNAL = 8;
   let n = 0;
 
   beforeAll(async () => {

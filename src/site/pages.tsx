@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type EventDetail, type SiteInfo } from './api';
+import { api, type EventCard, type EventDetail, type SiteInfo } from './api';
+import { takeEmbedded } from './embedded';
 import { loadCart, saveCart } from './cart';
 import {
   Badge,
@@ -22,7 +23,9 @@ import { useFetch } from './useFetch';
 export function HomePage() {
   usePageTitle('PartyX · Ingressos');
   const { go } = useRouter();
-  const [state, retry] = useFetch(s => api.home(s), 'home');
+  // Na primeira visita, os dados vêm no HTML (o servidor embute a vitrine): o destaque aparece sem esperar a API.
+  const [embedded] = useState(() => takeEmbedded<{ featured: EventCard[]; upcoming: EventCard[] }>('px-home-data'));
+  const [state, retry] = useFetch(s => api.home(s), 'home', embedded);
   const featured = state.status === 'ok' ? state.data.featured[0] : undefined;
   const list = state.status === 'ok' ? state.data.upcoming.filter(e => e.slug !== featured?.slug) : [];
   const fromCents = featured?.sale.kind === 'open' ? featured.sale.minPriceCents : null;

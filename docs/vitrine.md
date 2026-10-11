@@ -33,6 +33,7 @@ Implementado em 01/10/2026 (Prompt 08): RF-20 a RF-27 e CA-12 a CA-14. É a prim
 
 O WhatsApp não executa JavaScript. Em `/eventos/:slug` o servidor lê o `index.html` e troca a região `<!--og:start-->...<!--og:end-->` por título, descrição (data, horário, local e início da descrição), URL canônica e imagem.
 
+- **Página inicial no HTML (11/10/2026):** ao servir `/`, o servidor embute a vitrine (`<script id="px-home-data" type="application/json">`, com `<` escapado), o `preload` do banner do destaque (`fetchpriority="high"`, nas larguras do `srcset`) e uma cópia estática do cabeçalho e do destaque dentro de `#root`, que o React troca pelo mesmo conteúdo ao montar. A consulta fica 60 s em memória por instância (só exibição; o checkout confere o estoque na hora). Sem banco ou com erro, a página sai como antes e o front-end busca pela API. Código em `server/src/vitrine/homeHtml.ts`.
 - **Imagem:** o banner é gravado também como JPEG 1200x630 (`<hash>-og.jpg`, qualidade reduzida até caber em ~280 KB, porque o WhatsApp ignora imagens grandes). A URL é derivada do banner trocando `.webp` por `-og.jpg`.
 - Todo texto é escapado; `$` no texto não vira padrão de substituição. Testes com nome e descrição maliciosos.
 - Rascunho ou inexistente: **404 com tags genéricas**, sem nenhum dado do evento.

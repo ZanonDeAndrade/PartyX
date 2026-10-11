@@ -305,6 +305,11 @@ SCREENS = [
     ('V09', f"/portaria/{EV[roxa]}", 'sem conexao', 'validador', None,
      lambda p: (p.context.set_offline(True), p.wait_for_timeout(300))),
     ('G04', '/portaria', 'acesso negado ao cliente', 'marina', None, None),
+    # G05: a sessão acaba no servidor durante o uso (a lista de ingressos responde 401): aviso no login, com retorno ao ponto.
+    ('G05', '/meus-ingressos', 'sessao expirada com retorno', 'marina',
+     lambda p: p.route('**/api/tickets', lambda r: r.fulfill(status=401, content_type='application/json', body=json.dumps(
+         {'erro': {'codigo': 'nao_autenticado', 'mensagem': 'Entre na sua conta para continuar.'}}))),
+     lambda p: p.wait_for_url('**/entrar?voltar=*', timeout=8000)),
     # ----- painel -----
     ('ADM01', '/admin', 'visao geral', 'admin', None, None),
     ('ADM01', '/admin', 'carregando', 'admin', hang('**/api/admin/overview*'), None),

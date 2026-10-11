@@ -50,6 +50,13 @@
       "when": 1791687475328,
       "tag": "0006_encerramento_do_evento",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791727576969,
+      "tag": "0007_banner_responsivo",
+      "breakpoints": true
     }
   ]
 }

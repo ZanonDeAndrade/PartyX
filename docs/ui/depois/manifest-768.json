@@ -1083,5 +1083,12 @@
   "state": "pdf do pedido",
   "width": 0,
   "file": "E04__pdf-do-pedido-3.jpg"
+ },
+ {
+  "id": "G05",
+  "route": "/meus-ingressos",
+  "state": "sessao expirada com retorno",
+  "width": 768,
+  "file": "G05__sessao-expirada-com-retorno__768.jpg"
  }
 ]

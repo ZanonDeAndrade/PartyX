@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, ApiError, setCsrfToken, type SessionUser } from './api';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { api, ApiError, onSessionExpired, setCsrfToken, type SessionUser } from './api';
 
 interface SessionState {
   /** `loading` até a primeira resposta de /auth/me. */
@@ -49,6 +49,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     refresh().catch(() => {});
   }, [refresh]);
 
+  // G05: a sessão acabou no servidor (prazo ou saída em outro aparelho). Encerra aqui também e deixa um aviso para a tela de
+  // entrar. As páginas protegidas já levam ao login com `?voltar=` para o mesmo ponto; o carrinho fica no sessionStorage.
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        if (statusRef.current !== 'user') return;
+        markSessionExpired();
+        // O token CSRF fica: com a sessão de fato encerrada no servidor ele não é exigido, e o login seguinte troca por um novo.
+        setUser(null);
+        setStatus('anon');
+      }),
+    [],
+  );
+
   const value = useMemo<SessionState>(
     () => ({
       status,
@@ -83,4 +99,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 export function safeReturnPath(value: string | null | undefined, fallback = '/'): string {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return fallback;
   return value;
+}
+
+const EXPIRED_KEY = 'px.sessao-expirada';
+function markSessionExpired() {
+  try {
+    sessionStorage.setItem(EXPIRED_KEY, '1');
+  } catch {
+    // Sem armazenamento: o login aparece sem o aviso, com o retorno ao ponto mantido.
+  }
+}
+/** Lê e apaga o aviso de sessão expirada (mostrado uma vez, na tela de entrar). */
+export function takeSessionExpired(): boolean {
+  try {
+    const was = sessionStorage.getItem(EXPIRED_KEY) === '1';
+    sessionStorage.removeItem(EXPIRED_KEY);
+    return was;
+  } catch {
+    return false;
+  }
 }
