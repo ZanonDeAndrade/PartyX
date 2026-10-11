@@ -27,10 +27,15 @@ export interface Composed {
 }
 
 const PURPLE = '#5B21B6';
+/** Roxo de ação do site: texto branco 5,7:1. */
+const VIOLET = '#7C3AED';
 /** Caminho da logo dos e-mails (gerada por reference/tools/brand-assets.mjs). Exibida a 58×32. */
 export const EMAIL_LOGO_PATH = '/brand/partyx-logo-email.png';
 const INK = '#0B0B10';
-const MUTED = '#5B5B70';
+const MUTED = '#5B5B6E';
+const LINE = '#E4E4EC';
+const FONT = 'Arial,Helvetica,sans-serif';
+const FOOTER = 'PartyX. Razão social, CNPJ e canais de atendimento: a fornecer pela PartyX.';
 
 interface Layout {
   preheader: string;
@@ -41,41 +46,47 @@ interface Layout {
   footnote?: string;
 }
 
+/**
+ * Identidade do site em HTML de e-mail: faixa preta com a logo, linha roxa de destaque, título forte, detalhes em linhas
+ * com divisória e botão roxo "à prova de clientes" (célula de tabela com fundo, não CSS de botão). Sem <style>, sem fonte
+ * externa, sem imagem além da logo; funciona com imagens bloqueadas e no modo escuro forçado (cores sólidas).
+ */
 function html(l: Layout, ctx: MailContext): string {
   const p = (t: string) =>
-    `<p style="margin:0 0 16px;font-size:16px;line-height:1.5;color:${INK};">${escapeHtml(t)}</p>`;
+    `<p style="margin:0 0 16px;font-family:${FONT};font-size:16px;line-height:1.55;color:${INK};">${escapeHtml(t)}</p>`;
   const details = l.details?.length
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border:1px solid #E4E4EC;border-radius:8px;">${l.details
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 24px;border-collapse:collapse;border-top:2px solid ${INK};">${l.details
         .map(
           d =>
-            `<tr><td style="padding:10px 14px;font-size:13px;color:${MUTED};width:38%;">${escapeHtml(d.label)}</td><td style="padding:10px 14px;font-size:15px;color:${INK};font-weight:600;">${escapeHtml(d.value)}</td></tr>`,
+            `<tr><td valign="top" style="padding:11px 12px 11px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:13px;line-height:1.4;color:${MUTED};width:34%;">${escapeHtml(d.label)}</td><td valign="top" style="padding:11px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:15px;line-height:1.4;color:${INK};font-weight:700;">${escapeHtml(d.value)}</td></tr>`,
         )
         .join('')}</table>`
     : '';
   const cta = l.cta
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 24px;"><tr><td style="background:${PURPLE};border-radius:8px;"><a href="${escapeHtml(l.cta.url)}" style="display:inline-block;padding:14px 26px;font-size:16px;font-weight:700;color:#FFFFFF;text-decoration:none;">${escapeHtml(l.cta.label)}</a></td></tr></table>
-       <p style="margin:0 0 16px;font-size:13px;line-height:1.5;color:${MUTED};">Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${escapeHtml(l.cta.url)}</span></p>`
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;"><tr><td bgcolor="${VIOLET}" style="background:${VIOLET};border-radius:8px;"><a href="${escapeHtml(l.cta.url)}" style="display:inline-block;padding:15px 28px;font-family:${FONT};font-size:16px;font-weight:700;line-height:1;color:#FFFFFF;text-decoration:none;border-radius:8px;">${escapeHtml(l.cta.label)}</a></td></tr></table>
+       <p style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;color:${PURPLE};">${escapeHtml(l.cta.url)}</span></p>`
     : '';
   const foot = l.footnote
-    ? `<p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:${MUTED};">${escapeHtml(l.footnote)}</p>`
+    ? `<p style="margin:0 0 8px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">${escapeHtml(l.footnote)}</p>`
     : '';
   const env = ctx.environmentLabel
-    ? `<p style="margin:0 0 8px;font-size:12px;color:#854D0E;background:#FEF3C7;padding:6px 10px;border-radius:6px;">E-mail de teste (${escapeHtml(ctx.environmentLabel)}). Identidade visual provisória.</p>`
+    ? `<p style="margin:0 0 16px;font-family:${FONT};font-size:12px;color:#854D0E;background:#FEF3C7;padding:8px 12px;border-radius:6px;">E-mail de teste (${escapeHtml(ctx.environmentLabel)}). Identidade visual provisória.</p>`
     : '';
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeHtml(l.title)}</title></head>
-<body style="margin:0;padding:0;background:#F3F3F8;">
+<body style="margin:0;padding:0;background:#F7F7FA;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(l.preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F3F8;"><tr><td align="center" style="padding:24px 12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
-<tr><td bgcolor="${INK}" style="background:${INK};padding:18px 28px;"><img src="${escapeHtml(ctx.baseUrl + EMAIL_LOGO_PATH)}" width="58" height="32" alt="PartyX" style="display:block;width:58px;height:32px;border:0;outline:none;text-decoration:none;color:#FFFFFF;font-size:16px;line-height:32px;font-weight:900;font-family:Arial,Helvetica,sans-serif;"></td></tr>
-<tr><td style="padding:28px;">
-${env}<h1 style="margin:0 0 16px;font-size:24px;line-height:1.2;color:${INK};">${escapeHtml(l.title)}</h1>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F7FA;"><tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid ${LINE};border-radius:12px;overflow:hidden;font-family:${FONT};">
+<tr><td bgcolor="${INK}" style="background:${INK};padding:18px 28px;"><img src="${escapeHtml(ctx.baseUrl + EMAIL_LOGO_PATH)}" width="58" height="32" alt="PartyX" style="display:block;width:58px;height:32px;border:0;outline:none;text-decoration:none;color:#FFFFFF;font-size:16px;line-height:32px;font-weight:900;font-family:${FONT};"></td></tr>
+<tr><td bgcolor="${VIOLET}" style="background:${VIOLET};height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
+<tr><td style="padding:32px 28px 28px;">
+${env}<h1 style="margin:0 0 18px;font-family:${FONT};font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-0.3px;color:${INK};">${escapeHtml(l.title)}</h1>
 ${l.paragraphs.map(p).join('\n')}
 ${details}${cta}${foot}
-<hr style="border:0;border-top:1px solid #E4E4EC;margin:20px 0;">
-<p style="margin:0;font-size:12px;line-height:1.5;color:${MUTED};">PartyX · Razão social, CNPJ e canais de atendimento: a fornecer pela PartyX.</p>
-</td></tr></table></td></tr></table></body></html>`;
+</td></tr>
+<tr><td style="padding:16px 28px 22px;border-top:1px solid ${LINE};background:#FAFAFC;"><p style="margin:0;font-family:${FONT};font-size:12px;line-height:1.5;color:${MUTED};">${FOOTER}</p></td></tr>
+</table></td></tr></table></body></html>`;
 }
 
 function text(l: Layout, ctx: MailContext): string {
@@ -88,7 +99,7 @@ function text(l: Layout, ctx: MailContext): string {
   if (l.details?.length) lines.push(...l.details.map(d => `${d.label}: ${d.value}`), '');
   if (l.cta) lines.push(`${l.cta.label}:`, l.cta.url, '');
   if (l.footnote) lines.push(l.footnote, '');
-  lines.push('PartyX · Razão social, CNPJ e canais de atendimento: a fornecer pela PartyX.');
+  lines.push(FOOTER);
   return lines.join('\n');
 }
 

@@ -18,6 +18,20 @@ export const dateShort = (iso: string): string =>
 export const timeOf = (iso: string): string =>
   part(new Date(iso), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
+/**
+ * Partes da data para o bloco de data dos cartões e do evento: dia ("07"), mês curto ("dez") e dia da semana por extenso
+ * ("sábado"), no fuso do evento.
+ */
+export const dateParts = (iso: string): { day: string; month: string; weekday: string; year: string } => {
+  const d = new Date(iso);
+  return {
+    day: part(d, { day: '2-digit' }),
+    month: part(d, { month: 'short' }).replace(/\./g, ''),
+    weekday: part(d, { weekday: 'long' }),
+    year: part(d, { year: 'numeric' }),
+  };
+};
+
 /** Início de uma query string da busca, sempre com os valores codificados. */
 export function searchPath(q: string, date: string): string {
   const params = new URLSearchParams();
@@ -37,6 +51,35 @@ export function shareLinks(url: string, title: string) {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
     x: `https://twitter.com/intent/tweet?url=${u}&text=${encodeURIComponent(title)}`,
   };
+}
+
+/** (11) 98765-4321 para exibir. Valor que não tem 10 ou 11 dígitos volta como veio (o servidor é quem valida). */
+export function phoneBr(phone: string | null | undefined): string {
+  if (!phone) return '';
+  const d = phone.replace(/\D/g, '');
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return phone;
+}
+
+/**
+ * Máscaras de digitação (só aparência): o servidor guarda e valida só os dígitos, então o que se envia formatado é igual
+ * ao que se enviaria sem pontuação.
+ */
+export function cpfInput(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+export function phoneInput(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
 /** j***@gmail.com: confirma o destino sem expor o endereço inteiro na tela. */

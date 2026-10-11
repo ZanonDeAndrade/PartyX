@@ -5,6 +5,7 @@ import { Layout, usePageTitle } from './components';
 import { MeShell } from './ticketPages';
 import { useRouter } from './router';
 import { useSession } from './session';
+import { phoneInput } from './format';
 
 /** Troca de senha (U07), em janela sobre a conta. A senha atual é conferida pelo servidor. */
 export function PasswordDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
@@ -111,7 +112,7 @@ export function MyAccountPage() {
   const session = useSession();
   const user = session.user;
   const [name, setName] = useState(user?.name ?? '');
-  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [phone, setPhone] = useState(phoneInput(user?.phone ?? ''));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [general, setGeneral] = useState('');
   const [saved, setSaved] = useState('');
@@ -125,7 +126,7 @@ export function MyAccountPage() {
   useEffect(() => {
     if (user) {
       setName(user.name);
-      setPhone(user.phone ?? '');
+      setPhone(phoneInput(user.phone ?? ''));
     }
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -160,12 +161,19 @@ export function MyAccountPage() {
       <section className="px-ck-card" aria-labelledby="dados">
         <h2 id="dados">Dados pessoais</h2>
         <form onSubmit={save} className="px-form" noValidate>
-          <Field id="conta-nome" label="Nome completo" value={name} onChange={setName} error={errors.name} autoComplete="name" />
+          <Field
+            id="conta-nome"
+            label="Nome completo"
+            value={name}
+            onChange={setName}
+            error={errors.name}
+            autoComplete="name"
+          />
           <Field
             id="conta-tel"
             label="Telefone com DDD"
             value={phone}
-            onChange={setPhone}
+            onChange={v => setPhone(phoneInput(v))}
             error={errors.phone}
             autoComplete="tel"
             inputMode="tel"

@@ -11,6 +11,9 @@ import {
 } from './api';
 import { Layout, usePageTitle } from './components';
 import { brl, dateShort, timeOf } from './format';
+import { IconBack, IconClose, IconMenu } from './icons';
+import { animate, useReducedMotion } from 'motion/react';
+import { EASE_OUT } from './motion';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 import { useFetch } from './useFetch';
@@ -149,9 +152,10 @@ function AdminShell({ children, active }: { children: ReactNode; active: AdminTa
   const open = useOpenExceptions();
   const [drawer, setDrawer] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const label = [...NAV, ...NAV_END, { tab: 'excecoes', label: 'Exceções' }, { tab: 'conta', label: 'Minha conta' }].find(
-    n => n.tab === active,
-  )?.label ?? (active === 'relatorios' ? 'Relatórios' : 'Painel');
+  const label =
+    [...NAV, ...NAV_END, { tab: 'excecoes', label: 'Exceções' }, { tab: 'conta', label: 'Minha conta' }].find(
+      n => n.tab === active,
+    )?.label ?? (active === 'relatorios' ? 'Relatórios' : 'Painel');
   useEffect(() => {
     if (!drawer) return;
     closeRef.current?.focus();
@@ -178,11 +182,16 @@ function AdminShell({ children, active }: { children: ReactNode; active: AdminTa
               aria-controls="px-adm-drawer"
               onClick={() => setDrawer(true)}
             >
-              ☰ Menu do painel
+              <IconMenu size={18} />
+              Menu do painel
             </button>
-            <span className="px-small px-muted">
+            <span className="px-adm-where">
               {label}
-              {open > 0 ? ` · ${open} exceção${open === 1 ? '' : 'ões'}` : ''}
+              {open > 0 ? (
+                <span className="px-badge px-badge-err">
+                  {open} {open === 1 ? 'exceção' : 'exceções'}
+                </span>
+              ) : null}
             </span>
           </div>
           {open > 0 && active !== 'excecoes' ? (
@@ -207,8 +216,14 @@ function AdminShell({ children, active }: { children: ReactNode; active: AdminTa
           >
             <div className="px-drawer-head">
               <b>Painel</b>
-              <button ref={closeRef} type="button" className="px-btn" onClick={() => setDrawer(false)}>
-                Fechar
+              <button
+                ref={closeRef}
+                type="button"
+                className="px-icon-btn"
+                aria-label="Fechar menu do painel"
+                onClick={() => setDrawer(false)}
+              >
+                <IconClose />
               </button>
             </div>
             <AdminNav active={active} open={open} onNavigate={() => setDrawer(false)} />
@@ -308,7 +323,15 @@ export function TableWrap({ children }: { children: ReactNode }) {
 }
 
 export function Loading({ state, retry }: { state: { status: string }; retry: () => void }) {
-  if (state.status === 'loading') return <p aria-busy="true">Carregando…</p>;
+  // Esqueleto de tabela (G01): reserva a altura e mostra a forma do que vem, sem texto piscando.
+  if (state.status === 'loading')
+    return (
+      <div className="px-table-skel" aria-busy="true" aria-label="Carregando">
+        {Array.from({ length: 6 }, (_, i) => (
+          <span key={i} />
+        ))}
+      </div>
+    );
   if (state.status === 'error') {
     return (
       <p className="px-notice px-notice-err" role="alert">
@@ -324,6 +347,34 @@ export function Loading({ state, retry }: { state: { status: string }; retry: ()
 
 // ---------- visão geral (RF-55) ----------
 
+/** Número que conta de 0 até o valor na primeira exibição (indicadores do painel). Depois, troca direto. */
+function useCountUp(target: number, duration = 0.7): number {
+  const reduce = useReducedMotion();
+  const [value, setValue] = useState(reduce ? target : 0);
+  const done = useRef(false);
+  useEffect(() => {
+    if (reduce || done.current) {
+      setValue(target);
+      return;
+    }
+    done.current = true;
+    const controls = animate(0, target, { duration, ease: EASE_OUT, onUpdate: v => setValue(Math.round(v)) });
+    return () => controls.stop();
+  }, [target, duration, reduce]);
+  return value;
+}
+
+/** Valor que conta de zero até o total na primeira carga; o leitor de tela recebe só o valor final. */
+function KpiMoney({ cents }: { cents: number }) {
+  const shown = useCountUp(cents);
+  return (
+    <span>
+      <span aria-hidden="true">{brl(shown)}</span>
+      <span className="px-sr">{brl(cents)}</span>
+    </span>
+  );
+}
+
 function Kpi({ title, group }: { title: string; group: SalesGroup }) {
   const rows: [string, keyof SalesGroup][] = [
     ['Pagos', 'paid'],
@@ -335,7 +386,7 @@ function Kpi({ title, group }: { title: string; group: SalesGroup }) {
     <section className="px-panel" aria-label={title}>
       <h2 className="px-h3">{title}</h2>
       <p className="px-kpi">
-        {brl(group.paid.cents)}
+        <KpiMoney cents={group.paid.cents} />
         <small>
           {group.paid.tickets} {group.paid.tickets === 1 ? 'ingresso' : 'ingressos'} · {group.paid.orders}{' '}
           {group.paid.orders === 1 ? 'pedido pago' : 'pedidos pagos'}
@@ -807,7 +858,10 @@ export function AdminOrderPage({ id }: { id: string }) {
   return (
     <Gate access={access} active="pedidos">
       <p>
-        <Link to="/admin/pedidos">← Pedidos</Link>
+        <Link to="/admin/pedidos" className="px-textlink px-textlink-sm">
+          <IconBack size={18} />
+          Pedidos
+        </Link>
       </p>
       <Loading state={state} retry={retry} />
       {o ? (
@@ -850,11 +904,11 @@ export function AdminOrderPage({ id }: { id: string }) {
             </div>
             <div>
               <dt>Pago em</dt>
-              <dd>{o.paidAt ? `${dateShort(o.paidAt)} ${timeOf(o.paidAt)}` : '—'}</dd>
+              <dd>{o.paidAt ? `${dateShort(o.paidAt)} ${timeOf(o.paidAt)}` : 'Não pago'}</dd>
             </div>
             <div>
               <dt>Id no gateway</dt>
-              <dd className="px-mono">{o.gatewayPaymentId ?? '—'}</dd>
+              <dd className="px-mono">{o.gatewayPaymentId ?? 'Sem referência'}</dd>
             </div>
           </dl>
 
@@ -905,7 +959,7 @@ export function AdminOrderPage({ id }: { id: string }) {
             {o.trail.map((a, i) => (
               <li key={`a${i}`}>
                 <b>{a.action}</b> · {dateShort(a.at)} {timeOf(a.at)} · {a.actor ?? 'sistema'}
-                {a.reason ? <span className="px-muted"> — {a.reason}</span> : null}
+                {a.reason ? <span className="px-muted">: {a.reason}</span> : null}
               </li>
             ))}
             {o.gatewayEvents.map((g, i) => (
@@ -1035,9 +1089,9 @@ export function LiveEntriesPanel({ eventId }: { eventId: string }) {
                       <b>{RESULT[r.result] ?? r.result}</b>
                       {r.method === 'manual' ? ' (manual)' : ''}
                     </td>
-                    <td className="px-mono">{r.shortCode ?? '—'}</td>
-                    <td>{r.typeName ?? '—'}</td>
-                    <td>{r.holderName ?? '—'}</td>
+                    <td className="px-mono">{r.shortCode ?? 'Sem código'}</td>
+                    <td>{r.typeName ?? 'Não identificado'}</td>
+                    <td>{r.holderName ?? 'Não identificado'}</td>
                     <td>{r.validator}</td>
                   </tr>
                 ))}
@@ -1130,7 +1184,7 @@ export function TicketsPanel({ eventId }: { eventId: string }) {
                       <br />
                       <span className="px-muted">{t.buyerEmail}</span>
                     </td>
-                    <td>{t.buyerCpf ?? '—'}</td>
+                    <td>{t.buyerCpf ?? 'Não informado'}</td>
                     <td>
                       <Link to={`/admin/pedidos/${t.orderId}`}>PX-{t.orderNumber}</Link>
                     </td>
@@ -1232,7 +1286,7 @@ export function BuyersPanel({ eventId }: { eventId: string }) {
                       <br />
                       <span className="px-muted">{b.email}</span>
                     </td>
-                    <td>{b.cpf ?? '—'}</td>
+                    <td>{b.cpf ?? 'Não informado'}</td>
                     <td>{b.orders}</td>
                     <td>{b.tickets}</td>
                     <td>{b.cancelled}</td>

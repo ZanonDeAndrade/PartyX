@@ -9,5 +9,7 @@ if (__ENABLE_PROTOTYPE__ && prototypePath) {
     createRoot(document.getElementById('root')!).render(<PrototypeEntry path={path} />),
   );
 } else {
+  // Antes da primeira pintura: os estilos do site (altura mínima do conteúdo, fundo) valem desde o primeiro quadro.
+  document.body.classList.add('px-site');
   createRoot(document.getElementById('root')!).render(<SiteApp />);
 }

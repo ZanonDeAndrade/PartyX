@@ -213,6 +213,13 @@ must(
 );
 await gate.post('/api/gate/scan', { eventId: roxa, qr: S.qrCancelled });
 
+// Ingressos de João ainda válidos neste evento: um por largura nas capturas do resultado "válido" da portaria.
+const fresh: string[] = [];
+for (const t of ((await joao.get('/api/tickets')).json.tickets as { id: string; status: string; event: { slug: string } }[])
+  .filter(t => t.status === 'valido' && t.event.slug === 'noite-roxa-warehouse')
+  .sort((a, b) => a.id.localeCompare(b.id)))
+  fresh.push(await qrOf(joao, t.id));
+
 // ---------- recuperação de senha (e-mail E02) ----------
 must(await new Client().post('/api/auth/password/forgot', { email: 'marina@exemplo.com' }), 'recuperação', [202]);
 
@@ -227,6 +234,6 @@ await pool.end();
 
 writeFileSync(
   `${OUT}/state-ui.json`,
-  JSON.stringify({ ...S, events: Object.fromEntries(ids.map(r => [r.slug, r.id])) }, null, 1),
+  JSON.stringify({ ...S, freshQrs: fresh, events: Object.fromEntries(ids.map(r => [r.slug, r.id])) }, null, 1),
 );
 console.log('fluxos fictícios prontos:', Object.keys(S).length, 'referências');

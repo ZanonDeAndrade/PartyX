@@ -1,8 +1,10 @@
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
 import { api, type OrderRow, type TicketDetail, type TicketSummary } from './api';
-import { ErrorBox, Layout, stripesFor, usePageTitle } from './components';
-import { brl, dateLong, timeOf } from './format';
+import { DateStub, ErrorBox, Layout, usePageTitle } from './components';
+import { brl, dateParts, timeOf } from './format';
+import { IconBack, IconChevron, IconDownload, IconExpand, IconReceipt, IconTicket, IconUser } from './icons';
+import { DUR, EASE_OUT, m, useReducedMotion } from './motion';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 import { useFetch } from './useFetch';
@@ -19,14 +21,17 @@ function useLoggedIn(returnTo: string): boolean {
 
 const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const dayMonthYear = (iso: string) =>
-  new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' }).format(
-    new Date(iso),
-  );
+  new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(iso));
 
 const ME_TABS = [
-  { to: '/meus-ingressos', label: 'Meus ingressos', icon: '▣', also: ['/ingressos'] },
-  { to: '/minhas-compras', label: 'Minhas compras', icon: '≡', also: ['/pedido'] },
-  { to: '/minha-conta', label: 'Minha conta', icon: '○', also: [] as string[] },
+  { to: '/meus-ingressos', label: 'Meus ingressos', Icon: IconTicket, also: ['/ingressos'] },
+  { to: '/minhas-compras', label: 'Minhas compras', Icon: IconReceipt, also: ['/pedido'] },
+  { to: '/minha-conta', label: 'Minha conta', Icon: IconUser, also: [] as string[] },
 ] as const;
 
 /** Área do cliente (U01–U06): abas sob o cabeçalho no computador e barra inferior no celular. */
@@ -40,7 +45,7 @@ export function MeShell({ children, narrow = false }: { children: React.ReactNod
         <div className="px-wrap">
           {ME_TABS.map(t => (
             <Link key={t.to} to={t.to} aria-current={on(t) ? 'page' : undefined}>
-              <span aria-hidden="true">{t.icon}</span>
+              <t.Icon size={20} />
               {t.label}
             </Link>
           ))}
@@ -136,45 +141,74 @@ export function MyTicketsPage() {
           </Link>
         </div>
       ) : null}
-      {[...groups.entries()].map(([slug, items]) => {
-        const first = items[0]!;
-        return (
-          <section key={slug} className="px-me-group" aria-label={first.event.name}>
-            <div className="px-me-grouphead">
-              <span className="px-me-thumb" style={{ background: stripesFor(first.event.name, 6) }} aria-hidden="true" />
-              <div>
-                <b>{first.event.name}</b>
-                <span>
-                  {capital(dateLong(first.event.startsAt))} · {timeOf(first.event.startsAt)}
-                </span>
-                <small>{first.event.venue}</small>
-              </div>
-              <em>
-                {items.length} {items.length === 1 ? 'ingresso' : 'ingressos'}
-              </em>
-            </div>
-            <ul>
-              {items.map(t => (
-                <li key={t.id}>
-                  <Link to={`/ingressos/${t.id}`} className="px-me-ticket">
-                    <span className={`px-me-icon px-me-icon-${t.status}`} aria-hidden="true">
-                      {t.status === 'cancelado' ? '×' : 'QR'}
-                    </span>
-                    <span className="px-me-ticket-text">
-                      <b>{t.typeName}</b>
-                      <small>
-                        <span className="px-mono">{t.shortCode}</span> · {t.holderName}
-                      </small>
-                    </span>
-                    <StatusBadge status={t.status} />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+      {[...groups.entries()].map(([slug, items]) => (
+        <WalletGroup key={slug} items={items} />
+      ))}
     </MeShell>
+  );
+}
+
+/**
+ * Um evento na carteira (U01): cabeçalho do evento e os ingressos empilhados. Com dois ou mais, a pilha mostra o primeiro e
+ * as bordas dos outros; "Mostrar todos" abre a lista (os itens novos entram com opacidade e deslocamento, sem animar altura).
+ */
+/** Na pilha, o ingresso que ainda vale fica por cima. */
+const STATUS_ORDER: Record<TicketSummary['status'], number> = { valido: 0, utilizado: 1, cancelado: 2 };
+
+function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
+  const items = [...raw].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
+  const first = items[0]!;
+  const reduce = useReducedMotion();
+  const stacked = items.length > 1;
+  const [open, setOpen] = useState(false);
+  const shown = stacked && !open ? items.slice(0, 1) : items;
+  const listId = `carteira-${first.event.slug}`;
+  return (
+    <section className={`px-wallet${stacked && !open ? ' px-wallet-stacked' : ''}`} aria-label={first.event.name}>
+      <header className="px-wallet-head">
+        <DateStub iso={first.event.startsAt} />
+        <div>
+          <h2>{first.event.name}</h2>
+          <span>
+            {capital(dateParts(first.event.startsAt).weekday)}, às {timeOf(first.event.startsAt)}
+          </span>
+          <small>{first.event.venue}</small>
+        </div>
+      </header>
+      <ul id={listId} className="px-wallet-list">
+        {shown.map((t, i) => (
+          <m.li
+            key={t.id}
+            initial={i > 0 && !reduce ? { opacity: 0, y: -12 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: DUR.open, ease: EASE_OUT, delay: Math.min(i, 6) * 0.04 }}
+          >
+            <Link to={`/ingressos/${t.id}`} className={`px-me-ticket px-me-ticket-${t.status}`}>
+              <span className="px-me-ticket-text">
+                <b>{t.typeName}</b>
+                <small>
+                  <span className="px-mono">{t.shortCode}</span>
+                  <span>{t.holderName}</span>
+                </small>
+              </span>
+              <StatusBadge status={t.status} />
+              <IconChevron size={18} className="px-me-chev" />
+            </Link>
+          </m.li>
+        ))}
+      </ul>
+      {stacked ? (
+        <button
+          type="button"
+          className="px-wallet-toggle"
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => setOpen(v => !v)}
+        >
+          {open ? 'Mostrar só o primeiro' : `Mostrar os ${items.length} ingressos`}
+        </button>
+      ) : null}
+    </section>
   );
 }
 
@@ -204,26 +238,34 @@ export function TicketPage({ id }: { id: string }) {
   const t = state.status === 'ok' ? state.data : null;
   const invalid =
     t?.status === 'cancelado'
-      ? { title: 'Ingresso cancelado', text: 'Este ingresso não vale para entrada. O pagamento foi estornado ou contestado.' }
+      ? {
+          title: 'Ingresso cancelado',
+          text: 'Este ingresso não vale para entrada. O pagamento foi estornado ou contestado.',
+        }
       : t?.status === 'utilizado'
         ? {
             title: 'Ingresso já utilizado',
-            text: t.usedAt ? `A entrada foi registrada em ${dayMonthYear(t.usedAt)} às ${timeOf(t.usedAt)}.` : 'A entrada já foi registrada.',
+            text: t.usedAt
+              ? `A entrada foi registrada em ${dayMonthYear(t.usedAt)} às ${timeOf(t.usedAt)}.`
+              : 'A entrada já foi registrada.',
           }
         : null;
   return (
     <MeShell narrow>
       <Link to="/meus-ingressos" className="px-textlink px-textlink-sm px-self-start">
-        ‹ Meus ingressos
+        <IconBack size={18} />
+        Meus ingressos
       </Link>
-      {state.status === 'loading' ? <p aria-busy="true">Carregando…</p> : null}
+      {state.status === 'loading' ? (
+        <div className="px-skel px-tk-skel" aria-busy="true" aria-label="Carregando ingresso" />
+      ) : null}
       {state.status === 'error' ? <ErrorBox onRetry={retry} /> : null}
       {t ? (
         <>
           <article className="px-tk">
             <div className={`px-tk-head px-tk-head-${t.status}`}>
+              <DateStub iso={t.event.startsAt} />
               <div>
-                <small>Pedido PX-{t.orderNumber}</small>
                 <h1>{t.event.name}</h1>
                 <b>{t.typeName}</b>
               </div>
@@ -282,17 +324,19 @@ export function TicketPage({ id }: { id: string }) {
             <div className="px-tk-actions">
               {t.qrPayload && !invalid ? (
                 <Link to={`/ingressos/${t.id}/tela-cheia`} className="px-btn px-btn-pri px-btn-lg">
+                  <IconExpand size={18} />
                   Abrir em tela cheia
                 </Link>
               ) : null}
               <a className="px-btn px-btn-outline px-btn-lg" href={`/api/tickets/${t.id}/pdf`} download>
+                <IconDownload size={18} />
                 Baixar PDF
               </a>
             </div>
           </article>
           <p className="px-fine px-fine-dark">
-            Cada ingresso vale uma única entrada. Não compartilhe a imagem do QR Code: quem entrar primeiro com ele usa o
-            ingresso.
+            Cada ingresso vale uma entrada. Não envie a imagem do QR Code para ninguém: quem passar primeiro na portaria
+            usa o ingresso.
           </p>
         </>
       ) : null}
@@ -333,12 +377,27 @@ export function TicketFullscreenPage({ id }: { id: string }) {
   }, []);
 
   const t = state.status === 'ok' ? state.data : null;
+  // O QR só aparece depois que a folha branca termina de entrar: ele nunca é animado nem fica transparente.
+  const reduce = useReducedMotion();
+  const [settled, setSettled] = useState(Boolean(reduce));
+  useEffect(() => {
+    const id = window.setTimeout(() => setSettled(true), 500); // garantia, se a animação não terminar (aba em segundo plano)
+    return () => window.clearTimeout(id);
+  }, []);
   return (
-    <div className="px-fullscreen" role="dialog" aria-label="Ingresso em tela cheia">
+    <m.div
+      className="px-fullscreen"
+      role="dialog"
+      aria-label="Ingresso em tela cheia"
+      initial={reduce ? false : { y: 48, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: DUR.open, ease: EASE_OUT }}
+      onAnimationComplete={() => setSettled(true)}
+    >
       <div className="px-fs-bar">
         <span>{t ? `Pedido PX-${t.orderNumber}` : ''}</span>
         <button type="button" className="px-btn px-btn-outline" onClick={() => go(`/ingressos/${id}`)}>
-          Fechar ×
+          Fechar
         </button>
       </div>
       {state.status === 'loading' || !ready ? <p aria-busy="true">Carregando…</p> : null}
@@ -348,7 +407,7 @@ export function TicketFullscreenPage({ id }: { id: string }) {
           <div className="px-fs-event">
             <b>{t.event.name}</b>
             <span>
-              {dayMonthYear(t.event.startsAt)} · {timeOf(t.event.startsAt)}
+              {dayMonthYear(t.event.startsAt)}, às {timeOf(t.event.startsAt)}
             </span>
           </div>
           <div className="px-fs-type">{t.typeName}</div>
@@ -356,7 +415,11 @@ export function TicketFullscreenPage({ id }: { id: string }) {
       ) : null}
       {t && t.qrPayload ? (
         <>
-          <QrImage payload={t.qrPayload} size={size} label={`QR Code do ingresso ${t.shortCode}`} />
+          {settled ? (
+            <QrImage payload={t.qrPayload} size={size} label={`QR Code do ingresso ${t.shortCode}`} />
+          ) : (
+            <div className="px-qrbig" style={{ width: size, height: size }} aria-hidden="true" />
+          )}
           <p className="px-mono px-fs-code">{t.shortCode}</p>
           <p className="px-fs-info">{t.holderName}</p>
           <p className="px-fs-hint">Aumente o brilho da tela e segure o celular parado para facilitar a leitura.</p>
@@ -371,7 +434,7 @@ export function TicketFullscreenPage({ id }: { id: string }) {
           <p className="px-mono px-fs-code px-tk-strike">{t.shortCode}</p>
         </>
       ) : null}
-    </div>
+    </m.div>
   );
 }
 
@@ -446,8 +509,8 @@ export function MyOrdersPage() {
             <li key={o.id}>
               <Link to={`/pedido/${o.id}`} className="px-order">
                 <span className="px-order-main">
-                  <span className="px-mono">
-                    PX-{o.number} · {dayMonthYear(o.createdAt)}
+                  <span className="px-order-meta">
+                    <span className="px-mono">PX-{o.number}</span> <span>{dayMonthYear(o.createdAt)}</span>
                   </span>
                   <b>{o.eventName}</b>
                 </span>
@@ -460,7 +523,7 @@ export function MyOrdersPage() {
                     Pedido: {ORDER_LABEL[o.status] ?? o.status}
                   </span>
                   <span className={`px-badge px-badge-${ORDER_TONE[o.status] ?? 'neu'}`}>
-                    Pagamento: {PAYMENT_LABEL[o.status] ?? '—'}
+                    Pagamento: {PAYMENT_LABEL[o.status] ?? 'Não informado'}
                   </span>
                 </span>
               </Link>

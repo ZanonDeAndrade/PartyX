@@ -1,0 +1,560 @@
+/*
+ * Área do cliente (U01 a U07). Carteira com ingressos em forma de ingresso, tela cheia para a portaria e conta.
+ * Regra do QR: preto sobre branco, margem de leitura, sem filtro, transparência, recorte nem animação.
+ */
+
+/* Navegação: abas no computador, barra inferior fixa no celular. */
+.px-me-tabs {
+  position: fixed;
+  z-index: var(--px-z-sticky);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--px-ink);
+  border-top: 1px solid var(--px-ink-line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.px-me-tabs .px-wrap {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 0;
+}
+.px-me-tabs a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 60px;
+  color: var(--px-on-ink-2) !important;
+  font-size: var(--px-t-xs);
+  font-weight: 700;
+  text-decoration: none;
+}
+.px-me-tabs a[aria-current='page'] {
+  color: #fff !important;
+  box-shadow: inset 0 3px 0 var(--px-violet);
+}
+.px-me {
+  padding-top: var(--px-s-5);
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+}
+.px-me-narrow {
+  max-width: 640px;
+}
+@media (min-width: 768px) {
+  .px-me-tabs {
+    position: sticky;
+    top: 72px;
+    bottom: auto;
+    background: var(--px-paper);
+    border-top: 0;
+    border-bottom: 1px solid var(--px-line);
+    padding: 0;
+  }
+  .px-me-tabs .px-wrap {
+    display: flex;
+    gap: var(--px-s-2);
+    padding: 0 var(--px-gutter);
+  }
+  .px-me-tabs a {
+    flex-direction: row;
+    gap: var(--px-s-2);
+    min-height: 52px;
+    padding: 0 var(--px-s-3);
+    font-size: var(--px-t-md);
+    color: var(--px-text-3) !important;
+    border-bottom: 3px solid transparent;
+  }
+  .px-me-tabs a[aria-current='page'] {
+    color: var(--px-text) !important;
+    box-shadow: none;
+    border-bottom-color: var(--px-violet);
+  }
+  .px-me {
+    padding-bottom: var(--px-s-7);
+  }
+}
+.px-me-title {
+  margin: var(--px-s-3) 0 var(--px-s-4);
+  font-family: var(--px-font-display);
+  font-size: var(--px-d-lg);
+  font-weight: 800;
+  line-height: var(--px-lh-tight);
+  text-transform: uppercase;
+}
+.px-me .px-seg {
+  margin-top: 0;
+}
+.px-me-skel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-3);
+}
+.px-me-skel span {
+  display: block;
+  height: 132px;
+  border-radius: var(--px-r-lg);
+}
+.px-me-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--px-s-2);
+  padding: var(--px-s-7) var(--px-s-5);
+  border: 1px dashed #c9c9d6;
+  border-radius: var(--px-r-lg);
+  background: var(--px-paper);
+}
+.px-me-empty b {
+  font-size: var(--px-t-xl);
+  font-weight: 800;
+}
+.px-me-empty p {
+  margin: 0 0 var(--px-s-2);
+  color: var(--px-text-2);
+}
+
+/* ---------- carteira (U01) ---------- */
+.px-wallet {
+  position: relative;
+  margin: 0 0 var(--px-s-6);
+}
+.px-wallet-head {
+  display: flex;
+  gap: var(--px-s-3);
+  align-items: flex-start;
+  padding: var(--px-s-4);
+  border-radius: var(--px-r-lg) var(--px-r-lg) 0 0;
+  background: var(--px-ink);
+  color: var(--px-on-ink);
+}
+.px-wallet-head .px-stub {
+  flex: none;
+}
+.px-wallet-head > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.px-wallet-head h2 {
+  margin: 0 0 var(--px-s-1);
+  font-family: var(--px-font-display);
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 0.95;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.px-wallet-head span {
+  font-weight: 650;
+}
+.px-wallet-head small {
+  color: var(--px-on-ink-2);
+  font-size: var(--px-t-sm);
+}
+.px-wallet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--px-paper);
+  border: 1px solid var(--px-line);
+  border-top: 0;
+  border-radius: 0 0 var(--px-r-lg) var(--px-r-lg);
+  overflow: hidden;
+}
+.px-wallet-list li + li {
+  border-top: 1px dashed var(--px-line);
+}
+/* Pilha: bordas dos ingressos de baixo aparecem atrás do primeiro. */
+.px-wallet-stacked .px-wallet-list {
+  position: relative;
+  box-shadow:
+    0 6px 0 -1px var(--px-paper),
+    0 6px 0 0 var(--px-line),
+    0 12px 0 -2px var(--px-paper),
+    0 12px 0 -1px var(--px-line);
+}
+.px-me-ticket {
+  display: flex;
+  align-items: center;
+  gap: var(--px-s-3);
+  min-height: 68px;
+  padding: var(--px-s-3) var(--px-s-4);
+  color: var(--px-text) !important;
+  text-decoration: none;
+  transition: background-color var(--px-dur-1) linear;
+}
+.px-me-ticket:hover {
+  background: #faf8ff;
+}
+.px-me-ticket-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.px-me-ticket-text b {
+  font-size: var(--px-t-base);
+}
+.px-me-ticket-text small {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--px-s-3);
+  color: var(--px-text-3);
+  font-size: var(--px-t-sm);
+}
+.px-me-ticket-utilizado .px-me-ticket-text b,
+.px-me-ticket-cancelado .px-me-ticket-text b {
+  color: var(--px-text-3);
+}
+.px-me-chev {
+  flex: none;
+  color: var(--px-text-3);
+}
+.px-wallet-toggle {
+  display: block;
+  width: 100%;
+  min-height: var(--px-touch);
+  margin-top: var(--px-s-4);
+  border: 0;
+  background: none;
+  color: var(--px-violet);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.px-wallet-toggle:hover {
+  text-decoration: underline;
+}
+
+/* ---------- ingresso (U04) ---------- */
+.px-tk-skel {
+  height: 560px;
+  border-radius: var(--px-r-lg);
+}
+.px-tk {
+  margin: var(--px-s-3) 0 var(--px-s-4);
+  border-radius: var(--px-r-lg);
+  background: var(--px-paper);
+  border: 1px solid var(--px-line);
+  overflow: hidden;
+}
+.px-tk-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--px-s-3);
+  padding: var(--px-s-5);
+  background: var(--px-ink);
+  color: #fff;
+}
+.px-tk-head .px-stub {
+  flex: none;
+}
+.px-tk-head > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.px-tk-head h1 {
+  margin: 0 0 var(--px-s-1);
+  font-family: var(--px-font-display);
+  font-size: var(--px-d-sm);
+  font-weight: 800;
+  line-height: 0.95;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.px-tk-head b {
+  color: var(--px-lilac);
+}
+.px-tk-head-utilizado,
+.px-tk-head-cancelado {
+  background: #3f3f50;
+}
+.px-tk-head-utilizado .px-stub,
+.px-tk-head-cancelado .px-stub {
+  background: #6b6b80;
+}
+.px-tk-head-utilizado b,
+.px-tk-head-cancelado b {
+  color: #e4e4ec;
+}
+/* Picote entre o cabeçalho e o QR */
+.px-tk-qr {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--px-s-3);
+  padding: var(--px-s-6) var(--px-s-4);
+  border-bottom: 2px dashed var(--px-line);
+}
+.px-tk-qr::before,
+.px-tk-qr::after {
+  content: '';
+  position: absolute;
+  bottom: -11px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--px-ops);
+  border: 1px solid var(--px-line);
+}
+.px-tk-qr::before {
+  left: -11px;
+}
+.px-tk-qr::after {
+  right: -11px;
+}
+.px-tk-qrbox {
+  padding: 0;
+  background: #fff;
+}
+.px-qrbig {
+  display: block;
+  background: #fff;
+  image-rendering: pixelated;
+}
+.px-tk-code {
+  font-size: var(--px-t-lg);
+  letter-spacing: 0.08em;
+}
+.px-tk-strike {
+  text-decoration: line-through;
+  color: var(--px-text-3);
+}
+.px-tk-invalid {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--px-s-2);
+  padding: var(--px-s-5);
+  text-align: center;
+  border-radius: var(--px-r-md);
+  background: var(--px-neu-bg);
+  color: var(--px-neu-fg);
+}
+.px-tk-invalid b {
+  font-family: var(--px-font-display);
+  font-size: var(--px-d-sm);
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.px-tk-invalid-cancelado {
+  background: var(--px-err-bg);
+  color: var(--px-err-fg);
+}
+.px-tk-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--px-s-4) var(--px-s-4);
+  margin: 0;
+  padding: var(--px-s-6) var(--px-s-5) var(--px-s-4);
+}
+.px-tk-fields dt {
+  font-size: var(--px-t-sm);
+  color: var(--px-text-3);
+}
+.px-tk-fields dd {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.px-tk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--px-s-2);
+  padding: 0 var(--px-s-5) var(--px-s-5);
+}
+.px-tk-actions .px-btn {
+  flex: 1 1 200px;
+}
+
+/* ---------- tela cheia (U05) ---------- */
+.px-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--px-z-modal);
+  background: #fff;
+  color: var(--px-ink);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--px-s-2);
+  padding: 0 var(--px-s-4) calc(var(--px-s-5) + env(safe-area-inset-bottom));
+  text-align: center;
+}
+.px-fs-bar {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--px-s-3);
+  padding: var(--px-s-3) 0;
+  background: #fff;
+  font-size: var(--px-t-sm);
+  color: var(--px-text-3);
+}
+.px-fs-event {
+  display: flex;
+  flex-direction: column;
+}
+.px-fs-event b {
+  font-family: var(--px-font-display);
+  font-size: var(--px-d-sm);
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.px-fs-event span {
+  color: var(--px-text-2);
+  font-weight: 650;
+}
+.px-fs-type {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--px-ink);
+  color: #fff;
+  font-weight: 800;
+  border-radius: var(--px-r-xs);
+}
+.px-fs-code {
+  margin: var(--px-s-1) 0 0;
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+}
+.px-fs-info {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--px-t-lg);
+}
+.px-fs-hint {
+  margin: var(--px-s-2) 0 0;
+  max-width: 34ch;
+  color: var(--px-text-3);
+  font-size: var(--px-t-sm);
+}
+.px-fs-invalid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-2);
+  width: min(100%, 360px);
+  padding: var(--px-s-7) var(--px-s-5);
+  margin-top: var(--px-s-4);
+  border-radius: var(--px-r-md);
+  background: var(--px-err-bg);
+  color: var(--px-err-fg);
+}
+.px-fs-invalid b {
+  font-family: var(--px-font-display);
+  font-size: var(--px-d-md);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+/* ---------- minhas compras (U02) ---------- */
+.px-orders {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-2);
+}
+.px-order {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--px-s-2) var(--px-s-3);
+  padding: var(--px-s-4);
+  border-radius: var(--px-r-md);
+  border: 1px solid var(--px-line);
+  background: var(--px-paper);
+  color: var(--px-text) !important;
+  text-decoration: none;
+  transition: border-color var(--px-dur-1) linear;
+}
+.px-order:hover {
+  border-color: var(--px-violet);
+}
+.px-order-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.px-order-main .px-mono {
+  font-size: var(--px-t-sm);
+  color: var(--px-text-3);
+}
+.px-order-main b {
+  font-size: var(--px-t-lg);
+  overflow-wrap: anywhere;
+}
+.px-order-qty {
+  color: var(--px-text-3);
+  font-size: var(--px-t-md);
+  grid-column: 1;
+}
+.px-order-total {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: var(--px-t-lg);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.px-order-badges {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--px-s-2);
+}
+@media (min-width: 768px) {
+  .px-order {
+    grid-template-columns: minmax(0, 1fr) 120px auto 160px;
+    align-items: center;
+  }
+  .px-order-qty {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .px-order-badges {
+    grid-column: 3;
+    grid-row: 1;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .px-order-total {
+    grid-column: 4;
+  }
+}
+
+/* ---------- conta (U06, U07) ---------- */
+.px-me .px-ck-card {
+  padding: var(--px-s-5);
+}
+.px-btn-logout {
+  margin-top: var(--px-s-4);
+}
+@media (max-width: 767px) {
+  /* A barra inferior fixa não cobre o fim do rodapé. */
+  body:has(.px-me-tabs) .px-footer {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+}
+.px-order-meta {
+  display: flex;
+  gap: var(--px-s-3);
+  font-size: var(--px-t-sm);
+  color: var(--px-text-3);
+}

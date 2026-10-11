@@ -10,9 +10,11 @@ import {
   type TicketSummary,
 } from './api';
 import { loadCart, saveCart } from './cart';
-import { ErrorBox, Layout, stripesFor, usePageTitle } from './components';
+import { DateStub, ErrorBox, Layout, usePageTitle } from './components';
 import { mmss, useCountdown } from './countdown';
-import { brl, dateShort, maskEmail, timeOf } from './format';
+import { brl, dateParts, maskEmail, phoneBr, timeOf } from './format';
+import { IconCheck, IconCopy } from './icons';
+import { DUR, EASE_OUT, m, useReducedMotion } from './motion';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 
@@ -34,6 +36,7 @@ interface AsideData {
 }
 
 const STEPS = ['Revisão', 'Pagamento', 'Confirmação'] as const;
+const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** Estrutura das telas de compra: etapas no alto, conteúdo à esquerda e resumo do pedido à direita (C02–C10). */
 function CheckoutShell({
@@ -58,14 +61,10 @@ function CheckoutShell({
           {STEPS.map((label, i) => (
             <li key={label} aria-current={i === step ? 'step' : undefined} className={i <= step ? 'px-step-on' : ''}>
               <span className="px-step-n" aria-hidden="true">
-                {i < step ? '✓' : i + 1}
+                {i < step ? <IconCheck size={14} /> : i + 1}
               </span>
-              {label}
-              {i < STEPS.length - 1 ? (
-                <span className="px-step-sep" aria-hidden="true">
-                  ›
-                </span>
-              ) : null}
+              <span className="px-step-label">{label}</span>
+              {i < step ? <span className="px-sr">(concluída)</span> : null}
             </li>
           ))}
         </ol>
@@ -74,11 +73,11 @@ function CheckoutShell({
           {aside ? (
             <aside className="px-ck-aside" aria-label="Resumo do pedido">
               <div className="px-ck-event">
-                <span className="px-ck-thumb" style={{ background: stripesFor(aside.event.name, 6) }} aria-hidden="true" />
+                <DateStub iso={aside.event.startsAt} />
                 <div>
                   <b>{aside.event.name}</b>
                   <small className="px-ck-date">
-                    {dateShort(aside.event.startsAt)} · {timeOf(aside.event.startsAt)}
+                    {capitalize(dateParts(aside.event.startsAt).weekday)}, {timeOf(aside.event.startsAt)}
                   </small>
                   <small>{aside.event.venue}</small>
                 </div>
@@ -96,7 +95,9 @@ function CheckoutShell({
                 {aside.coupon ? (
                   <li className="px-ck-promo">
                     <span>Promoter</span>
-                    <span className="px-mono">{aside.coupon.code} · sem alteração de valor</span>
+                    <span>
+                      <span className="px-mono">{aside.coupon.code}</span>, valor inalterado
+                    </span>
                   </li>
                 ) : null}
               </ul>
@@ -116,25 +117,65 @@ function CheckoutShell({
   );
 }
 
-/** Prazo da reserva (C04): faixa que vira amarela nos dois últimos minutos. */
+/**
+ * Prazo da reserva (C04). A barra encolhe com `transform` (sem mexer no layout). Nos últimos 60 s o bloco fica âmbar e diz
+ * que falta menos de um minuto, sem piscar nem alarmar: o prazo é do servidor e a página atualiza sozinha.
+ */
 function TimerCard({ secondsLeft }: { secondsLeft: number }) {
   const peak = useRef(secondsLeft);
   if (secondsLeft > peak.current) peak.current = secondsLeft;
-  const warn = secondsLeft < 120;
-  const pct = peak.current > 0 ? Math.min(100, (secondsLeft / peak.current) * 100) : 0;
+  const warn = secondsLeft <= 60;
+  const fraction = peak.current > 0 ? Math.min(1, secondsLeft / peak.current) : 0;
   return (
     <div className={`px-timerbar${warn ? ' px-timerbar-warn' : ''}`} role="timer" aria-live="off">
-      <div>
-        <b>Ingressos reservados para você</b>
-        <span className="px-mono">{mmss(secondsLeft)}</span>
+      <div className="px-timerbar-top">
+        <b>{warn ? 'Menos de um minuto para pagar' : 'Ingressos reservados para você'}</b>
+        <span className="px-timerbar-clock" aria-label={`Faltam ${mmss(secondsLeft)}`}>
+          {mmss(secondsLeft)}
+        </span>
       </div>
-      <div className="px-timerbar-track">
-        <div style={{ width: `${pct}%` }} />
+      <div className="px-timerbar-track" aria-hidden="true">
+        <div style={{ transform: `scaleX(${fraction})` }} />
       </div>
       <small>
-        Conclua o pagamento dentro do prazo. Depois disso a reserva é liberada e os ingressos voltam para venda.
+        {warn
+          ? 'Se o prazo terminar, a reserva é liberada. Se você já pagou, aguarde: a confirmação chega mesmo assim.'
+          : 'Conclua o pagamento dentro do prazo. Depois disso a reserva é liberada e os ingressos voltam para venda.'}
       </small>
     </div>
+  );
+}
+
+/**
+ * Ingresso "entrando na carteira" na confirmação: cai alguns pixels e aparece, um depois do outro. Momento discreto, sem
+ * confete. Sem movimento quando o aparelho pede menos movimento.
+ */
+function WalletItem({ index, children }: { index: number; children: ReactNode }) {
+  const reduce = useReducedMotion();
+  if (reduce) return <li>{children}</li>;
+  return (
+    <m.li
+      initial={{ opacity: 0, y: -18, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: DUR.enter, ease: EASE_OUT, delay: 0.25 + Math.min(index, 5) * 0.09 }}
+    >
+      {children}
+    </m.li>
+  );
+}
+
+/** Troca de etapa dentro do pedido (forma de pagamento, Pix, resultado): o conteúdo novo entra da direita, no sentido da compra. */
+function Stage({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <m.div
+      key={id}
+      className="px-ck-stage"
+      initial={{ opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: DUR.open, ease: EASE_OUT }}
+    >
+      {children}
+    </m.div>
   );
 }
 
@@ -158,7 +199,7 @@ function ResultCard({
 }) {
   return (
     <section className="px-ck-card px-result" aria-labelledby="res-title">
-      <span className={`px-done-icon px-tone-${tone}`} aria-hidden="true">
+      <span className={`px-done-icon px-result-icon px-tone-${tone}`} aria-hidden="true">
         {icon}
       </span>
       {order ? <span className="px-mono px-muted">Pedido PX-{order}</span> : null}
@@ -272,7 +313,7 @@ export function CheckoutPage({ slug }: { slug: string }) {
         <div className="px-ck-mobbar">
           <div>
             <small>Total</small>
-            <b>{summary ? brl(summary.totalCents) : '—'}</b>
+            <b>{summary ? brl(summary.totalCents) : '...'}</b>
           </div>
           {goPay}
         </div>
@@ -297,7 +338,9 @@ export function CheckoutPage({ slug }: { slug: string }) {
             {summary.items.map(i => (
               <li key={i.ticketTypeId}>
                 <span>
-                  <b>{i.quantity} ×</b> {i.name}
+                  <span>
+                    <b>{i.quantity} ×</b> {i.name}
+                  </span>
                   <small>{brl(i.unitPriceCents)} cada</small>
                 </span>
                 <b>{brl(i.subtotalCents)}</b>
@@ -320,11 +363,11 @@ export function CheckoutPage({ slug }: { slug: string }) {
           </div>
           <div>
             <dt>CPF</dt>
-            <dd>{user?.cpf ?? '—'}</dd>
+            <dd>{user?.cpf ?? 'Não informado'}</dd>
           </div>
           <div>
             <dt>Telefone</dt>
-            <dd>{user?.phone ?? '—'}</dd>
+            <dd>{user?.phone ? phoneBr(user.phone) : 'Não informado'}</dd>
           </div>
         </dl>
         <p className="px-ck-note">
@@ -337,8 +380,8 @@ export function CheckoutPage({ slug }: { slug: string }) {
           Código do promoter <small>(opcional)</small>
         </h2>
         <p className="px-ck-text">
-          Se alguém indicou o evento, informe o código dessa pessoa. O código registra a indicação e não altera o valor do
-          pedido.
+          Se alguém indicou o evento, informe o código dessa pessoa. O código registra a indicação e não altera o valor
+          do pedido.
         </p>
         {applied && !error?.coupon ? (
           <div className="px-promo-ok">
@@ -439,12 +482,20 @@ function PixBox({ pix, total }: { pix: NonNullable<PaymentView['pix']>; total: n
         </div>
         <div className="px-pix-qr-box">
           {qr ? (
-            <img src={qr} alt="QR Code do Pix de pagamento" width={204} height={204} />
+            <m.img
+              src={qr}
+              alt="QR Code do Pix de pagamento"
+              width={204}
+              height={204}
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: DUR.enter, ease: EASE_OUT }}
+            />
           ) : (
-            <p aria-busy="true">Gerando QR Code…</p>
+            <span className="px-skel px-pix-qr-skel" aria-busy="true" aria-label="Gerando QR Code" />
           )}
         </div>
-        <small>QR de pagamento. Não é o seu ingresso.</small>
+        <small>QR de pagamento Pix. Não é o seu ingresso.</small>
       </div>
       <div className="px-pix-side">
         <div className="px-ck-card">
@@ -457,11 +508,16 @@ function PixBox({ pix, total }: { pix: NonNullable<PaymentView['pix']>; total: n
             aria-label="Pix copia e cola"
             onFocus={e => e.currentTarget.select()}
           />
-          <button type="button" className="px-btn px-btn-dark px-btn-block" onClick={copy}>
-            Copiar código Pix
+          <button
+            type="button"
+            className={`px-btn px-btn-block ${copied ? 'px-btn-copied' : 'px-btn-dark'}`}
+            onClick={copy}
+          >
+            {copied ? <IconCheck size={18} /> : <IconCopy size={18} />}
+            {copied ? 'Código copiado' : 'Copiar código Pix'}
           </button>
-          <p role="status" aria-live="polite" className="px-copied px-copied-light">
-            {copied ? 'Código copiado.' : ''}
+          <p role="status" aria-live="polite" className="px-sr">
+            {copied ? 'Código Pix copiado. Cole no aplicativo do banco.' : ''}
           </p>
         </div>
         <ol className="px-pix-steps">
@@ -472,8 +528,8 @@ function PixBox({ pix, total }: { pix: NonNullable<PaymentView['pix']>; total: n
         <div className="px-awaiting" aria-live="polite">
           <i aria-hidden="true" />
           <span>
-            <b>Aguardando pagamento.</b> Esta página atualiza sozinha quando o gateway confirmar. Os ingressos são
-            liberados depois da confirmação.
+            <b>Aguardando pagamento.</b> Esta página atualiza sozinha quando o pagamento for confirmado. Os ingressos
+            aparecem depois da confirmação; não é preciso recarregar.
           </span>
         </div>
       </div>
@@ -706,6 +762,18 @@ export function OrderPage({ id }: { id: string }) {
         <PixBox pix={payment.pix} total={order.totalCents} />
       </>
     );
+  } else if (pending && order.paymentMethod === 'pix' && !payment && !error) {
+    // Pix já gerado, dados do pagamento ainda a caminho: esqueleto do mesmo tamanho (sem mensagem errada nem salto de layout).
+    body = (
+      <>
+        <h1 className="px-ck-title">Pague com Pix</h1>
+        {secondsLeft !== null ? <TimerCard secondsLeft={secondsLeft} /> : null}
+        <div className="px-pix" aria-busy="true" aria-label="Carregando o Pix">
+          <div className="px-skel px-pix-skel-qr" />
+          <div className="px-skel px-pix-skel-side" />
+        </div>
+      </>
+    );
   } else if (pending) {
     body = (
       <section className="px-ck-card px-result" aria-live="polite">
@@ -725,7 +793,7 @@ export function OrderPage({ id }: { id: string }) {
     body =
       tickets.length === 0 ? (
         <section className="px-ck-card px-result" aria-live="polite">
-          <span className="px-done-icon px-tone-ok" aria-hidden="true">
+          <span className="px-done-icon px-result-icon px-tone-ok" aria-hidden="true">
             ✓
           </span>
           <h1>Pagamento confirmado. Preparando seus ingressos</h1>
@@ -737,29 +805,30 @@ export function OrderPage({ id }: { id: string }) {
           </div>
         </section>
       ) : (
-        <section className="px-ck-card px-result">
-          <span className="px-done-icon px-tone-ok" aria-hidden="true">
+        <section className="px-ck-card px-result px-result-ok">
+          <span className="px-done-icon px-result-icon px-tone-ok" aria-hidden="true">
             ✓
           </span>
           <span className="px-mono px-muted">Pedido PX-{order.number}</span>
           <h1>Compra confirmada</h1>
           <p>
-            Seus {units} {units === 1 ? 'ingresso' : 'ingressos'} para {order.event.name} estão em Meus ingressos.
-            Enviamos a confirmação com o link de acesso para <b>{maskEmail(email)}</b>.
+            {units === 1 ? 'Seu ingresso' : `Seus ${units} ingressos`} para {order.event.name}{' '}
+            {units === 1 ? 'já está' : 'já estão'} em Meus ingressos, com um QR Code para cada ingresso. Enviamos a
+            confirmação para <b>{maskEmail(email)}</b>.
           </p>
-          <ul className="px-ck-tickets">
+          <ul className="px-ck-tickets" aria-label="Seus ingressos">
             {tickets.map((t, i) => (
-              <li key={t.id}>
+              <WalletItem key={t.id} index={i}>
                 <Link to={`/ingressos/${t.id}`}>
                   <span>
                     <b>{t.typeName}</b>
-                    <small className="px-mono">
-                      {t.shortCode} · {i + 1} de {tickets.length}
+                    <small>
+                      <span className="px-mono">{t.shortCode}</span>, ingresso {i + 1} de {tickets.length}
                     </small>
                   </span>
                   <span className="px-badge px-badge-ok">Válido</span>
                 </Link>
-              </li>
+              </WalletItem>
             ))}
           </ul>
           <div className="px-done-actions">
@@ -789,8 +858,8 @@ export function OrderPage({ id }: { id: string }) {
         }
       >
         A reserva foi liberada e este Pix não pode mais ser pago. Se ainda houver ingressos, você pode fazer um novo
-        pedido. As quantidades são conferidas de novo. Se você já pagou, aguarde: confirmamos o pagamento mesmo depois do
-        prazo.
+        pedido. As quantidades são conferidas de novo. Se você já pagou, aguarde: confirmamos o pagamento mesmo depois
+        do prazo.
       </ResultCard>
     );
   } else if (order.status === 'nao_concluido') {
@@ -807,8 +876,8 @@ export function OrderPage({ id }: { id: string }) {
         }}
         actions={back}
       >
-        O pagamento não foi aprovado. Nenhum ingresso foi emitido e nada foi cobrado. Você pode tentar de novo, com outro
-        cartão ou com Pix.
+        O pagamento não foi aprovado. Nenhum ingresso foi emitido e nada foi cobrado. Você pode tentar de novo, com
+        outro cartão ou com Pix.
       </ResultCard>
     );
   } else if (order.status === 'pago_sem_estoque') {
@@ -834,7 +903,7 @@ export function OrderPage({ id }: { id: string }) {
                         E-mail: <a href={`mailto:${support.email}`}>{support.email}</a>
                       </>
                     ) : null}
-                    {support.email && support.whatsapp ? ' · ' : null}
+                    {support.email && support.whatsapp ? '. ' : null}
                     {support.whatsapp ? (
                       <>
                         WhatsApp:{' '}
@@ -861,8 +930,8 @@ export function OrderPage({ id }: { id: string }) {
           </>
         }
       >
-        Seu pagamento foi aprovado depois do fim da reserva e, nesse intervalo, as unidades foram vendidas. Nenhum ingresso
-        foi emitido para este pedido.
+        Seu pagamento foi aprovado depois do fim da reserva e, nesse intervalo, as unidades foram vendidas. Nenhum
+        ingresso foi emitido para este pedido.
       </ResultCard>
     );
   } else {
@@ -905,7 +974,20 @@ export function OrderPage({ id }: { id: string }) {
       <p className="px-sr" role="status" aria-live="polite">
         Situação do pedido: {order.status}
       </p>
-      {body}
+      <Stage
+        key={
+          pending
+            ? payment?.pix || (order.paymentMethod === 'pix' && !payment)
+              ? 'pix'
+              : order.paymentMethod || payment
+                ? 'gateway'
+                : 'metodo'
+            : order.status
+        }
+        id={order.status}
+      >
+        {body}
+      </Stage>
       {order.paymentMethod && order.status !== 'estornado' ? (
         <LocalSimulator id={id} onDone={() => void refresh()} />
       ) : null}

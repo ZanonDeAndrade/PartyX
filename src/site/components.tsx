@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { type EventCard, type SaleKind, type TypeState } from './api';
-import { brl, dateShort, eventPath, searchPath, timeOf } from './format';
+import { brl, dateParts, eventPath, searchPath, timeOf } from './format';
+import { IconClose, IconMenu, IconSearch } from './icons';
+import { m, staggerIn, useReducedMotion } from './motion';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 
@@ -49,7 +51,7 @@ function MenuDrawer({ onClose }: { onClose: () => void }) {
         <div className="px-drawer-head">
           <h2>Menu</h2>
           <button ref={closeRef} type="button" className="px-icon-btn" aria-label="Fechar menu" onClick={onClose}>
-            ×
+            <IconClose />
           </button>
         </div>
         <nav className="px-drawer-nav" aria-label="Menu">
@@ -131,6 +133,7 @@ export function Header() {
                 </Link>
               </nav>
               <form className="px-hsearch" role="search" onSubmit={submit}>
+                <IconSearch size={18} />
                 <input
                   type="search"
                   aria-label="Buscar evento"
@@ -142,7 +145,7 @@ export function Header() {
               </form>
               <div className="px-header-end">
                 <Link to="/eventos" className="px-icon-btn px-only-mob" aria-label="Buscar eventos">
-                  ⌕
+                  <IconSearch />
                 </Link>
                 {session.status === 'anon' ? (
                   <Link to="/entrar" className="px-enter">
@@ -183,7 +186,7 @@ export function Header() {
                   aria-expanded={menu}
                   onClick={() => setMenu(true)}
                 >
-                  ≡
+                  <IconMenu />
                 </button>
                 {user ? (
                   <button
@@ -234,7 +237,16 @@ export function Footer() {
 }
 
 /** Páginas de vitrine (início, eventos, evento, 404) usam o tema escuro do protótipo; o resto fica no claro. */
-export function Layout({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
+export function Layout({
+  children,
+  dark = false,
+  footer = true,
+}: {
+  children: ReactNode;
+  dark?: boolean;
+  /** Portaria: sem rodapé, para nada competir com a leitura. */
+  footer?: boolean;
+}) {
   useEffect(() => {
     document.body.classList.toggle('px-dark', dark);
     return () => document.body.classList.remove('px-dark');
@@ -245,7 +257,7 @@ export function Layout({ children, dark = false }: { children: ReactNode; dark?:
       <main id="conteudo" tabIndex={-1}>
         {children}
       </main>
-      <Footer />
+      {footer ? <Footer /> : null}
     </>
   );
 }
@@ -286,54 +298,111 @@ export function stripesFor(name: string, step = 10): string {
   return `repeating-linear-gradient(135deg, ${c1} 0 ${step}px, ${c2} ${step}px ${step * 2}px)`;
 }
 
+/**
+ * Nome da transição compartilhada do banner (View Transitions): o banner do cartão "vira" o banner da página do evento.
+ * Precisa ser um identificador CSS válido e único na página.
+ */
+export const bannerTransitionName = (slug: string) => `px-banner-${slug}`;
+
 /** Banner do evento. Sem imagem, listras discretas (como no protótipo), para o cartão não ficar vazio. */
 export function Banner({
   event,
   className = '',
   children,
   step = 10,
+  transitionName,
+  eager = false,
 }: {
   event: Pick<EventCard, 'name' | 'bannerUrl'>;
   className?: string;
   children?: ReactNode;
   step?: number;
+  transitionName?: string;
+  eager?: boolean;
 }) {
   return (
     <div
       className={`px-banner ${className}`}
-      style={event.bannerUrl ? undefined : { background: stripesFor(event.name, step) }}
+      style={{
+        ...(event.bannerUrl ? null : { background: stripesFor(event.name, step) }),
+        ...(transitionName ? { viewTransitionName: transitionName } : null),
+      }}
     >
-      {event.bannerUrl ? <img src={event.bannerUrl} alt="" loading="lazy" decoding="async" /> : null}
+      {event.bannerUrl ? (
+        <img
+          src={event.bannerUrl}
+          alt=""
+          loading={eager ? 'eager' : 'lazy'}
+          fetchPriority={eager ? 'high' : undefined}
+          decoding="async"
+        />
+      ) : null}
       {children}
     </div>
   );
 }
 
-export function EventCardView({ event }: { event: EventCard }) {
-  const open = event.sale.kind === 'open';
+/**
+ * Bloco de data no formato de cartaz: dia grande, mês abaixo, com o canto cortado na diagonal do X do logotipo.
+ * O texto completo fica para o leitor de tela (o visual abrevia).
+ */
+export function DateStub({ iso, size = 'md' }: { iso: string; size?: 'md' | 'lg' }) {
+  const p = dateParts(iso);
   return (
-    <li className="px-card">
+    <span className={`px-stub px-stub-${size}`}>
+      <span className="px-stub-day" aria-hidden="true">
+        {p.day}
+      </span>
+      <span className="px-stub-month" aria-hidden="true">
+        {p.month}
+      </span>
+      <span className="px-sr">
+        {p.day} de {p.month}
+      </span>
+    </span>
+  );
+}
+
+const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+export function EventCardView({
+  event,
+  index = 0,
+  animate = false,
+}: {
+  event: EventCard;
+  index?: number;
+  animate?: boolean;
+}) {
+  const reduce = useReducedMotion();
+  const open = event.sale.kind === 'open';
+  const when = dateParts(event.startsAt);
+  return (
+    <m.li className="px-card" {...staggerIn(index, animate && !reduce)}>
       <Link to={eventPath(event.slug)} className="px-card-link" aria-label={`${event.name}, ${event.sale.label}`}>
-        <Banner event={event}>
-          {open ? null : (
-            <span className="px-banner-state">
-              <Badge kind={event.sale.kind}>{event.sale.label}</Badge>
-            </span>
-          )}
-        </Banner>
+        <div className="px-card-media">
+          <Banner event={event} transitionName={bannerTransitionName(event.slug)}>
+            {open ? null : (
+              <span className="px-banner-state">
+                <Badge kind={event.sale.kind}>{event.sale.label}</Badge>
+              </span>
+            )}
+          </Banner>
+          <DateStub iso={event.startsAt} />
+        </div>
         <div className="px-card-body">
-          <p className="px-card-date">
-            {dateShort(event.startsAt)} · {timeOf(event.startsAt)}
-          </p>
           <h3 className="px-card-title">{event.name}</h3>
+          <p className="px-card-when">
+            {capitalize(when.weekday)}, {timeOf(event.startsAt)}
+          </p>
           <p className="px-card-venue">{event.venue}</p>
           <div className="px-card-foot">
             {open && event.sale.minPriceCents !== null ? (
               <p className="px-price">
-                a partir de <b>{brl(event.sale.minPriceCents)}</b>
+                <span>a partir de</span> <b>{brl(event.sale.minPriceCents)}</b>
               </p>
             ) : (
-              <span />
+              <p className="px-price px-price-off">{event.sale.label}</p>
             )}
             <span className={`px-cta ${open ? 'px-cta-pri' : ''}`} aria-hidden="true">
               {open ? 'Comprar' : 'Ver evento'}
@@ -341,20 +410,22 @@ export function EventCardView({ event }: { event: EventCard }) {
           </div>
         </div>
       </Link>
-    </li>
+    </m.li>
   );
 }
 
 export function CardSkeletons({ n = 3 }: { n?: number }) {
   return (
-    <ul className="px-grid" aria-hidden="true">
+    <ul className="px-grid px-grid-skel" aria-hidden="true">
       {Array.from({ length: n }, (_, i) => (
-        <li key={i} className="px-card px-skel">
-          <div className="px-banner" />
+        <li key={i} className="px-card">
+          <div className="px-card-media">
+            <div className="px-banner px-skel" />
+          </div>
           <div className="px-card-body">
-            <span className="px-skel-line" style={{ width: '40%' }} />
-            <span className="px-skel-line" style={{ width: '80%', height: 20 }} />
-            <span className="px-skel-line" style={{ width: '55%' }} />
+            <span className="px-skel-line" style={{ width: '80%', height: 26 }} />
+            <span className="px-skel-line" style={{ width: '45%' }} />
+            <span className="px-skel-line" style={{ width: '60%' }} />
           </div>
         </li>
       ))}
@@ -366,7 +437,7 @@ export function ErrorBox({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="px-box" role="alert">
       <h2>Não foi possível carregar</h2>
-      <p>Verifique a conexão e tente de novo.</p>
+      <p>A conexão falhou ou o servidor não respondeu. O que você estava fazendo continua aqui: tente de novo.</p>
       <button type="button" className="px-btn px-btn-pri" onClick={onRetry}>
         Tentar de novo
       </button>

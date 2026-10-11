@@ -1,0 +1,694 @@
+/*
+ * Compra (C02 a C10): superfície clara e calma, uma decisão por vez, resumo sempre à vista. Carregado só nesta área.
+ */
+.px-ck {
+  padding-top: var(--px-s-5);
+  padding-bottom: var(--px-s-6);
+}
+/* Com barra fixa no celular, o conteúdo termina acima dela (nada fica coberto). */
+.px-ck-bar {
+  padding-bottom: calc(112px + env(safe-area-inset-bottom));
+}
+@media (min-width: 960px) {
+  .px-ck-bar {
+    padding-bottom: var(--px-s-6);
+  }
+}
+
+/* Etapas: número, nome e a barra diagonal do X como separador. */
+.px-steps {
+  list-style: none;
+  margin: 0 0 var(--px-s-6);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--px-s-2);
+  font-size: var(--px-t-md);
+  font-weight: 650;
+  color: var(--px-text-3);
+}
+.px-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--px-s-2);
+  min-width: 0;
+}
+.px-steps li + li::before {
+  content: '';
+  flex: none;
+  width: 18px;
+  height: 2px;
+  margin-right: var(--px-s-1);
+  background: var(--px-line);
+  transform: rotate(-54deg);
+}
+.px-step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--px-line);
+  background: var(--px-paper);
+  font-size: var(--px-t-sm);
+  font-weight: 800;
+  transition:
+    background-color var(--px-dur-2) linear,
+    border-color var(--px-dur-2) linear;
+}
+.px-step-on {
+  color: var(--px-text);
+}
+.px-step-on .px-step-n {
+  background: var(--px-ink);
+  border-color: var(--px-ink);
+  color: #fff;
+}
+.px-steps li[aria-current='step'] .px-step-n {
+  background: var(--px-violet);
+  border-color: var(--px-violet);
+}
+.px-steps li[aria-current='step'] {
+  font-weight: 800;
+}
+@media (max-width: 479px) {
+  /* Em tela estreita, só a etapa atual mostra o nome. */
+  .px-steps li:not([aria-current='step']) .px-step-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
+
+.px-ck-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--px-s-5);
+  align-items: start;
+}
+@media (min-width: 960px) {
+  .px-ck-grid {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: var(--px-s-8);
+  }
+  .px-ck-aside {
+    position: sticky;
+    top: 96px;
+  }
+}
+.px-ck-main {
+  min-width: 0;
+  view-transition-name: px-ck-main;
+}
+.px-ck-title {
+  margin: 0 0 var(--px-s-5);
+  font-family: var(--px-font-display);
+  font-size: var(--px-d-md);
+  font-weight: 800;
+  line-height: var(--px-lh-tight);
+  text-transform: uppercase;
+}
+
+/* Resumo do pedido */
+.px-ck-aside {
+  background: var(--px-paper);
+  border: 1px solid var(--px-line);
+  border-radius: var(--px-r-lg);
+  padding: var(--px-s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-3);
+}
+.px-ck-event {
+  display: flex;
+  gap: var(--px-s-3);
+  align-items: flex-start;
+  padding-bottom: var(--px-s-3);
+  border-bottom: 1px solid var(--px-line-2);
+}
+.px-ck-event .px-stub {
+  flex: none;
+}
+.px-ck-event > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.px-ck-event b {
+  font-family: var(--px-font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 0.95;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  margin-bottom: var(--px-s-1);
+}
+.px-ck-event small {
+  font-size: var(--px-t-sm);
+  color: var(--px-text-3);
+}
+.px-ck-event .px-ck-date {
+  color: var(--px-text);
+  font-weight: 700;
+}
+.px-ck-lines {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-1);
+  font-size: var(--px-t-md);
+  font-variant-numeric: tabular-nums;
+}
+.px-ck-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--px-s-3);
+}
+.px-ck-promo {
+  color: var(--px-text-3);
+  font-size: var(--px-t-sm);
+}
+.px-ck-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0;
+  padding-top: var(--px-s-3);
+  border-top: 2px solid var(--px-ink);
+  font-variant-numeric: tabular-nums;
+}
+.px-ck-total b:last-child {
+  font-size: var(--px-t-2xl);
+  font-weight: 800;
+}
+.px-ck-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--px-s-2);
+}
+.px-ck-aside .px-fine {
+  margin: 0;
+}
+
+/* Revisão (C02) */
+.px-ck-review-lines {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.px-ck-review-lines li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--px-s-3);
+  padding: var(--px-s-3) 0;
+  border-bottom: 1px solid var(--px-line-2);
+  font-variant-numeric: tabular-nums;
+}
+.px-ck-review-lines li:last-child {
+  border-bottom: 0;
+}
+.px-ck-review-lines span {
+  display: flex;
+  flex-direction: column;
+}
+.px-ck-review-lines small {
+  color: var(--px-text-3);
+  font-size: var(--px-t-sm);
+}
+.px-ck-buyer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--px-s-3) var(--px-s-5);
+  margin: 0;
+}
+.px-ck-buyer dt {
+  font-size: var(--px-t-sm);
+  color: var(--px-text-3);
+}
+.px-ck-buyer dd {
+  margin: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.px-ck-card h2 small {
+  font-weight: 500;
+  font-size: var(--px-t-md);
+  color: var(--px-text-3);
+}
+.px-coupon {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--px-s-2);
+}
+.px-coupon .px-field {
+  flex: 1;
+}
+.px-coupon .px-btn {
+  margin-top: 29px;
+  min-height: 48px;
+}
+.px-promo-ok {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--px-s-3);
+  flex-wrap: wrap;
+  padding: var(--px-s-3) var(--px-s-4);
+  border-radius: var(--px-r-sm);
+  background: var(--px-ok-bg);
+  color: var(--px-ok-fg);
+}
+.px-ck-desk-cta {
+  display: none;
+  margin-top: var(--px-s-5);
+}
+.px-ck-desk-cta .px-btn {
+  min-width: 280px;
+}
+.px-ck-mobbar {
+  position: fixed;
+  z-index: var(--px-z-sticky);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--px-s-3);
+  padding: var(--px-s-3) var(--px-gutter) calc(var(--px-s-3) + env(safe-area-inset-bottom));
+  background: var(--px-paper);
+  border-top: 1px solid var(--px-line);
+  box-shadow: 0 -10px 30px -12px rgb(11 11 16 / 0.25);
+}
+.px-ck-mobbar > div {
+  display: flex;
+  flex-direction: column;
+}
+.px-ck-mobbar small {
+  font-size: var(--px-t-sm);
+  color: var(--px-text-3);
+}
+.px-ck-mobbar b {
+  font-size: var(--px-t-xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.px-ck-mobbar .px-btn {
+  flex: none;
+}
+@media (min-width: 960px) {
+  .px-ck-desk-cta {
+    display: block;
+  }
+  .px-ck-mobbar {
+    display: none;
+  }
+}
+
+/* Prazo da reserva */
+.px-timerbar {
+  margin: 0 0 var(--px-s-4);
+  padding: var(--px-s-4);
+  border-radius: var(--px-r-md);
+  background: var(--px-paper);
+  border: 1px solid var(--px-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-2);
+  transition:
+    background-color var(--px-dur-4) linear,
+    border-color var(--px-dur-4) linear;
+}
+.px-timerbar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--px-s-3);
+}
+.px-timerbar-clock {
+  font-family: var(--px-font-display);
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.px-timerbar-track {
+  height: 6px;
+  border-radius: var(--px-r-pill);
+  background: var(--px-line-2);
+  overflow: hidden;
+}
+.px-timerbar-track div {
+  height: 100%;
+  background: var(--px-violet);
+  transform-origin: left center;
+  transition:
+    transform 1s linear,
+    background-color var(--px-dur-4) linear;
+}
+.px-timerbar small {
+  color: var(--px-text-3);
+  font-size: var(--px-t-sm);
+}
+.px-timerbar-warn {
+  background: var(--px-warn-bg);
+  border-color: #f2d78a;
+}
+.px-timerbar-warn b,
+.px-timerbar-warn .px-timerbar-clock,
+.px-timerbar-warn small {
+  color: var(--px-warn-fg);
+}
+.px-timerbar-warn .px-timerbar-track div {
+  background: #b45309;
+}
+
+/* Forma de pagamento (C03) */
+.px-methods {
+  display: grid;
+  gap: var(--px-s-3);
+  margin: 0 0 var(--px-s-4);
+}
+.px-method {
+  display: flex;
+  gap: var(--px-s-3);
+  align-items: flex-start;
+  width: 100%;
+  padding: var(--px-s-4);
+  border-radius: var(--px-r-md);
+  border: 2px solid var(--px-line);
+  background: var(--px-paper);
+  color: var(--px-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--px-dur-2) linear,
+    background-color var(--px-dur-2) linear;
+}
+.px-method:hover {
+  border-color: #c9c9d6;
+}
+.px-method > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.px-method b {
+  font-size: var(--px-t-lg);
+}
+.px-method small {
+  color: var(--px-text-3);
+  font-size: var(--px-t-sm);
+}
+.px-method-on {
+  border-color: var(--px-violet);
+  background: #faf8ff;
+}
+.px-radio {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2px solid #8a8a9e;
+  display: grid;
+  place-items: center;
+}
+.px-radio::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--px-violet);
+  transform: scale(0);
+  transition: transform var(--px-dur-2) var(--px-ease-out);
+}
+.px-method-on .px-radio {
+  border-color: var(--px-violet);
+}
+.px-method-on .px-radio::after {
+  transform: scale(1);
+}
+.px-ck-note-box {
+  padding: var(--px-s-3) var(--px-s-4);
+  border-radius: var(--px-r-sm);
+  background: var(--px-line-2);
+}
+.px-done-actions-start {
+  justify-content: flex-start;
+}
+
+/* Pix (C04): o QR de pagamento fica num bloco roxo, diferente do QR do ingresso (sempre preto no branco). */
+.px-pix {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--px-s-4);
+}
+@media (min-width: 720px) {
+  .px-pix {
+    grid-template-columns: 280px minmax(0, 1fr);
+    align-items: start;
+  }
+}
+.px-pix-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--px-s-3);
+  padding: var(--px-s-4);
+  border-radius: var(--px-r-lg);
+  background: var(--px-violet);
+  color: #fff;
+}
+.px-pix-qr-head {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-weight: 800;
+  font-size: var(--px-t-md);
+}
+.px-pix-qr-head span:last-child {
+  font-variant-numeric: tabular-nums;
+}
+.px-pix-qr-box {
+  width: 228px;
+  height: 228px;
+  padding: 12px;
+  border-radius: var(--px-r-md);
+  background: #fff;
+  display: grid;
+  place-items: center;
+}
+.px-pix-qr-box img {
+  display: block;
+  width: 204px;
+  height: 204px;
+  image-rendering: pixelated;
+}
+.px-pix-qr-skel {
+  display: block;
+  width: 204px;
+  height: 204px;
+  border-radius: var(--px-r-sm);
+}
+.px-pix-qr small {
+  font-size: var(--px-t-sm);
+  opacity: 0.92;
+  text-align: center;
+}
+.px-pix-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-3);
+  min-width: 0;
+}
+.px-pix-side .px-ck-card {
+  margin: 0;
+}
+.px-copy {
+  width: 100%;
+  resize: none;
+  padding: var(--px-s-3);
+  border: 1px dashed #8a8a9e;
+  border-radius: var(--px-r-sm);
+  background: var(--px-ops);
+  color: var(--px-text);
+  font-family: var(--px-font-code);
+  font-size: var(--px-t-sm);
+  line-height: 1.5;
+  word-break: break-all;
+  margin-bottom: var(--px-s-3);
+}
+.px-btn-copied {
+  --btn-bg: var(--px-ok-bg);
+  --btn-fg: var(--px-ok-fg);
+  --btn-line: var(--px-ok-fg);
+}
+.px-pix-steps {
+  margin: 0;
+  padding-left: 1.3em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-1);
+  color: var(--px-text-2);
+}
+.px-awaiting {
+  display: flex;
+  gap: var(--px-s-3);
+  align-items: flex-start;
+  padding: var(--px-s-3) var(--px-s-4);
+  border-radius: var(--px-r-sm);
+  background: var(--px-warn-bg);
+  color: var(--px-warn-fg);
+  font-size: var(--px-t-md);
+}
+.px-awaiting i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pxpulse 1.6s var(--px-ease-in-out) infinite;
+}
+
+/* Resultados (C06 a C10, U03) */
+.px-result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--px-s-3);
+  padding: var(--px-s-7) var(--px-s-5);
+}
+@media (min-width: 640px) {
+  .px-result {
+    padding: var(--px-s-8);
+  }
+}
+.px-result h1 {
+  margin: 0;
+  font-family: var(--px-font-display);
+  font-size: var(--px-d-md);
+  font-weight: 800;
+  line-height: var(--px-lh-tight);
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.px-result > p {
+  margin: 0;
+  color: var(--px-text-2);
+  max-width: 60ch;
+}
+.px-result-box {
+  width: 100%;
+  padding: var(--px-s-3) var(--px-s-4);
+  border-radius: var(--px-r-sm);
+  font-size: var(--px-t-md);
+}
+.px-result-box-neu {
+  background: var(--px-neu-bg);
+  color: var(--px-neu-fg);
+}
+.px-result-box-warn {
+  background: var(--px-warn-bg);
+  color: var(--px-warn-fg);
+}
+.px-result-box a {
+  color: inherit;
+  font-weight: 700;
+}
+.px-result .px-done-actions {
+  margin-top: var(--px-s-2);
+}
+.px-skel-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-2);
+  width: 100%;
+}
+.px-skel-rows span {
+  display: block;
+  height: 64px;
+  border-radius: var(--px-r-md);
+}
+
+/* Carteira da confirmação (C07): ingressos empilhados num bolso escuro. */
+.px-ck-tickets {
+  list-style: none;
+  margin: var(--px-s-2) 0 0;
+  padding: var(--px-s-3);
+  width: 100%;
+  border-radius: var(--px-r-lg);
+  background: var(--px-ink);
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-2);
+}
+.px-ck-tickets a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--px-s-3);
+  padding: var(--px-s-3) var(--px-s-4) var(--px-s-3) var(--px-s-5);
+  border-radius: var(--px-r-sm);
+  background: var(--px-paper);
+  color: var(--px-text) !important;
+  text-decoration: none;
+  /* Picote do ingresso: dois recortes laterais. */
+  -webkit-mask:
+    radial-gradient(circle 7px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 7px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle 7px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 7px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+.px-ck-tickets a:hover {
+  background: var(--px-violet-soft);
+}
+.px-ck-tickets a > span:first-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.px-ck-tickets small {
+  color: var(--px-text-3);
+  font-size: var(--px-t-sm);
+}
+
+/* Troca de rota da revisão para o pagamento: o conteúdo principal desliza no sentido da compra. */
+::view-transition-old(px-ck-main) {
+  animation: pxckout var(--px-dur-3) var(--px-ease-in) both;
+}
+::view-transition-new(px-ck-main) {
+  animation: pxckin var(--px-dur-4) var(--px-ease-out) both;
+}
+@keyframes pxckout {
+  to {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+@keyframes pxckin {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+.px-pix-skel-qr {
+  height: 316px;
+  border-radius: var(--px-r-lg);
+}
+.px-pix-skel-side {
+  height: 420px;
+  border-radius: var(--px-r-md);
+}

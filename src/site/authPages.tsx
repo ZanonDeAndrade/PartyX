@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, type LegalKind } from './api';
 import { Layout, usePageTitle } from './components';
-import { maskEmail } from './format';
+import { cpfInput, maskEmail, phoneInput } from './format';
 import { HumanCheck, type HumanState } from './HumanCheck';
+import { IconBack } from './icons';
 import { Link, useRouter } from './router';
 import { safeReturnPath, useSession } from './session';
 import { useFetch } from './useFetch';
@@ -383,7 +384,7 @@ export function SignupPage() {
               id="cpf"
               label="CPF"
               value={f.cpf}
-              onChange={set('cpf')}
+              onChange={v => set('cpf')(cpfInput(v))}
               error={errors.cpf}
               inputMode="numeric"
               placeholder="000.000.000-00"
@@ -394,11 +395,11 @@ export function SignupPage() {
               id="tel"
               label="Telefone com DDD"
               value={f.phone}
-              onChange={set('phone')}
+              onChange={v => set('phone')(phoneInput(v))}
               error={errors.phone}
               autoComplete="tel"
               inputMode="tel"
-              placeholder="(55) 99999-9999"
+              placeholder="(11) 98765-4321"
               wide={false}
             />
             <PasswordField
@@ -576,7 +577,8 @@ export function ForgotPasswordPage() {
       <AuthCard>
         <section className="px-authcard" aria-labelledby="auth-title">
           <Link to="/entrar" className="px-textlink px-textlink-sm px-self-start">
-            ‹ Voltar para entrar
+            <IconBack size={18} />
+            Voltar para entrar
           </Link>
           <header>
             <h1 id="auth-title">Recuperar senha</h1>

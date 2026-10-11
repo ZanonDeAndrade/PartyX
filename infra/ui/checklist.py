@@ -8,8 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 UI = ROOT / 'docs' / 'ui'
 before = json.loads((UI / 'antes' / 'manifest.json').read_text())
-after_path = UI / 'depois' / 'manifest.json'
-after = json.loads(after_path.read_text()) if after_path.exists() else []
+after = [row for f in sorted((UI / 'depois').glob('manifest*.json')) for row in json.loads(f.read_text())]
 
 NAMES = {
     'P01': 'Página inicial', 'P02': 'Listagem e busca', 'P03': 'Página do evento', 'P04': 'Termos de Uso',

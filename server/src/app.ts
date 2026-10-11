@@ -154,7 +154,7 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
     if (!permitted) {
       const destination = role === 'cliente' ? '/minha-conta' : '/portaria';
       return c.html(
-        `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso negado · PartyX</title><link rel="stylesheet" href="/access-denied.css"></head><body><main><span class="code">G04</span><h1>Acesso negado</h1><p>Você não tem permissão para acessar esta área.</p><a href="${destination}">Ir para minha área</a></main></body></html>`,
+        `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Acesso negado · PartyX</title><link rel="stylesheet" href="/access-denied.css"></head><body><main data-screen="G04"><img src="/brand/partyx-logo.png" width="65" height="36" alt="PartyX"><h1>Acesso negado</h1><p>Sua conta não tem acesso a esta área. Volte para a área do seu perfil.</p><a href="${destination}">Ir para minha área</a></main></body></html>`,
         403,
       );
     }

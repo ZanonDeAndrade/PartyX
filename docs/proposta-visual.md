@@ -10,11 +10,12 @@ Identidade **provisória**, derivada do protótipo, aplicada ao site, aos e-mail
 
 | Papel | Valor | Onde aparece |
 | --- | --- | --- |
-| Preto de marca | `#0B0B10` | Cabeçalho, rodapé, vitrine (início, eventos, evento), cabeçalho do ingresso |
+| Preto de marca | `#0B0B10` | Cabeçalho, rodapé, vitrine (início, eventos, evento), portaria, menu do painel, cabeçalho do ingresso |
 | Superfície escura | `#15151E` com linha `#2C2C3A` | Cartões de evento, busca e blocos de informação sobre o preto |
-| Roxo de ação | `#7C3AED` (hover `#6D28D9`) | Botão principal ("Comprar ingressos", "Continuar", "Entrar") |
+| Roxo de ação | `#7C3AED` (hover `#6D28D9`) | Botão principal ("Comprar ingressos", "Continuar", "Entrar") e bloco de data |
 | Roxo de marca | `#8B5CF6` | Foco de teclado |
-| Lilás | `#C4B5FD` | Datas, links e destaques sobre fundo escuro |
+| Lilás | `#C4B5FD` | Links e destaques sobre fundo escuro |
+| Textos no escuro | `#B9B9C9`, `#8B8BA0` | Secundário e apoio sobre o preto (contraste AA medido) |
 | Fundo claro | `#F7F7FA` | Páginas de conta, compra e área do cliente |
 | Branco | `#FFFFFF` | Cartões e formulários sobre o fundo claro, painel de ingressos |
 | Texto | `#0B0B10`, `#3F3F50`, `#5B5B6E` | Principal, secundário, apoio |
@@ -24,21 +25,24 @@ Identidade **provisória**, derivada do protótipo, aplicada ao site, aos e-mail
 
 ### Tipografia
 
+Atualizada no refinamento de UI de 11/10/2026 (detalhes em `ui/design-system.md`).
+
 | Papel | Fonte | Uso |
 | --- | --- | --- |
-| Texto e títulos | **Archivo** (variável, pesos 100 a 900, larguras 62 a 125%) | Todo o texto. Títulos em peso 800 a 900, alargados (110 a 118%) e com espaçamento de letras levemente negativo |
-| Códigos e números de referência | **IBM Plex Mono** (400, 500, 600) | Código do ingresso, número do pedido, Pix copia e cola, código do promoter |
+| Nomes de evento e títulos | **Big Shoulders Display** (variável) | Nome do evento, títulos de página, datas e números grandes, em peso 800 e caixa-alta, como num cartaz |
+| Texto | **Archivo** (variável) | Todo o texto de leitura, botões, campos e tabelas |
+| Códigos | **IBM Plex Mono** (400 e 500) | Código do ingresso, Pix copia e cola, senha temporária |
+| 404 | Big Shoulders **Stencil** Display | Só o numeral da página inexistente, parente dos cortes do logotipo |
 
-**E-mails** usam Arial/Helvetica, porque a maioria dos aplicativos de e-mail não carrega fontes externas; as cores e o logotipo são os mesmos do site.
-
-Escala principal: destaque da página inicial de 40 a 84 px; título de página de 28 a 48 px; seção de 18 a 28 px; texto de 15 a 16 px; apoio de 12 a 14 px. Os campos de formulário usam 16 px para o iPhone não ampliar a tela. As duas fontes são livres (licença OFL) e carregadas pelo Google Fonts; com a fonte final da marca, a troca é só de arquivo.
+As fontes são livres (licença OFL) e **servidas pelo próprio site**, sem Google Fonts nem outra CDN. **E-mails** usam Arial/Helvetica e o **PDF** usa as fontes padrão do PDF (compatibilidade e impressão); as cores e o logotipo são os mesmos do site. Campos de formulário em 16 px para o iPhone não ampliar a tela. Com a fonte final da marca, a troca é só de arquivo e de token.
 
 ### Forma e movimento
 
-- Cantos: 20 px nos blocos grandes (destaque, ingresso, painel de ingressos), 16 px nos cartões, 10 a 12 px nos botões e campos, 6 px nas etiquetas de estado.
-- Botões principais com 52 px de altura; demais alvos de toque com no mínimo 44 px.
-- Banner do evento: a imagem enviada pelo cliente; sem imagem, listras discretas em tons de roxo e cinza.
-- Movimento só onde informa: contagem da reserva, indicador de espera do Pix e carregamento. Respeita "reduzir movimento" do aparelho.
+- **Elemento de marca:** o corte diagonal do X do logotipo, no canto do bloco de data (cartões, evento, compra, carteira, portaria, PDF), no separador das etapas da compra e no marcador do menu do painel.
+- Cantos por hierarquia: 2 px no cartaz do evento e no bloco de data, 8 px em botões e campos, 12 px em cartões, 18 px em janelas, painel de ingressos e ingresso.
+- Botões principais com 52 px de altura; demais alvos com no mínimo 44 px; "Próxima leitura" da portaria com 72 px.
+- Banner do evento: a imagem enviada pelo cliente, em destaque na página inicial e no topo da página do evento; sem imagem, listras discretas em tons de roxo e cinza.
+- Movimento só onde informa ou responde a um toque: entrada dos cartões na primeira visita, banner que passa do cartão para a página do evento, quantidade e total que rolam, prazo da reserva que muda de cor nos últimos 60 s, ingressos que "entram na carteira" na confirmação. O QR do ingresso nunca é animado. Na portaria, o resultado aparece de imediato. Com "reduzir movimento" do aparelho, nada se move.
 - Abertura com o vídeo do logotipo (3 s): só na primeira página da vitrine aberta na sessão (início, eventos ou evento), com botão "Pular" e tecla Esc. Não aparece na compra, na conta, no painel, na portaria, nos links de e-mail nem com "reduzir movimento".
 
 ### Logotipo e aviso
@@ -56,7 +60,9 @@ Escala principal: destaque da página inicial de 40 a 84 px; título de página 
    - **Compra:** revisão do pedido, forma de pagamento, Pix, compra confirmada, prazo vencido, pagamento recusado e "pago sem estoque".
    - **Cliente:** meus ingressos (próximos e histórico), minhas compras, ingresso com QR Code, tela cheia e minha conta.
    - **E-mails:** confirmação de compra, ingresso e recuperação de senha.
-   - **Ainda no desenho anterior, serão restilizadas depois da sua aprovação:** portaria e painel administrativo.
+   - **Portaria:** seleção do evento, câmera, busca manual e resultados verde, amarelo e vermelho.
+   - **Painel administrativo:** visão geral, eventos, pedidos, compradores, ingressos, promoters, relatórios, entradas e equipe.
+   - Capturas de todas as telas e estados em 360, 390, 768 e 1440 px: `ui/depois/` (antes e depois lado a lado em `ui/comparativo.md`).
 3. As capturas são geradas do ambiente de homologação (`docs/visual-e-legal.md`, seção "Como gerar as capturas").
 
 ## O que o cliente precisa decidir ou fornecer

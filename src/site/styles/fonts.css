@@ -1,0 +1,11 @@
+/*
+ * Fontes servidas pelo próprio site (pacotes @fontsource, licença OFL), sem CDN. Só o subconjunto latino entra:
+ * o navegador baixa os outros por `unicode-range` apenas se a página tiver esses caracteres.
+ * Big Shoulders Display (condensada) nos nomes de evento e números; Archivo na interface; IBM Plex Mono só em códigos.
+ * Provisórias até o cliente enviar as fontes oficiais (D-10).
+ */
+@import '@fontsource-variable/big-shoulders-display/wght';
+@import '@fontsource/big-shoulders-stencil-display/latin-800';
+@import '@fontsource-variable/archivo/wght';
+@import '@fontsource/ibm-plex-mono/latin-400';
+@import '@fontsource/ibm-plex-mono/latin-500';

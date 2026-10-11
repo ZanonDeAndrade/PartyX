@@ -210,6 +210,16 @@ Restrições respeitadas: sem cupom de desconto, sem comissão de promoter, sem 
 14. **Carteira: estados inequívocos.** "Utilizado em 25/10 às 23:42" com QR oculto; "Cancelado" com QR oculto e texto explicando que o estorno, se houver, é tratado pelo pagamento. Evitar rótulo ambíguo como o "Esgotado" que reaparece da Shotgun.
 15. **Portaria e admin: resposta instantânea e números reais.** Leitura com retorno em tela cheia por cor e texto ("Entrada liberada", "Já utilizado às 23:42", "Ingresso inválido"), com vibração quando houver; busca manual com CPF mascarado; uma leitura por unidade, sem lista de pedido para marcar um a um (contra o fluxo da Posh). No admin, vendidos, reservas válidas e capacidade por tipo, e vendas por código de promoter só como atribuição.
 
+### O que foi aplicado neste refinamento
+
+| Item | Situação |
+| --- | --- |
+| 1, 3, 5, 6 | Aplicados: cartão com imagem, bloco de data, título e local; preço "a partir de" só com tipo à venda (regra do servidor); barra fixa no celular; estados de tipo sempre listados |
+| 7, 9, 11, 13, 14, 15 | Aplicados dentro das regras atuais (retorno ao checkout, Pix com "Código copiado", carteira na confirmação, tela cheia, estados do ingresso, portaria imediata) |
+| 8 | Parcial: o contador do servidor continua sempre visível; a ênfase só aparece nos últimos 60 s, sem modal |
+| 12 | Parcial: ingressos agrupados por evento e empilhados; navegação lateral entre unidades não foi criada |
+| 2, 4 (seções novas), 10 | Não aplicados: dependem de dados, filtros ou mensagens que a API não oferece hoje (ver `sugestoes-futuras.md`) |
+
 ## Fontes
 
 - **DICE**: https://ixd.prattsi.org/2026/02/design-critique-dice-ios-app/; https://ixd.prattsi.org/2025/02/design-critique-dice/; https://www.ticketnews.com/2019/09/mobile-ticketing-app-dice-puts-fans-first-with-transparency-waiting-lists/; https://dice.fm/blog/identify-fan-demand-with-the-waiting-list; https://dice.fm/blog/dices-big-fat-2021-product-round-up; https://dice.fm/event/pyp26w-wet-leg-10th-jul-alexandra-palace-london-tickets (via resultado de busca; leitura direta bloqueada); https://en.wikipedia.org/wiki/Dice_(ticketing_company); https://edmidentity.com/2023/04/01/dice-event-ticketing-fan-first/

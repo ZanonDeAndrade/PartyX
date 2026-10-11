@@ -1,8 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type EventDetail, type SiteInfo } from './api';
 import { loadCart, saveCart } from './cart';
-import { Badge, Banner, CardSkeletons, ErrorBox, EventCardView, Layout, SearchForm, usePageTitle } from './components';
-import { brl, dateLong, dateShort, searchPath, shareLinks, timeOf } from './format';
+import {
+  Badge,
+  Banner,
+  bannerTransitionName,
+  CardSkeletons,
+  DateStub,
+  ErrorBox,
+  EventCardView,
+  Layout,
+  SearchForm,
+  usePageTitle,
+} from './components';
+import { brl, dateLong, dateParts, searchPath, shareLinks, timeOf } from './format';
+import { IconCheck, IconClose, IconLink, IconShare } from './icons';
+import { Roll, useFirstMount } from './motion';
 import { Link, useRouter } from './router';
 import { useFetch } from './useFetch';
 
@@ -13,31 +26,51 @@ export function HomePage() {
   const featured = state.status === 'ok' ? state.data.featured[0] : undefined;
   const list = state.status === 'ok' ? state.data.upcoming.filter(e => e.slug !== featured?.slug) : [];
   const fromCents = featured?.sale.kind === 'open' ? featured.sale.minPriceCents : null;
+  const first = useFirstMount();
 
   return (
     <Layout dark>
-      <h1 className="px-sr">Ingressos para os melhores eventos</h1>
+      <h1 className="px-sr">PartyX: ingressos para os próximos eventos</h1>
+      {state.status === 'loading' ? (
+        // Reserva a altura do destaque enquanto os eventos chegam: o resto da página não pula depois (CLS).
+        <section className="px-hero px-hero-skel" aria-hidden="true">
+          <div className="px-banner px-skel px-hero-media" />
+        </section>
+      ) : null}
       {featured ? (
-        <section className="px-wrap px-hero-wrap" aria-label="Evento em destaque">
-          <div className="px-hero">
-            <Banner event={featured} className="px-hero-bg" step={14} />
-            <div className="px-hero-in">
-              <p className="px-eyebrow">Em destaque</p>
-              <h2 className="px-hero-title">{featured.name}</h2>
-              <p className="px-hero-date">
-                {dateShort(featured.startsAt)} · {timeOf(featured.startsAt)}
+        <section className="px-hero" aria-label="Evento em destaque">
+          <Banner
+            event={featured}
+            className="px-hero-media"
+            step={14}
+            eager
+            transitionName={bannerTransitionName(featured.slug)}
+          />
+          <div className="px-wrap px-hero-in">
+            <p className="px-hero-tag">Em destaque</p>
+            <h2 className="px-hero-title">
+              <Link to={`/eventos/${featured.slug}`}>{featured.name}</Link>
+            </h2>
+            <div className="px-hero-meta">
+              <DateStub iso={featured.startsAt} size="lg" />
+              <p>
+                <b>
+                  {capital(dateParts(featured.startsAt).weekday)}, às {timeOf(featured.startsAt)}
+                </b>
+                <span>{featured.venue}</span>
               </p>
-              <p className="px-hero-venue">{featured.venue}</p>
-              <div className="px-hero-cta">
-                <Link to={`/eventos/${featured.slug}`} className="px-btn px-btn-pri px-btn-lg">
-                  {featured.sale.kind === 'open' ? 'Comprar ingressos' : 'Ver evento'}
-                </Link>
-                {fromCents !== null ? (
-                  <span className="px-hero-price">
-                    a partir de <b>{brl(fromCents)}</b>
-                  </span>
-                ) : null}
-              </div>
+            </div>
+            <div className="px-hero-cta">
+              <Link to={`/eventos/${featured.slug}`} className="px-btn px-btn-pri px-btn-lg">
+                {featured.sale.kind === 'open' ? 'Comprar ingressos' : 'Ver evento'}
+              </Link>
+              {fromCents !== null ? (
+                <span className="px-hero-price">
+                  a partir de <b>{brl(fromCents)}</b>
+                </span>
+              ) : featured.sale.kind !== 'open' ? (
+                <Badge kind={featured.sale.kind}>{featured.sale.label}</Badge>
+              ) : null}
             </div>
           </div>
         </section>
@@ -61,14 +94,17 @@ export function HomePage() {
           {state.status === 'error' ? <ErrorBox onRetry={retry} /> : null}
           {state.status === 'ok' && !featured && list.length === 0 ? (
             <div className="px-box">
-              <h3>Nenhum evento à venda no momento</h3>
-              <p>Quando a PartyX abrir as vendas de um novo evento, ele aparece aqui.</p>
+              <h3>Nenhum evento à venda agora</h3>
+              <p>Quando a PartyX abrir as vendas de um novo evento, ele aparece aqui primeiro.</p>
             </div>
           ) : null}
+          {state.status === 'ok' && featured && list.length === 0 ? (
+            <p className="px-muted">Por enquanto, o evento em destaque é o único com venda aberta.</p>
+          ) : null}
           {state.status === 'ok' && list.length > 0 ? (
-            <ul className="px-grid">
-              {list.map(e => (
-                <EventCardView key={e.slug} event={e} />
+            <ul className="px-grid px-grid-editorial">
+              {list.map((e, i) => (
+                <EventCardView key={e.slug} event={e} index={i} animate={first} />
               ))}
             </ul>
           ) : null}
@@ -90,6 +126,7 @@ export function EventsPage() {
   const [state, retry] = useFetch(s => api.events(q, date, s), `${q}|${date}`);
   const filtering = Boolean(q || date);
   const events = state.status === 'ok' ? state.data.events : [];
+  const first = useFirstMount();
 
   const count =
     state.status === 'loading'
@@ -102,8 +139,8 @@ export function EventsPage() {
 
   return (
     <Layout dark>
-      <div className="px-wrap">
-        <h1 className="px-h1">Eventos</h1>
+      <div className="px-wrap px-events-page">
+        <h1 className="px-h1 px-page-title">Eventos</h1>
         <SearchForm idPrefix="lista" q={q} date={date} onSubmit={(nq, nd) => go(searchPath(nq, nd))} />
         {filtering ? (
           <ul className="px-chips" aria-label="Filtros aplicados">
@@ -147,11 +184,11 @@ export function EventsPage() {
         {state.status === 'error' ? <ErrorBox onRetry={retry} /> : null}
         {state.status === 'ok' && events.length === 0 ? (
           <div className="px-box">
-            <h2>{filtering ? 'Nenhum evento encontrado' : 'Nenhuma venda disponível no momento'}</h2>
+            <h2>{filtering ? 'Nenhum evento encontrado' : 'Nenhuma venda aberta agora'}</h2>
             <p>
               {filtering
-                ? 'Não há eventos com esse nome ou nessa data. Tente outra palavra ou limpe os filtros.'
-                : 'Quando a PartyX abrir as vendas de um novo evento, ele aparece aqui.'}
+                ? 'Nenhum evento à venda combina com essa busca. Tente parte do nome ou outra data.'
+                : 'Quando a PartyX abrir as vendas de um novo evento, ele aparece aqui primeiro.'}
             </p>
             {filtering ? (
               <Link to="/eventos" className="px-btn">
@@ -162,8 +199,8 @@ export function EventsPage() {
         ) : null}
         {state.status === 'ok' && events.length > 0 ? (
           <ul className="px-grid">
-            {events.map(e => (
-              <EventCardView key={e.slug} event={e} />
+            {events.map((e, i) => (
+              <EventCardView key={e.slug} event={e} index={i} animate={first} />
             ))}
           </ul>
         ) : null}
@@ -214,7 +251,7 @@ function ShareDialog({ event, onClose }: { event: EventDetail; onClose: () => vo
             aria-label="Fechar"
             onClick={onClose}
           >
-            ×
+            <IconClose />
           </button>
         </div>
         <div className="px-og">
@@ -222,7 +259,7 @@ function ShareDialog({ event, onClose }: { event: EventDetail; onClose: () => vo
           <div className="px-og-text">
             <small>{window.location.host}</small>
             <b>
-              {event.name} · {dateLong(event.startsAt)} · PartyX
+              {event.name}, {dateLong(event.startsAt)} | PartyX
             </b>
             <span>{event.venue}. Ingressos online na PartyX.</span>
           </div>
@@ -238,7 +275,8 @@ function ShareDialog({ event, onClose }: { event: EventDetail; onClose: () => vo
             X
           </a>
           <button type="button" className="px-btn" onClick={copy}>
-            Copiar link
+            {copied ? <IconCheck size={18} /> : <IconLink size={18} />}
+            {copied ? 'Link copiado' : 'Copiar link'}
           </button>
         </div>
         <p role="status" aria-live="polite" className="px-copied">
@@ -294,7 +332,7 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
     <>
       <div className="px-side-head">
         <h2 id="ingressos">Ingressos</h2>
-        {hasBuyable ? <span>Até {limit} por compra</span> : null}
+        {hasBuyable ? <span>Até {limit} por pedido</span> : null}
       </div>
       {notices}
       {event.ticketTypes.length === 0 ? <p className="px-muted">Nenhum ingresso cadastrado.</p> : null}
@@ -318,7 +356,9 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
                   >
                     −
                   </button>
-                  <output aria-live="polite">{n}</output>
+                  <output aria-live="polite">
+                    <Roll value={String(n)} />
+                  </output>
                   <button
                     type="button"
                     aria-label={`Mais um ${t.name}`}
@@ -350,8 +390,17 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
             </ul>
           ) : null}
           <p className="px-total px-total-row-side">
-            <span>Total</span>
-            <b>{brl(total)}</b>
+            <span>
+              Total
+              {units > 0 ? (
+                <small>
+                  {units} {units === 1 ? 'ingresso' : 'ingressos'}
+                </small>
+              ) : null}
+            </span>
+            <b>
+              <Roll value={brl(total)} />
+            </b>
           </p>
           <button
             type="button"
@@ -366,17 +415,28 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
             <p className="px-notice px-notice-neu">As vendas ainda não foram abertas neste ambiente.</p>
           ) : null}
           <p className="px-fine">
-            Selecionar quantidades não reserva ingressos. A reserva começa quando você iniciar o pagamento.{' '}
+            Escolher a quantidade ainda não reserva nada. A reserva começa quando você for para o pagamento.{' '}
             <Link to="/politica-de-cancelamento">Política de cancelamento</Link>
           </p>
           <div className="px-mobbar">
             <div>
-              <small>{units === 0 ? 'Nenhum ingresso' : `${units} ${units === 1 ? 'ingresso' : 'ingressos'}`}</small>
-              <b>{brl(total)}</b>
+              <small>
+                {units === 0 ? 'Escolha a quantidade' : `${units} ${units === 1 ? 'ingresso' : 'ingressos'}`}
+              </small>
+              <b>
+                <Roll value={brl(total)} />
+              </b>
             </div>
-            <button type="button" className="px-btn px-btn-pri px-btn-lg" disabled={blocked} onClick={goCheckout}>
-              Continuar
-            </button>
+            {units === 0 && !salesClosed ? (
+              // Sem ingresso escolhido, a barra leva até a lista (no celular ela fica abaixo da descrição).
+              <a href="#ingressos" className="px-btn px-btn-light px-btn-lg">
+                Escolher ingressos
+              </a>
+            ) : (
+              <button type="button" className="px-btn px-btn-pri px-btn-lg" disabled={blocked} onClick={goCheckout}>
+                Continuar
+              </button>
+            )}
           </div>
         </>
       ) : null}
@@ -394,9 +454,15 @@ export function EventPage({ slug }: { slug: string }) {
   return (
     <Layout dark>
       {state.status === 'loading' ? (
-        <div className="px-wrap" aria-busy="true" aria-label="Carregando evento">
-          <div className="px-banner px-skel px-event-banner" />
-          <span className="px-skel-line" style={{ width: '60%', height: 32, marginTop: 24 }} />
+        <div aria-busy="true" aria-label="Carregando evento">
+          <div className="px-event-hero">
+            <div className="px-banner px-skel px-event-banner" />
+          </div>
+          <div className="px-wrap px-event-skel">
+            <span className="px-skel-line" style={{ width: '70%', height: 48 }} />
+            <span className="px-skel-line" style={{ width: '40%', height: 18 }} />
+            <span className="px-skel-line" style={{ width: '55%', height: 18 }} />
+          </div>
         </div>
       ) : null}
       {state.status === 'error' ? (
@@ -438,23 +504,32 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
 
   return (
     <>
-      <div className="px-wrap">
-        <Banner event={event} className="px-event-banner" step={14}>
+      <div className="px-event-hero">
+        <Banner
+          event={event}
+          className="px-event-banner"
+          step={14}
+          eager
+          transitionName={preview ? undefined : bannerTransitionName(event.slug)}
+        >
           {sale.kind === 'ended' ? <span className="px-ended-tag">Evento encerrado</span> : null}
         </Banner>
+        <div className="px-wrap px-event-head">
+          <DateStub iso={event.startsAt} size="lg" />
+          <h1 className="px-event-name">{event.name}</h1>
+        </div>
       </div>
       <div className="px-wrap px-event">
         <article className="px-event-main">
           <div className="px-event-title">
-            <h1>{event.name}</h1>
             <dl className="px-facts">
               <div>
-                <dt>Data e horário</dt>
+                <dt>Quando</dt>
                 <dd>{capital(dateLong(event.startsAt))}</dd>
                 <dd className="px-facts-sub">Início às {timeOf(event.startsAt)}</dd>
               </div>
               <div>
-                <dt>Local</dt>
+                <dt>Onde</dt>
                 <dd>{event.venue}</dd>
                 <dd className="px-facts-sub">{event.address}</dd>
               </div>
@@ -466,14 +541,16 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
             {preview ? null : (
               <div className="px-share-row">
                 <button type="button" className="px-btn px-btn-ghost" onClick={shareNow} aria-haspopup="dialog">
+                  <IconShare size={18} />
                   Compartilhar
                 </button>
                 <button type="button" className="px-btn px-btn-ghost" onClick={copyLink}>
-                  Copiar link
+                  {copied ? <IconCheck size={18} /> : <IconLink size={18} />}
+                  {copied ? 'Link copiado' : 'Copiar link'}
                 </button>
               </div>
             )}
-            <p role="status" aria-live="polite" className="px-copied">
+            <p role="status" aria-live="polite" className="px-sr">
               {copied ? 'Link copiado.' : ''}
             </p>
           </div>
@@ -550,11 +627,13 @@ export function NotFoundPage() {
     <Layout dark>
       <div className="px-wrap">
         <div className="px-404">
-          <p className="px-404-code">Erro 404</p>
-          <h1>Não encontramos esta página</h1>
+          <p className="px-404-code" aria-hidden="true">
+            404
+          </p>
+          <h1>Esta página não existe</h1>
           <p>
-            O endereço pode estar incorreto ou o evento não está disponível no site. Eventos que já aconteceram
-            continuam acessíveis pelo link original, com o aviso de evento encerrado.
+            Confira o endereço ou procure o evento na lista. Um evento que já aconteceu continua abrindo pelo link
+            original, com o aviso de evento encerrado.
           </p>
           <div className="px-404-actions">
             <Link to="/eventos" className="px-btn px-btn-pri px-btn-lg">

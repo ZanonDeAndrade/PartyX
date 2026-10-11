@@ -1,8 +1,9 @@
 import jsQR from 'jsqr';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, type GateEvent, type GateHit, type GateOutcome } from './api';
-import { ErrorBox, Layout, usePageTitle } from './components';
-import { dateShort, timeOf } from './format';
+import { DateStub, ErrorBox, Layout, usePageTitle } from './components';
+import { dateParts, dateShort, timeOf } from './format';
+import { IconBack, IconCamera, IconKeyboard } from './icons';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 import { useFetch } from './useFetch';
@@ -62,7 +63,7 @@ function useStaff(returnTo: string): 'espera' | 'ok' | 'negado' {
 
 function Denied() {
   return (
-    <Layout>
+    <Layout dark footer={false}>
       <div className="px-wrap px-narrow">
         <div className="px-box">
           <h1 className="px-h2">Acesso negado</h1>
@@ -84,16 +85,21 @@ export function GateEventsPage() {
   if (access === 'negado') return <Denied />;
   if (access === 'espera')
     return (
-      <Layout>
+      <Layout dark footer={false}>
         <div className="px-wrap" aria-busy="true" />
       </Layout>
     );
   return (
-    <Layout>
+    <Layout dark footer={false}>
       <div className="px-wrap px-narrow">
-        <h1 className="px-h1">Portaria</h1>
-        <p>Escolha o evento em que você vai validar os ingressos.</p>
-        {state.status === 'loading' ? <p aria-busy="true">Carregando…</p> : null}
+        <h1 className="px-h1 px-gate-h1">Portaria</h1>
+        <p className="px-gate-lead">Escolha o evento desta porta. Confira nome, data e local antes de começar.</p>
+        {state.status === 'loading' ? (
+          <div className="px-gate-events-skel" aria-busy="true" aria-label="Carregando eventos">
+            <span className="px-skel-line" />
+            <span className="px-skel-line" />
+          </div>
+        ) : null}
         {state.status === 'error' ? <ErrorBox onRetry={retry} /> : null}
         {state.status === 'ok' && state.data.length === 0 ? (
           <div className="px-box">
@@ -105,30 +111,31 @@ export function GateEventsPage() {
           </div>
         ) : null}
         {state.status === 'ok' ? (
-          <ul className="px-tickets">
+          <ul className="px-gate-events">
             {state.data.map(e => (
               <li key={e.id}>
-                <Link to={`/portaria/${e.id}`} className="px-ticketrow">
-                  <span>
+                <Link to={`/portaria/${e.id}`} className="px-gate-event">
+                  <DateStub iso={e.startsAt} />
+                  <span className="px-gate-event-text">
                     <b>{e.name}</b>
-                    <br />
-                    <span className="px-muted">
-                      {dateShort(e.startsAt)} · {timeOf(e.startsAt)} · {e.venue}
+                    <span>
+                      {cap(dateParts(e.startsAt).weekday)}, {timeOf(e.startsAt)}
                     </span>
+                    <small>{e.venue}</small>
                     {e.salesClosed ? (
-                      <>
-                        <br />
-                        <span className="px-badge px-badge-neu">Vendas encerradas</span>{' '}
+                      <span className="px-gate-event-note">
+                        <span className="px-badge px-badge-neu">Vendas encerradas</span>
                         {e.gateClosesAt ? (
-                          <span className="px-small px-muted">
-                            Portaria até {dateShort(e.gateClosesAt)} {timeOf(e.gateClosesAt)}
-                          </span>
+                          <small>
+                            Portaria até {dateShort(e.gateClosesAt)}, {timeOf(e.gateClosesAt)}
+                          </small>
                         ) : null}
-                      </>
+                      </span>
                     ) : null}
                   </span>
-                  <span className="px-mono">
-                    {e.entered}/{e.total}
+                  <span className="px-gate-event-count" aria-label={`${e.entered} entradas de ${e.total} ingressos`}>
+                    <b>{e.entered}</b>
+                    <small>de {e.total}</small>
                   </span>
                 </Link>
               </li>
@@ -140,12 +147,15 @@ export function GateEventsPage() {
   );
 }
 
-const TONE: Record<GateOutcome['result'], { bg: string; fg: string; icon: string; title: string }> = {
-  valido: { bg: '#166534', fg: '#FFFFFF', icon: '✓', title: 'VÁLIDO' },
-  ja_utilizado: { bg: '#FACC15', fg: '#1C1500', icon: '!', title: 'JÁ UTILIZADO' },
-  invalido: { bg: '#B91C1C', fg: '#FFFFFF', icon: '✕', title: 'INVÁLIDO' },
-  cancelado: { bg: '#B91C1C', fg: '#FFFFFF', icon: '✕', title: 'CANCELADO' },
-  outro_evento: { bg: '#B91C1C', fg: '#FFFFFF', icon: '✕', title: 'OUTRO EVENTO' },
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** Cor (classe com os tokens semânticos), símbolo e título por resultado. Nunca só a cor: sempre símbolo e texto. */
+const TONE: Record<GateOutcome['result'], { tone: 'ok' | 'warn' | 'err'; icon: string; title: string }> = {
+  valido: { tone: 'ok', icon: '✓', title: 'Válido' },
+  ja_utilizado: { tone: 'warn', icon: '!', title: 'Já utilizado' },
+  invalido: { tone: 'err', icon: '✕', title: 'Inválido' },
+  cancelado: { tone: 'err', icon: '✕', title: 'Cancelado' },
+  outro_evento: { tone: 'err', icon: '✕', title: 'Outro evento' },
 };
 
 /** Resultado em tela cheia (RF-48): verde, amarelo ou vermelho, sempre também em texto e símbolo. */
@@ -157,37 +167,50 @@ function ResultScreen({ outcome, eventName, onDone }: { outcome: GateOutcome; ev
     const id = setTimeout(onDone, outcome.result === 'valido' ? 1800 : 8000);
     return () => clearTimeout(id);
   }, [outcome, onDone]);
+  // Aparece de imediato (sem transição de entrada). Só um pulso curto de cor, por baixo do conteúdo, que não atrasa nada.
   return (
-    <div
-      className="px-gate-result"
-      role="alert"
-      aria-live="assertive"
-      style={{ background: t.bg, color: t.fg }}
-      onClick={onDone}
-    >
+    <div className={`px-gate-result px-gate-r-${t.tone}`} role="alert" aria-live="assertive" onClick={onDone}>
       <p className="px-gate-top">
-        {eventName} · Entradas {outcome.counter.entered} de {outcome.counter.total}
+        <span>{eventName}</span>
+        <span>
+          Entradas <b>{outcome.counter.entered}</b> de {outcome.counter.total}
+        </span>
       </p>
-      <div className="px-gate-icon" aria-hidden="true">
-        {t.icon}
+      <div className="px-gate-body">
+        <div className="px-gate-icon" aria-hidden="true">
+          {t.icon}
+        </div>
+        <h1 className="px-gate-title">{t.title}</h1>
+        <p className="px-gate-msg px-gate-msg-main">{outcome.message}</p>
+        {outcome.ticket ? (
+          <div className="px-gate-ticket">
+            <p className="px-gate-type">{outcome.ticket.typeName}</p>
+            <p className="px-gate-name">{outcome.ticket.holderName}</p>
+            <p className="px-gate-code px-mono">{outcome.ticket.shortCode}</p>
+          </div>
+        ) : null}
+        {outcome.firstEntry ? (
+          <p className="px-gate-msg">
+            Primeira entrada às <b>{timeOf(outcome.firstEntry.at)}</b> por {outcome.firstEntry.validatorName}
+          </p>
+        ) : null}
+        {outcome.otherEvent ? (
+          <p className="px-gate-msg">
+            Este ingresso é de: <b>{outcome.otherEvent.name}</b>
+          </p>
+        ) : null}
+        {outcome.method === 'manual' ? <p className="px-gate-small">Entrada manual</p> : null}
       </div>
-      <h1 className="px-gate-title">{t.title}</h1>
-      <p className="px-gate-msg">{outcome.message}</p>
-      {outcome.ticket ? (
-        <>
-          <p className="px-gate-type">{outcome.ticket.typeName}</p>
-          <p className="px-gate-name">{outcome.ticket.holderName}</p>
-          <p className="px-gate-code px-mono">{outcome.ticket.shortCode}</p>
-        </>
-      ) : null}
-      {outcome.firstEntry ? (
-        <p className="px-gate-msg">
-          Primeira entrada às {timeOf(outcome.firstEntry.at)} por {outcome.firstEntry.validatorName}
-        </p>
-      ) : null}
-      {outcome.otherEvent ? <p className="px-gate-msg">Este ingresso é de: {outcome.otherEvent.name}</p> : null}
-      {outcome.method === 'manual' ? <p className="px-gate-small">Entrada manual</p> : null}
-      <p className="px-gate-small">Toque para continuar</p>
+      <button
+        type="button"
+        className="px-gate-next"
+        onClick={e => {
+          e.stopPropagation();
+          onDone();
+        }}
+      >
+        Próxima leitura
+      </button>
     </div>
   );
 }
@@ -328,18 +351,19 @@ export function GatePage({ eventId }: { eventId: string }) {
   if (access === 'negado') return <Denied />;
   if (access === 'espera')
     return (
-      <Layout>
+      <Layout dark footer={false}>
         <div className="px-wrap" aria-busy="true" />
       </Layout>
     );
 
   return (
-    <Layout>
+    <Layout dark footer={false}>
       <div className="px-wrap px-narrow">
-        <p>
-          <Link to="/portaria">← Trocar de evento</Link>
-        </p>
-        <h1 className="px-h2">{event?.name ?? 'Portaria'}</h1>
+        <Link to="/portaria" className="px-textlink px-textlink-sm">
+          <IconBack size={18} />
+          Trocar de evento
+        </Link>
+        <h1 className="px-gate-event-name">{event?.name ?? 'Portaria'}</h1>
         {event?.salesClosed ? (
           <p className="px-small">
             <span className="px-badge px-badge-neu">Vendas encerradas</span>{' '}
@@ -349,8 +373,11 @@ export function GatePage({ eventId }: { eventId: string }) {
           </p>
         ) : null}
         <div className="px-gate-counter" role="status" aria-live="polite">
-          <b className="px-gate-count">{counter ? counter.entered : '–'}</b> entradas
-          {counter ? <span className="px-muted"> de {counter.total} ingressos</span> : null}
+          <b className="px-gate-count">{counter ? counter.entered : '0'}</b>
+          <span>
+            entradas
+            {counter ? <small> de {counter.total} ingressos</small> : null}
+          </span>
         </div>
         {byType.length > 0 ? (
           <ul className="px-gate-types">
@@ -377,11 +404,13 @@ export function GatePage({ eventId }: { eventId: string }) {
           </p>
         ) : null}
 
-        <div className="px-tabs" role="tablist" aria-label="Modo">
+        <div className="px-tabs px-gate-tabs" role="tablist" aria-label="Modo">
           <button type="button" role="tab" aria-selected={tab === 'camera'} onClick={() => setTab('camera')}>
+            <IconCamera size={20} />
             Câmera
           </button>
           <button type="button" role="tab" aria-selected={tab === 'busca'} onClick={() => setTab('busca')}>
+            <IconKeyboard size={20} />
             Busca manual
           </button>
         </div>
@@ -390,6 +419,7 @@ export function GatePage({ eventId }: { eventId: string }) {
           <div className="px-camera">
             <video ref={videoRef} muted playsInline aria-label="Imagem da câmera" />
             <canvas ref={canvasRef} hidden />
+            {camera === 'lendo' ? <span className="px-camera-frame" aria-hidden="true" /> : null}
             {camera !== 'lendo' ? (
               <div className="px-camera-cover">
                 {camera === 'negada' ? (
@@ -416,9 +446,7 @@ export function GatePage({ eventId }: { eventId: string }) {
               </div>
             ) : null}
           </div>
-          <p className="px-small px-muted">
-            Aponte a câmera para o QR Code do ingresso. O resultado aparece em tela cheia.
-          </p>
+          <p className="px-gate-hint">Aponte para o QR Code do ingresso e segure parado. O resultado ocupa a tela.</p>
         </div>
 
         {tab === 'busca' ? <ManualSearch eventId={eventId} onOutcome={setOutcome} /> : null}
@@ -483,7 +511,7 @@ function ManualSearch({ eventId, onOutcome }: { eventId: string; onOutcome: (o: 
             CPF e e-mail precisam estar completos. Nome: 3 letras ou mais. Código: PX-...
           </small>
         </div>
-        <button type="submit" className="px-btn px-btn-pri" disabled={busy || !q.trim()}>
+        <button type="submit" className="px-btn px-btn-pri px-btn-lg" disabled={busy || !q.trim()}>
           Buscar
         </button>
       </form>
@@ -492,15 +520,22 @@ function ManualSearch({ eventId, onOutcome }: { eventId: string; onOutcome: (o: 
           {error}
         </p>
       ) : null}
-      {hits && hits.length === 0 ? <p className="px-muted">Nenhum ingresso encontrado neste evento.</p> : null}
-      <ul className="px-tickets">
+      {hits && hits.length === 0 ? (
+        <p className="px-gate-empty">
+          Nenhum ingresso deste evento com esse dado. Confira o código no celular da pessoa ou tente o e-mail completo.
+        </p>
+      ) : null}
+      <ul className="px-gate-hits">
         {hits?.map(h => (
           <li key={h.ticketId} className="px-hit">
-            <div>
-              <b>{h.holderName}</b> · {h.typeName}
-              <br />
-              <span className="px-mono">{h.shortCode}</span> · {h.cpf ?? 'sem CPF'} · {h.email}
-              <br />
+            <div className="px-hit-text">
+              <b>{h.holderName}</b>
+              <span>{h.typeName}</span>
+              <small>
+                <span className="px-mono">{h.shortCode}</span>
+                <span>CPF {h.cpf ?? 'não informado'}</span>
+                <span className="px-break">{h.email}</span>
+              </small>
               <span
                 className={`px-badge px-badge-${h.status === 'valido' ? 'ok' : h.status === 'utilizado' ? 'warn' : 'err'}`}
               >
@@ -513,7 +548,7 @@ function ManualSearch({ eventId, onOutcome }: { eventId: string; onOutcome: (o: 
             </div>
             <button
               type="button"
-              className="px-btn px-btn-pri"
+              className="px-btn px-btn-pri px-btn-lg"
               disabled={busy || h.status !== 'valido'}
               onClick={() => admit(h.ticketId)}
             >

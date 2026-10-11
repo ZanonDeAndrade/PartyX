@@ -1,8 +1,74 @@
-html, body { min-height: 100%; }
-body { margin: 0; display: grid; place-items: center; background: #0b0b10; color: #f7f7f8; font-family: Archivo, system-ui, sans-serif; }
-main { box-sizing: border-box; width: min(100% - 32px, 520px); padding: 40px; border: 1px solid #35353f; border-radius: 16px; background: #17171f; }
-.code { color: #b49cff; font-weight: 700; letter-spacing: .14em; }
-h1 { margin: 12px 0; font-size: clamp(28px, 5vw, 40px); }
-p { line-height: 1.5; color: #d4d4de; }
-a { display: inline-block; margin-top: 16px; padding: 12px 20px; border-radius: 8px; background: #b49cff; color: #0b0b10; font-weight: 700; text-decoration: none; }
-a:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+/* Página de acesso negado (G04) que o servidor devolve antes de carregar o app. Mesmas cores do site; fontes do sistema,
+   porque esta página não carrega os pacotes do front-end. */
+html,
+body {
+  min-height: 100%;
+}
+body {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  background: #0b0b10;
+  color: #ffffff;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+main {
+  position: relative;
+  box-sizing: border-box;
+  width: min(100% - 32px, 520px);
+  padding: 40px 32px 36px;
+  border: 1px solid #2c2c3a;
+  border-radius: 18px;
+  background: #15151e;
+}
+main::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 32px;
+  width: 56px;
+  height: 8px;
+  background: #7c3aed;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+img {
+  display: block;
+  height: 36px;
+  width: auto;
+}
+h1 {
+  margin: 24px 0 8px;
+  font-family: 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
+  font-size: clamp(32px, 7vw, 44px);
+  font-weight: 800;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+p {
+  margin: 0;
+  line-height: 1.55;
+  color: #b9b9c9;
+}
+a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 52px;
+  margin-top: 24px;
+  padding: 0 24px;
+  border-radius: 8px;
+  background: #7c3aed;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+a:hover {
+  background: #6d28d9;
+}
+a:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 3px;
+}

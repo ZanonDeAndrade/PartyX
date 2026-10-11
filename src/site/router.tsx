@@ -9,6 +9,7 @@ import {
   type AnchorHTMLAttributes,
   type ReactNode,
 } from 'react';
+import { flushSync } from 'react-dom';
 
 interface Location {
   path: string;
@@ -20,6 +21,38 @@ const RouterContext = createContext<{ loc: Location; go: Go; setGuard: (message:
   go: () => {},
   setGuard: () => {},
 });
+
+/**
+ * Troca de página com a View Transitions API, quando existe e o visitante não pediu menos movimento: o navegador fotografa a
+ * página antiga, o React desenha a nova de forma síncrona (`flushSync`) e os elementos com o mesmo `view-transition-name`
+ * (o banner do cartão e o da página do evento) se transformam um no outro. Sem suporte, a troca é imediata, como antes.
+ * Páginas com QR Code de ingresso ficam fora: o QR não pode aparecer com transparência nem em movimento.
+ */
+function withTransition(update: () => void, to?: string) {
+  type Transition = { ready: Promise<void>; finished: Promise<void>; updateCallbackDone: Promise<void> };
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => Transition };
+  const qrPage = (path: string) => path.startsWith('/ingressos/') || path.startsWith('/portaria');
+  const skip =
+    !doc.startViewTransition ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+    qrPage(window.location.pathname) ||
+    (to !== undefined && qrPage(to));
+  if (skip) {
+    update();
+    return;
+  }
+  try {
+    const t = doc.startViewTransition!(() => flushSync(update));
+    // Duas navegações seguidas (entrar e ser redirecionado, por exemplo) fazem o navegador pular a primeira transição e
+    // rejeitar as promessas dela. A página já foi atualizada; a rejeição não é erro.
+    const ignore = () => {};
+    t.ready.catch(ignore);
+    t.finished.catch(ignore);
+    t.updateCallbackDone.catch(ignore);
+  } catch {
+    update();
+  }
+}
 
 const read = (): Location => ({
   path: window.location.pathname.replace(/\/+$/, '') || '/',
@@ -41,7 +74,7 @@ export function Router({ children }: { children: ReactNode }) {
         return;
       }
       guard.current = null;
-      setLoc(read());
+      withTransition(() => setLoc(read()));
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -49,9 +82,11 @@ export function Router({ children }: { children: ReactNode }) {
   const go = useCallback<Go>((to, options) => {
     if (!options?.force && guard.current && !window.confirm(guard.current)) return;
     guard.current = null;
-    window.history.pushState(null, '', to);
-    setLoc(read());
-    window.scrollTo(0, 0);
+    withTransition(() => {
+      window.history.pushState(null, '', to);
+      setLoc(read());
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, to.split('?')[0]);
   }, []);
   const setGuard = useCallback((message: string | null) => {
     guard.current = message;

@@ -26,8 +26,10 @@ export function toLatin1(text: string): string {
 }
 
 const PURPLE = '#5B21B6';
+const VIOLET = '#7C3AED';
 const INK = '#0B0B10';
 const MUTED = '#5B5B70';
+const LINE = '#C9C9D6';
 
 function drawQr(doc: PDFKit.PDFDocument, payload: string, x: number, y: number, size: number) {
   const qr = QRCode.create(payload, { errorCorrectionLevel: 'M' });
@@ -46,8 +48,27 @@ function drawQr(doc: PDFKit.PDFDocument, payload: string, x: number, y: number, 
   doc.restore();
 }
 
-/** Altura da logo na faixa do topo (70 pt): centralizada na vertical. */
-const LOGO_H = 36;
+/**
+ * Bloco de data da identidade (dia grande e mês), com o canto inferior direito cortado na diagonal do X do logotipo.
+ * Só texto e um polígono: imprime bem em preto e branco.
+ */
+function drawDateBlock(doc: PDFKit.PDFDocument, x: number, y: number, day: string, month: string) {
+  const w = 64;
+  const h = 72;
+  doc.save();
+  doc.polygon([x, y], [x + w, y], [x + w, y + h - 14], [x + w - 10, y + h], [x, y + h]).fill(VIOLET);
+  doc
+    .fillColor('#FFFFFF')
+    .font('Helvetica-Bold')
+    .fontSize(30)
+    .text(day, x, y + 9, { width: w, align: 'center', lineBreak: false });
+  doc.fontSize(12).text(toLatin1(month.toUpperCase()), x, y + 44, { width: w, align: 'center', lineBreak: false });
+  doc.restore();
+}
+
+/** Altura da faixa do topo e da logo, centralizada na vertical. Faixa fina: o PDF é feito para imprimir. */
+const BAND_H = 56;
+const LOGO_H = 30;
 
 function page(
   doc: PDFKit.PDFDocument,
@@ -60,48 +81,83 @@ function page(
   const start = new Date(t.event.startsAt);
   const date = formatInEventZone(start, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const time = formatInEventZone(start, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const day = formatInEventZone(start, { day: '2-digit' });
+  const month = formatInEventZone(start, { month: 'short' }).replace(/\./g, '');
 
-  doc.rect(0, 0, W, 70).fill(INK);
-  if (logo) doc.image(logo, M, (70 - LOGO_H) / 2, { height: LOGO_H });
-  else doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(26).text('PartyX', M, 22);
-
+  // Faixa da marca, com o número do pedido à direita.
+  doc.rect(0, 0, W, BAND_H).fill(INK);
+  if (logo) doc.image(logo, M, (BAND_H - LOGO_H) / 2, { height: LOGO_H });
+  else doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(22).text('PartyX', M, 17);
   doc
-    .fillColor(INK)
-    .font('Helvetica-Bold')
-    .fontSize(24)
-    .text(toLatin1(t.event.name), M, 100, { width: W - 2 * M });
-  doc
-    .moveDown(0.4)
+    .fillColor('#C4B5FD')
     .font('Helvetica')
-    .fontSize(14)
-    .fillColor(PURPLE)
-    .text(toLatin1(`${date} · ${time}`), { width: W - 2 * M });
-  doc
-    .fillColor(INK)
-    .fontSize(13)
-    .text(toLatin1(`${t.event.venue} — ${t.event.address}`), { width: W - 2 * M });
-  doc
-    .fillColor(MUTED)
-    .fontSize(11)
-    .text(toLatin1(`Classificação: ${t.event.ageRating}`));
+    .fontSize(10)
+    .text(`Pedido PX-${t.orderNumber}`, M, (BAND_H - 10) / 2, { width: W - 2 * M, align: 'right' });
 
-  doc.moveDown(1);
-  const top = doc.y;
-  doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('TIPO', M, top);
+  // Evento: bloco de data e, ao lado, nome, data por extenso, local e classificação.
+  const top = BAND_H + 34;
+  drawDateBlock(doc, M, top, day, month);
+  const tx = M + 82;
+  const tw = W - tx - M;
+  doc
+    .fillColor(INK)
+    .font('Helvetica-Bold')
+    .fontSize(22)
+    .text(toLatin1(t.event.name), tx, top - 2, { width: tw });
+  doc
+    .moveDown(0.25)
+    .font('Helvetica-Bold')
+    .fontSize(12)
+    .fillColor(PURPLE)
+    .text(toLatin1(`${date}, às ${time}`), tx, undefined, { width: tw });
+  doc
+    .moveDown(0.15)
+    .font('Helvetica')
+    .fillColor(INK)
+    .fontSize(12)
+    .text(toLatin1(`${t.event.venue}, ${t.event.address}`), tx, undefined, { width: tw });
+  doc
+    .moveDown(0.15)
+    .fillColor(MUTED)
+    .fontSize(10)
+    .text(toLatin1(`Classificação: ${t.event.ageRating}`), tx, undefined, { width: tw });
+
+  // Tipo e comprador (nome em todas as unidades; sem CPF).
+  const fields = Math.max(doc.y, top + 72) + 22;
+  doc
+    .moveTo(M, fields - 10)
+    .lineTo(W - M, fields - 10)
+    .lineWidth(0.6)
+    .stroke(LINE);
+  doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Tipo', M, fields);
   doc
     .fillColor(INK)
     .font('Helvetica-Bold')
     .fontSize(15)
-    .text(toLatin1(t.typeName), M, top + 13, { width: 230 });
-  doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('COMPRADOR', 300, top);
+    .text(toLatin1(t.typeName), M, fields + 13, { width: 230 });
+  doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Comprador', 300, fields);
   doc
     .fillColor(INK)
     .font('Helvetica-Bold')
     .fontSize(15)
-    .text(toLatin1(t.holderName), 300, top + 13, { width: W - 300 - M });
+    .text(toLatin1(t.holderName), 300, fields + 13, { width: W - 300 - M });
+
+  // Picote: linha tracejada com meia-lua nas bordas, separando o canhoto do QR.
+  const cut = Math.max(doc.y, fields + 40) + 18;
+  doc.save();
+  doc
+    .moveTo(M, cut)
+    .lineTo(W - M, cut)
+    .lineWidth(1)
+    .dash(5, { space: 4 })
+    .stroke(LINE)
+    .undash();
+  doc.circle(0, cut, 10).lineWidth(1).stroke(LINE);
+  doc.circle(W, cut, 10).lineWidth(1).stroke(LINE);
+  doc.restore();
 
   const qrSize = 300;
-  const qrY = Math.max(doc.y, top + 50) + 25;
+  const qrY = cut + 26;
   if (t.status === 'cancelado' || !t.qrPayload) {
     doc
       .rect((W - qrSize) / 2, qrY, qrSize, qrSize)
@@ -122,25 +178,31 @@ function page(
     .fillColor(MUTED)
     .font('Helvetica')
     .fontSize(10)
-    .text('CÓDIGO DO INGRESSO', M, qrY + qrSize + 16, { width: W - 2 * M, align: 'center' });
+    .text(toLatin1('Código do ingresso'), M, qrY + qrSize + 14, { width: W - 2 * M, align: 'center' });
   doc
     .fillColor(INK)
     .font('Courier-Bold')
     .fontSize(22)
-    .text(t.shortCode, M, qrY + qrSize + 30, { width: W - 2 * M, align: 'center' });
+    .text(t.shortCode, M, qrY + qrSize + 28, { width: W - 2 * M, align: 'center' });
 
+  // Duas linhas separadas: `toLatin1` troca quebra de linha por espaço.
   doc
     .fillColor(MUTED)
     .font('Helvetica')
     .fontSize(10)
     .text(
-      toLatin1(
-        `Apresente este QR Code na entrada. Cada ingresso vale uma única entrada.\nPedido PX-${t.orderNumber} · ingresso ${position.index} de ${position.total}.`,
-      ),
+      toLatin1('Apresente este QR Code na entrada. Cada ingresso vale uma única entrada.'),
       M,
-      doc.page.height - 70,
-      { width: W - 2 * M, align: 'center' },
-    );
+      doc.page.height - 66,
+      {
+        width: W - 2 * M,
+        align: 'center',
+      },
+    )
+    .text(toLatin1(`Pedido PX-${t.orderNumber}, ingresso ${position.index} de ${position.total}.`), M, undefined, {
+      width: W - 2 * M,
+      align: 'center',
+    });
 }
 
 /**

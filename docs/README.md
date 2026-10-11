@@ -28,6 +28,7 @@ Preparação do plano de desenvolvimento (Prompt 01). Tudo aqui é registro e ra
 | `pagamento.md` | Checkout, contrato interno do gateway, adaptador fictício, regras de cartão e o que depende da escolha do cliente |
 | `reserva.md` | Pedido, reserva, estoque, expiração, estados do pedido e tudo que foi provado e o que falta |
 | `vitrine.md` | API pública, páginas, Open Graph, busca, o que foi testado e o que falta |
+| `ui/` | Refinamento de UI: design system (`design-system.md`), checklist de 152 telas e estados, capturas antes e depois, comparativo, diagnóstico, referências, verificação e sugestões futuras |
 | `modelo-de-dados.md` | Tabelas, regras garantidas pelo banco, migrações, testes e o que não foi verificado |
 | `arquitetura.md` | Estrutura front-end e API, convenções, por que Drizzle e transações, desvios do Prompt 02 |
 | `registros/logs-contratuais.md` | Logs de assinatura, recebimentos, validações em 5 dias úteis, suspensões, prorrogações e comunicações formais |

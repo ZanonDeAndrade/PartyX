@@ -1,0 +1,148 @@
+/*
+ * Tokens do PartyX: a única fonte de cores, tipos, espaços, raios, sombras, camadas e movimento.
+ * Documentação: docs/ui/design-system.md.
+ * Contraste medido por infra/ui/contrast.mjs (todos os pares de texto em AA). Identidade PROVISÓRIA até a aprovação escrita do cliente (CA-33).
+ *
+ * Elemento de marca: o corte diagonal do X do logotipo (cerca de 54 graus). Aparece no canto do bloco de data, no
+ * separador das etapas da compra, na borda do ingresso e no marcador do menu. Use com moderação: um por bloco.
+ */
+:root {
+  /* ---- cor: marca ---- */
+  --px-ink: #0b0b10; /* preto de marca: cabeçalho, vitrine, portaria */
+  --px-ink-2: #15151e; /* superfície sobre o preto */
+  --px-ink-3: #1f1f2b; /* superfície elevada, hover no escuro */
+  --px-ink-line: #2c2c3a; /* linhas no escuro */
+  --px-on-ink: #ffffff;
+  --px-on-ink-2: #b9b9c9; /* texto secundário no escuro: 10,1:1 sobre --px-ink */
+  --px-on-ink-3: #8b8ba0; /* apoio no escuro: 5,9:1 sobre --px-ink */
+
+  --px-paper: #ffffff;
+  --px-ops: #f7f7fa; /* fundo das áreas operacionais (compra, cliente, painel) */
+  --px-line: #e4e4ec;
+  --px-line-2: #eeeef3;
+  --px-text: #0b0b10;
+  --px-text-2: #3f3f50; /* 9,6:1 sobre --px-ops */
+  --px-text-3: #5b5b6e; /* 6,2:1 sobre --px-ops */
+
+  --px-violet: #7c3aed; /* ação principal: texto branco 5,7:1 */
+  --px-violet-hover: #6d28d9;
+  --px-violet-press: #5b21b6;
+  --px-violet-bright: #8b5cf6; /* foco de teclado */
+  --px-violet-soft: #ede9fe;
+  --px-violet-ink: #5b21b6; /* texto sobre --px-violet-soft: 7,6:1 */
+  --px-lilac: #c4b5fd; /* destaque e links sobre o preto: 10,6:1 */
+
+  /* ---- cor: semântica (só para estado, sempre com texto) ---- */
+  --px-ok-bg: #dcfce7;
+  --px-ok-fg: #14532d;
+  --px-ok-solid: #15803d; /* texto branco 5,0:1 */
+  --px-warn-bg: #fef3c7;
+  --px-warn-fg: #854d0e;
+  --px-warn-solid: #facc15; /* texto --px-warn-on 11,9:1 */
+  --px-warn-on: #1c1500;
+  --px-err-bg: #fee2e2;
+  --px-err-fg: #991b1b;
+  --px-err-solid: #b91c1c; /* texto branco 6,5:1 */
+  --px-neu-bg: #eeeef3;
+  --px-neu-fg: #3f3f50;
+  --px-info-bg: var(--px-violet-soft);
+  --px-info-fg: var(--px-violet-ink);
+
+  /* ---- tipo ---- */
+  --px-font-display: 'Big Shoulders Display Variable', 'Archivo Narrow', 'Arial Narrow', sans-serif;
+  --px-font-stencil: 'Big Shoulders Stencil Display', var(--px-font-display);
+  --px-font-ui: 'Archivo Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --px-font-code: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* Interface: terça maior (1,25) a partir de 16 px. */
+  --px-t-xs: 0.75rem; /* 12 */
+  --px-t-sm: 0.8125rem; /* 13 */
+  --px-t-md: 0.9375rem; /* 15 */
+  --px-t-base: 1rem; /* 16: campos sempre 16 px (iPhone não amplia) */
+  --px-t-lg: 1.125rem; /* 18 */
+  --px-t-xl: 1.375rem; /* 22 */
+  --px-t-2xl: 1.75rem; /* 28 */
+  /* Display condensada: nomes de evento, datas, números grandes. */
+  --px-d-sm: 1.625rem; /* 26 */
+  --px-d-md: clamp(2rem, 4.2vw, 2.75rem); /* 32 a 44 */
+  --px-d-lg: clamp(2.5rem, 6vw, 4.25rem); /* 40 a 68 */
+  --px-d-xl: clamp(3.25rem, 9vw, 7.5rem); /* 52 a 120 */
+  --px-lh-tight: 0.92;
+  --px-lh-head: 1.15;
+  --px-lh-body: 1.55;
+
+  /* ---- espaço (base 4) ---- */
+  --px-s-1: 4px;
+  --px-s-2: 8px;
+  --px-s-3: 12px;
+  --px-s-4: 16px;
+  --px-s-5: 20px;
+  --px-s-6: 24px;
+  --px-s-7: 32px;
+  --px-s-8: 40px;
+  --px-s-9: 56px;
+  --px-s-10: 72px;
+  --px-s-11: 96px;
+  --px-gutter: 16px;
+  --px-max: 1240px;
+  --px-touch: 44px; /* alvo mínimo de toque */
+
+  /* ---- raio: por hierarquia, não um só para tudo ---- */
+  --px-r-poster: 2px; /* cartaz de evento e bloco de data: canto quase seco */
+  --px-r-xs: 4px; /* etiquetas */
+  --px-r-sm: 8px; /* botões, campos */
+  --px-r-md: 12px; /* cartões operacionais */
+  --px-r-lg: 18px; /* folhas, janelas, ingresso */
+  --px-r-pill: 999px;
+
+  /* Corte do X: deslocamento horizontal e vertical do canto cortado (proporção do logotipo). */
+  --px-cut-x: 10px;
+  --px-cut-y: 14px;
+
+  /* ---- sombra: poucas e com papel definido ---- */
+  --px-sh-1: 0 1px 2px rgb(11 11 16 / 0.06), 0 0 0 1px rgb(11 11 16 / 0.04);
+  --px-sh-2: 0 10px 28px -14px rgb(11 11 16 / 0.35);
+  --px-sh-3: 0 24px 60px -20px rgb(11 11 16 / 0.55);
+
+  /* ---- camadas ---- */
+  --px-z-header: 30;
+  --px-z-sticky: 40;
+  --px-z-drawer: 60;
+  --px-z-modal: 70;
+  --px-z-toast: 80;
+  --px-z-gate: 90;
+  --px-z-intro: 100;
+  --px-z-skip: 110;
+
+  /* ---- movimento (espelhado em src/site/motion.ts) ---- */
+  --px-dur-1: 120ms; /* pressionar, cor */
+  --px-dur-2: 180ms; /* microinterações */
+  --px-dur-3: 240ms; /* abrir e fechar componentes */
+  --px-dur-4: 340ms; /* entrada de conteúdo */
+  --px-dur-5: 460ms; /* transição de página */
+  --px-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --px-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --px-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --px-gutter: 24px;
+  }
+}
+@media (min-width: 1200px) {
+  :root {
+    --px-gutter: 32px;
+  }
+}
+
+/* Menos movimento: tudo vira troca instantânea (ou quase), em todo o site. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --px-dur-1: 0ms;
+    --px-dur-2: 0ms;
+    --px-dur-3: 0ms;
+    --px-dur-4: 0ms;
+    --px-dur-5: 0ms;
+  }
+}

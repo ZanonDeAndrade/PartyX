@@ -10,6 +10,29 @@ describe('formatação da vitrine', () => {
     expect(timeOf('2026-12-13T01:00:00.000Z')).toBe('22:00');
     expect(dateShort('2026-12-13T01:00:00.000Z')).toMatch(/12/); // ainda dia 12 em Brasília
   });
+  it('partes da data do bloco de data, no fuso do evento', async () => {
+    const { dateParts } = await import('./format');
+    // 01:00 UTC do dia 13 ainda é sábado, 12 de dezembro, em São Paulo.
+    expect(dateParts('2026-12-13T01:00:00.000Z')).toEqual({ day: '12', month: 'dez', weekday: 'sábado', year: '2026' });
+  });
+  it('máscaras de CPF e telefone enquanto a pessoa digita', async () => {
+    const { cpfInput, phoneInput } = await import('./format');
+    expect(cpfInput('123')).toBe('123');
+    expect(cpfInput('1234567')).toBe('123.456.7');
+    expect(cpfInput('123.456.789-0912')).toBe('123.456.789-09');
+    expect(phoneInput('')).toBe('');
+    expect(phoneInput('11')).toBe('(11');
+    expect(phoneInput('113333')).toBe('(11) 3333');
+    expect(phoneInput('1133334444')).toBe('(11) 3333-4444');
+    expect(phoneInput('11987654321')).toBe('(11) 98765-4321');
+  });
+  it('telefone formatado só para exibir', async () => {
+    const { phoneBr } = await import('./format');
+    expect(phoneBr('11987654321')).toBe('(11) 98765-4321');
+    expect(phoneBr('1133334444')).toBe('(11) 3333-4444');
+    expect(phoneBr('+55 11 9')).toBe('+55 11 9');
+    expect(phoneBr(null)).toBe('');
+  });
   it('monta a busca só com o que foi preenchido e codifica o texto', () => {
     expect(searchPath('', '')).toBe('/eventos');
     expect(searchPath(' festa neon ', '2026-12-12')).toBe('/eventos?q=festa+neon&date=2026-12-12');

@@ -22,6 +22,7 @@ import {
   zonedInputsToIso,
 } from './format';
 import { EventView } from './pages';
+import { IconBack } from './icons';
 import { Link, useLeaveGuard, useRouter } from './router';
 import { useFetch } from './useFetch';
 
@@ -650,7 +651,10 @@ export function AdminEventFormPage({ id }: { id?: string }) {
   return (
     <Gate access={access} active="eventos">
       <p>
-        <Link to={id ? `/admin/eventos/${id}` : '/admin/eventos'}>← {id ? 'Evento' : 'Eventos'}</Link>
+        <Link to={id ? `/admin/eventos/${id}` : '/admin/eventos'} className="px-textlink px-textlink-sm">
+          <IconBack size={18} />
+          {id ? 'Evento' : 'Eventos'}
+        </Link>
       </p>
       <h1 className="px-h1">{id ? 'Editar evento' : 'Criar evento'}</h1>
       <Loading state={meta} retry={retryMeta} />
@@ -1126,7 +1130,10 @@ export function AdminEventPage({ id }: { id: string }) {
   return (
     <Gate access={access} active="eventos">
       <p>
-        <Link to="/admin/eventos">← Eventos</Link>
+        <Link to="/admin/eventos" className="px-textlink px-textlink-sm">
+          <IconBack size={18} />
+          Eventos
+        </Link>
       </p>
       <Loading state={state} retry={retry} />
       {ev ? (

@@ -14,6 +14,7 @@ import {
   normalizeCoupon,
   timeOf,
 } from './format';
+import { IconBack } from './icons';
 import { Link, useLeaveGuard, useRouter } from './router';
 import { useSession } from './session';
 import { useFetch } from './useFetch';
@@ -395,7 +396,10 @@ export function AdminPromoterPage({ id }: { id: string }) {
   return (
     <Gate access={access} active="promoters">
       <p>
-        <Link to="/admin/promoters">← Promoters</Link>
+        <Link to="/admin/promoters" className="px-textlink px-textlink-sm">
+          <IconBack size={18} />
+          Promoters
+        </Link>
       </p>
       <h1 className="px-h1">{p?.name ?? 'Promoter'}</h1>
       {p ? (
@@ -554,7 +558,10 @@ export function AdminBuyerPage({ id }: { id: string }) {
   return (
     <Gate access={access} active="compradores">
       <p>
-        <Link to="/admin/compradores">← Compradores</Link>
+        <Link to="/admin/compradores" className="px-textlink px-textlink-sm">
+          <IconBack size={18} />
+          Compradores
+        </Link>
       </p>
       <Loading state={state} retry={retry} />
       {d ? (
@@ -750,7 +757,8 @@ function IdentityDialog({
         <ul className="px-minilist">
           {emailChanged ? (
             <li>
-              E-mail: <span className="px-break">{buyer.email}</span> → <b className="px-break">{email.trim()}</b>
+              E-mail: <span className="px-break">{buyer.email}</span> passa a ser{' '}
+              <b className="px-break">{email.trim()}</b>
             </li>
           ) : null}
           {cpfDigits ? (
@@ -875,7 +883,13 @@ export function AdminTicketPage({ id }: { id: string }) {
   return (
     <Gate access={access} active="ingressos">
       <p>
-        <Link to={t ? `/admin/ingressos?evento=${t.event.id}` : '/admin/ingressos'}>← Ingressos</Link>
+        <Link
+          to={t ? `/admin/ingressos?evento=${t.event.id}` : '/admin/ingressos'}
+          className="px-textlink px-textlink-sm"
+        >
+          <IconBack size={18} />
+          Ingressos
+        </Link>
       </p>
       <Loading state={state} retry={retry} />
       {t ? (

@@ -50,9 +50,28 @@ def wanted(sid: str) -> bool:
 
 
 def shot(page, sid: str, route: str, state: str, width: int, full=True):
+    # Janela ou gaveta aberta: captura só a tela visível (é o que a pessoa vê; a página por trás fica inerte).
+    if full and page.locator('[aria-modal="true"]:visible').count() > 0:
+        full = False
     name = f"{sid}__{re.sub(r'[^a-z0-9]+', '-', state.lower()).strip('-')}__{width}.jpg"
+    if full:
+        # Desce a página inteira para carregar as imagens com loading="lazy" e volta ao topo (cabeçalho fixo no lugar).
+        page.evaluate("""async () => {
+          const h = document.documentElement.scrollHeight;
+          for (let y = 0; y < h; y += innerHeight / 2) { scrollTo(0, y); await new Promise(r => setTimeout(r, 40)); }
+          scrollTo(0, 0);
+        }""")
     page.wait_for_timeout(350)
-    page.screenshot(path=str(OUT / name), full_page=full, type='jpeg', quality=72, animations='disabled')
+    if full:
+        # Viewport do tamanho da página: barras fixas (compra no celular) aparecem no rodapé, como no aparelho.
+        vp = page.viewport_size
+        h = min(page.evaluate('document.documentElement.scrollHeight'), 14000)
+        page.set_viewport_size({'width': vp['width'], 'height': max(h, vp['height'])})
+        page.wait_for_timeout(150)
+        page.screenshot(path=str(OUT / name), full_page=True, type='jpeg', quality=72, animations='disabled')
+        page.set_viewport_size(vp)
+    else:
+        page.screenshot(path=str(OUT / name), full_page=False, type='jpeg', quality=72, animations='disabled')
     manifest.append({'id': sid, 'route': route, 'state': state, 'width': width, 'file': name})
     print('ok', name, flush=True)
 
@@ -188,7 +207,7 @@ SCREENS = [
     # ----- acesso -----
     ('A01', '/entrar', 'padrao', None, None, None),
     ('A01', '/entrar', 'credenciais incorretas', None, None,
-     seq(fill('E-mail', 'marina@exemplo.com'), fill('Senha', 'senha-errada-1'), click('Entrar', exact=True))),
+     seq(fill('E-mail', 'ana@exemplo.com'), fill('Senha', 'senha-errada-1'), click('Entrar', exact=True))),
     ('A01', '/entrar', 'bloqueio temporario', None,
      lambda p: p.route('**/api/auth/login', lambda r: r.fulfill(status=429, content_type='application/json', body=json.dumps(
          {'erro': {'codigo': 'login_bloqueado', 'mensagem': 'Muitas tentativas.'}}))),
@@ -389,7 +408,7 @@ def joao_fresh_qrs(pw) -> list[str]:
 
 def capture_gate(pw):
     """Resultados da portaria com a câmera simulada do Chromium lendo um QR de verdade (V02, V05 a V09)."""
-    fresh = joao_fresh_qrs(pw)
+    fresh = S.get('freshQrs') or joao_fresh_qrs(pw)
     cases = [
         ('V05', 'entrada liberada', None),
         ('V06', 'ingresso ja utilizado', S['qrUsed']),
@@ -405,10 +424,12 @@ def capture_gate(pw):
             if not wanted(f'{sid}:{state}'):
                 continue
             if qr is None:
-                if not fresh:
+                # Um ingresso novo por largura, fixo pela posição da largura: processos em paralelo não disputam o mesmo.
+                slot = [360, 390, 768, 1440].index(width) if width in (360, 390, 768, 1440) else 0
+                if slot >= len(fresh):
                     print('FALHA sem ingresso válido para', width)
                     continue
-                qr = fresh.pop()
+                qr = fresh[slot]
             vid = tmp / f'{sid}-{width}-{abs(hash(state))}.y4m'
             qr_video(qr, vid)
             b = pw.chromium.launch(args=['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
@@ -490,7 +511,8 @@ with sync_playwright() as pw:
     capture_mail_and_pdf(pw)
 
 old = []
-mf = OUT / 'manifest.json'
+# Um manifesto por conjunto de larguras: capturas em paralelo (uma largura por processo) não sobrescrevem umas às outras.
+mf = OUT / ('manifest.json' if sys.argv[3] == '390,1440' else f"manifest-{sys.argv[3].replace(',', '-')}.json")
 if mf.exists() and FILTER is not None:
     keep = {(m['id'], m['state'], m['width']) for m in manifest}
     old = [m for m in json.loads(mf.read_text()) if (m['id'], m['state'], m['width']) not in keep]
