@@ -17,7 +17,7 @@ Roteiro completo, decisões, medições e estimativa de custo: **`README-DEPLOY.
 | `infra/producao/deploy.sh` | Um único script com subcomandos: `setup`, `varredura`, `migrate`, `deploy`, `hosting`, `evento-on`, `evento-off`, `rollback`, `status`, `alertas`. Exige `PROJECT` (e `BILLING_ACCOUNT` no `setup`), sem padrão, e recusa nomes de homologação. O `deploy` **recusa** sem `BACKUP_DONE=sim` e `NO_FICTITIOUS_DATA=sim`; para abrir a venda exige gateway real, textos legais, identidade aprovada e `GO_LIVE_CONFIRMED`. Padrão: vendas **fechadas**. Recusas testadas sem tocar na nuvem; os flags do `gcloud` foram conferidos contra a ajuda da versão instalada |
 | `firebase.json` | Rewrites `/api/**` e `**` para o Cloud Run em `southamerica-east1` |
 | `infra/producao/artifact-cleanup.json` | Mantém só as 3 imagens mais recentes |
-| `infra/operacao/alerts.sh` | 8 sinais de alerta por log (inclui `conciliacao_revisao_manual` e `fila_conciliacao_falhou`) |
+| `infra/operacao/alerts.sh` | 13 sinais de alerta por log desde 12/10/2026 (inclui `estorno_parcial` e `cobranca_duplicada`, da etapa 07). Os 2 novos entram em produção só com o deploy de produção, depois do aceite |
 
 **Código (testado, 661 testes):** cookie `__session`; `Cache-Control: private, no-store` em toda `/api/*`; estáticos com hash imutáveis e `index.html` `no-cache`; conciliação sob demanda por Cloud Tasks (`server/src/payments/taskQueue.ts`, `reconcileTask.ts`); `JOBS_CALLER_EMAIL` com mais de uma conta.
 

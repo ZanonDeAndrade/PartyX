@@ -88,6 +88,40 @@ Fluxo de branches: `main` produção (protegida), `develop` homologação, `feat
 | Revisão do acesso público da URL | A homologação está aberta na internet, sem login, porque o app ainda é protótipo com dados fictícios. Restringir antes de colocar dados reais do cliente. |
 | `sslmode` da URL do Neon antes de upgrade major do `pg` | Testar `sslmode=verify-full` na URL do Neon de homologação antes de qualquer upgrade major do `pg`; replicar em produção no próximo deploy. Motivo: o `pg` 8 avisa que, no `pg` 9 (`pg-connection-string` 3), `sslmode=require` passa à semântica do libpq e deixa de verificar o certificado. Hoje: `pg` 8.23.1 e `pg-connection-string` 2.14.1; `"pg": "^8.23.1"` não deixa subir para a 9. URLs **não** alteradas (pedido do responsável, 10/10/2026). Ver `registros/migracoes-neon-2026-10-10.md`. |
 
+## Checklist da etapa 10 (infra de homologação e backup)
+
+Itens da etapa 10 da sequência de fechamento. Nada abaixo foi executado ainda.
+
+### Alertas por log: 13 sinais em HOMOLOGAÇÃO, com disparo de propósito
+
+Pedido do responsável em 12/10/2026. **Em produção os alertas não são criados agora:** entram junto com o deploy de produção, depois do aceite (`README-DEPLOY.md`, seção 9).
+
+- [ ] **1. Mostrar o custo estimado ao responsável e esperar o "pode rodar".** Conferir antes o preço vigente na página oficial ([preços do Google Cloud Observability](https://cloud.google.com/products/observability/pricing), [exemplos de preço](https://cloud.google.com/stackdriver/observability-pricing-examples)) e atualizar a tabela abaixo se mudou. Listar o que já existe no projeto, para mostrar só o acréscimo: `gcloud alpha monitoring policies list --project=partyx-hml --format='value(displayName)'` e `gcloud logging metrics list --project=partyx-hml --format='value(name)'`.
+
+  Estimativa preliminar (12/10/2026, **não medida**; as fontes divergem sobre o modelo de cobrança dos alertas em vigor):
+
+  | Item | Base de cálculo | Estimativa por mês |
+  |---|---|---|
+  | 13 políticas de alerta, 1 condição cada | US$ 0,10 por condição (modelo com vigência indicada a partir de 01/05/2026) ou US$ 0,35 por métrica referenciada (modelo anterior). Os 2 sinais novos são US$ 0,20 a 0,70 desse total | US$ 1,30 a 4,55 |
+  | Séries ou pontos lidos pelas condições | US$ 0,35 por milhão de séries ou US$ 0,50 por milhão de pontos. Cada condição lê uma métrica quase sempre vazia, a cada 5 min | menos de US$ 0,05 |
+  | 13 métricas baseadas em log | Cobradas como métrica do usuário, por volume ingerido; os primeiros 150 MiB por **conta de faturamento** são gratuitos. Só geram amostra quando o sinal aparece (raro em homologação) | perto de US$ 0 |
+  | Ingestão de logs | Não muda: as métricas leem os logs que já são gravados | US$ 0 a mais |
+  | **Total** | | **cerca de US$ 1,35 a 4,60** (R$ 7 a 26, câmbio de referência de R$ 5,50), dentro do orçamento de R$ 150 da homologação |
+
+  Observações: a conta "Pagamento do Firebase" é compartilhada com outros projetos, então a cota grátis de 150 MiB também é. Se o custo por condição incomodar, dá para trocar as 13 métricas por **uma** métrica com o rótulo `alert` e uma política agrupada por rótulo (1 condição). Isso muda o script e fica para decidir.
+
+- [ ] **2. Criar os alertas em homologação.** O `infra/producao/deploy.sh` recusa projeto de homologação, então use o script direto: `PROJECT=partyx-hml SERVICE=partyx-hml NOTIFY_EMAIL=<caixa da equipe> ./infra/operacao/alerts.sh`. Ele é idempotente: cria só o que falta e termina com "13 métricas e 13 políticas".
+- [ ] **3. Pré-requisito do disparo:** homologação com o Mercado Pago de **teste** (`PAYMENT_GATEWAY=mercadopago`, `GATEWAY_ENVIRONMENT=sandbox`, credenciais de teste no Secret Manager do `partyx-hml`). O gateway fictício de homologação não simula estorno parcial nem cobrança em dobro.
+- [ ] **4. Disparar `estorno_parcial` de propósito:** comprar 2 ingressos com Pix (pagador de teste `APRO`), fazer um estorno **parcial** pela API (`POST /v1/orders/{id}/refund` com valor menor que o total) e entregar a notificação.
+  - Limitação conhecida: as notificações das compras de teste vêm assinadas pela aplicação do usuário de teste e a plataforma as recusa com 401 (`pagamento-mercadopago.md`). A notificação precisa ser montada e assinada com a assinatura secreta de homologação, como faz `server/src/api/mercadopago.sandbox.test.ts`.
+  - **O script de disparo para homologação ainda não existe**: escrever nesta etapa em `infra/testes/`, sem imprimir token nem assinatura.
+  - Esperado: pedido continua `pago`, nenhum ingresso cancelado, trilha `pagamento.estorno_parcial` com o texto do ADM15 no histórico do pedido.
+- [ ] **5. Disparar `cobranca_duplicada` de propósito:** criar pela API uma segunda order aprovada com a **mesma referência externa** de um pedido já pago e o mesmo valor, e entregar a notificação assinada. Esperado: nada emitido, caso na aba **Exceções > Cobranças em dobro**; marcar como tratada com motivo.
+- [ ] **6. Confirmar que o aviso chega:** e-mail do Cloud Monitoring na `NOTIFY_EMAIL` para os dois sinais. Na medição de 06/10, o tempo do log ao alerta aberto foi de 3 a 4,5 min. Conferir também o incidente aberto no console. Só o responsável vê a caixa de entrada.
+- [ ] **7. Registrar a evidência** em `operacao/registro-rotinas.md`: data, sinais, horário do log, horário do e-mail e pedidos de teste usados. Sem token, assinatura, CPF nem endereço de caixa real. Os incidentes fecham sozinhos em 24 h (`autoClose`).
+
+Uma linha de log falsa (`gcloud logging write`) provaria só o caminho do alerta, não o código. Não vale como disparo de propósito.
+
 ## Ocorrências desta etapa
 
 - O papel criado pela API do Neon vem como membro de `neon_superuser` e conseguia apagar histórico. Foi apagado e recriado por SQL, sem privilégios extras, e os testes passaram a provar a restrição.
