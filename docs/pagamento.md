@@ -12,7 +12,7 @@ Implementado em 01/10/2026 (Prompt 10): RF-28, RF-29, RF-32, RF-33 (telas) e RF-
 | Conta aprovada para Pix e cartão, em nome da PartyX, com credenciais e webhook | Credenciais de teste e de produção recebidas; produção no Secret Manager; webhook configurado no painel | D-01, insumo 5 |
 | Parcelamento no cartão | Pendente; hoje só à vista (422 `parcelamento_indisponivel` acima de 1; Brick sem opção de parcelas) | D-02 |
 | Taxas e prazo de recebimento | Pendente, entre cliente e gateway | D-04 |
-| Compatibilidade entre a expiração do Pix e a reserva | **Resolvida: reserva de 30 minutos** (mínimo do Pix no Mercado Pago). O Pix vence com a reserva, dentro dos limites do provedor (`pixExpiry`); com reserva menor que o mínimo, o Pix não é oferecido | D-03 |
+| Compatibilidade entre a expiração do Pix e a reserva | **Premissa adotada: reserva de 30 minutos** (mínimo do Pix no Mercado Pago); aguardando confirmação escrita da PartyX. O Pix vence com a reserva, dentro dos limites do provedor (`pixExpiry`); com reserva menor que o mínimo, o Pix não é oferecido | D-03 |
 
 ## Contrato (`server/src/payments/gateway.ts`)
 

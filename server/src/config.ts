@@ -91,7 +91,7 @@ const schema = z
     /** Endereço público dos banners. Padrão: https://storage.googleapis.com/<bucket>. Use para CDN ou domínio próprio. */
     BANNER_PUBLIC_BASE_URL: z.url().optional(),
     /**
-     * Duração da reserva temporária, em minutos. D-03 (11/10/2026): 30 para todos, porque o Pix do Mercado Pago vence em no mínimo
+     * Duração da reserva temporária, em minutos. D-03 (premissa adotada em 11/10/2026, aguardando confirmação escrita): 30 para todos, porque o Pix do Mercado Pago vence em no mínimo
      * 30 minutos e o QR precisa valer até o fim da reserva. Com menos que o mínimo do gateway, o Pix não é oferecido.
      */
     RESERVATION_MINUTES: z.coerce.number().int().min(1).max(60).default(30),

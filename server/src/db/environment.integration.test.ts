@@ -105,6 +105,8 @@ describe.skipIf(!ADMIN_URL)('marca de ambiente do banco (integração)', () => {
     });
   }
 
+  // Sobe o servidor de verdade TRÊS vezes (cada subida compila o código com tsx e pode esperar até 12 s). Sozinho leva uns 4 s,
+  // mas com a suíte em paralelo ou numa máquina de CI mais lenta passava dos 20 s padrão e falhava sem motivo real: limite de 60 s.
   it('o SERVIDOR se recusa a subir (processo real) com banco de outro ambiente ou sem marca; com a marca certa sobe', async () => {
     const d = await fresh(true);
     await markDatabaseEnvironment(d.pool, 'homologacao');
@@ -134,5 +136,5 @@ describe.skipIf(!ADMIN_URL)('marca de ambiente do banco (integração)', () => {
     const ok = await boot({ ...base, APP_ENV: 'homologacao' });
     expect(ok.started).toBe(true);
     expect(ok.err).not.toContain('banco_de_outro_ambiente');
-  });
+  }, 60_000);
 });
