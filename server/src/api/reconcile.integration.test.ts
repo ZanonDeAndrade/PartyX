@@ -56,7 +56,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
     extra: { env?: Record<string, string>; jobAuth?: JobAuthenticator | undefined; queue?: TaskQueue } = {},
   ) =>
     createApp({
-      config: loadConfig({ APP_ENV: 'local', PAYMENT_GATEWAY: 'none', ...extra.env }),
+      config: loadConfig({ APP_ENV: 'local', PAYMENT_GATEWAY: 'none', RESERVATION_MINUTES: '10', ...extra.env }),
       clock,
       auth: {
         db: createDrizzle(testDb.pool),

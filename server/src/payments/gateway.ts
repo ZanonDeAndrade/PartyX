@@ -1,8 +1,8 @@
 import type { GatewayStatus, PaymentMethod, PaymentSnapshot } from '../domain/payment';
 
 /**
- * Contrato interno com o gateway de pagamento. **Um único gateway** será escolhido pelo cliente (D-01); até lá
- * existe só o adaptador fictício, usado apenas no ambiente local. Nenhum tipo de SDK aparece aqui: cada adaptador
+ * Contrato interno com o gateway de pagamento. **Um único gateway** (D-01: Mercado Pago, `payments/mercadopago/`); o adaptador
+ * fictício segue só para o ambiente local e os testes. Nenhum tipo de SDK aparece aqui: cada adaptador
  * converte a resposta do provedor para os tipos de `domain/payment.ts`.
  *
  * Regras que todo adaptador cumpre:
@@ -21,6 +21,8 @@ export interface GatewayCapabilities {
   pixExpiry: { minSeconds: number; maxSeconds: number };
   /** Parcelamento só existe se o cliente e o gateway aprovarem (D-02). */
   maxInstallments: number;
+  /** Chave PÚBLICA do gateway para o componente de cartão no navegador (modo `token`). Nula no modo hospedado. */
+  publicKey: string | null;
 }
 
 export interface Payer {
@@ -47,7 +49,16 @@ export interface CreatePixInput extends CommonInput {
 export type CreateCardInput = CommonInput &
   (
     | { mode: 'hosted'; returnUrl: string }
-    | { mode: 'token'; cardToken: string; installments: number; returnUrl?: undefined }
+    | {
+        mode: 'token';
+        cardToken: string;
+        installments: number;
+        /** Bandeira escolhida no componente do gateway (ex.: `visa`). */
+        paymentMethodId: string;
+        /** Crédito ou débito, como o componente do gateway informa. */
+        paymentTypeId: string;
+        returnUrl?: undefined;
+      }
   );
 
 export interface CreatedPayment {
@@ -58,9 +69,15 @@ export interface CreatedPayment {
   snapshot: PaymentSnapshot;
 }
 
+/**
+ * Do que trata uma notificação autêntica: uma cobrança (que será reconsultada) ou um assunto que a PartyX não usa
+ * (responde 200 e não faz nada).
+ */
+export type NotificationSubject = { kind: 'payment'; id: string } | { kind: 'ignored' };
+
 /** Resultado de autenticar uma notificação (webhook). Nunca lança por assinatura inválida: devolve `valid: false`. */
 export type NotificationCheck =
-  | { valid: true; eventId: string; gatewayPaymentId: string; type: string }
+  | { valid: true; eventId: string; type: string; subject: NotificationSubject }
   | { valid: false; reason: 'assinatura_ausente' | 'assinatura_invalida' | 'formato_invalido' | 'fora_do_prazo' };
 
 export interface PaymentGateway {
@@ -69,8 +86,8 @@ export interface PaymentGateway {
   createCard(input: CreateCardInput): Promise<CreatedPayment>;
   /** Consulta o estado real no gateway. É a fonte da verdade antes de aprovar qualquer pedido. */
   getPayment(gatewayPaymentId: string): Promise<PaymentSnapshot>;
-  /** Autentica a notificação segundo o método do provedor, sobre o corpo **bruto** recebido. */
-  verifyNotification(input: { headers: Headers; rawBody: string }): Promise<NotificationCheck>;
+  /** Autentica a notificação segundo o método do provedor, sobre o corpo **bruto** recebido e os parâmetros da URL. */
+  verifyNotification(input: { headers: Headers; rawBody: string; query: URLSearchParams }): Promise<NotificationCheck>;
   /** Conta do provedor que deve receber (a da PartyX). Usada na conferência antes de aprovar. */
   readonly accountId: string;
 }

@@ -1,0 +1,32 @@
+{
+  "action": "order.processed",
+  "api_version": "v1",
+  "application_id": "0000000000000000",
+  "data": {
+    "currency_id": "BRL",
+    "external_reference": "11111111-2222-4333-8444-555555555555",
+    "id": "ORD01M28P44G5FG8RJPM579EH56FV",
+    "status": "processed",
+    "status_detail": "accredited",
+    "total_amount": "200.00",
+    "total_paid_amount": "200.00",
+    "transactions": {
+      "payments": [
+        {
+          "amount": "200.00",
+          "id": "PAY01M28P44GDSD4JYTSK5SYZT6BH",
+          "paid_amount": "200.00",
+          "payment_method": { "id": "master", "installments": 1, "type": "credit_card" },
+          "status": "processed",
+          "status_detail": "accredited"
+        }
+      ]
+    },
+    "type": "online",
+    "version": 1
+  },
+  "date_created": "2026-10-10T15:00:00.000000000Z",
+  "live_mode": false,
+  "type": "order",
+  "user_id": "123456789"
+}

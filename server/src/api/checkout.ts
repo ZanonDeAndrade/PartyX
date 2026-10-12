@@ -4,7 +4,8 @@ import { createMemoryLimiter } from '../auth/limits';
 import { requireRole } from '../auth/permissions';
 import type { AuthDeps, AuthVariables } from '../auth/types';
 import { AppError } from '../domain/errors';
-import { getPayment, rejectCardData, startPayment } from '../orders/payment';
+import { getPayment, paymentOptions, rejectCardData, startPayment } from '../orders/payment';
+import { reconcilePayment } from '../payments/reconcile';
 import { cancelOrder, createOrder, getOrder, quote, type OrdersDeps } from '../orders/service';
 import { parseJson } from './validate';
 
@@ -17,11 +18,16 @@ const checkoutBody = z.object({
 });
 const paymentBody = z.discriminatedUnion('method', [
   z.object({ method: z.literal('pix') }),
-  // Cartão: só um token do gateway (se o gateway usar token) e parcelas. Nunca número, validade nem CVV.
+  // Cartão: só o token do gateway, a bandeira, o tipo (crédito ou débito) e as parcelas. Nunca número, validade nem CVV.
   z.object({
     method: z.literal('cartao'),
     cardToken: z.string().min(8).max(500).optional(),
     installments: z.number().optional(),
+    paymentMethodId: z
+      .string()
+      .regex(/^[a-z0-9_-]{2,40}$/)
+      .optional(),
+    paymentTypeId: z.enum(['credit_card', 'debit_card']).optional(),
   }),
 ]);
 const idParam = z.uuid();
@@ -69,11 +75,29 @@ export function checkoutRoutes(deps: AuthDeps) {
     c.json({ order: await cancelOrder(ordersDeps, userId(c), orderId(c.req.param('id'))) }),
   );
 
+  const gateway = deps.gateway;
   const paymentDeps = () => ({
     ...ordersDeps,
-    gateway: deps.gateway,
+    gateway,
     publicBaseUrl: deps.config.PUBLIC_BASE_URL ?? 'http://localhost:5173',
+    settle: gateway
+      ? async (gatewayPaymentId: string) => {
+          await reconcilePayment(
+            {
+              db: deps.db,
+              clock: deps.clock,
+              gateway,
+              issueTickets: deps.issueTickets,
+              mail: { db: deps.db, clock: deps.clock, mailer: deps.mailer, config: deps.config, taskQueue: deps.taskQueue },
+            },
+            gatewayPaymentId,
+          );
+        }
+      : undefined,
   });
+
+  /** Como montar a tela de pagamento: componente de cartão (chave PÚBLICA do gateway) e se o Pix está disponível (D-03). */
+  app.get('/payments/options', buyer, c => c.json({ options: paymentOptions(gateway, deps.config.RESERVATION_MINUTES) }));
   const payLimiter = createMemoryLimiter({ max: 20, windowMs: 600_000, now });
 
   /** Escolhe a forma de pagamento e cria a cobrança. Valor e prazo vêm do pedido; o corpo só diz Pix ou cartão. */

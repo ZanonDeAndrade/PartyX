@@ -61,15 +61,15 @@ describe('adaptador fictício', () => {
   describe('autenticação de notificações', () => {
     const body = JSON.stringify({ id: 'evt-1', paymentId: 'pay-1', type: 'payment.approved' });
     const check = (g: ReturnType<typeof createMockGateway>, headers: Record<string, string>, raw = body) =>
-      g.verifyNotification({ headers: new Headers(headers), rawBody: raw });
+      g.verifyNotification({ headers: new Headers(headers), rawBody: raw, query: new URLSearchParams() });
 
     it('aceita a assinatura correta e extrai evento, pagamento e tipo', async () => {
       const g = createMockGateway(clock);
       expect(await check(g, { 'x-mock-signature': g.simulate.sign(body) })).toEqual({
         valid: true,
         eventId: 'evt-1',
-        gatewayPaymentId: 'pay-1',
         type: 'payment.approved',
+        subject: { kind: 'payment', id: 'pay-1' },
       });
     });
     it('recusa sem assinatura, mal formada, de outra instância, com corpo alterado e vencida', async () => {

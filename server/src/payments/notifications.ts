@@ -33,6 +33,8 @@ export function createInvalidWriteLimiter(max: number, windowMs: number, now: ()
 export interface NotificationInput {
   headers: Headers;
   rawBody: string;
+  /** Parâmetros da URL do webhook (o Mercado Pago assina o `data.id` que vem nela). */
+  query?: URLSearchParams;
   /** Pode gravar a linha de uma notificação inválida (limite por origem). */
   mayRecordInvalid: boolean;
 }
@@ -46,7 +48,11 @@ export interface NotificationInput {
  * 3. Processa: **reconsulta o gateway** e aplica (idempotente). Se falhar, o evento fica pendente e a resposta pede nova tentativa.
  */
 export async function handleNotification(deps: ReconcileDeps, input: NotificationInput): Promise<NotificationResult> {
-  const check = await deps.gateway.verifyNotification({ headers: input.headers, rawBody: input.rawBody });
+  const check = await deps.gateway.verifyNotification({
+    headers: input.headers,
+    rawBody: input.rawBody,
+    query: input.query ?? new URLSearchParams(),
+  });
   if (!check.valid) {
     logger.warn('notificação de pagamento recusada', {
       reason: check.reason,
@@ -70,11 +76,19 @@ export async function handleNotification(deps: ReconcileDeps, input: Notificatio
     return { status: 'invalida' };
   }
 
-  const [linked] = await deps.db
-    .select({ id: orders.id })
-    .from(orders)
-    .where(eq(orders.gatewayPaymentId, check.gatewayPaymentId))
-    .limit(1);
+  const { subject } = check;
+  const [linked] =
+    subject.kind === 'payment'
+      ? await deps.db
+          .select({ id: orders.id })
+          .from(orders)
+          .where(eq(orders.gatewayPaymentId, subject.id))
+          .limit(1)
+      : [];
+  const payload: EventPayload =
+    subject.kind === 'payment'
+      ? { gatewayPaymentId: subject.id, type: check.type.slice(0, 80) }
+      : { type: check.type.slice(0, 80) };
 
   // Chave única só entre eventos válidos: um evento forjado nunca "ocupa" o id de um real.
   const inserted = await deps.db
@@ -84,11 +98,14 @@ export async function handleNotification(deps: ReconcileDeps, input: Notificatio
       signatureValid: true,
       orderId: linked?.id ?? null,
       type: check.type.slice(0, 80),
-      payloadJson: { gatewayPaymentId: check.gatewayPaymentId, type: check.type.slice(0, 80) },
+      payloadJson: payload,
       receivedAt: deps.clock.now(),
+      // Assunto que a PartyX não usa: fica registrado e já resolvido (responde 200 para o gateway não repetir).
+      processedAt: subject.kind === 'ignored' ? deps.clock.now() : undefined,
     })
     .onConflictDoNothing()
     .returning({ id: paymentEvents.id });
+  if (subject.kind === 'ignored') return { status: 'ignorada' };
 
   let eventId = inserted[0]?.id;
   if (!eventId) {
@@ -101,21 +118,25 @@ export async function handleNotification(deps: ReconcileDeps, input: Notificatio
     eventId = existing?.id; // repetida mas ainda não processada (a primeira tentativa falhou): processa agora
   }
   if (!eventId) return { status: 'ignorada' };
-  return processEvent(deps, eventId, check.gatewayPaymentId);
+  return processEvent(deps, eventId, payload);
+}
+
+/** O que fica gravado de uma notificação válida: só identificadores do gateway e o tipo, nunca o corpo. */
+interface EventPayload {
+  gatewayPaymentId?: string;
+  type: string;
 }
 
 /** Processa um evento já registrado. Seguro de repetir e de rodar em paralelo: a conciliação é idempotente. */
-async function processEvent(
-  deps: ReconcileDeps,
-  eventId: string,
-  gatewayPaymentId: string,
-): Promise<NotificationResult> {
+async function processEvent(deps: ReconcileDeps, eventId: string, payload: EventPayload): Promise<NotificationResult> {
   await deps.db
     .update(paymentEvents)
     .set({ attempts: sql`${paymentEvents.attempts} + 1` })
     .where(eq(paymentEvents.id, eventId));
   try {
-    const result = await reconcilePayment(deps, gatewayPaymentId);
+    const result = payload.gatewayPaymentId
+      ? await reconcilePayment(deps, payload.gatewayPaymentId)
+      : { outcome: 'sem_pedido' as const };
     await deps.db
       .update(paymentEvents)
       .set({
@@ -160,9 +181,9 @@ export async function retryPendingEvents(deps: ReconcileDeps, limit = 50): Promi
     .limit(limit);
   let done = 0;
   for (const ev of pending) {
-    const paymentId = (ev.payload as { gatewayPaymentId?: string }).gatewayPaymentId;
-    if (!paymentId) continue;
-    const r = await processEvent(deps, ev.id, paymentId);
+    const payload = ev.payload as EventPayload;
+    if (!payload.gatewayPaymentId) continue;
+    const r = await processEvent(deps, ev.id, payload);
     if (!r.retry) done++;
   }
   return { tried: pending.length, done };

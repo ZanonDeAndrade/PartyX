@@ -1,0 +1,27 @@
+{
+  "id": "ORDTST01AAAAAAAAAAAAAAAAAAAAAAAA",
+  "type": "online",
+  "processing_mode": "automatic",
+  "external_reference": "11111111-2222-4333-8444-555555555555",
+  "total_amount": "240.00",
+  "total_paid_amount": "240.00",
+  "country_code": "BRA",
+  "user_id": "123456789",
+  "status": "processed",
+  "status_detail": "accredited",
+  "capture_mode": "automatic_async",
+  "currency": "BRL",
+  "transactions": {
+    "payments": [
+      {
+        "id": "PAY01AAAAAAAAAAAAAAAAAAAAAAAA",
+        "amount": "240.00",
+        "paid_amount": "240.00",
+        "reference_id": "000aaaaaaa",
+        "status": "processed",
+        "status_detail": "accredited",
+        "payment_method": { "id": "master", "type": "credit_card", "installments": 1 }
+      }
+    ]
+  }
+}

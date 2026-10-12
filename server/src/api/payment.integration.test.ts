@@ -23,7 +23,7 @@ describe.skipIf(!ADMIN_URL)('pagamento: checkout e contrato do gateway (integra�
 
   const build = (gateway: PaymentGateway | undefined) =>
     createApp({
-      config: loadConfig({ APP_ENV: 'local', PAYMENT_GATEWAY: 'none' }),
+      config: loadConfig({ APP_ENV: 'local', PAYMENT_GATEWAY: 'none', RESERVATION_MINUTES: '10' }),
       clock,
       auth: { db: createDrizzle(testDb.pool), hasher: argon2Hasher, mailer: new MemoryEmailSender(), gateway },
     });
@@ -260,9 +260,19 @@ describe.skipIf(!ADMIN_URL)('pagamento: checkout e contrato do gateway (integra�
       const order = await pendingOrder(a, e);
       const missing = await a.post(`/orders/${order.id}/payment`, { method: 'cartao' });
       expect([missing.status, await code(missing)]).toEqual([422, 'dados_invalidos']);
+      // Só o token não basta: o componente do gateway também informa a bandeira e o tipo (crédito ou débito).
+      const noBrand = await a.post(`/orders/${order.id}/payment`, { method: 'cartao', cardToken: 'tok_abcdef123456' });
+      expect([noBrand.status, await code(noBrand)]).toEqual([422, 'dados_invalidos']);
       expect(await row(order.id)).toMatchObject({ payment_method: null });
       expect(
-        (await a.post(`/orders/${order.id}/payment`, { method: 'cartao', cardToken: 'tok_abcdef123456' })).status,
+        (
+          await a.post(`/orders/${order.id}/payment`, {
+            method: 'cartao',
+            cardToken: 'tok_abcdef123456',
+            paymentMethodId: 'master',
+            paymentTypeId: 'credit_card',
+          })
+        ).status,
       ).toBe(201);
     });
   });

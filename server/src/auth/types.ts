@@ -3,6 +3,7 @@ import type { Db } from '../db/client';
 import type { EmailSender } from '../providers/email';
 import type { BannerStorage } from '../providers/bannerStorage';
 import type { PaymentGateway } from '../payments/gateway';
+import type { TicketIssuer } from '../payments/reconcile';
 import type { TaskQueue } from '../payments/taskQueue';
 import type { HumanVerifier } from '../security/humanCheck';
 import type { PasswordHasher } from '../providers/passwordHasher';
@@ -22,6 +23,8 @@ export interface AuthDeps {
   taskQueue?: TaskQueue;
   /** Verificação humana (Turnstile) no cadastro e na recuperação. Ausente: não exige (local, testes e homologação sem chave). */
   human?: HumanVerifier;
+  /** Emissão dos ingressos na confirmação (a mesma do webhook), para a conciliação imediata do cartão. */
+  issueTickets?: TicketIssuer;
 }
 
 export type Role = 'cliente' | 'validador' | 'administrador';

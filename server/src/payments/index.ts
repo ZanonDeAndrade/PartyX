@@ -1,17 +1,26 @@
 import type { Config } from '../config';
 import type { Clock } from '../providers/clock';
 import type { PaymentGateway } from './gateway';
+import { createMercadoPagoGateway } from './mercadopago';
 import { createMockGateway } from './mockGateway';
 
+type GatewayConfig = Pick<Config, 'PAYMENT_GATEWAY' | 'APP_ENV'> &
+  Partial<
+    Pick<
+      Config,
+      | 'MP_ACCESS_TOKEN'
+      | 'MP_PUBLIC_KEY'
+      | 'MP_WEBHOOK_SECRET'
+      | 'MP_COLLECTOR_ID'
+      | 'GATEWAY_ENVIRONMENT'
+    >
+  > & { mockGatewayInHomologacao?: boolean };
+
 /**
- * Escolhe o adaptador pela configuração. Hoje só existe o fictício, e **só no ambiente local** (e em homologação, com a variável explícita).
- * O gateway real entra aqui quando o cliente escolher (D-01); até lá, em homologação e produção,
- * não há gateway e a criação de pagamento responde 503.
+ * Escolhe o adaptador pela configuração: `mercadopago` (D-01) ou o fictício, que só vale no ambiente local (e em homologação,
+ * com a variável explícita). Sem gateway, a criação de pagamento responde 503.
  */
-export function createGateway(
-  config: Pick<Config, 'PAYMENT_GATEWAY' | 'APP_ENV'> & { mockGatewayInHomologacao?: boolean },
-  clock: Clock,
-): PaymentGateway | undefined {
+export function createGateway(config: GatewayConfig, clock: Clock): PaymentGateway | undefined {
   switch (config.PAYMENT_GATEWAY) {
     case 'none':
       return undefined;
@@ -21,5 +30,23 @@ export function createGateway(
         throw new Error('o gateway fictício só pode ser usado no ambiente local (em homologação só com HOMOLOGACAO_GATEWAY_FICTICIO=true)');
       }
       return createMockGateway(clock);
+    case 'mercadopago': {
+      const { MP_ACCESS_TOKEN, MP_PUBLIC_KEY, MP_WEBHOOK_SECRET, MP_COLLECTOR_ID } = config;
+      if (!MP_ACCESS_TOKEN || !MP_PUBLIC_KEY || !MP_WEBHOOK_SECRET || !MP_COLLECTOR_ID) {
+        throw new Error('Mercado Pago sem credenciais completas (MP_ACCESS_TOKEN, MP_PUBLIC_KEY, MP_WEBHOOK_SECRET, MP_COLLECTOR_ID)');
+      }
+      const liveMode = config.GATEWAY_ENVIRONMENT === 'producao';
+      if (liveMode && config.APP_ENV !== 'producao') {
+        throw new Error('credenciais de produção do Mercado Pago só no ambiente de produção');
+      }
+      return createMercadoPagoGateway({
+        accessToken: MP_ACCESS_TOKEN,
+        publicKey: MP_PUBLIC_KEY,
+        webhookSecret: MP_WEBHOOK_SECRET,
+        collectorId: MP_COLLECTOR_ID,
+        liveMode,
+        clock,
+      });
+    }
   }
 }

@@ -1,18 +1,18 @@
 # Checkout e contrato do gateway
 
-Implementado em 01/10/2026 (Prompt 10): RF-28, RF-29, RF-32, RF-33 (telas) e RF-34, RF-37 (parte). **O gateway real ainda não existe**: o cliente não o escolheu (D-01). Há só o contrato interno e um adaptador **fictício**, usado apenas no ambiente local.
+Implementado em 01/10/2026 (Prompt 10): RF-28, RF-29, RF-32, RF-33 (telas) e RF-34, RF-37 (parte). Desde 11/10/2026 o gateway real é o **Mercado Pago** (D-01), pela API de Orders: adaptador, credenciais, CSP e provas no ambiente de teste em **`pagamento-mercadopago.md`**. O adaptador fictício continua só para o ambiente local e os testes.
 
 > Esta etapa não aprova pagamento. A confirmação por webhook e a reconsulta vieram no Prompt 12 (`webhook-e-conciliacao.md`); a emissão dos ingressos é do Prompt 13.
 
-## Pendências do cliente que bloqueiam o gateway real
+## Pendências do cliente sobre o gateway
 
 | Item | Situação | Registro |
 |---|---|---|
-| Qual gateway (único) | Não escolhido | D-01 |
-| Conta aprovada para Pix e cartão, em nome da PartyX, com credenciais sandbox e produção e webhook | Não existe | D-01, insumo 5 |
-| Parcelamento no cartão | Pendente; hoje só à vista (422 `parcelamento_indisponivel` acima de 1) | D-02 |
+| Qual gateway (único) | **Mercado Pago** (11/10/2026) | D-01 |
+| Conta aprovada para Pix e cartão, em nome da PartyX, com credenciais e webhook | Credenciais de teste e de produção recebidas; produção no Secret Manager; webhook configurado no painel | D-01, insumo 5 |
+| Parcelamento no cartão | Pendente; hoje só à vista (422 `parcelamento_indisponivel` acima de 1; Brick sem opção de parcelas) | D-02 |
 | Taxas e prazo de recebimento | Pendente, entre cliente e gateway | D-04 |
-| Compatibilidade entre a expiração do Pix e a reserva | Pendente. O Pix já é criado com o prazo da reserva, limitado ao máximo que o provedor aceitar (`pixExpiry`) | D-03 |
+| Compatibilidade entre a expiração do Pix e a reserva | **Resolvida: reserva de 30 minutos** (mínimo do Pix no Mercado Pago). O Pix vence com a reserva, dentro dos limites do provedor (`pixExpiry`); com reserva menor que o mínimo, o Pix não é oferecido | D-03 |
 
 ## Contrato (`server/src/payments/gateway.ts`)
 

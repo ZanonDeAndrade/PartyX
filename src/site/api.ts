@@ -163,13 +163,43 @@ export interface OrderView {
   reservation: { status: string; expiresAt: string; serverNow: string; secondsLeft: number } | null;
   /** Contato de atendimento da PartyX, só no pedido pago sem estoque. Nulo: a PartyX ainda não forneceu (mensagem neutra). */
   support?: { email: string | null; whatsapp: string | null } | null;
+  /** Pagamento recusado: categoria para o texto ao comprador. */
+  declineReason?: DeclineReason | null;
 }
+
+export type DeclineReason =
+  | 'dados_do_cartao'
+  | 'saldo_insuficiente'
+  | 'nao_autorizado'
+  | 'cartao_desabilitado'
+  | 'pagamento_duplicado'
+  | 'seguranca'
+  | 'limite_de_tentativas'
+  | 'autenticacao'
+  | 'outro';
 
 export interface PaymentView {
   method: 'pix' | 'cartao';
   status: string;
   pix: { copyPaste: string; qrCodeImage: string | null; expiresAt: string } | null;
   redirectUrl: string | null;
+  declineReason?: DeclineReason | null;
+}
+
+/** Como montar a tela de pagamento (servidor): componente de cartão, chave pública do gateway e Pix disponível. */
+export interface PaymentOptions {
+  provider: string | null;
+  cardMode: 'hosted' | 'token' | null;
+  publicKey: string | null;
+  maxInstallments: number;
+  pixAvailable: boolean;
+}
+
+/** Só o que o componente do gateway devolve para o servidor: nunca número, validade nem CVV. */
+export interface CardTokenData {
+  cardToken: string;
+  paymentMethodId: string;
+  paymentTypeId: 'credit_card' | 'debit_card';
 }
 
 export interface TicketSummary {
@@ -717,10 +747,13 @@ export const api = {
     get<{ order: OrderView }>(`/orders/${encodeURIComponent(id)}`, signal).then(r => r.order),
   cancelOrder: (id: string) =>
     request<{ order: OrderView }>('POST', `/orders/${encodeURIComponent(id)}/cancel`).then(r => r.order),
-  startPayment: (id: string, method: 'pix' | 'cartao') =>
-    request<{ payment: PaymentView }>('POST', `/orders/${encodeURIComponent(id)}/payment`, { method }).then(
-      r => r.payment,
-    ),
+  startPayment: (id: string, method: 'pix' | 'cartao', card?: CardTokenData) =>
+    request<{ payment: PaymentView }>('POST', `/orders/${encodeURIComponent(id)}/payment`, {
+      method,
+      ...(card ? { ...card, installments: 1 } : {}),
+    }).then(r => r.payment),
+  paymentOptions: (signal?: AbortSignal) =>
+    get<{ options: PaymentOptions }>('/payments/options', signal).then(r => r.options),
   tickets: (signal?: AbortSignal) => get<{ tickets: TicketSummary[] }>('/tickets', signal).then(r => r.tickets),
   ticket: (id: string, signal?: AbortSignal) =>
     get<{ ticket: TicketDetail }>(`/tickets/${encodeURIComponent(id)}`, signal).then(r => r.ticket),

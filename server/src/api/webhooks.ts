@@ -64,7 +64,12 @@ export function webhookRoutes(deps: WebhookDeps) {
     },
   });
 
-  /** Webhook do gateway. Responde 200 se registrou e processou (ou já tinha processado), 401 se a assinatura não confere, 503 para o gateway tentar de novo. */
+  /**
+   * Webhook do gateway. Responde 200 se registrou e processou (ou já tinha processado, ou o assunto não interessa), 401 se a
+   * assinatura não confere, 503 para o gateway tentar de novo. A reconsulta tem tempo limite (7 s por tentativa, no máximo duas),
+   * dentro dos 22 s que o Mercado Pago espera; se falhar, o evento fica gravado e pendente, e as verificações do pedido no
+   * Cloud Tasks e a rotina diária o retomam.
+   */
   app.post('/webhooks/payments', tooBig, async c => {
     if (!deps.gateway) throw new AppError(503, 'pagamento_indisponivel', 'Pagamento indisponível.');
     const rawBody = await c.req.text(); // corpo bruto: a assinatura é calculada sobre ele
@@ -72,6 +77,7 @@ export function webhookRoutes(deps: WebhookDeps) {
     const result = await handleNotification(reconcileDeps(deps.gateway), {
       headers: c.req.raw.headers,
       rawBody,
+      query: new URL(c.req.url).searchParams,
       mayRecordInvalid: mayRecord(ip),
     });
     if (result.status === 'invalida')

@@ -129,7 +129,7 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
         taskQueue: auth.taskQueue,
       }),
     );
-  if (auth) app.route('/api', authRoutes({ ...auth, config, clock }));
+  if (auth) app.route('/api', authRoutes({ ...auth, config, clock, issueTickets: auth.issueTickets ?? issueTickets }));
   if (extraApiRoutes) app.route('/api', extraApiRoutes);
   app.all('/api/*', c => c.json({ erro: { codigo: 'nao_encontrado', mensagem: 'Recurso não encontrado.' } }, 404));
 

@@ -94,8 +94,8 @@ describe('loadConfig', () => {
       TURNSTILE_SECRET: 'segredo-turnstile-teste',
       TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
     };
-    it('padrões: reserva de 10 minutos e 6 ingressos por compra (premissas D-03 e D-05)', () => {
-      expect(loadConfig({})).toMatchObject({ RESERVATION_MINUTES: 10, MAX_TICKETS_PER_ORDER: 6 });
+    it('padrões: reserva de 30 minutos (D-03, decidida em 11/10/2026) e 6 ingressos por compra (premissa D-05)', () => {
+      expect(loadConfig({})).toMatchObject({ RESERVATION_MINUTES: 30, MAX_TICKETS_PER_ORDER: 6 });
     });
     it('aceita valores configurados e recusa fora da faixa', () => {
       expect(loadConfig({ RESERVATION_MINUTES: '15', MAX_TICKETS_PER_ORDER: '4' })).toMatchObject({

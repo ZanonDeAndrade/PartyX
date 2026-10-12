@@ -46,6 +46,15 @@ export const orders = pgTable(
     /** Nulo até o comprador escolher a forma de pagamento. */
     paymentMethod: paymentMethod('payment_method'),
     gatewayPaymentId: text('gateway_payment_id'),
+    /** Último código de detalhe do gateway numa recusa (ex.: `cc_rejected_insufficient_amount`), para o atendimento. */
+    gatewayStatusDetail: varchar('gateway_status_detail', { length: 80 }),
+    /** Categoria da recusa (domain/payment.ts, `DeclineReason`): a tela mostra um texto amigável para ela. */
+    declineReason: varchar('decline_reason', { length: 32 }),
+    /**
+     * Tentativa de cobrança do pedido, parte da chave de idempotência enviada ao gateway. Sobe só quando o gateway RECUSA criar a
+     * cobrança (ex.: token de cartão inválido): a nova tentativa leva chave nova. Reenvio da mesma tentativa repete a chave.
+     */
+    paymentAttempt: smallint('payment_attempt').notNull().default(0),
     paidAt: instant('paid_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

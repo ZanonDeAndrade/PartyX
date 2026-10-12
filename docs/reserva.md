@@ -33,7 +33,7 @@ Não há chamada externa dentro da transação. Várias instâncias do Cloud Run
 ## Regras
 
 - **Limite por compra (CA-15):** `MAX_TICKETS_PER_ORDER` (padrão 6), somando todos os tipos. Também: quantidade inteira maior que zero, sem tipo repetido, tipo do mesmo evento.
-- **Reserva (RF-33):** `RESERVATION_MINUTES` (padrão 10). O contador usa `serverNow` e `secondsLeft` da resposta, não o relógio do aparelho.
+- **Reserva (RF-33):** `RESERVATION_MINUTES` (padrão 30 desde 11/10/2026, D-03: mínimo do Pix no Mercado Pago). O contador usa `serverNow` e `secondsLeft` da resposta, não o relógio do aparelho.
 - **Cupom (RF-30, RF-31):** só vincula o pedido ao promoter; **o total não muda**. Inexistente, desativado ou malformado: 422 com mensagem clara e nada é reservado. Em branco equivale a sem cupom.
 - **Fora de venda:** em breve, encerrada, desativada, esgotada, reservada por outros, evento em rascunho ou encerrado: recusa o pedido inteiro, sem reservar item algum.
 - **Reserva não é venda:** `quantity_sold` não muda e `paid_at` fica nulo.

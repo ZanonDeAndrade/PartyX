@@ -67,6 +67,8 @@ export function createMockGateway(clock: Clock): MockGateway {
     accountId: MOCK_ACCOUNT_ID,
     paidAt: null,
     pix: null,
+    statusDetail: null,
+    declineReason: null,
   });
 
   const sign = (rawBody: string, timestamp: number) =>
@@ -90,6 +92,7 @@ export function createMockGateway(clock: Clock): MockGateway {
       cardMode: 'hosted',
       pixExpiry: { minSeconds: 30, maxSeconds: 86_400 },
       maxInstallments: 1,
+      publicKey: null,
     },
     accountId: MOCK_ACCOUNT_ID,
 
@@ -154,7 +157,7 @@ export function createMockGateway(clock: Clock): MockGateway {
       try {
         const body = JSON.parse(rawBody) as { id?: string; paymentId?: string; type?: string };
         if (!body.id || !body.paymentId || !body.type) return { valid: false, reason: 'formato_invalido' };
-        return { valid: true, eventId: body.id, gatewayPaymentId: body.paymentId, type: body.type };
+        return { valid: true, eventId: body.id, type: body.type, subject: { kind: 'payment', id: body.paymentId } };
       } catch {
         return { valid: false, reason: 'formato_invalido' };
       }
@@ -168,6 +171,8 @@ export function createMockGateway(clock: Clock): MockGateway {
           ...found.snapshot,
           status,
           paidAt: status === 'aprovado' ? clock.now() : found.snapshot.paidAt,
+          statusDetail: status === 'recusado' ? 'recusa_ficticia' : found.snapshot.statusDetail,
+          declineReason: status === 'recusado' ? 'outro' : found.snapshot.declineReason,
         };
       },
       failNext(error) {

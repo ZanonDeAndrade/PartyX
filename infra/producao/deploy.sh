@@ -186,6 +186,14 @@ cmd_deploy() {
   [ "${GATEWAY_ENVIRONMENT:-}" != "sandbox" ] || { echo "Recuso: credenciais de SANDBOX do gateway em produção." >&2; exit 1; }
   [ "${PAYMENT_GATEWAY:-none}" = "none" ] || [ "${GATEWAY_ENVIRONMENT:-}" = "producao" ] || { echo "Recuso: com gateway configurado, informe GATEWAY_ENVIRONMENT=producao." >&2; exit 1; }
   [ "${PAYMENT_GATEWAY:-none}" != "mock" ] || { echo "Recuso: o gateway fictício não existe em produção." >&2; exit 1; }
+  # Mercado Pago (D-01): os três segredos gravados por scripts/setup-mp-credentials-producao.sh e o id da conta da PartyX.
+  if [ "${PAYMENT_GATEWAY:-none}" = "mercadopago" ]; then
+    [[ "${MP_COLLECTOR_ID:-}" =~ ^[0-9]+$ ]] || { echo "Recuso: informe MP_COLLECTOR_ID (id da conta da PartyX no Mercado Pago)." >&2; exit 1; }
+    for s in mp-access-token mp-public-key mp-webhook-secret; do
+      [ -n "$(g secrets versions list "$s" --limit=1 --filter='state=ENABLED' --format='value(name)' 2>/dev/null)" ] \
+        || { echo "Recuso: o segredo $s precisa ter valor (scripts/setup-mp-credentials-producao.sh)." >&2; exit 1; }
+    done
+  fi
   # Turnstile: OPCIONAL e DESLIGADO por padrão em produção (decisão de 06/10/2026). Para ligar: TURNSTILE_ENABLED=true com as DUAS chaves
   # (README-DEPLOY.md, seção 8b). Ligado sem as chaves, recusa aqui, antes do build e da migração. A chave de TESTE da Cloudflare não vale em produção.
   if [ "${TURNSTILE_ENABLED:-false}" = "true" ]; then
@@ -224,7 +232,7 @@ cmd_deploy() {
     "JOBS_CALLER_EMAIL=$(sa $SCHED_SA),$(sa $TASKS_SA)"
     "TASKS_QUEUE=projects/$PROJECT/locations/$REGION/queues/$QUEUE" "TASKS_INVOKER_EMAIL=$(sa $TASKS_SA)"
     "TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-false}" "GLOBAL_SIGNUPS_PER_HOUR=${GLOBAL_SIGNUPS_PER_HOUR:-1000}" "SIGNUPS_PER_IP_PER_HOUR=${SIGNUPS_PER_IP_PER_HOUR:-100}" "GLOBAL_RECOVERIES_PER_HOUR=${GLOBAL_RECOVERIES_PER_HOUR:-60}"
-    ${GATEWAY_ENVIRONMENT:+"GATEWAY_ENVIRONMENT=$GATEWAY_ENVIRONMENT"}
+    ${GATEWAY_ENVIRONMENT:+"GATEWAY_ENVIRONMENT=$GATEWAY_ENVIRONMENT"} ${MP_COLLECTOR_ID:+"MP_COLLECTOR_ID=$MP_COLLECTOR_ID"}
     "QR_HMAC_CURRENT=${QR_HMAC_CURRENT:-1}" "SALES_OPEN=$sales" "PAYMENT_GATEWAY=$gateway" "VISUAL_APPROVED=${VISUAL_APPROVED:-false}")
   for v in TERMS_VERSION PRIVACY_VERSION CANCELLATION_VERSION EMAIL_FROM EMAIL_REPLY_TO RESERVATION_MINUTES MAX_TICKETS_PER_ORDER \
            RETENTION_LOGIN_ATTEMPTS_DAYS RETENTION_SESSIONS_DAYS RETENTION_PASSWORD_RESETS_DAYS GATE_SCANS_PER_MINUTE GATE_SEARCHES_PER_MINUTE \
@@ -239,6 +247,7 @@ cmd_deploy() {
   # Segredos obrigatórios sempre; SMTP e Turnstile só entram se o segredo já tem valor (o Cloud Run recusa montar segredo sem versão).
   local secrets="DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,QR_HMAC_KEYS=qr-hmac-keys:latest"
   local pairs=(SMTP_URL=smtp-url); [ "${TURNSTILE_ENABLED:-false}" != "true" ] || pairs+=(TURNSTILE_SECRET=turnstile-secret)
+  [ "$gateway" != "mercadopago" ] || secrets="$secrets,MP_ACCESS_TOKEN=mp-access-token:latest,MP_PUBLIC_KEY=mp-public-key:latest,MP_WEBHOOK_SECRET=mp-webhook-secret:latest"
   for pair in "${pairs[@]}"; do
     [ -z "$(g secrets versions list "${pair#*=}" --limit=1 --format='value(name)' 2>/dev/null)" ] || secrets="$secrets,${pair%%=*}=${pair#*=}:latest"
   done

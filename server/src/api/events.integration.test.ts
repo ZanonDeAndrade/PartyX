@@ -865,7 +865,7 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
       });
       expect(meta.ageRatings).toContain('18 anos');
       expect(meta.limits).toMatchObject({ priceMaxCents: 10_000_000, quantityMax: 100_000, typeNameMax: 60 });
-      expect(meta.reservationMinutes).toBe(10);
+      expect(meta.reservationMinutes).toBe(30);
       expect(meta.gateWindow).toEqual({ beforeHours: 12, afterHours: 24 });
       expect(meta.maxTicketsPerOrder).toBe(6);
       // Sem armazenamento configurado, a tela sabe que o banner está indisponível.

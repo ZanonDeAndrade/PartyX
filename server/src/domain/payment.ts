@@ -39,11 +39,39 @@ const INTENT: Record<GatewayStatus, PaymentIntent> = {
 
 export const intentFor = (status: GatewayStatus): PaymentIntent => INTENT[status];
 
+/**
+ * Motivo de uma recusa, já traduzido do código do gateway para uma categoria da PartyX. A tela mostra um texto amigável
+ * para cada uma; o código original do gateway fica guardado no pedido para o atendimento (`gateway_status_detail`).
+ */
+export type DeclineReason =
+  | 'dados_do_cartao'
+  | 'saldo_insuficiente'
+  | 'nao_autorizado'
+  | 'cartao_desabilitado'
+  | 'pagamento_duplicado'
+  | 'seguranca'
+  | 'limite_de_tentativas'
+  | 'autenticacao'
+  | 'outro';
+
+export const DECLINE_REASONS: readonly DeclineReason[] = [
+  'dados_do_cartao',
+  'saldo_insuficiente',
+  'nao_autorizado',
+  'cartao_desabilitado',
+  'pagamento_duplicado',
+  'seguranca',
+  'limite_de_tentativas',
+  'autenticacao',
+  'outro',
+];
+
 /** Foto de um pagamento no gateway, no formato da PartyX. */
 export interface PaymentSnapshot {
   gatewayPaymentId: string;
   status: GatewayStatus;
-  method: PaymentMethod;
+  /** `outro`: forma que a PartyX não oferece (ex.: saldo em conta). Nunca confere com o pedido. */
+  method: PaymentMethod | 'outro';
   /** Nosso identificador do pedido, devolvido pelo gateway (referência externa). */
   orderRef: string;
   amountCents: number;
@@ -53,6 +81,10 @@ export interface PaymentSnapshot {
   paidAt: Date | null;
   /** Só enquanto Pix pendente: para mostrar o código de novo ao recarregar a página. */
   pix: PixData | null;
+  /** Código de detalhe do gateway (ex.: motivo da recusa), como veio. Nunca contém dado do comprador. */
+  statusDetail: string | null;
+  /** Recusa: categoria para a mensagem ao comprador. Nulo nos demais estados. */
+  declineReason: DeclineReason | null;
 }
 
 export interface PixData {

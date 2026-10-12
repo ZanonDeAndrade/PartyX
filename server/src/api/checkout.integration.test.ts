@@ -17,7 +17,7 @@ describe.skipIf(!ADMIN_URL)('carrinho, reserva e estoque (integração)', () => 
   const sql = (text: string, params: unknown[] = []) => testDb.pool.query(text, params);
   const build = (env: Record<string, string> = {}) =>
     createApp({
-      config: loadConfig({ APP_ENV: 'local', ...env }),
+      config: loadConfig({ APP_ENV: 'local', RESERVATION_MINUTES: '10', ...env }),
       clock,
       auth: { db: createDrizzle(testDb.pool), hasher: argon2Hasher, mailer: new MemoryEmailSender() },
     });

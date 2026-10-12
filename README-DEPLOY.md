@@ -227,9 +227,41 @@ Nada de produção reaproveita banco, segredo ou credencial da homologação, e 
 2. **O servidor recusa subir** (antes de atender qualquer requisição) se o banco não for do ambiente dele ou não tiver marca: log `banco_de_outro_ambiente`, saída 1, sem imprimir a URL. Provado subindo o processo de verdade.
 3. **A migração recusa** banco de outro ambiente ou sem marca, antes de criar qualquer tabela.
 4. **`deploy.sh` (produção)** recusa, antes do build: banco que não seja de produção, URLs pooled e direta de bancos diferentes, credenciais de **sandbox** do gateway, gateway configurado sem `GATEWAY_ENVIRONMENT=producao`, gateway fictício, projeto com `hml` no nome. **`deploy.sh` (homologação)** recusa o inverso: banco de produção, credenciais de produção do gateway, projeto com `prod` no nome.
-5. **A configuração** recusa `GATEWAY_ENVIRONMENT=sandbox` em produção e `producao` em homologação. Cada adaptador do gateway ainda vai conferir o formato da chave (a fazer com o gateway escolhido, D-01): hoje não há gateway real, então essa camada é só a declaração.
+5. **A configuração** recusa `GATEWAY_ENVIRONMENT=sandbox` em produção, `producao` em homologação e `producao` no ambiente local; com `PAYMENT_GATEWAY=mercadopago` exige as três credenciais e o `MP_COLLECTOR_ID`, e recusa token `TEST-` com `producao`. Na partida, o servidor confere a conta das credenciais (`GET /users/me`) contra `MP_COLLECTOR_ID` (alerta `gateway_conta`), e toda order reconsultada precisa ter esse recebedor.
 
 A marca é posta pelo `deploy.sh roles` (produção) e já foi posta no banco de homologação.
+
+## 8f. Mercado Pago (D-01): painel, segredos e troca para produção
+
+Detalhes técnicos e provas em `docs/pagamento-mercadopago.md`. A integração usa a **API de Orders** com o Card Payment Brick.
+
+**No painel do Mercado Pago** (Suas integrações > aplicação da PartyX > **Webhooks > Configurar notificações**):
+
+- **Modo produtivo:** URL `https://<domínio>/api/webhooks/payments` (hoje `https://partyx-producao.web.app/api/webhooks/payments`;
+  trocar quando o domínio próprio existir, D-08). Evento **Order (Mercado Pago)**: ele traz também a contestação (`order.charged_back`).
+- **Modo de teste:** só durante testes (um túnel temporário ou a homologação). Não deixe o endereço de um túnel no modo produtivo.
+- **Assinatura secreta:** salvar a configuração pode gerar uma nova. Depois de qualquer "Redefinir" ou salvamento que a troque, grave
+  de novo: `bash scripts/setup-mp-credentials-producao.sh --so-webhook` (e `bash scripts/setup-mp-credentials.sh --so-webhook` no
+  local). Use **Simular notificação**: com a assinatura certa, o servidor responde **200** (o id fictício `123456` é ignorado).
+
+**Segredos de produção** (Secret Manager do `partyx-producao`, lidos só por `partyx-app`): `mp-access-token`, `mp-public-key` e
+`mp-webhook-secret`, gravados por `bash scripts/setup-mp-credentials-producao.sh` (digitação oculta, confere a conta pela API, nunca
+grava em arquivo). Gravados em 11/10/2026; a assinatura foi regravada no mesmo dia e conferida com a notificação simulada do painel.
+
+**Ligar em produção** (só com autorização expressa; continua com as vendas fechadas até o go-live):
+
+```bash
+PAYMENT_GATEWAY=mercadopago GATEWAY_ENVIRONMENT=producao MP_COLLECTOR_ID=<id da conta da PartyX> \
+  PUBLIC_BASE_URL=https://partyx-producao.web.app BACKUP_DONE=sim NO_FICTITIOUS_DATA=sim ./infra/producao/deploy.sh deploy
+```
+
+O `deploy` recusa sem `MP_COLLECTOR_ID` ou sem versão ativa nos três segredos, monta os segredos como `MP_ACCESS_TOKEN`,
+`MP_PUBLIC_KEY` e `MP_WEBHOOK_SECRET`, e a migração `0008` (motivo da recusa e tentativa de cobrança) entra pelo job antes do deploy.
+A reserva passa a 30 minutos pelo padrão do código (D-03); não precisa de variável. Depois: compra real de baixo valor (13.1),
+conferir no log `gateway de pagamento: conta conferida` e a chegada do webhook. Estorno é feito pela PartyX no painel do Mercado Pago.
+
+**Voltar para teste** (homologação): as credenciais de teste do painel (Testes > Credenciais de teste) com
+`GATEWAY_ENVIRONMENT=sandbox`; produção nunca aceita `sandbox`.
 
 ## 9. Checklist final (manual)
 
@@ -237,7 +269,7 @@ A marca é posta pelo `deploy.sh roles` (produção) e já foi posta no banco de
 - [ ] **Turnstile: desligado em produção por decisão** (seção 8b). Para ligar: widget, `turnstile-secret` e `TURNSTILE_ENABLED=true`. **Antes de um evento, suba `GLOBAL_SIGNUPS_PER_HOUR`.**
 - [ ] Domínio: no console do Firebase (Hosting) adicione o domínio, crie os registros DNS que ele pedir (TXT de verificação e A/AAAA) e espere o certificado. Ajuste `PUBLIC_BASE_URL` para o domínio e faça novo `deploy` (a checagem de origem, contra CSRF, depende dele). Domínio no Turnstile também.
 - [ ] E-mail: provedor SMTP, remetente e **SPF, DKIM, DMARC** do domínio (`DOMAIN=<domínio> DKIM_SELECTOR=<seletor> ./infra/email-dns-check.sh`).
-- [ ] Gateway real na conta da PartyX, credenciais e webhook de produção (D-01 a D-04). O endereço do webhook é `https://<domínio>/api/webhooks/payments`.
+- [ ] **Mercado Pago** (D-01, seção 8f): segredos `mp-*` gravados (feito em 11/10/2026), URL do webhook de produção e evento **Order (Mercado Pago)** no painel, deploy com `PAYMENT_GATEWAY=mercadopago GATEWAY_ENVIRONMENT=producao MP_COLLECTOR_ID=<id>` e a compra real de baixo valor (13.1). D-04 segue com o cliente.
 - [ ] Textos legais e versões (D-11), identidade visual aprovada (D-10), regras de meia-entrada.
 - [ ] **Backup diário ativo e uma restauração de teste feita: PRÉ-REQUISITO DO GO-LIVE.** Os scripts estão prontos e foram verificados na **homologação** (seção 10 e `docs/backup.md`); **em produção** falta rodar `deploy.sh backup`, executar o job uma vez e fazer o ensaio de restauração com o banco real. O `deploy` recusa sem `BACKUP_DONE=sim`.
 - [ ] **Cópia semanal do backup em outro projeto** (recomendado): hoje as cópias ficam no mesmo projeto do banco.

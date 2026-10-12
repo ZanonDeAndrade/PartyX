@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:server": "tsx watch --env-file-if-exists=.env server/src/index.ts",
+    "dev:server": "tsx watch --env-file-if-exists=.env --env-file-if-exists=.env.local server/src/index.ts",
     "build": "tsc -b && vite build && npm run build:server",
     "build:server": "esbuild index=server/src/index.ts migrate=server/scripts/migrate.ts --bundle --platform=node --format=esm --target=node24 --packages=external --outdir=dist-server",
     "start": "node dist-server/index.js",

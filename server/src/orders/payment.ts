@@ -1,7 +1,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { orders, reservations, users } from '../db/schema';
 import { AppError } from '../domain/errors';
-import { looksLikeCardNumber, type PaymentMethod } from '../domain/payment';
+import { looksLikeCardNumber, type DeclineReason, type PaymentMethod } from '../domain/payment';
 import { logger } from '../logger';
 import { delayUntil, nextCheck } from '../domain/reconcileSchedule';
 import { GatewayError, GatewayRejectedError, type CreatedPayment, type PaymentGateway } from '../payments/gateway';
@@ -12,17 +12,53 @@ export interface PaymentDeps extends OrdersDeps {
   gateway: PaymentGateway | undefined;
   /** Endereço público, para a volta do cartão hospedado. */
   publicBaseUrl: string;
+  /**
+   * Conciliação imediata: quando o gateway já responde com um estado final na criação (cartão aprovado ou recusado), o pedido é
+   * resolvido na hora, sempre **reconsultando** o gateway (mesmo caminho do webhook). Ausente: o webhook e as tarefas resolvem.
+   */
+  settle?: (gatewayPaymentId: string) => Promise<void>;
 }
 
-export type StartPaymentInput = { method: 'pix' } | { method: 'cartao'; cardToken?: string; installments?: number };
+export type StartPaymentInput =
+  | { method: 'pix' }
+  | { method: 'cartao'; cardToken?: string; installments?: number; paymentMethodId?: string; paymentTypeId?: string };
 
-/** O que a tela precisa para pagar. Nunca inclui id do gateway, conta nem dados de cartão. */
+/** O que a tela precisa para pagar. Nunca inclui conta nem dados de cartão. */
 export interface PaymentView {
   method: PaymentMethod;
   status: 'pendente' | 'aprovado' | 'recusado' | 'expirado' | 'cancelado' | 'estornado' | 'contestado';
   pix: { copyPaste: string; qrCodeImage: string | null; expiresAt: string } | null;
   /** Cartão hospedado: para onde levar o comprador. */
   redirectUrl: string | null;
+  /** Recusa: categoria para o texto amigável. */
+  declineReason: DeclineReason | null;
+}
+
+/** Como a tela de pagamento deve se montar: forma do cartão, chave pública e se o Pix cabe no prazo da reserva (D-03). */
+export interface PaymentOptions {
+  provider: string | null;
+  cardMode: 'hosted' | 'token' | null;
+  publicKey: string | null;
+  maxInstallments: number;
+  pixAvailable: boolean;
+}
+
+/**
+ * O Pix só é oferecido se o prazo mínimo do gateway couber na reserva: o QR vence junto com a reserva (D-03). No Mercado Pago o
+ * mínimo é 30 minutos; com a reserva de 10 minutos o Pix fica fora até a decisão da PartyX.
+ */
+export function pixFits(gateway: PaymentGateway | undefined, reservationMinutes: number): boolean {
+  return Boolean(gateway && reservationMinutes * 60 >= gateway.capabilities.pixExpiry.minSeconds);
+}
+
+export function paymentOptions(gateway: PaymentGateway | undefined, reservationMinutes: number): PaymentOptions {
+  return {
+    provider: gateway?.capabilities.providerId ?? null,
+    cardMode: gateway?.capabilities.cardMode ?? null,
+    publicKey: gateway?.capabilities.publicKey ?? null,
+    maxInstallments: gateway?.capabilities.maxInstallments ?? 1,
+    pixAvailable: pixFits(gateway, reservationMinutes),
+  };
 }
 
 /** Folga mínima para criar a cobrança: abaixo disso o Pix nasceria praticamente vencido. */
@@ -61,10 +97,13 @@ export function rejectCardData(body: unknown, depth = 0): void {
   }
 }
 
-function present(created: Pick<CreatedPayment, 'status' | 'redirectUrl' | 'snapshot'>): PaymentView {
+function present(
+  created: Pick<CreatedPayment, 'status' | 'redirectUrl' | 'snapshot'>,
+  orderMethod: PaymentMethod,
+): PaymentView {
   const { snapshot } = created;
   return {
-    method: snapshot.method,
+    method: snapshot.method === 'outro' ? orderMethod : snapshot.method,
     status: created.status,
     pix: snapshot.pix
       ? {
@@ -74,6 +113,7 @@ function present(created: Pick<CreatedPayment, 'status' | 'redirectUrl' | 'snaps
         }
       : null,
     redirectUrl: created.redirectUrl,
+    declineReason: created.status === 'recusado' ? (snapshot.declineReason ?? 'outro') : null,
   };
 }
 
@@ -88,12 +128,24 @@ async function loadOwn(deps: PaymentDeps, userId: string, orderId: string) {
   return row;
 }
 
-/** Desfaz a escolha da forma de pagamento quando a cobrança não chegou a existir, para o comprador poder tentar de novo ou trocar. */
-async function unclaim(deps: PaymentDeps, orderId: string) {
+/**
+ * Desfaz a escolha da forma de pagamento quando a cobrança não chegou a existir, para o comprador poder tentar de novo ou trocar.
+ * `newAttempt`: o gateway recusou criar a cobrança, então a próxima tentativa leva chave de idempotência nova. Em falha de rede a
+ * cobrança pode ter sido criada: a tentativa (e a chave) continua a mesma, e repetir devolve a mesma cobrança.
+ */
+async function unclaim(deps: PaymentDeps, orderId: string, newAttempt = false) {
   await deps.db
     .update(orders)
-    .set({ paymentMethod: null })
+    .set({
+      paymentMethod: null,
+      ...(newAttempt ? { paymentAttempt: sql`${orders.paymentAttempt} + 1` } : {}),
+    })
     .where(and(eq(orders.id, orderId), isNull(orders.gatewayPaymentId), eq(orders.status, 'pendente')));
+}
+
+/** Chave de idempotência da tentativa de cobrança: estável por pedido, forma e tentativa (a primeira mantém o formato antigo). */
+export function chargeKey(orderId: string, method: PaymentMethod, attempt: number): string {
+  return attempt > 0 ? `order:${orderId}:${method}:${attempt}` : `order:${orderId}:${method}`;
 }
 
 /**
@@ -101,9 +153,9 @@ async function unclaim(deps: PaymentDeps, orderId: string) {
  * valida → marca a forma escolhida (curta transação) → **chama o gateway fora de qualquer transação** →
  * guarda o id da cobrança. Valor, referência e prazo vêm do pedido no banco, nunca do navegador.
  *
- * Seguro de repetir: a chave de idempotência é `order:<id>:<método>`, então repetir (clique duplo, falha de rede,
- * queda entre a criação e o registro) devolve a mesma cobrança. O retorno do navegador **não** aprova nada:
- * só o servidor, depois de reconsultar o gateway, muda o pedido para pago (Prompt 12).
+ * Seguro de repetir: a chave de idempotência é `order:<id>:<método>[:<tentativa>]`, então repetir (clique duplo, falha de rede,
+ * queda entre a criação e o registro) devolve a mesma cobrança; só uma recusa na criação abre tentativa nova (chave nova).
+ * O retorno do navegador **não** aprova nada: só o servidor, depois de reconsultar o gateway, muda o pedido para pago (Prompt 12).
  */
 export async function startPayment(
   deps: PaymentDeps,
@@ -160,21 +212,20 @@ export async function startPayment(
     amountCents: order.totalCents,
     payer: { name, email, cpf },
     description: `Ingressos PartyX, pedido ${order.number}`,
-    idempotencyKey: `order:${orderId}:${input.method}`,
+    idempotencyKey: chargeKey(orderId, input.method, order.paymentAttempt),
   };
 
   // Prepara a chamada antes de marcar o pedido, para erro de entrada não deixar rastro.
   let call: () => Promise<CreatedPayment>;
   if (input.method === 'pix') {
-    // A cobrança vence junto com a reserva, mas nunca além do que o provedor aceita (D-03).
-    const seconds = Math.min(remaining, capabilities.pixExpiry.maxSeconds);
-    if (seconds < capabilities.pixExpiry.minSeconds) {
-      throw new AppError(
-        409,
-        'reserva_expirada',
-        'A reserva está acabando. Volte ao evento e escolha os ingressos de novo.',
-      );
+    if (!pixFits(gateway, deps.config.RESERVATION_MINUTES)) {
+      throw new AppError(409, 'pix_indisponivel', 'O Pix não está disponível no momento. Pague com cartão.');
     }
+    // A cobrança vence junto com a reserva (D-03), dentro dos limites do provedor. Se faltar menos que o mínimo do provedor (no
+    // Mercado Pago, 30 minutos, com a reserva também de 30), o Pix vence no mínimo dele, um pouco depois da reserva: pagamento
+    // nesse intervalo segue a regra da aprovação tardia (emite se ainda houver estoque; senão, "pago sem estoque").
+    const floor = capabilities.pixExpiry.minSeconds + (capabilities.pixExpiry.minSeconds >= 600 ? 60 : 0);
+    const seconds = Math.min(Math.max(remaining, floor), capabilities.pixExpiry.maxSeconds);
     const expiresAt = new Date(now.getTime() + seconds * 1000);
     call = () => gateway.createPix({ ...common, expiresAt });
   } else {
@@ -185,12 +236,13 @@ export async function startPayment(
       ]);
     }
     if (capabilities.cardMode === 'token') {
-      if (!input.cardToken)
+      if (!input.cardToken || !input.paymentMethodId || !input.paymentTypeId)
         throw new AppError(422, 'dados_invalidos', 'Alguns campos precisam de ajuste.', [
           { campo: 'cardToken', mensagem: 'Informe o token do cartão gerado pelo gateway.' },
         ]);
-      const cardToken = input.cardToken;
-      call = () => gateway.createCard({ ...common, mode: 'token', cardToken, installments });
+      const { cardToken, paymentMethodId, paymentTypeId } = input;
+      call = () =>
+        gateway.createCard({ ...common, mode: 'token', cardToken, installments, paymentMethodId, paymentTypeId });
     } else {
       call = () =>
         gateway.createCard({
@@ -221,7 +273,7 @@ export async function startPayment(
   try {
     created = await call(); // chamada externa: fora de qualquer transação
   } catch (error) {
-    await unclaim(deps, orderId);
+    await unclaim(deps, orderId, error instanceof GatewayRejectedError);
     if (error instanceof GatewayRejectedError) {
       logger.warn('gateway recusou a criação da cobrança', {
         orderId,
@@ -289,7 +341,20 @@ export async function startPayment(
       throw new AppError(409, 'pedido_nao_pendente', 'Este pedido já tem um pagamento em andamento.');
     }
   }
-  return { payment: present(created) };
+  // Estado final já na criação (cartão aprovado ou recusado): resolve o pedido agora, reconsultando o gateway. Falha aqui não
+  // desfaz a cobrança: o webhook e as verificações agendadas resolvem depois.
+  if (created.status !== 'pendente' && deps.settle) {
+    try {
+      await deps.settle(created.gatewayPaymentId);
+    } catch (error) {
+      logger.warn('conciliação imediata adiada', {
+        orderId,
+        provider: capabilities.providerId,
+        error: error instanceof GatewayError ? error.name : 'desconhecido',
+      });
+    }
+  }
+  return { payment: present(created, input.method) };
 }
 
 /** Situação do pagamento do pedido, consultada no gateway (mostra o Pix de novo ao recarregar a página). */
@@ -308,7 +373,7 @@ export async function getPayment(deps: PaymentDeps, userId: string, orderId: str
         'O pagamento está instável no momento. Tente novamente em instantes.',
       );
     }
-    return present({ status: snapshot.status, redirectUrl: null, snapshot });
+    return present({ status: snapshot.status, redirectUrl: null, snapshot }, order.paymentMethod);
   } catch (error) {
     if (error instanceof AppError) throw error;
     logger.error('falha ao consultar o gateway', {

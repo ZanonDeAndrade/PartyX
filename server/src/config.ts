@@ -58,14 +58,26 @@ const schema = z
     BANNER_BUCKET: z.string().min(3).optional(),
     /** Endereço público dos banners. Padrão: https://storage.googleapis.com/<bucket>. Use para CDN ou domínio próprio. */
     BANNER_PUBLIC_BASE_URL: z.url().optional(),
-    /** Duração da reserva temporária ao iniciar o pagamento, em minutos. Decisão do cliente (D-03); 10 é a sugestão da documentação. */
-    RESERVATION_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
+    /**
+     * Duração da reserva temporária, em minutos. D-03 (11/10/2026): 30 para todos, porque o Pix do Mercado Pago vence em no mínimo
+     * 30 minutos e o QR precisa valer até o fim da reserva. Com menos que o mínimo do gateway, o Pix não é oferecido.
+     */
+    RESERVATION_MINUTES: z.coerce.number().int().min(1).max(60).default(30),
     /** Máximo de ingressos por compra, somando todos os tipos. Decisão do cliente (D-05); 6 é a premissa do protótipo. */
     MAX_TICKETS_PER_ORDER: z.coerce.number().int().min(1).max(50).default(6),
     /** Abre a criação de pedidos. Em produção fica fechada até a decisão expressa (gateway real, textos legais, equipe). */
     SALES_OPEN: z.enum(['true', 'false']).optional(),
-    /** Gateway de pagamento. `mock` (fictício) só no ambiente local. O real entra depois da escolha do cliente (D-01). Padrão: mock no local, nenhum nos demais. */
-    PAYMENT_GATEWAY: z.enum(['none', 'mock']).optional(),
+    /** Gateway de pagamento: `mercadopago` (D-01) ou `mock` (fictício, só no ambiente local). Padrão: mock no local, nenhum nos demais. */
+    PAYMENT_GATEWAY: z.enum(['none', 'mock', 'mercadopago']).optional(),
+    /** Mercado Pago: Access Token (SEGREDO, Secret Manager na nuvem; `.env.local` no ambiente local, só de teste). */
+    MP_ACCESS_TOKEN: z.string().min(20).max(200).optional(),
+    /** Mercado Pago: Public Key, usada pelo componente de cartão no navegador (pública). */
+    MP_PUBLIC_KEY: z.string().min(20).max(200).optional(),
+    /** Mercado Pago: assinatura secreta das notificações (Webhooks > Configurar notificações). SEGREDO. */
+    MP_WEBHOOK_SECRET: z.string().min(16).max(200).optional(),
+    /** Mercado Pago: id da conta da PartyX (`collector_id`). Todo pagamento precisa ter este recebedor para ser aprovado. */
+    MP_COLLECTOR_ID: z.string().regex(/^\d{1,20}$/, 'só dígitos').optional(),
+
     /** Endereço do serviço, usado como `audience` do token OIDC que o Cloud Scheduler envia às rotinas internas. Sem ele, as rotinas respondem 503. */
     JOBS_AUDIENCE: z.url().optional(),
     /** E-mail(s) das contas de serviço aceitas nas rotinas internas (Cloud Scheduler e Cloud Tasks), separados por vírgula. */
@@ -239,6 +251,22 @@ const schema = z
         message: 'em produção, com gateway configurado, GATEWAY_ENVIRONMENT precisa ser producao',
       });
     }
+    if (env.PAYMENT_GATEWAY === 'mercadopago') {
+      for (const key of ['MP_ACCESS_TOKEN', 'MP_PUBLIC_KEY', 'MP_WEBHOOK_SECRET', 'MP_COLLECTOR_ID'] as const) {
+        if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: 'obrigatória com PAYMENT_GATEWAY=mercadopago' });
+      }
+      // Credencial de produção cobra de verdade: nunca no computador de desenvolvimento.
+      if (env.APP_ENV === 'local' && env.GATEWAY_ENVIRONMENT === 'producao') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['GATEWAY_ENVIRONMENT'],
+          message: 'credenciais de PRODUÇÃO do gateway no ambiente local: recusado',
+        });
+      }
+      if (env.GATEWAY_ENVIRONMENT === 'producao' && env.MP_ACCESS_TOKEN?.startsWith('TEST-')) {
+        ctx.addIssue({ code: 'custom', path: ['MP_ACCESS_TOKEN'], message: 'credencial de teste com GATEWAY_ENVIRONMENT=producao' });
+      }
+    }
     if (env.TURNSTILE_ENABLED === 'true') {
       for (const key of ['TURNSTILE_SECRET', 'TURNSTILE_SITE_KEY'] as const) {
         if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: 'obrigatória com TURNSTILE_ENABLED=true' });
@@ -298,7 +326,7 @@ export type Config = Omit<
 > & {
   /** Chaves de assinatura dos QR por versão, e a versão usada nos ingressos novos. */
   qr: { keys: QrKeys; currentVersion: number };
-  PAYMENT_GATEWAY: 'none' | 'mock';
+  PAYMENT_GATEWAY: 'none' | 'mock' | 'mercadopago';
   /** A verificação humana (Turnstile) está ligada (`TURNSTILE_ENABLED=true`). */
   turnstileEnabled: boolean;
   /** O adaptador fictício está liberado em homologação (só com a variável explícita). */

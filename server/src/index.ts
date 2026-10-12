@@ -50,6 +50,21 @@ const taskQueue =
       })
     : undefined;
 
+const gateway = createGateway(config, systemClock);
+// Mercado Pago: confere, sem bloquear a partida, que as credenciais são da conta configurada (MP_COLLECTOR_ID). Conta diferente
+// nunca aprova nada (a conferência de cada pagamento recusa), mas o alerta avisa logo na publicação.
+if (gateway && 'checkAccount' in gateway && typeof gateway.checkAccount === 'function') {
+  void (gateway.checkAccount as () => Promise<string>)().then(result => {
+    if (result === 'ok') logger.info('gateway de pagamento: conta conferida', { provider: gateway.capabilities.providerId });
+    else
+      logger.error('gateway de pagamento: conta não conferida', {
+        provider: gateway.capabilities.providerId,
+        result,
+        alert: 'gateway_conta',
+      });
+  });
+}
+
 const app = createApp({
   config,
   clock: systemClock,
@@ -63,7 +78,7 @@ const app = createApp({
         hasher: argon2Hasher,
         mailer,
         banners: bannerStorageFor(config),
-        gateway: createGateway(config, systemClock),
+        gateway,
         taskQueue,
         human: config.TURNSTILE_SECRET ? turnstileVerifier(config.TURNSTILE_SECRET) : undefined,
       }

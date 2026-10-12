@@ -34,7 +34,7 @@ describe.skipIf(!ADMIN_URL)('disputa de estoque e pagamento tardio (integração
     extra: { env?: Record<string, string>; jobAuth?: JobAuthenticator | undefined } = {},
   ) =>
     createApp({
-      config: loadConfig({ APP_ENV: 'local', PAYMENT_GATEWAY: 'none', ...extra.env }),
+      config: loadConfig({ APP_ENV: 'local', PAYMENT_GATEWAY: 'none', RESERVATION_MINUTES: '10', ...extra.env }),
       clock,
       auth: { db: createDrizzle(testDb.pool), hasher: argon2Hasher, mailer: new MemoryEmailSender(), gateway },
       jobAuth: 'jobAuth' in extra ? extra.jobAuth : fakeJobAuth,

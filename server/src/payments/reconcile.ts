@@ -115,7 +115,7 @@ export async function reconcilePayment(
       return { outcome, orderId: order.id };
     }
     case 'recusar':
-      return { outcome: await applyDecline(deps, order.id), orderId: order.id };
+      return { outcome: await applyDecline(deps, order.id, snapshot), orderId: order.id };
     case 'expirar':
       return { outcome: await applyGatewayExpiry(deps, order.id), orderId: order.id };
     case 'estornar':
@@ -299,14 +299,24 @@ async function applyApproval(
   });
 }
 
-/** Cartão recusado (CA-P2): sem ingresso, e a reserva é liberada (o estoque volta). */
-async function applyDecline(deps: ReconcileDeps, orderId: string): Promise<ReconcileOutcome> {
+/**
+ * Cartão recusado (CA-P2): sem ingresso, e a reserva é liberada (o estoque volta). Guarda o código de detalhe do gateway (para o
+ * atendimento) e a categoria da recusa (para o texto amigável ao comprador).
+ */
+async function applyDecline(deps: ReconcileDeps, orderId: string, snapshot: PaymentSnapshot): Promise<ReconcileOutcome> {
   const now = deps.clock.now();
   return deps.db.transaction(async tx => {
     const order = await lockOrder(tx, orderId);
     if (order.status !== 'pendente') return 'ignorado';
     assertTransition('pendente', 'nao_concluido');
-    await tx.update(orders).set({ status: 'nao_concluido' }).where(eq(orders.id, orderId));
+    await tx
+      .update(orders)
+      .set({
+        status: 'nao_concluido',
+        gatewayStatusDetail: snapshot.statusDetail,
+        declineReason: snapshot.declineReason ?? 'outro',
+      })
+      .where(eq(orders.id, orderId));
     await tx
       .update(reservations)
       .set({ status: 'liberada', releasedAt: now })

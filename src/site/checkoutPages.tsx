@@ -3,13 +3,17 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   api,
   ApiError,
+  type CardTokenData,
   type CartItem,
+  type DeclineReason,
   type OrderView,
+  type PaymentOptions,
   type PaymentView,
   type Summary,
   type TicketSummary,
 } from './api';
 import { loadCart, saveCart } from './cart';
+import { CardBrick } from './cardBrick';
 import { DateStub, ErrorBox, Layout, usePageTitle } from './components';
 import { mmss, useCountdown } from './countdown';
 import { brl, dateParts, maskEmail, phoneBr, timeOf } from './format';
@@ -539,7 +543,20 @@ function PixBox({ pix, total }: { pix: NonNullable<PaymentView['pix']>; total: n
 
 const POLL_MS = 4000;
 
-/** Só aparece no ambiente local: simula o gateway fictício avisando o servidor, pelo mesmo caminho do webhook. */
+/** Texto ao comprador para cada motivo de recusa (o código técnico do gateway nunca aparece na tela). */
+const DECLINE_TEXT: Record<DeclineReason, string> = {
+  dados_do_cartao: 'Algum dado do cartão não conferiu. Confira número, validade e código de segurança.',
+  saldo_insuficiente: 'O cartão não tem limite ou saldo suficiente para esta compra.',
+  nao_autorizado: 'O banco do cartão não autorizou o pagamento. Fale com o banco ou use outro cartão.',
+  cartao_desabilitado: 'O cartão está desabilitado para compras pela internet. Fale com o banco ou use outro cartão.',
+  pagamento_duplicado: 'Já existe um pagamento igual e recente neste cartão. Se precisar pagar de novo, use outro cartão.',
+  seguranca: 'O pagamento foi recusado pela análise de segurança. Tente com outro cartão.',
+  limite_de_tentativas: 'Este cartão atingiu o limite de tentativas. Use outro cartão.',
+  autenticacao: 'A confirmação com o banco não foi concluída. Tente de novo.',
+  outro: 'O pagamento não foi aprovado.',
+};
+
+/** Só aparece no ambiente local com o gateway fictício: simula o gateway avisando o servidor, pelo mesmo caminho do webhook. */
 function LocalSimulator({ id, onDone }: { id: string; onDone: () => void }) {
   const [env, setEnv] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -591,6 +608,22 @@ export function OrderPage({ id }: { id: string }) {
   const [tick, setTick] = useState(0);
   const [method, setMethod] = useState<'pix' | 'cartao'>('pix');
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
+  const [options, setOptions] = useState<PaymentOptions | null>(null);
+  const [cardOpen, setCardOpen] = useState(false);
+
+  // Forma de pagamento disponível neste ambiente: componente de cartão do gateway e se o Pix cabe na reserva (D-03).
+  useEffect(() => {
+    if (!ready) return;
+    const ctrl = new AbortController();
+    api
+      .paymentOptions(ctrl.signal)
+      .then(o => {
+        setOptions(o);
+        if (!o.pixAvailable) setMethod('cartao');
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [ready]);
 
   const refresh = useCallback(async () => {
     try {
@@ -669,6 +702,12 @@ export function OrderPage({ id }: { id: string }) {
   }
 
   const start = async (m: 'pix' | 'cartao') => {
+    // Cartão com token: primeiro o formulário seguro do gateway; a cobrança só é criada quando ele devolve o token.
+    if (m === 'cartao' && options?.cardMode === 'token') {
+      setError(null);
+      setCardOpen(true);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -680,6 +719,17 @@ export function OrderPage({ id }: { id: string }) {
       setError(e instanceof ApiError ? e.message : 'Não foi possível iniciar o pagamento.');
     } finally {
       setBusy(false);
+    }
+  };
+  const payWithCard = async (card: CardTokenData) => {
+    setError(null);
+    try {
+      const p = await api.startPayment(id, 'cartao', card);
+      setPayment(p);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Não foi possível concluir o pagamento. Tente de novo.');
+      throw e; // o formulário do gateway volta a aceitar o envio
     }
   };
   const cancel = async () => {
@@ -708,7 +758,30 @@ export function OrderPage({ id }: { id: string }) {
   );
 
   let body: ReactNode;
-  if (pending && !payment && !order.paymentMethod) {
+  if (pending && !payment && !order.paymentMethod && cardOpen && options?.publicKey) {
+    body = (
+      <>
+        <h1 className="px-ck-title">Pague com cartão</h1>
+        {secondsLeft !== null ? <TimerCard secondsLeft={secondsLeft} /> : null}
+        <CardBrick
+          publicKey={options.publicKey}
+          amountCents={order.totalCents}
+          payerEmail={email}
+          onToken={payWithCard}
+        />
+        <div className="px-done-actions px-done-actions-start">
+          {options.pixAvailable ? (
+            <button type="button" className="px-btn px-btn-outline px-btn-lg" onClick={() => setCardOpen(false)}>
+              Escolher outra forma
+            </button>
+          ) : null}
+          <button type="button" className="px-btn px-btn-outline px-btn-lg" disabled={busy} onClick={cancel}>
+            Cancelar pedido
+          </button>
+        </div>
+      </>
+    );
+  } else if (pending && !payment && !order.paymentMethod) {
     body = (
       <>
         <h1 className="px-ck-title">Como você quer pagar?</h1>
@@ -719,11 +792,15 @@ export function OrderPage({ id }: { id: string }) {
               ['pix', 'Pix', 'Aprovação em instantes. O QR Code e o código copia e cola valem até o fim da reserva.'],
               [
                 'cartao',
-                'Cartão de crédito',
-                'Pagamento em campos seguros do gateway. Parcelamento aparece somente se estiver habilitado e aprovado no gateway escolhido.',
+                'Cartão de crédito ou débito',
+                options?.cardMode === 'token'
+                  ? 'À vista, nos campos seguros do Mercado Pago. Os dados do cartão não passam pela PartyX.'
+                  : 'Pagamento em campos seguros do gateway. À vista.',
               ],
             ] as const
-          ).map(([k, label, text]) => (
+          )
+            .filter(([k]) => k !== 'pix' || options?.pixAvailable !== false)
+            .map(([k, label, text]) => (
             <button
               key={k}
               type="button"
@@ -773,6 +850,18 @@ export function OrderPage({ id }: { id: string }) {
           <div className="px-skel px-pix-skel-side" />
         </div>
       </>
+    );
+  } else if (pending && order.paymentMethod === 'cartao' && options?.cardMode === 'token') {
+    // Cartão em análise (o banco ou o antifraude ainda não decidiram): a página atualiza sozinha.
+    body = (
+      <section className="px-ck-card px-result" aria-live="polite">
+        <span className="px-spinner" aria-hidden="true" />
+        <h1>Pagamento em análise</h1>
+        <p>
+          O banco ainda está confirmando o pagamento. Esta página atualiza sozinha e os ingressos aparecem aqui assim
+          que ele for aprovado. Não faça um novo pedido.
+        </p>
+      </section>
     );
   } else if (pending) {
     body = (
@@ -876,8 +965,9 @@ export function OrderPage({ id }: { id: string }) {
         }}
         actions={back}
       >
-        O pagamento não foi aprovado. Nenhum ingresso foi emitido e nada foi cobrado. Você pode tentar de novo, com
-        outro cartão ou com Pix.
+        {order.declineReason && order.declineReason !== 'outro' ? `${DECLINE_TEXT[order.declineReason]} ` : null}O
+        pagamento não foi aprovado. Nenhum ingresso foi emitido e nada foi cobrado. Você pode tentar de novo
+        {options?.pixAvailable === false ? ', com outro cartão.' : ', com outro cartão ou com Pix.'}
       </ResultCard>
     );
   } else if (order.status === 'pago_sem_estoque') {
@@ -988,7 +1078,7 @@ export function OrderPage({ id }: { id: string }) {
       >
         {body}
       </Stage>
-      {order.paymentMethod && order.status !== 'estornado' ? (
+      {order.paymentMethod && order.status !== 'estornado' && options?.provider === 'mock' ? (
         <LocalSimulator id={id} onDone={() => void refresh()} />
       ) : null}
       {error ? (

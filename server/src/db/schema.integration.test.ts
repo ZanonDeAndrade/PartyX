@@ -144,7 +144,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(8);
+      expect(r.rows[0].n).toBe(9);
     });
   });
 
@@ -597,9 +597,22 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag5 = '0005_excecoes_pagamento';
       const tag6 = '0006_encerramento_do_evento';
       const tag7 = '0007_banner_responsivo';
+      const tag8 = '0008_recusa_do_pagamento';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag7)).rejects.toThrow(/não é a última/);
+
+      // 0008: só as três colunas da recusa e da tentativa de cobrança em orders; reverter as apaga.
+      const declineColumns = async () =>
+        (
+          await db.pool.query(
+            "select count(*)::int as n from information_schema.columns where table_name = 'orders' and column_name in ('gateway_status_detail','decline_reason','payment_attempt')",
+          )
+        ).rows[0].n;
+      expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag8);
+      expect(await declineColumns()).toBe(0);
 
       // 0007: só a coluna das larguras do banner; reverter a apaga e o banner continua pela banner_url.
       const widthsColumn = async () =>
@@ -640,7 +653,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe a 0007 de volta: ela sai antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe a 0007 e a 0008 de volta: elas saem antes da 0006
+      expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag8);
       await rollbackLastMigration(db.url, tag7);
       await rollbackLastMigration(db.url, tag6);
       expect(

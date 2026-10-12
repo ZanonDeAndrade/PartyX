@@ -1,0 +1,33 @@
+{
+  "id": "ORD01HRYFWNYRE1MR1E60MW3X0T2P",
+  "type": "online",
+  "total_amount": "180.00",
+  "external_reference": "11111111-2222-4333-8444-555555555555",
+  "country_code": "BRA",
+  "user_id": "123456789",
+  "status": "action_required",
+  "status_detail": "waiting_transfer",
+  "capture_mode": "automatic_async",
+  "currency": "BRL",
+  "transactions": {
+    "payments": [
+      {
+        "id": "PAY01HRYFXQ53Q3JPEC48MYWMR0TE",
+        "reference_id": "123456789",
+        "status": "action_required",
+        "status_detail": "waiting_transfer",
+        "amount": "180.00",
+        "date_of_expiration": "2026-10-10T15:31:00.000+00:00",
+        "payment_method": {
+          "id": "pix",
+          "type": "bank_transfer",
+          "ticket_url": "https://www.mercadopago.com.br/sandbox/payments/00000000000/ticket?caller_id=77777777777&hash=ficticio",
+          "qr_code": "00020126580014br.gov.bcb.pix0136b76aa9c2-2ec4-4110-954e-ebfe34f05b61520400005303986540510.005802BR5912TESTPVBWOSBE6009Sao Paulo62240520mpqrinter715936942186304C3C0",
+          "qr_code_base64": "iVBORw0KGgoAAAANSUhEUgAABWQAAAVkAQAAAAB79iscAAANZklEQVR42u3dQW4bORAF0L6BrqqjRVebdhdtVfaxxZeMFwDDQyCASSBKgkRrQAAAAAAAAAAAAAAAAAAA"
+        }
+      }
+    ]
+  },
+  "processing_mode": "automatic",
+  "marketplace": "NONE"
+}

@@ -12,6 +12,7 @@ import {
   type TypeForPlan,
 } from '../domain/checkout';
 import { AppError } from '../domain/errors';
+import { DECLINE_REASONS, type DeclineReason } from '../domain/payment';
 import { isCouponCodeValid, normalizeCouponCode } from '../domain/events';
 import type { Config, SupportContact } from '../config';
 import { reservedByType } from '../events/service';
@@ -210,6 +211,8 @@ export interface OrderView {
    * não forneceu: a tela mostra uma mensagem neutra. Nunca há contato da contratada aqui.
    */
   support: SupportContact | null;
+  /** Pagamento recusado: categoria para o texto amigável (nunca o código técnico do gateway). Nula nos demais estados. */
+  declineReason: DeclineReason | null;
 }
 
 async function view(
@@ -274,6 +277,10 @@ async function view(
       : null,
     createdAt: order.o.createdAt.toISOString(),
     support: order.o.status === 'pago_sem_estoque' ? support : null,
+    declineReason:
+      order.o.status === 'nao_concluido' && DECLINE_REASONS.includes(order.o.declineReason as DeclineReason)
+        ? (order.o.declineReason as DeclineReason)
+        : null,
   };
 }
 
