@@ -8,7 +8,7 @@ fictícios). **Nada rodou em homologação nem em produção, e nenhum aparelho 
 | `roteiro-11-2/sandbox/` | Roteiro 11.2 do PDF, itens 1 a 20, pela interface (Playwright, Chromium), mais o formulário de cartão do Mercado Pago a 360 px. `resultado.md` traz o que cada item conferiu | **Mercado Pago, ambiente de teste** (credenciais de usuário de teste; a conta é conferida antes) | `npm run e2e:roteiro:sandbox` |
 | `roteiro-11-2/ficticio/` | O mesmo roteiro com o gateway fictício local (determinístico; o teste do formulário de cartão fica pulado, porque o Brick só existe com o gateway real) | Fictício | `npm run e2e:roteiro:ficticio` |
 | `responsividade/` | CA-32: 152 telas e estados × 360, 390, 768 e 1440 px; falha se a página tiver `scrollWidth > clientWidth`. `resultado.md` com o resultado e o link da captura de cada medição | Fictício (os estados de pedido vêm do simulador) | `npm run e2e:responsivo` |
-| `carga/` | PDF 11.3 com k6: 200 visitantes simultâneos na página do evento e 50 compras/min por 3 min, com estoque menor que a procura. `resultado.md` (sem limite de memória) e `resultado-heap384.md` (heap do Node limitado a 384 MB) | Fictício | `npm run carga` e `NODE_HEAP_MB=384 npm run carga` |
+| `carga/` | PDF 11.3 com k6: 200 visitantes simultâneos na página do evento e 50 compras/min por 3 min, com estoque menor que a procura. `resultado.md` (sem limite de memória) e `resultado-heap320.md` (heap do Node limitado a 320 MB, como no Cloud Run) | Fictício | `npm run carga` e `NODE_HEAP_MB=320 npm run carga` |
 | `compatibilidade.md` | Checklist **manual** para Chrome Android, Safari iPhone e Chrome/Edge no computador (câmera, QR na tela e impresso, som, PDF, CSV no Excel). **Nenhum item executado** | n/a | À mão, em homologação |
 
 **Capturas fora do Git.** Imagens e o PDF do ingresso de cada rodada ficam em `img/` dentro de cada pasta (por exemplo
@@ -41,9 +41,11 @@ durante a leitura do corpo volta a ser cancelamento). Depois da correção, o ro
 
 ## Observações para revisão
 
-- **Memória sob carga:** sem limite, o servidor chegou a 1,35 GB de RSS e estabilizou (o coletor do V8 adia a coleta quando há RAM
-  sobrando). Com `--max-old-space-size=384`, estabilizou em cerca de 440 a 460 MB, sem erro. O Cloud Run está com 512 MiB e roda o JS
-  empacotado (sem o `tsx` da medição local). Conferir a memória da instância em homologação sob carga antes de uma abertura grande.
+- **Memória sob carga:** a primeira rodada chegou a 1,35 GB de RSS. Não era o heap do V8: cada data formatada criava um
+  `Intl.DateTimeFormat`, com memória nativa do ICU que o coletor quase não enxerga. Corrigido em `server/src/domain/time.ts`; a carga
+  foi refeita com o JS empacotado (o mesmo do contêiner): **375 MB** sem limite e **269 MB** com heap de 320 MB, estáveis do início
+  ao fim. Investigação, outros suspeitos e a recomendação para aberturas grandes: `docs/operacao/memoria.md`. Conferir a memória da
+  instância em homologação sob carga antes de uma abertura grande.
 - **Rolagem interna a 768 px:** cinco tabelas do painel (ingressos e compradores do evento, pedidos, taxa mensal, exceções) rolam na
   horizontal **dentro da própria caixa** a 768 px. A página não rola (CA-32 passa), mas fica listado no resultado da responsividade.
 - Os tempos de carga **não valem para a nuvem**: sem rede, sem Neon, sem gateway real.

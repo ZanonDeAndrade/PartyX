@@ -4,6 +4,7 @@ import { writeAudit } from '../db/audit';
 import { checkins, events, orders, ticketTypes, tickets, users } from '../db/schema';
 import { maskCpf, onlyDigits } from '../domain/cpf';
 import { AppError } from '../domain/errors';
+import { formatInEventZone } from '../domain/time';
 import { logger } from '../logger';
 import type { Clock } from '../providers/clock';
 import { lookupByQr } from '../tickets/service';
@@ -35,16 +36,13 @@ export function gateWindowOf(startsAt: Date, w: GateWindow) {
   };
 }
 const fmt = (d: Date) =>
-  new Intl.DateTimeFormat('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
+  formatInEventZone(d, {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
-  })
-    .format(d)
-    .replace(', ', ' às ');
+  }).replace(', ', ' às ');
 export interface Validator {
   id: string;
   name: string;

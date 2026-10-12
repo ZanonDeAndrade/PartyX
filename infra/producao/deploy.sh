@@ -23,6 +23,8 @@
 #   PUBLIC_BASE_URL   endereço público em HTTPS (obrigatório no `deploy`): https://seudominio.com.br
 #   TRUSTED_PROXY_HOPS=2   MEDIDO atrás do Firebase Hosting em 05/10/2026 (ver README-DEPLOY.md). Direto no Cloud Run seria 1.
 #   MIN_INSTANCES=0  MAX_INSTANCES=3  NOTIFY_EMAIL=<e-mail dos alertas>
+#   MEMORY=512Mi  NODE_HEAP_MB=320  CONCURRENCY=80   memória, heap do V8 e requisições por instância (docs/operacao/memoria.md);
+#                    MEMORY diferente de 512Mi exige NODE_HEAP_MB (ex.: MEMORY=1Gi NODE_HEAP_MB=768 numa abertura grande)
 #   RECONCILE_TASK_OFFSETS_SECONDS=60,120,240,480  RECONCILE_TASK_MARGIN_SECONDS=120
 #   RECONCILE_LATE_OFFSETS_SECONDS=900,1800,3600,10800,28800,86400  RECONCILE_LOCK_SECONDS=120   (padrões do código; só passe para mudar)
 #   PARTYX_SUPPORT_EMAIL  PARTYX_SUPPORT_WHATSAPP   contato de atendimento DA PARTYX para o comprador (nunca o da contratada)
@@ -37,6 +39,9 @@ cd "$(dirname "$0")/../.."
 case "$PROJECT" in *hml*|*homolog*) echo "PROJECT parece de homologação: $PROJECT" >&2; exit 1;; esac
 REGION="${REGION:-southamerica-east1}"        # São Paulo (Tier 2), junto do Neon aws-sa-east-1
 SERVICE="${SERVICE:-partyx}"
+# Heap do V8 abaixo da memória da instância: com 512 MiB, 320 MB de heap deixam cerca de 190 MB para o que não é heap.
+MEMORY="${MEMORY:-512Mi}"
+case "$MEMORY" in 512Mi) NODE_HEAP_MB="${NODE_HEAP_MB:-320}";; *) : "${NODE_HEAP_MB:?com MEMORY=$MEMORY, informe NODE_HEAP_MB}";; esac
 BUDGET_BRL="${BUDGET_BRL:-30}"
 QUEUE="partyx-conciliacao"
 REPO="partyx"
@@ -245,7 +250,7 @@ cmd_deploy() {
 
   echo "== deploy (venda aberta: $sales)"
   # Variáveis em uma lista; o delimitador do gcloud é "#" (os valores têm vírgulas e e-mails com "@").
-  local vars=(NODE_ENV=production APP_ENV=producao "DB_POOL_MAX=5" "TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-2}"
+  local vars=(NODE_ENV=production "NODE_OPTIONS=--max-old-space-size=$NODE_HEAP_MB" APP_ENV=producao "DB_POOL_MAX=5" "TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-2}"
     "PUBLIC_BASE_URL=$PUBLIC_BASE_URL" "BANNER_BUCKET=$BANNERS" "JOBS_AUDIENCE=$url"
     "JOBS_CALLER_EMAIL=$(sa $SCHED_SA),$(sa $TASKS_SA)"
     "TASKS_QUEUE=projects/$PROJECT/locations/$REGION/queues/$QUEUE" "TASKS_INVOKER_EMAIL=$(sa $TASKS_SA)"
@@ -262,7 +267,7 @@ cmd_deploy() {
   done
   [ "${TURNSTILE_ENABLED:-false}" != "true" ] || vars+=("TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY")
   local joined; joined="$(IFS='#'; echo "${vars[*]}")"
-  # Cobrança por requisição (CPU só durante a requisição), 1 vCPU/512 MiB, concorrência 80, teto de 3 instâncias (teto REAL de gasto).
+  # Cobrança por requisição (CPU só durante a requisição), 1 vCPU/512 MiB (heap 320 MB), concorrência 80, teto de 3 instâncias (teto REAL de gasto).
   # Precisa aceitar chamadas sem login: o Firebase Hosting, o Cloud Tasks e o Scheduler chamam por HTTPS; quem protege é o código (OIDC/sessão).
   # Segredos obrigatórios sempre; SMTP e Turnstile só entram se o segredo já tem valor (o Cloud Run recusa montar segredo sem versão).
   local secrets="DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,QR_HMAC_KEYS=qr-hmac-keys:latest"
@@ -272,7 +277,7 @@ cmd_deploy() {
     [ -z "$(g secrets versions list "${pair#*=}" --limit=1 --format='value(name)' 2>/dev/null)" ] || secrets="$secrets,${pair%%=*}=${pair#*=}:latest"
   done
   g run deploy "$SERVICE" --region="$REGION" --image="$IMAGE" --service-account="$(sa $APP_SA)" \
-    --allow-unauthenticated --port=8080 --cpu=1 --memory=512Mi --concurrency=80 --timeout=60 --cpu-throttling --cpu-boost \
+    --allow-unauthenticated --port=8080 --cpu=1 --memory="$MEMORY" --concurrency="${CONCURRENCY:-80}" --timeout=60 --cpu-throttling --cpu-boost \
     --min-instances="${MIN_INSTANCES:-0}" --max-instances="${MAX_INSTANCES:-3}" \
     --set-env-vars="^#^${joined}" \
     --set-secrets="$secrets" \

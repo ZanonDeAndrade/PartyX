@@ -48,8 +48,8 @@ export function injectHome(template: string, data: HomeData): string {
   return withBody.replace('<div id="root"></div>', () => `<div id="root">${heroShell(featured)}</div>`);
 }
 
-const brl = (cents: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
+const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const brl = (cents: number) => BRL.format(cents / 100);
 
 /**
  * Mesma marcação e classes do destaque de `src/site/pages.tsx` (HomePage) e do cabeçalho de `components.tsx`: ao mudar um,

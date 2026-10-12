@@ -1,0 +1,112 @@
+
+
+  █ THRESHOLDS 
+
+    compra_completa_ms
+    ✓ 'p(95)<10000' p(95)=63.05ms
+
+    erros_inesperados
+    ✓ 'count==0' count=0
+
+    http_req_duration{etapa:compra_1_login}
+    ✓ 'p(95)<5000' p(95)=27.49ms
+
+    http_req_duration{etapa:compra_2_pedido_reserva}
+    ✓ 'p(95)<5000' p(95)=9.1ms
+
+    http_req_duration{etapa:compra_3_pix}
+    ✓ 'p(95)<5000' p(95)=6.64ms
+
+    http_req_duration{etapa:compra_4_confirmacao}
+    ✓ 'p(95)<5000' p(95)=19.3ms
+
+    http_req_duration{etapa:compra_5_meus_ingressos}
+    ✓ 'p(95)<5000' p(95)=3.32ms
+
+    http_req_duration{etapa:evento_api}
+    ✓ 'p(95)<1000' p(95)=2.6ms
+
+    http_req_duration{etapa:evento_html}
+    ✓ 'p(95)<1000' p(95)=3.66ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+      {etapa:evento_api}
+      ✓ 'rate<0.01' rate=0.00%
+
+      {etapa:evento_html}
+      ✓ 'rate<0.01' rate=0.00%
+
+    http_reqs{etapa:compra_1_login}
+    ✓ 'count>=0' count=302
+
+    http_reqs{etapa:compra_2_pedido_reserva}
+    ✓ 'count>=0' count=151
+
+    http_reqs{etapa:compra_3_pix}
+    ✓ 'count>=0' count=120
+
+    http_reqs{etapa:compra_4_confirmacao}
+    ✓ 'count>=0' count=120
+
+    http_reqs{etapa:compra_5_meus_ingressos}
+    ✓ 'count>=0' count=120
+
+    http_reqs{etapa:evento_api}
+    ✓ 'count>=0' count=18018
+
+    http_reqs{etapa:evento_html}
+    ✓ 'count>=0' count=18018
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 36036   197.179985/s
+    checks_succeeded...................: 100.00% 36036 out of 36036
+    checks_failed......................: 0.00%   0 out of 36036
+
+    ✓ página do evento 200
+    ✓ API do evento 200
+
+    CUSTOM
+    compra_completa_ms....................................................................: avg=55.35ms med=51ms    p(90)=60.1ms  p(95)=63.05ms p(99)=68.24ms  max=479ms   
+    compras_concluidas....................................................................: 120    0.65661/s
+    compras_iniciadas.....................................................................: 151    0.826234/s
+    compras_recusadas_por_estoque.........................................................: 31     0.169624/s
+    erros_inesperados.....................................................................: 0      0/s
+
+    HTTP
+    http_req_duration.....................................................................: avg=4.14ms  med=2.09ms  p(90)=3.13ms  p(95)=3.58ms  p(99)=38.36ms  max=403.18ms
+      { etapa:compra_1_login }............................................................: avg=12.4ms  med=15.7ms  p(90)=24.95ms p(95)=27.49ms p(99)=29.08ms  max=249.76ms
+      { etapa:compra_2_pedido_reserva }...................................................: avg=7.42ms  med=6.8ms   p(90)=8.77ms  p(95)=9.1ms   p(99)=11.21ms  max=129.93ms
+      { etapa:compra_3_pix }..............................................................: avg=5.15ms  med=4.76ms  p(90)=6.2ms   p(95)=6.64ms  p(99)=7.22ms   max=38.21ms 
+      { etapa:compra_4_confirmacao }......................................................: avg=13.29ms med=12.76ms p(90)=16.64ms p(95)=19.3ms  p(99)=26.7ms   max=28.03ms 
+      { etapa:compra_5_meus_ingressos }...................................................: avg=2.64ms  med=2.64ms  p(90)=3.05ms  p(95)=3.32ms  p(99)=4.52ms   max=4.64ms  
+      { etapa:evento_api }................................................................: avg=2.55ms  med=1.8ms   p(90)=2.35ms  p(95)=2.6ms   p(99)=33.36ms  max=102.57ms
+      { etapa:evento_html }...............................................................: avg=5.52ms  med=2.48ms  p(90)=3.33ms  p(95)=3.66ms  p(99)=105.31ms max=403.18ms
+      { expected_response:true }..........................................................: avg=4.14ms  med=2.09ms  p(90)=3.13ms  p(95)=3.58ms  p(99)=38.36ms  max=403.18ms
+    http_req_failed.......................................................................: 0.00%  0 out of 36849
+      { etapa:evento_api }................................................................: 0.00%  0 out of 18018
+      { etapa:evento_html }...............................................................: 0.00%  0 out of 18018
+    http_reqs.............................................................................: 36849  201.628518/s
+      { etapa:compra_1_login }............................................................: 302    1.652469/s
+      { etapa:compra_2_pedido_reserva }...................................................: 151    0.826234/s
+      { etapa:compra_3_pix }..............................................................: 120    0.65661/s
+      { etapa:compra_4_confirmacao }......................................................: 120    0.65661/s
+      { etapa:compra_5_meus_ingressos }...................................................: 120    0.65661/s
+      { etapa:evento_api }................................................................: 18018  98.589993/s
+      { etapa:evento_html }...............................................................: 18018  98.589993/s
+
+    EXECUTION
+    iteration_duration....................................................................: avg=1.99s   med=2s      p(90)=2.81s   p(95)=2.9s    p(99)=2.98s    max=3.33s   
+    iterations............................................................................: 18169  99.416227/s
+    vus...................................................................................: 25     min=25         max=200
+    vus_max...............................................................................: 220    min=220        max=220
+
+    NETWORK
+    data_received.........................................................................: 94 MB  516 kB/s
+    data_sent.............................................................................: 5.2 MB 28 kB/s
+
+
+

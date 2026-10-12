@@ -8,6 +8,10 @@ export const BANNER_MAX_WIDTH = 1600;
 /** Contra "bombas de descompressão": imagem pequena em bytes e gigante em pixels. */
 const MAX_INPUT_PIXELS = 40_000_000;
 const ACCEPTED = new Set(['jpeg', 'png', 'webp']);
+// Memória nativa da libvips numa instância de 512 MiB e 1 vCPU: sem cache de operações (o banner é processado uma vez) e uma
+// thread por imagem. Medido com 10 banners de 3200 x 1800: o processo subia cerca de 200 MB; assim, cerca de 125 MB.
+sharp.cache(false);
+sharp.concurrency(1);
 
 export interface ShareImage {
   data: Buffer;

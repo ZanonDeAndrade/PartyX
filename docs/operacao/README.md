@@ -71,7 +71,7 @@ Condição: o cliente avisa **com 15 dias** (Anexo II, 1). Sem aviso, registrar 
 
 1. Pedir: data e hora da abertura, público esperado, número de ingressos, divulgação prevista.
 2. Comparar com o que foi medido: no servidor local, 200 visitantes e 50 compras por minuto passaram sem erro e o dobro também (`docs/carga-compatibilidade-seguranca.md`). **Isso não vale para a nuvem**: repita `infra/testes/load.mjs` em **homologação** com os números do cliente.
-3. Ajustar: `--max-instances` do Cloud Run (hoje 3), `DB_POOL_MAX` (cada instância abre até esse número de conexões; multiplicar pelo máximo de instâncias e comparar com o limite do plano do Neon), unidades de computação do Neon (D-18), limites de chamadas do gateway.
+3. Ajustar: memória da instância (512 MiB com heap de 320 MB; subir para 1 GiB durante a janela ou limitar a concorrência, ver `memoria.md`), `--max-instances` do Cloud Run (hoje 3), `DB_POOL_MAX` (cada instância abre até esse número de conexões; multiplicar pelo máximo de instâncias e comparar com o limite do plano do Neon), unidades de computação do Neon (D-18), limites de chamadas do gateway.
 4. Conferir: `/api/health/ready`, alertas ligados, backup do dia, rotina de conciliação rodando, e-mail autenticado, orçamento com folga.
 5. Combinar a janela: nenhuma publicação nem manutenção nas 24 h ao redor.
 6. Orçamento: aumento de custo acima do previsto precisa de autorização do cliente.

@@ -3,7 +3,8 @@
 # Nunca produção: o script só sobe e mede o servidor local; o k6 recusa qualquer BASE_URL que não seja localhost.
 # Uso: infra/carga/run-carga.sh [duração=3m] [visitantes=200] [compras_por_min=50] [capacidade=240]
 # Saída: docs/evidencias/carga/resultado.md (p95, erros, sobrevenda) e k6-resumo.json / k6-saida.txt.
-# NODE_HEAP_MB=384 limita o heap do Node (perto dos 512 MiB do Cloud Run) e grava os arquivos com o sufixo -heap384.
+# NODE_HEAP_MB=320 limita o heap do Node como no Cloud Run (512 MiB, docs/operacao/memoria.md) e grava os arquivos com o sufixo -heap320.
+# O servidor é o JS empacotado (dist-server, o mesmo do contêiner), com a memória separada em heap e nativa a cada 2 s (memoria.mjs).
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 DURACAO=${1:-3m}
@@ -24,6 +25,7 @@ if [ -z "${TEST_DATABASE_URL:-}" ] || [[ "$TEST_DATABASE_URL" == *neon.tech* ]];
   exit 1
 fi
 [ -f dist/index.html ] || npx vite build
+npm run -s build:server # sempre: o empacotado precisa refletir o código atual
 
 rm -rf "$WORK"
 mkdir -p "$WORK/server" "$OUT"
@@ -36,8 +38,8 @@ TYPE_ID=$(node -e "console.log(require('$WORK/seed.json').typeId)")
 # Mesmo tamanho de pool de conexões de homologação e produção (DB_POOL_MAX=5 nos scripts de deploy).
 (cd "$WORK/server" && exec env -i PATH="$PATH" HOME="$HOME" APP_ENV=local NODE_ENV=production PAYMENT_GATEWAY=mock PORT=$PORT \
   DATABASE_URL="$URL" DATABASE_URL_DIRECT="$URL" DB_POOL_MAX=5 WEB_DIST_DIR="$ROOT/dist" PUBLIC_BASE_URL="http://localhost:$PORT" \
-  TRUSTED_PROXY_HOPS=1 RESERVATION_MINUTES=30 PARTYX_SUPPORT_EMAIL=atendimento@exemplo.com \
-  node $HEAP_FLAG --import "$ROOT/node_modules/tsx/dist/loader.mjs" "$ROOT/server/src/index.ts" > "$WORK/server.log" 2>&1) &
+  TRUSTED_PROXY_HOPS=1 RESERVATION_MINUTES=30 PARTYX_SUPPORT_EMAIL=atendimento@exemplo.com CARGA_MEMORIA_ARQUIVO="$WORK/memoria.txt" \
+  node $HEAP_FLAG --import "$ROOT/infra/carga/memoria.mjs" "$ROOT/dist-server/index.js" > "$WORK/server.log" 2>&1) &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null || true; kill $SAMPLER 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do curl -sf "http://localhost:$PORT/api/health" > /dev/null && break; sleep 0.5; done

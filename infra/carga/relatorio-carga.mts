@@ -59,6 +59,17 @@ for (let i = 1; i < recursos.length; i++) {
   cpuMax = Math.max(cpuMax, ((c2 - c1) / 100 / (t2 - t1)) * 100);
 }
 const rssMax = Math.max(...recursos.map(r => r[2])) / 1024;
+// Memória por partes (memoria.mjs): segundos, RSS, heap reservado, heap em uso e memória externa do V8, em MB.
+const memoria = readFileSync(path.join(WORK, 'memoria.txt'), 'utf8')
+  .trim()
+  .split('\n')
+  .map(l => l.split(' ').map(Number) as [number, number, number, number, number])
+  .filter(r => r.length === 5 && r.every(Number.isFinite));
+const pico = (i: number) => Math.max(...memoria.map(r => r[i]!));
+const nativaMax = Math.max(...memoria.map(r => r[1] - r[2]));
+const mb = (v: number) => `${v.toFixed(0)} MB`;
+// Uma amostra a cada 30 s: mostra se a memória estabiliza ou cresce sem parar.
+const serie = memoria.filter((r, i) => i === memoria.length - 1 || r[0] % 30 < 2);
 
 const etapas: [string, string][] = [
   ['evento_html', 'Página do evento (HTML)'],
@@ -86,7 +97,8 @@ const out = [
   `Gerado em ${new Date().toISOString()} por \`infra/carga/run-carga.sh\` (k6 1.0.0 em contêiner). **Ambiente: LOCAL** (um processo Node, ` +
     'PostgreSQL de teste em contêiner na mesma máquina, `DB_POOL_MAX=5` como em homologação e produção), **gateway fictício**. ' +
     '**Não** foi executado em homologação nem em produção: os tempos não incluem rede, Cloud Run, Neon nem o gateway real.' +
-    (HEAP ? ` Servidor com \`--max-old-space-size=${HEAP}\`, para aproximar o limite de 512 MiB do Cloud Run.` : ''),
+    ' Servidor: o JS empacotado (`dist-server/index.js`), o mesmo do contêiner.' +
+    (HEAP ? ` Com \`--max-old-space-size=${HEAP}\`, como no Cloud Run (512 MiB, \`docs/operacao/memoria.md\`).` : ''),
   '',
   '## Configuração',
   '',
@@ -108,6 +120,8 @@ const out = [
   `| p95 da compra completa | ${ms(m.compra_completa_ms?.['p(95)'])} |`,
   `| CPU do servidor (pico em janelas de 2 s) | ${cpuMax.toFixed(0)} % de um núcleo |`,
   `| Memória do servidor (pico, RSS) | ${rssMax.toFixed(0)} MB |`,
+  `| Heap do V8 (pico reservado / pico em uso) | ${mb(pico(2))} / ${mb(pico(3))} |`,
+  `| Memória fora do heap (pico de RSS menos heap reservado) | ${mb(nativaMax)} |`,
   `| Limites do k6 (thresholds) | ${thresholdsFailed.length ? `**reprovados:** ${thresholdsFailed.join('; ')}` : 'todos aprovados'} (código de saída ${K6_STATUS}) |`,
   '',
   '### Tempos por etapa',
@@ -118,6 +132,15 @@ const out = [
     const d = m[`http_req_duration{etapa:${tag}}`];
     return `| ${label} | ${count(`http_reqs{etapa:${tag}}`) || '-'} | ${ms(d?.med)} | ${ms(d?.['p(95)'])} | ${ms(d?.['p(99)'])} | ${ms(d?.max)} |`;
   }),
+  '',
+  '### Memória ao longo da carga',
+  '',
+  'Amostras do próprio processo (`process.memoryUsage()`), uma a cada 30 s. RSS que sobe sem parar com o heap estável indica memória ' +
+    'nativa retida; RSS que estabiliza indica que não há vazamento.',
+  '',
+  '| Segundos | RSS | Heap reservado | Heap em uso | Externa (buffers) |',
+  '|---|---|---|---|---|',
+  ...serie.map(([t, rss, total, usado, ext]) => `| ${t} | ${mb(rss)} | ${mb(total)} | ${mb(usado)} | ${mb(ext)} |`),
   '',
   '## Sobrevenda (conferida no banco depois da carga)',
   '',

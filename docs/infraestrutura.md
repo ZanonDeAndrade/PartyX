@@ -10,7 +10,7 @@ Criada e verificada em 01/10/2026 (Prompt 04). **Produção não existe ainda** 
 |---|---|---|
 | Projeto Google Cloud | `partyx-hml` | Só homologação. Separado dos demais projetos da conta. Faturamento: conta "Pagamento do Firebase". |
 | Região | `southamerica-east1` (São Paulo) | Público brasileiro e Neon na mesma região (`aws-sa-east-1`), para reduzir latência e tráfego entre regiões. |
-| Cloud Run (serviço) | `partyx-hml` | 1 vCPU, 512 MiB, **mínimo 0 e máximo 3 instâncias**, concorrência 80, tempo limite 60 s. Escala a zero. |
+| Cloud Run (serviço) | `partyx-hml` | 1 vCPU, 512 MiB (heap do Node em 320 MB, `NODE_OPTIONS`; `docs/operacao/memoria.md`), **mínimo 0 e máximo 3 instâncias**, concorrência 80, tempo limite 60 s. Escala a zero. |
 | Cloud Run (job) | `partyx-migrate` | Roda as migrações com a conexão direta. Executado antes de cada deploy. |
 | URL | `https://partyx-hml-fypn7xnohq-rj.a.run.app` | Pública, em HTTPS, sem domínio próprio ainda (D-08). |
 | Artifact Registry | `partyx` | Mantém as 5 imagens mais recentes e apaga as com mais de 7 dias. |

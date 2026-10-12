@@ -31,7 +31,7 @@ Meta sugerida: 200 usuários simultâneos na página e 50 compras por minuto. Ca
 
 ¹ 13 cadastros foram recusados com 422 porque meu teste reutilizou CPFs de uma rodada anterior; a causa foi confirmada ("Este CPF já tem cadastro"). Não é defeito.
 
-Latências no servidor local (p50 / p95 / p99, ms), meta: página inicial 1,9 / 2,9 / 3,8; página do evento 3,5 / 4,6 / 6,9; cadastro 28,8 / 37,4 / 41,8 (hash de senha); pedido com reserva 8,6 / 12,2 / 14,7; Pix 6,2 / 8,7 / 13,1; confirmação do webhook 14,5 / 19,9 / 21,9; compra completa 66,5 / 79,8 / 83,8. No dobro, o pior p99 foi 94 ms. Processo: até ~30 % de uma CPU e ~500 MB de memória.
+Latências no servidor local (p50 / p95 / p99, ms), meta: página inicial 1,9 / 2,9 / 3,8; página do evento 3,5 / 4,6 / 6,9; cadastro 28,8 / 37,4 / 41,8 (hash de senha); pedido com reserva 8,6 / 12,2 / 14,7; Pix 6,2 / 8,7 / 13,1; confirmação do webhook 14,5 / 19,9 / 21,9; compra completa 66,5 / 79,8 / 83,8. No dobro, o pior p99 foi 94 ms. Processo: até ~30 % de uma CPU e ~500 MB de memória (medição anterior à correção dos formatadores de data de 12/10/2026; ver `operacao/memoria.md`).
 
 Depois de tudo, no banco: vendidos = ingressos emitidos por tipo, 0 códigos repetidos, 0 reservas ativas penduradas, nenhum tipo acima da capacidade. **Mas:** são tempos sem rede, sem gateway e com banco local; o gargalo real em produção será a latência do Neon, o limite de conexões (`DB_POOL_MAX`) e o gateway. Repetir em homologação antes de qualquer abertura grande.
 
