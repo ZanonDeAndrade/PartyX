@@ -12,6 +12,7 @@
 #   evento-on    min-instances=1: instância sempre quente (use ANTES do evento)
 #   evento-off   min-instances=0: volta a escalar a zero (use DEPOIS do evento)
 #   rollback     volta para a revisão anterior (ou REVISAO=<nome>)
+#   manutencao   on|off: liga ou desliga a página de manutenção (G06) sem build, só trocando a variável (nova revisão)
 #   status       mostra o que está no ar, a configuração e avisos de custo
 #   alertas      cria os alertas por log (infra/operacao/alerts.sh)
 #
@@ -25,6 +26,10 @@
 #   RECONCILE_TASK_OFFSETS_SECONDS=60,120,240,480  RECONCILE_TASK_MARGIN_SECONDS=120
 #   RECONCILE_LATE_OFFSETS_SECONDS=900,1800,3600,10800,28800,86400  RECONCILE_LOCK_SECONDS=120   (padrões do código; só passe para mudar)
 #   PARTYX_SUPPORT_EMAIL  PARTYX_SUPPORT_WHATSAPP   contato de atendimento DA PARTYX para o comprador (nunca o da contratada)
+#   PARTYX_LEGAL_NAME  PARTYX_CNPJ  PARTYX_ADDRESS  PARTYX_SUPPORT_HOURS   dados públicos DA PARTYX (rodapé, e-mails, manutenção)
+#   TERMS_DATE  PRIVACY_DATE  CANCELLATION_DATE   vigência (AAAA-MM-DD) das versões; textos em conteudo-legal/ (fora do Git)
+#   SIGNUP_OPEN=false   cadastro de compradores; `true` só com os três textos publicados (arquivo, versão e data)
+#   MAINTENANCE_MODE=false   página de manutenção (G06); para ligar sem novo build: comando `manutencao on|off`
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -208,6 +213,19 @@ cmd_deploy() {
   # Travas de TODA publicação (a migração só se desfaz restaurando backup):
   [ "${BACKUP_DONE:-}" = "sim" ] || { echo "Recuso: backup diário ativo e restauração testada são PRÉ-REQUISITO (BACKUP_DONE=sim). Prompt 25." >&2; exit 1; }
   [ "${NO_FICTITIOUS_DATA:-}" = "sim" ] || { echo "Recuso: confirme banco sem dados fictícios (NO_FICTITIOUS_DATA=sim)." >&2; exit 1; }
+  # Textos legais (D-11): vão na imagem a partir de conteudo-legal/ (fora do Git). Cadastro aberto exige os três publicados.
+  local legal_dir="conteudo-legal" k
+  for k in termos-de-uso privacidade cancelamento meia-entrada; do
+    [ ! -s "$legal_dir/$k.txt" ] || echo "   texto legal $k.txt: sha256 $(sha256sum "$legal_dir/$k.txt" | cut -c1-16)"
+  done
+  if [ "${SIGNUP_OPEN:-false}" = "true" ]; then
+    for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE; do
+      [ -n "${!v:-}" ] || { echo "Recuso: SIGNUP_OPEN=true exige $v (texto legal fornecido pela PartyX)." >&2; exit 1; }
+    done
+    for k in termos-de-uso privacidade cancelamento; do
+      [ -s "$legal_dir/$k.txt" ] || { echo "Recuso: SIGNUP_OPEN=true sem $legal_dir/$k.txt (texto oficial da PartyX)." >&2; exit 1; }
+    done
+  fi
   if [ "$sales" = "true" ]; then   # travas extras para ABRIR A VENDA (go-live)
     [ "$gateway" != "none" ] || { echo "Recuso: venda aberta sem gateway real." >&2; exit 1; }
     for v in TERMS_VERSION PRIVACY_VERSION CANCELLATION_VERSION GO_LIVE_CONFIRMED; do [ -n "${!v:-}" ] || { echo "Recuso: $v é obrigatório para abrir a venda." >&2; exit 1; }; done
@@ -233,11 +251,13 @@ cmd_deploy() {
     "TASKS_QUEUE=projects/$PROJECT/locations/$REGION/queues/$QUEUE" "TASKS_INVOKER_EMAIL=$(sa $TASKS_SA)"
     "TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-false}" "GLOBAL_SIGNUPS_PER_HOUR=${GLOBAL_SIGNUPS_PER_HOUR:-1000}" "SIGNUPS_PER_IP_PER_HOUR=${SIGNUPS_PER_IP_PER_HOUR:-100}" "GLOBAL_RECOVERIES_PER_HOUR=${GLOBAL_RECOVERIES_PER_HOUR:-60}"
     ${GATEWAY_ENVIRONMENT:+"GATEWAY_ENVIRONMENT=$GATEWAY_ENVIRONMENT"} ${MP_COLLECTOR_ID:+"MP_COLLECTOR_ID=$MP_COLLECTOR_ID"}
-    "QR_HMAC_CURRENT=${QR_HMAC_CURRENT:-1}" "SALES_OPEN=$sales" "PAYMENT_GATEWAY=$gateway" "VISUAL_APPROVED=${VISUAL_APPROVED:-false}")
+    "QR_HMAC_CURRENT=${QR_HMAC_CURRENT:-1}" "SALES_OPEN=$sales" "PAYMENT_GATEWAY=$gateway" "VISUAL_APPROVED=${VISUAL_APPROVED:-false}"
+    "LEGAL_CONTENT_DIR=/app/legal" "SIGNUP_OPEN=${SIGNUP_OPEN:-false}" "MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}")
   for v in TERMS_VERSION PRIVACY_VERSION CANCELLATION_VERSION EMAIL_FROM EMAIL_REPLY_TO RESERVATION_MINUTES MAX_TICKETS_PER_ORDER \
            RETENTION_LOGIN_ATTEMPTS_DAYS RETENTION_SESSIONS_DAYS RETENTION_PASSWORD_RESETS_DAYS GATE_SCANS_PER_MINUTE GATE_SEARCHES_PER_MINUTE \
            RECONCILE_TASK_OFFSETS_SECONDS RECONCILE_TASK_MARGIN_SECONDS RECONCILE_LATE_OFFSETS_SECONDS RECONCILE_LOCK_SECONDS \
-           PARTYX_SUPPORT_EMAIL PARTYX_SUPPORT_WHATSAPP; do
+           PARTYX_SUPPORT_EMAIL PARTYX_SUPPORT_WHATSAPP PARTYX_LEGAL_NAME PARTYX_CNPJ PARTYX_ADDRESS PARTYX_SUPPORT_HOURS \
+           TERMS_DATE PRIVACY_DATE CANCELLATION_DATE; do
     [ -z "${!v:-}" ] || vars+=("$v=${!v}")
   done
   [ "${TURNSTILE_ENABLED:-false}" != "true" ] || vars+=("TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY")
@@ -297,6 +317,18 @@ cmd_evento_off() {
   echo "EVENTO OFF: min-instances=0 (escala a zero, sem custo parado)."
 }
 
+# --- Manutenção (G06): o site inteiro mostra a página de indisponibilidade com o contato da PartyX. Webhook e rotinas seguem no ar. ---
+cmd_manutencao() {
+  case "${1:-}" in
+    on) g run services update "$SERVICE" --region="$REGION" --update-env-vars=MAINTENANCE_MODE=true --quiet
+        echo "MANUTENÇÃO LIGADA: site, painel e portaria fechados (503). Webhook do gateway e rotinas internas continuam."
+        echo "=> Para desligar: ./infra/producao/deploy.sh manutencao off" ;;
+    off) g run services update "$SERVICE" --region="$REGION" --update-env-vars=MAINTENANCE_MODE=false --quiet
+         echo "MANUTENÇÃO DESLIGADA." ;;
+    *) echo "use: manutencao on|off" >&2; exit 1 ;;
+  esac
+}
+
 cmd_rollback() {
   local target="${REVISAO:-}"
   if [ -z "$target" ]; then   # a revisão pronta mais recente que NÃO é a que recebe tráfego agora
@@ -323,5 +355,6 @@ cmd_alertas() { : "${NOTIFY_EMAIL:?informe NOTIFY_EMAIL}"; PROJECT="$PROJECT" SE
 case "${1:-}" in
   setup) cmd_setup ;; roles) cmd_roles ;; backup) cmd_backup ;; varredura) cmd_varredura ;; migrate) cmd_migrate ;; deploy) cmd_deploy ;; hosting) cmd_hosting ;;
   evento-on) cmd_evento_on ;; evento-off) cmd_evento_off ;; rollback) cmd_rollback ;; status) cmd_status ;; alertas) cmd_alertas ;;
-  *) sed -n '2,28p' "$0"; exit 1 ;;
+  manutencao) cmd_manutencao "${2:-}" ;;
+  *) sed -n '2,33p' "$0"; exit 1 ;;
 esac

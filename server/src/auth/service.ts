@@ -12,6 +12,8 @@ import {
 } from '../domain/identity';
 import { hashToken, passwordProblem } from '../domain/password';
 import { enqueueEmail, processSoon } from '../mail/outbox';
+import { signupBlockers } from '../legal/documents';
+import { logger } from '../logger';
 import { loginBlock, recordLoginAttempt } from './limits';
 import { createSession, revokeSession, revokeUserSessions } from './sessions';
 import type { AuthDeps, AuthUser, RequestMeta } from './types';
@@ -48,8 +50,13 @@ export interface RegisterInput {
 
 export async function register(deps: AuthDeps, input: RegisterInput, meta: RequestMeta) {
   const { legal } = deps.config;
-  if (!legal.ready) {
-    // Sem os textos legais do cliente, não há o que aceitar: bloqueia o cadastro real.
+  const blockers = signupBlockers(deps.config);
+  if (!legal.ready || blockers.length) {
+    // Sem os textos legais do cliente publicados (ou com o cadastro fechado pela flag), não há o que aceitar: bloqueia o cadastro
+    // real. O motivo vai só para o log, nunca para quem tenta se cadastrar.
+    logger.warn('cadastro bloqueado', {
+      motivos: blockers.length ? blockers : ['versões dos Termos e da Privacidade'],
+    });
     throw new AppError(
       503,
       'cadastro_indisponivel',

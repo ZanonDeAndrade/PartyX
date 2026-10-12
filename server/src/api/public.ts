@@ -24,6 +24,8 @@ export function publicRoutes(deps: VitrineDeps & { config: Config }) {
       salesOpen: deps.config.salesOpen,
       // Chave PÚBLICA do Turnstile (a secreta nunca sai do servidor). Nula: a tela não mostra o desafio.
       turnstileSiteKey: deps.config.TURNSTILE_SITE_KEY ?? null,
+      // Dados e contatos públicos DA PARTYX para o rodapé e os textos de atendimento (D-16). Só o que vier da configuração.
+      partyx: deps.config.partyx,
     }),
   );
   /** Textos legais e regras de meia-entrada (RF-68). Texto simples em blocos; o front nunca o trata como HTML. */

@@ -30,6 +30,7 @@ import { privacyRoutes } from './privacy';
 import { teamRoutes } from './team';
 import { ticketRoutes } from './tickets';
 import { parseJson } from './validate';
+import { signupBlockers, signupTextsProvisional } from '../legal/documents';
 
 /** Dados do usuário que a interface pode ver. O CPF sai mascarado; o hash da senha nunca sai. */
 function publicUser(user: AuthState['user']) {
@@ -110,13 +111,18 @@ export function authRoutes(deps: AuthDeps) {
     });
   };
 
-  /** Versões vigentes dos textos legais, para a tela de cadastro enviar o aceite correto. */
+  /**
+   * Versões vigentes dos textos legais, para a tela de cadastro enviar o aceite correto e mostrar a versão e a data que a pessoa aceita.
+   * `ready` falso: cadastro fechado (flag ou, em produção, textos não publicados). `provisional`: homologação sem o texto oficial.
+   */
   app.get('/legal/versions', c =>
     c.json({
       terms: deps.config.legal.terms,
       privacy: deps.config.legal.privacy,
-      ready: deps.config.legal.ready,
-      provisional: deps.config.legal.provisional,
+      termsDate: deps.config.legalDates.terms,
+      privacyDate: deps.config.legalDates.privacy,
+      ready: deps.config.legal.ready && signupBlockers(deps.config).length === 0,
+      provisional: deps.config.legal.provisional || signupTextsProvisional(deps.config),
     }),
   );
 

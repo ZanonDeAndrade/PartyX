@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { requestId } from 'hono/request-id';
 import { bodyLimit } from 'hono/body-limit';
 import { securityHeaders } from './security/headers';
+import { maintenanceGuard } from './ops/maintenance';
 import { authRoutes } from './api/auth';
 import { healthRoutes } from './api/health';
 import { localMediaRoutes } from './api/media';
@@ -80,6 +81,8 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
     c.header('Cross-Origin-Resource-Policy', 'cross-origin');
   });
   app.use(securityHeaders(config));
+  // Manutenção (G06): antes de qualquer rota, para nada além do técnico (saúde, webhook, rotinas) responder com a flag ligada.
+  app.use('*', maintenanceGuard(config));
   // **Política de cache da API:** nenhuma resposta de `/api/*` é guardada por navegador intermediário, proxy ou CDN. Atrás do
   // Firebase Hosting isso garante que resposta de usuário logado nunca seja servida a outro. Vale para sucesso, erro e 404,
   // e sobrepõe qualquer cabeçalho que uma rota tenha definido (ver também o `onError`).

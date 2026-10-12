@@ -40,6 +40,24 @@ export interface SiteInfo {
   salesOpen: boolean;
   /** Chave pública do Turnstile; nula quando o desafio não está ligado. */
   turnstileSiteKey: string | null;
+  /** Dados e contatos públicos da PartyX (configuração do servidor). Cada campo nulo enquanto a PartyX não informar. */
+  partyx: PartyxInfo;
+}
+
+export interface PartyxInfo {
+  legalName: string | null;
+  cnpj: string | null;
+  address: string | null;
+  supportEmail: string | null;
+  supportWhatsapp: string | null;
+  supportHours: string | null;
+}
+
+/** Contato que a API devolve com o erro `manutencao` (G06). */
+export interface MaintenanceContact {
+  email: string | null;
+  whatsapp: string | null;
+  hours: string | null;
 }
 
 export interface FieldProblem {
@@ -85,6 +103,17 @@ export function onSessionExpired(listener: ExpiredListener): () => void {
 }
 const EXPECTED_401 = new Set(['/auth/me', '/auth/login', '/auth/logout']);
 
+/**
+ * Manutenção (G06): o servidor respondeu 503 `manutencao`. Quem escuta (`MaintenanceGate`) troca a tela aberta pelo aviso, com o
+ * contato da PartyX que veio na resposta. Uma página nova já chega pronta do servidor; isto cobre quem estava com o site aberto.
+ */
+type MaintenanceListener = (message: string, contact: MaintenanceContact | null) => void;
+const maintenanceListeners = new Set<MaintenanceListener>();
+export function onMaintenance(listener: MaintenanceListener): () => void {
+  maintenanceListeners.add(listener);
+  return () => maintenanceListeners.delete(listener);
+}
+
 /** Chamada à API. Alterações levam o token CSRF da sessão; o token fica só em memória, nunca em localStorage. */
 export async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = { accept: 'application/json' };
@@ -109,6 +138,10 @@ export async function request<T>(method: string, path: string, body?: unknown, s
   if (!res.ok) {
     if (res.status === 401 && data?.erro?.codigo === 'nao_autenticado' && !EXPECTED_401.has(path))
       expiredListeners.forEach(l => l());
+    if (res.status === 503 && data?.erro?.codigo === 'manutencao') {
+      const contact = (data.erro.detalhes as { contato?: MaintenanceContact } | undefined)?.contato ?? null;
+      maintenanceListeners.forEach(l => l(data.erro?.mensagem ?? '', contact));
+    }
     throw new ApiError(
       res.status,
       data?.erro?.mensagem ?? 'Não foi possível concluir a ação.',
@@ -120,6 +153,7 @@ export async function request<T>(method: string, path: string, body?: unknown, s
 }
 
 const get = <T>(path: string, signal?: AbortSignal) => request<T>('GET', path, undefined, signal);
+let siteOnce: Promise<SiteInfo> | null = null;
 
 export interface SessionUser {
   id: string;
@@ -719,6 +753,14 @@ export interface CartItem {
 
 export const api = {
   site: (signal?: AbortSignal) => get<SiteInfo>('/public/site', signal),
+  /** As mesmas informações, buscadas uma vez por carregamento da página (rodapé e textos de atendimento em toda tela). */
+  siteCached: () => {
+    siteOnce ??= get<SiteInfo>('/public/site').catch(error => {
+      siteOnce = null; // falhou: a próxima tela tenta de novo
+      throw error;
+    });
+    return siteOnce;
+  },
   legalDocument: async (kind: LegalKind, signal?: AbortSignal) =>
     (await get<{ document: LegalDocument }>(`/public/legal/${kind}`, signal)).document,
   home: (signal?: AbortSignal) => get<{ featured: EventCard[]; upcoming: EventCard[] }>('/public/home', signal),
@@ -745,7 +787,7 @@ export const api = {
     }).then(r => r.estado),
   resetPassword: (token: string, password: string) =>
     request<{ mensagem: string }>('POST', '/auth/password/reset', { token, password }),
-  legal: () => get<{ terms: string; privacy: string; ready: boolean; provisional: boolean }>('/legal/versions'),
+  legal: () => get<LegalVersions>('/legal/versions'),
 
   quote: (eventSlug: string, items: CartItem[], couponCode?: string) =>
     request<{ summary: Summary }>('POST', '/checkout/quote', {
@@ -923,5 +965,17 @@ export interface LegalDocument {
   title: string;
   status: 'oficial' | 'homologacao' | 'pendente';
   version: string | null;
+  /** Data de vigência da versão (AAAA-MM-DD), quando a PartyX informou. */
+  effectiveDate: string | null;
   blocks: { type: 'heading' | 'paragraph'; text: string }[];
+}
+
+/** Versões vigentes que o cadastro aceita (RF-03). `ready` falso: cadastro fechado. `provisional`: homologação sem texto oficial. */
+export interface LegalVersions {
+  terms: string;
+  privacy: string;
+  termsDate: string | null;
+  privacyDate: string | null;
+  ready: boolean;
+  provisional: boolean;
 }

@@ -354,4 +354,74 @@ describe('loadConfig', () => {
         expect(() => loadConfig({ PARTYX_SUPPORT_WHATSAPP: bad }), bad).toThrow(/PARTYX_SUPPORT_WHATSAPP/);
     });
   });
+
+  describe('etapa 08: textos legais publicados, dados da PartyX, cadastro e manutenção', () => {
+    const prodEnv = {
+      APP_ENV: 'producao',
+      PUBLIC_BASE_URL: 'https://partyx.example.com',
+      DATABASE_URL: 'postgres://x',
+      SESSION_SECRET: SECRET,
+      QR_HMAC_KEYS: QR,
+    };
+
+    it('datas de vigência: só AAAA-MM-DD de um dia que existe', () => {
+      expect(loadConfig({ TERMS_DATE: '2026-10-01', CANCELLATION_DATE: '2024-02-29' }).legalDates).toEqual({
+        terms: '2026-10-01',
+        privacy: null,
+        cancellation: '2024-02-29',
+      });
+      for (const bad of ['01/10/2026', '2026-13-01', '2026-02-30', '2025-02-29', '2026-10-1'])
+        expect(() => loadConfig({ PRIVACY_DATE: bad }), bad).toThrow(/PRIVACY_DATE/);
+    });
+
+    it('cadastro: aberto por padrão fora de produção, fechado por padrão em produção, e a flag manda', () => {
+      expect(loadConfig({}).signupOpen).toBe(true);
+      expect(loadConfig({ SIGNUP_OPEN: 'false' }).signupOpen).toBe(false);
+      expect(loadConfig(prodEnv).signupOpen).toBe(false);
+      expect(loadConfig({ ...prodEnv, SIGNUP_OPEN: 'true' }).signupOpen).toBe(true);
+      expect(() => loadConfig({ SIGNUP_OPEN: 'sim' })).toThrow(/SIGNUP_OPEN/);
+    });
+
+    it('manutenção só liga com MAINTENANCE_MODE=true', () => {
+      expect(loadConfig({}).maintenance).toBe(false);
+      expect(loadConfig({ MAINTENANCE_MODE: 'false' }).maintenance).toBe(false);
+      expect(loadConfig({ MAINTENANCE_MODE: 'true' }).maintenance).toBe(true);
+      expect(() => loadConfig({ MAINTENANCE_MODE: '1' })).toThrow(/MAINTENANCE_MODE/);
+    });
+
+    it('dados públicos da PartyX: nulos sem configuração; CNPJ validado e formatado', () => {
+      expect(loadConfig({}).partyx).toEqual({
+        legalName: null,
+        cnpj: null,
+        address: null,
+        supportEmail: null,
+        supportWhatsapp: null,
+        supportHours: null,
+      });
+      const c = loadConfig({
+        PARTYX_LEGAL_NAME: 'Empresa Exemplo Ltda',
+        PARTYX_CNPJ: '11222333000181',
+        PARTYX_ADDRESS: 'Rua Exemplo, 100, São Paulo, SP',
+        PARTYX_SUPPORT_EMAIL: 'atendimento@exemplo.test',
+        PARTYX_SUPPORT_WHATSAPP: '+55 11 91234-5678',
+        PARTYX_SUPPORT_HOURS: 'Segunda a sexta, das 10h às 18h',
+      });
+      expect(c.partyx).toEqual({
+        legalName: 'Empresa Exemplo Ltda',
+        cnpj: '11.222.333/0001-81',
+        address: 'Rua Exemplo, 100, São Paulo, SP',
+        supportEmail: 'atendimento@exemplo.test',
+        supportWhatsapp: '+55 11 91234-5678',
+        supportHours: 'Segunda a sexta, das 10h às 18h',
+      });
+      expect(loadConfig({ PARTYX_CNPJ: '12.abc.345/01de-35' }).partyx.cnpj).toBe('12.ABC.345/01DE-35');
+      expect(() => loadConfig({ PARTYX_CNPJ: '11222333000182' })).toThrow(/PARTYX_CNPJ/);
+    });
+
+    it('texto público de uma linha: recusa quebra de linha e marcação', () => {
+      expect(() => loadConfig({ PARTYX_LEGAL_NAME: 'Empresa\nBcc: x@y.z' })).toThrow(/PARTYX_LEGAL_NAME/);
+      expect(() => loadConfig({ PARTYX_ADDRESS: 'Rua <script>' })).toThrow(/PARTYX_ADDRESS/);
+      expect(() => loadConfig({ PARTYX_SUPPORT_HOURS: 'x' })).toThrow(/PARTYX_SUPPORT_HOURS/);
+    });
+  });
 });

@@ -194,3 +194,9 @@ export const isEmailLike = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.tr
 /** Código de promoter como o servidor guarda: maiúsculas, sem espaços. Válido com 3 a 20 letras ou números sem acento. */
 export const normalizeCoupon = (v: string) => v.trim().toUpperCase();
 export const isCouponValid = (v: string) => /^[A-Z0-9]{3,20}$/.test(v);
+
+/** Data de calendário AAAA-MM-DD (vigência de um texto legal) em DD/MM/AAAA, sem fuso: é um dia, não um instante. */
+export function calendarDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+}

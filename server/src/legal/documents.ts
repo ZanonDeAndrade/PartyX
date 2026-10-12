@@ -32,10 +32,12 @@ export interface LegalDocument {
   /** `oficial`: texto da PartyX. `homologacao`: ainda não há texto, só um aviso. `pendente`: produção sem texto. */
   status: 'oficial' | 'homologacao' | 'pendente';
   version: string | null;
+  /** Data em que a versão passou a valer (AAAA-MM-DD), quando a PartyX a informou. */
+  effectiveDate: string | null;
   blocks: { type: 'heading' | 'paragraph'; text: string }[];
 }
 
-type LegalConfig = Pick<Config, 'APP_ENV' | 'legal' | 'legalContentDir' | 'cancellationVersion'>;
+type LegalConfig = Pick<Config, 'APP_ENV' | 'legal' | 'legalContentDir' | 'cancellationVersion' | 'legalDates'>;
 
 export const isLegalKind = (v: string): v is LegalKind => (LEGAL_KINDS as readonly string[]).includes(v);
 
@@ -44,6 +46,13 @@ function versionOf(config: LegalConfig, kind: LegalKind): string | null {
   if (kind === 'privacidade') return config.legal.privacy || null;
   if (kind === 'cancelamento')
     return config.cancellationVersion ?? (config.APP_ENV === 'producao' ? null : 'ficticio-0');
+  return null;
+}
+
+function dateOf(config: LegalConfig, kind: LegalKind): string | null {
+  if (kind === 'termos-de-uso') return config.legalDates.terms;
+  if (kind === 'privacidade') return config.legalDates.privacy;
+  if (kind === 'cancelamento') return config.legalDates.cancellation;
   return null;
 }
 
@@ -78,14 +87,16 @@ export function legalDocument(config: LegalConfig, kind: LegalKind): LegalDocume
   const version = versionOf(config, kind);
   if (hasFile(config, kind)) {
     const text = readFileSync(filePath(config, kind)!, 'utf8');
-    return { kind, title, status: 'oficial', version, blocks: parseBlocks(text) };
+    return { kind, title, status: 'oficial', version, effectiveDate: dateOf(config, kind), blocks: parseBlocks(text) };
   }
-  if (config.APP_ENV === 'producao') return { kind, title, status: 'pendente', version: null, blocks: [] };
+  if (config.APP_ENV === 'producao')
+    return { kind, title, status: 'pendente', version: null, effectiveDate: null, blocks: [] };
   return {
     kind,
     title,
     status: 'homologacao',
     version,
+    effectiveDate: null,
     blocks: [
       {
         type: 'paragraph',
@@ -105,6 +116,31 @@ export function salesBlockers(config: LegalConfig & Pick<Config, 'visualApproved
   if (!config.legal.ready) out.push('versões dos Termos e da Privacidade não informadas');
   for (const kind of REQUIRED) if (!hasFile(config, kind)) out.push(`texto legal ausente: ${LEGAL_TITLES[kind]}`);
   if (!versionOf(config, 'cancelamento')) out.push('versão da Política de Cancelamento não informada');
+  for (const kind of REQUIRED)
+    if (!dateOf(config, kind)) out.push(`data de vigência não informada: ${LEGAL_TITLES[kind]}`);
   if (!config.visualApproved) out.push('identidade visual sem aprovação escrita do cliente');
   return out;
+}
+
+/**
+ * O que impede o cadastro de compradores (RF-03, D-11). Vale em qualquer ambiente o `SIGNUP_OPEN=false`. Em produção, além da flag
+ * (fechada por padrão), cada um dos três textos precisa estar **publicado**: arquivo oficial, versão e data de vigência. Sem isso não há
+ * o que aceitar, e o cadastro real continua bloqueado. Fora de produção, a falta do texto só gera o aviso de homologação.
+ */
+export function signupBlockers(config: LegalConfig & Pick<Config, 'signupOpen'>): string[] {
+  const out: string[] = [];
+  if (!config.signupOpen) out.push('cadastro fechado por configuração (SIGNUP_OPEN)');
+  if (config.APP_ENV !== 'producao') return out;
+  for (const kind of REQUIRED) {
+    if (!hasFile(config, kind)) out.push(`texto legal ausente: ${LEGAL_TITLES[kind]}`);
+    if (!versionOf(config, kind)) out.push(`versão não informada: ${LEGAL_TITLES[kind]}`);
+    if (!dateOf(config, kind)) out.push(`data de vigência não informada: ${LEGAL_TITLES[kind]}`);
+  }
+  return out;
+}
+
+/** Fora de produção: algum dos documentos aceitos no cadastro (Termos, Privacidade) ainda não tem o texto oficial. */
+export function signupTextsProvisional(config: LegalConfig): boolean {
+  if (config.APP_ENV === 'producao') return false;
+  return (['termos-de-uso', 'privacidade'] as const).some(kind => !hasFile(config, kind));
 }

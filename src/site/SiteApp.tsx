@@ -1,9 +1,10 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import './styles/fonts.css';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/public.css';
-import { Layout, ToastHost } from './components';
+import { Layout, MaintenanceScreen, ToastHost } from './components';
+import { onMaintenance, type MaintenanceContact } from './api';
 import { FirstAccessPage, ForgotPasswordPage, LegalPage, LoginPage, ResetPasswordPage, SignupPage } from './authPages';
 import { SessionProvider } from './session';
 import { EventPage, EventsPage, HomePage, NotFoundPage } from './pages';
@@ -92,14 +93,23 @@ function Routes() {
   return <NotFoundPage />;
 }
 
+/** Manutenção (G06) com o site já aberto: a primeira resposta `manutencao` da API troca a tela inteira pelo aviso. */
+function MaintenanceGate({ children }: { children: ReactNode }) {
+  const [down, setDown] = useState<{ message: string; contact: MaintenanceContact | null } | null>(null);
+  useEffect(() => onMaintenance((message, contact) => setDown({ message, contact })), []);
+  return down ? <MaintenanceScreen message={down.message} contact={down.contact} /> : <>{children}</>;
+}
+
 /** Vitrine pública do PartyX (Prompt 08). O protótipo navegável fica em `/prototipo`. */
 export function SiteApp() {
   return (
     <MotionRoot>
       <Router>
         <SessionProvider>
-          <Routes />
-          <ToastHost />
+          <MaintenanceGate>
+            <Routes />
+            <ToastHost />
+          </MaintenanceGate>
         </SessionProvider>
         {/* Depois das rotas: a página já está montada por baixo quando a abertura aparece. */}
         <IntroSplash />

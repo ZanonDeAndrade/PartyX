@@ -11,6 +11,7 @@ import {
   ErrorBox,
   EventCardView,
   Layout,
+  PartyxContact,
   SearchForm,
   usePageTitle,
 } from './components';
@@ -606,7 +607,9 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
                 {sale.kind === 'closed' ? (
                   <div className="px-notice px-notice-neu" role="status">
                     <b>Vendas encerradas</b>
-                    <span>As vendas online deste evento foram encerradas. Em caso de dúvida, fale com a PartyX.</span>
+                    <span>
+                      As vendas online deste evento foram encerradas. Em caso de dúvida, <PartyxContact />.
+                    </span>
                   </div>
                 ) : null}
                 {event.ticketTypes.some(t => /meia/i.test(t.name)) ? (

@@ -35,6 +35,7 @@ export interface OrdersDeps {
     | 'legal'
     | 'legalContentDir'
     | 'cancellationVersion'
+    | 'legalDates'
     | 'visualApproved'
     | 'reconcile'
     | 'partyxSupport'

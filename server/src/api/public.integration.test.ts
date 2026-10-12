@@ -329,6 +329,14 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
         maxTicketsPerOrder: 6,
         salesOpen: true,
         turnstileSiteKey: null,
+        partyx: {
+          legalName: null,
+          cnpj: null,
+          address: null,
+          supportEmail: null,
+          supportWhatsapp: null,
+          supportHours: null,
+        },
       });
     });
   });

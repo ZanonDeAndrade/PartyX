@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app';
 import { loadConfig } from './config';
+import { replyToFor } from './mail/outbox';
 import { createDatabase } from './db/client';
 import { logger } from './logger';
 import { systemClock } from './providers/clock';
@@ -18,8 +19,9 @@ const config = loadConfig();
 
 /** Provedor de e-mail pela configuração. Nunca finge entrega: sem provedor, só o ambiente local captura (em disco, fictício). */
 function mailerFor(): EmailSender {
+  // Resposta do comprador vai ao atendimento DA PARTYX quando não há EMAIL_REPLY_TO (nunca a um endereço da contratada).
   if (config.SMTP_URL && config.EMAIL_FROM)
-    return smtpEmailSender({ url: config.SMTP_URL, from: config.EMAIL_FROM, replyTo: config.EMAIL_REPLY_TO });
+    return smtpEmailSender({ url: config.SMTP_URL, from: config.EMAIL_FROM, replyTo: replyToFor(config) });
   if (config.APP_ENV === 'local') return new LocalCaptureEmailSender('.data/emails');
   return unconfiguredEmailSender;
 }

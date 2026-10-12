@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, ApiError, type LegalKind } from './api';
-import { Layout, usePageTitle } from './components';
-import { cpfInput, maskEmail, phoneInput } from './format';
+import { api, ApiError, type LegalKind, type LegalVersions } from './api';
+import { Layout, PartyxContact, usePageTitle } from './components';
+import { calendarDate, cpfInput, maskEmail, phoneInput } from './format';
 import { HumanCheck, type HumanState } from './HumanCheck';
 import { IconBack } from './icons';
 import { Link, useRouter } from './router';
@@ -270,9 +270,7 @@ export function SignupPage() {
   // Depois do cadastro a pessoa já está conectada: a tela "Conta criada" aparece antes de seguir, sem redirecionar de imediato.
   const [created, setCreated] = useState<string | null>(null);
   const justRegistered = useRef(false);
-  const [legal, setLegal] = useState<{ terms: string; privacy: string; ready: boolean; provisional: boolean } | null>(
-    null,
-  );
+  const [legal, setLegal] = useState<LegalVersions | null>(null);
   const set = (k: keyof typeof f) => (v: string) => setF(s => ({ ...s, [k]: v }));
 
   useEffect(() => {
@@ -351,7 +349,8 @@ export function SignupPage() {
           </header>
           {legal?.provisional ? (
             <p className="px-notice px-notice-info" role="note">
-              Textos legais provisórios: valem só neste ambiente de teste.
+              <b>Ambiente de homologação.</b> Os Termos de Uso e a Política de Privacidade oficiais da PartyX ainda não
+              foram publicados. O aceite aqui registra uma versão de teste, sem valor jurídico.
             </p>
           ) : null}
           {legal && !legal.ready ? (
@@ -441,6 +440,9 @@ export function SignupPage() {
                 </small>
               ) : null}
               <small id="aceite-dica" className="px-hint px-indent">
+                {legal && !legal.provisional
+                  ? `Você aceita os Termos de Uso, versão ${legal.terms}${legal.termsDate ? ` de ${calendarDate(legal.termsDate)}` : ''}, e a Política de Privacidade, versão ${legal.privacy}${legal.privacyDate ? ` de ${calendarDate(legal.privacyDate)}` : ''}. `
+                  : ''}
                 Registramos a versão dos documentos, a data e o IP do aceite.
               </small>
             </div>
@@ -494,6 +496,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
           {doc?.status === 'oficial' && doc.version ? (
             <p className="px-legal-meta">
               <span>Versão {doc.version}</span>
+              {doc.effectiveDate ? <span>Vigente desde {calendarDate(doc.effectiveDate)}</span> : null}
             </p>
           ) : null}
           {state.status === 'loading' ? <p role="status">Carregando…</p> : null}
@@ -507,7 +510,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
           ) : null}
           {doc?.status === 'pendente' ? (
             <p className="px-notice px-notice-neu" role="note">
-              Este documento ainda não está disponível. Fale com a PartyX.
+              Este documento ainda não está disponível. Em caso de dúvida, <PartyxContact />.
             </p>
           ) : null}
           <div className="px-legal">

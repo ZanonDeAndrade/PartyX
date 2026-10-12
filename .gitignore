@@ -31,3 +31,6 @@ dist-ssr
 *.key
 dist-server
 .data
+
+# Textos legais da PartyX: entram na imagem pelo build, não no Git (D-61, docs/visual-e-legal.md)
+/conteudo-legal/

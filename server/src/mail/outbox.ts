@@ -50,7 +50,7 @@ export interface OutboxDeps {
   db: Db;
   clock: Clock;
   mailer: EmailSender;
-  config: Pick<Config, 'APP_ENV' | 'PUBLIC_BASE_URL' | 'PORT'>;
+  config: Pick<Config, 'APP_ENV' | 'PUBLIC_BASE_URL' | 'PORT'> & Partial<Pick<Config, 'partyx'>>;
   /** Agenda o reenvio no Cloud Tasks. Ausente (local, testes): só a varredura retoma o item. */
   taskQueue?: TaskQueue;
 }
@@ -83,7 +83,12 @@ export async function enqueueEmail(db: Db | Tx, clock: Clock, input: EnqueueInpu
 export const mailContext = (config: OutboxDeps['config']): MailContext => ({
   baseUrl: (config.PUBLIC_BASE_URL ?? `http://localhost:${config.PORT}`).replace(/\/$/, ''),
   environmentLabel: config.APP_ENV === 'producao' ? null : config.APP_ENV === 'homologacao' ? 'HOMOLOGAÇÃO' : 'LOCAL',
+  partyx: config.partyx,
 });
+
+/** `Reply-To` dos e-mails: o configurado ou, na falta, o e-mail de atendimento da PartyX. Nunca um endereço da contratada. */
+export const replyToFor = (config: Pick<Config, 'EMAIL_REPLY_TO' | 'partyx'>): string | undefined =>
+  config.EMAIL_REPLY_TO ?? config.partyx.supportEmail ?? undefined;
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 

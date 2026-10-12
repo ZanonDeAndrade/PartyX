@@ -193,6 +193,15 @@ Efeito de cada estado: **desligado** = o servidor sobe sem a chave secreta, `/ap
 
 Falha de e-mail **nunca** desfaz pagamento ou cadastro. A tentativa 1 acontece logo depois do fato; cada falha agenda a próxima no Cloud Tasks, reaproveitando a fila da conciliação: **+2, +10 e +30 minutos** (4 tentativas no total). Esgotadas, o item vira `falhou` (**revisão manual**), entra na trilha (`email.revisao_manual`) e dispara o alerta `email_falhou`; o administrador reabre em `POST /api/admin/emails/:id/retry`. A **varredura diária** fica só como rede de segurança (pega o que venceu sem tarefa). Se a fila falhar ao agendar: alerta `fila_email_falhou`, e a varredura cobre.
 
+SMTP, segredo `smtp-url`, `EMAIL_FROM`, registros SPF/DKIM/DMARC e o roteiro do teste de entrega real: `docs/operacao/email.md` (provedor e domínio ainda não definidos pela PartyX em 11/10/2026).
+
+## 8c-2. Textos legais, dados da PartyX, cadastro e manutenção (etapa 08, 11/10/2026)
+
+- **Textos legais:** os arquivos `termos-de-uso.txt`, `privacidade.txt`, `cancelamento.txt` (e `meia-entrada.txt`, se houver) ficam na pasta **`conteudo-legal/`** na raiz, **fora do Git** (`.gitignore`). O `gcloud builds submit .` envia a pasta e o `Dockerfile` a copia para `/app/legal`; o deploy define `LEGAL_CONTENT_DIR=/app/legal`. Publicar uma versão = trocar o arquivo **e** passar `TERMS_VERSION`/`TERMS_DATE` (idem `PRIVACY_*`, `CANCELLATION_*`) no mesmo deploy. O deploy imprime o sha256 de cada arquivo. Rollback volta texto e versão juntos.
+- **Cadastro:** `SIGNUP_OPEN=false` por padrão em produção. Com `SIGNUP_OPEN=true` o `deploy` recusa sem as seis variáveis de versão e data e sem os três arquivos; o servidor também recusa (503 `cadastro_indisponivel`) se faltar qualquer um.
+- **Dados públicos da PartyX:** `PARTYX_LEGAL_NAME`, `PARTYX_CNPJ`, `PARTYX_ADDRESS`, `PARTYX_SUPPORT_EMAIL`, `PARTYX_SUPPORT_WHATSAPP`, `PARTYX_SUPPORT_HOURS`, passados no ambiente de quem roda o deploy. Nunca dados da contratada.
+- **Manutenção (G06):** `./infra/producao/deploy.sh manutencao on|off`. Detalhes em `docs/operacao/runbooks/indisponibilidade.md`.
+
 ## 8d. Migrações retrocompatíveis (expand/contract) e rollback
 
 O deploy aplica a migração **antes** de a nova revisão receber tráfego. `deploy.sh rollback` volta o **código**, mas o banco **continua no esquema novo**. Por isso toda migração precisa deixar o código da revisão **anterior** funcionando:

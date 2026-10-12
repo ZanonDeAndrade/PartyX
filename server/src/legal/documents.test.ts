@@ -7,7 +7,14 @@ import { describe, expect, it } from 'vitest';
 import { publicRoutes } from '../api/public';
 import { loadConfig } from '../config';
 import { createOrder } from '../orders/service';
-import { isLegalKind, legalDocument, parseBlocks, salesBlockers } from './documents';
+import {
+  isLegalKind,
+  legalDocument,
+  parseBlocks,
+  salesBlockers,
+  signupBlockers,
+  signupTextsProvisional,
+} from './documents';
 
 const prod = (extra: Record<string, string> = {}) =>
   loadConfig({
@@ -25,6 +32,7 @@ const dirWith = (files: Record<string, string>) => {
   for (const [name, text] of Object.entries(files)) writeFileSync(join(dir, `${name}.txt`), text);
   return dir;
 };
+const DATES = { TERMS_DATE: '2026-10-01', PRIVACY_DATE: '2026-10-01', CANCELLATION_DATE: '2026-10-02' };
 const FULL = {
   'termos-de-uso': '# Seção\n\nTexto dos termos fornecido pela PartyX.',
   privacidade: 'Texto da privacidade.',
@@ -87,8 +95,13 @@ describe('textos legais (RF-68)', () => {
       PRIVACY_VERSION: 'v1',
       CANCELLATION_VERSION: 'v1',
       LEGAL_CONTENT_DIR: dirWith(FULL),
+      ...DATES,
     };
     expect(salesBlockers(prod(base))).toEqual(['identidade visual sem aprovação escrita do cliente']);
+    const { CANCELLATION_DATE: _sem, ...semData } = base;
+    expect(salesBlockers(prod({ ...semData, VISUAL_APPROVED: 'true' }))).toEqual([
+      'data de vigência não informada: Política de Cancelamento',
+    ]);
     expect(salesBlockers(prod({ ...base, VISUAL_APPROVED: 'true' }))).toEqual([]);
     const semCancel = { ...base, LEGAL_CONTENT_DIR: dirWith({ ...FULL, cancelamento: '' }), VISUAL_APPROVED: 'true' };
     expect(salesBlockers(prod(semCancel))).toEqual(['texto legal ausente: Política de Cancelamento']);
@@ -108,6 +121,7 @@ describe('textos legais (RF-68)', () => {
       CANCELLATION_VERSION: 'v1',
       LEGAL_CONTENT_DIR: dirWith(FULL),
       VISUAL_APPROVED: 'true',
+      ...DATES,
     });
     // Passou da trava de venda: falha adiante (banco ausente), não com 503 de vendas fechadas.
     const err = await createOrder({ ...(deps as object), config: pronta } as never, 'u', {
@@ -133,5 +147,65 @@ describe('textos legais (RF-68)', () => {
     expect(
       ((await (await aprovado.request('/public/site')).json()) as { provisionalTheme: boolean }).provisionalTheme,
     ).toBe(false);
+  });
+
+  it('documento publicado mostra versão e data de vigência; sem data, a data fica nula', () => {
+    const config = prod({
+      TERMS_VERSION: 'v3',
+      PRIVACY_VERSION: 'v2',
+      CANCELLATION_VERSION: 'v1',
+      LEGAL_CONTENT_DIR: dirWith(FULL),
+      TERMS_DATE: '2026-10-01',
+    });
+    expect(legalDocument(config, 'termos-de-uso')).toMatchObject({
+      status: 'oficial',
+      version: 'v3',
+      effectiveDate: '2026-10-01',
+    });
+    expect(legalDocument(config, 'privacidade')).toMatchObject({ status: 'oficial', effectiveDate: null });
+    expect(legalDocument(loadConfig({ TERMS_DATE: '2026-10-01' }), 'termos-de-uso')).toMatchObject({
+      status: 'homologacao',
+      effectiveDate: null, // sem texto oficial, nenhuma data é apresentada como vigência
+    });
+  });
+
+  describe('cadastro (RF-03, D-11): bloqueado em produção sem os textos oficiais publicados', () => {
+    const published = { TERMS_VERSION: 'v1', PRIVACY_VERSION: 'v1', CANCELLATION_VERSION: 'v1', ...DATES };
+
+    it('produção: fechado por padrão, mesmo com tudo publicado; abre só com SIGNUP_OPEN=true', () => {
+      const all = { ...published, LEGAL_CONTENT_DIR: dirWith(FULL) };
+      expect(signupBlockers(prod(all))).toEqual(['cadastro fechado por configuração (SIGNUP_OPEN)']);
+      expect(signupBlockers(prod({ ...all, SIGNUP_OPEN: 'true' }))).toEqual([]);
+    });
+
+    it('produção com a flag ligada: cada texto, versão e data que falta é um bloqueio', () => {
+      expect(signupBlockers(prod({ SIGNUP_OPEN: 'true' }))).toHaveLength(9);
+      const semTexto = prod({
+        ...published,
+        SIGNUP_OPEN: 'true',
+        LEGAL_CONTENT_DIR: dirWith({ ...FULL, cancelamento: '' }),
+      });
+      expect(signupBlockers(semTexto)).toEqual(['texto legal ausente: Política de Cancelamento']);
+      const { PRIVACY_DATE: _p, ...semData } = published;
+      expect(signupBlockers(prod({ ...semData, SIGNUP_OPEN: 'true', LEGAL_CONTENT_DIR: dirWith(FULL) }))).toEqual([
+        'data de vigência não informada: Política de Privacidade',
+      ]);
+    });
+
+    it('fora de produção: aberto e marcado como provisório sem o texto oficial; SIGNUP_OPEN=false fecha', () => {
+      const hml = loadConfig({
+        APP_ENV: 'homologacao',
+        DATABASE_URL: 'postgres://x',
+        SESSION_SECRET: 's'.repeat(40),
+        QR_HMAC_KEYS: `1:${randomBytes(32).toString('base64url')}`,
+      });
+      expect(signupBlockers(hml)).toEqual([]);
+      expect(signupTextsProvisional(hml)).toBe(true);
+      expect(signupTextsProvisional(loadConfig({ LEGAL_CONTENT_DIR: dirWith(FULL) }))).toBe(false);
+      expect(signupBlockers(loadConfig({ SIGNUP_OPEN: 'false' }))).toEqual([
+        'cadastro fechado por configuração (SIGNUP_OPEN)',
+      ]);
+      expect(signupTextsProvisional(prod())).toBe(false);
+    });
   });
 });

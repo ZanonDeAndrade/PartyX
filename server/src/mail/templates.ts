@@ -1,6 +1,7 @@
 import { escapeHtml } from '../vitrine/og';
 import type { EmailTemplate } from '../providers/email';
 import { headerSafe } from '../providers/email';
+import type { PartyxPublicInfo } from '../config';
 
 /**
  * Composição dos e-mails (RF-36, RF-67): assunto, texto e HTML. Funções puras. Textos do design (E01, E02, E03).
@@ -18,6 +19,8 @@ export interface MailContext {
   baseUrl: string;
   /** Em homologação e local o assunto ganha um prefixo para ninguém confundir com e-mail de produção. */
   environmentLabel: string | null;
+  /** Dados e contatos públicos DA PARTYX (configuração `PARTYX_*`), para o rodapé. Ausentes: rodapé sem eles. */
+  partyx?: PartyxPublicInfo;
 }
 
 export interface Composed {
@@ -35,7 +38,27 @@ const INK = '#0B0B10';
 const MUTED = '#5B5B6E';
 const LINE = '#E4E4EC';
 const FONT = 'Arial,Helvetica,sans-serif';
-const FOOTER = 'PartyX. Razão social, CNPJ e canais de atendimento: a fornecer pela PartyX.';
+
+/**
+ * Rodapé com os dados e contatos públicos da PartyX, só os que vierem da configuração (D-16). Nunca o contato da contratada. Fora de
+ * produção, o que faltar aparece como "a fornecer"; em produção, o item ausente é omitido (sem texto inventado).
+ */
+export function footerLines(ctx: MailContext): string[] {
+  const p = ctx.partyx;
+  const testing = ctx.environmentLabel !== null;
+  const identity = ['PartyX', p?.legalName, p?.cnpj ? `CNPJ ${p.cnpj}` : null].filter(Boolean).join(' · ');
+  const contacts = [
+    p?.supportEmail ? `e-mail ${p.supportEmail}` : null,
+    p?.supportWhatsapp ? `WhatsApp ${p.supportWhatsapp}` : null,
+  ].filter(Boolean);
+  const lines = [identity];
+  if (p?.address) lines.push(p.address);
+  if (contacts.length)
+    lines.push(`Atendimento da PartyX: ${contacts.join(' · ')}${p?.supportHours ? ` (${p.supportHours})` : ''}`);
+  if (testing && (!p?.legalName || !p?.cnpj)) lines.push('Razão social e CNPJ da PartyX: a fornecer.');
+  if (testing && !contacts.length) lines.push('Canais de atendimento da PartyX: a fornecer.');
+  return lines;
+}
 
 interface Layout {
   preheader: string;
@@ -85,7 +108,7 @@ ${env}<h1 style="margin:0 0 18px;font-family:${FONT};font-size:26px;line-height:
 ${l.paragraphs.map(p).join('\n')}
 ${details}${cta}${foot}
 </td></tr>
-<tr><td style="padding:16px 28px 22px;border-top:1px solid ${LINE};background:#FAFAFC;"><p style="margin:0;font-family:${FONT};font-size:12px;line-height:1.5;color:${MUTED};">${FOOTER}</p></td></tr>
+<tr><td style="padding:16px 28px 22px;border-top:1px solid ${LINE};background:#FAFAFC;"><p style="margin:0;font-family:${FONT};font-size:12px;line-height:1.5;color:${MUTED};">${footerLines(ctx).map(escapeHtml).join('<br>')}</p></td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -99,7 +122,7 @@ function text(l: Layout, ctx: MailContext): string {
   if (l.details?.length) lines.push(...l.details.map(d => `${d.label}: ${d.value}`), '');
   if (l.cta) lines.push(`${l.cta.label}:`, l.cta.url, '');
   if (l.footnote) lines.push(l.footnote, '');
-  lines.push(FOOTER);
+  lines.push(...footerLines(ctx));
   return lines.join('\n');
 }
 

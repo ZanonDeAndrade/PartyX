@@ -14,7 +14,7 @@ import {
 } from './api';
 import { loadCart, saveCart } from './cart';
 import { CardBrick } from './cardBrick';
-import { DateStub, ErrorBox, Layout, usePageTitle } from './components';
+import { DateStub, ErrorBox, Layout, PartyxContact, usePageTitle } from './components';
 import { mmss, useCountdown } from './countdown';
 import { brl, dateParts, maskEmail, phoneBr, timeOf } from './format';
 import { IconCheck, IconCopy } from './icons';
@@ -1045,7 +1045,7 @@ export function OrderPage({ id }: { id: string }) {
           </>
         }
       >
-        Este pedido não tem mais ingressos válidos. Em caso de dúvida, fale com a PartyX.
+        Este pedido não tem mais ingressos válidos. Em caso de dúvida, <PartyxContact />.
       </ResultCard>
     );
   }

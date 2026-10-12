@@ -1,4 +1,7 @@
 import { randomBytes } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app';
 import { loadConfig, type Config } from '../config';
@@ -218,30 +221,100 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       expect((await sql('select count(*)::int as n from users')).rows[0].n).toBe(0);
     });
 
-    it('em produção com os textos informados, o cadastro volta a funcionar', async () => {
-      const cfg = config({
-        APP_ENV: 'producao',
-        PUBLIC_BASE_URL: ORIGIN,
-        DATABASE_URL: 'postgres://x',
-        QR_HMAC_KEYS: `1:${randomBytes(32).toString('base64url')}`,
-        SESSION_SECRET: 'x'.repeat(40),
-        TURNSTILE_SECRET: 'segredo-turnstile-teste',
-        TURNSTILE_SITE_KEY: 'chave-site-turnstile-teste',
-        TERMS_VERSION: '2026-10',
-        PRIVACY_VERSION: '2026-10',
+    const prodBase = () => ({
+      APP_ENV: 'producao',
+      PUBLIC_BASE_URL: ORIGIN,
+      DATABASE_URL: 'postgres://x',
+      QR_HMAC_KEYS: `1:${randomBytes(32).toString('base64url')}`,
+      SESSION_SECRET: 'x'.repeat(40),
+      TERMS_VERSION: '2026-10',
+      PRIVACY_VERSION: '2026-10',
+      CANCELLATION_VERSION: '2026-10',
+      TERMS_DATE: '2026-10-01',
+      PRIVACY_DATE: '2026-10-01',
+      CANCELLATION_DATE: '2026-10-01',
+    });
+    const legalDir = (files: Record<string, string>) => {
+      const dir = mkdtempSync(join(tmpdir(), 'px-legal-'));
+      for (const [k, v] of Object.entries(files)) writeFileSync(join(dir, `${k}.txt`), v);
+      return dir;
+    };
+    const OFFICIAL = { 'termos-de-uso': 'Termos.', privacidade: 'Privacidade.', cancelamento: 'Cancelamento.' };
+
+    it('em produção, com versões mas sem textos publicados ou sem a flag, o cadastro continua bloqueado', async () => {
+      const semFlag = config({ ...prodBase(), LEGAL_CONTENT_DIR: legalDir(OFFICIAL) });
+      const semTexto = config({
+        ...prodBase(),
+        SIGNUP_OPEN: 'true',
+        LEGAL_CONTENT_DIR: legalDir({ privacidade: 'P.' }),
       });
-      const res = await browser(() => build({ cfg })).call(
+      for (const cfg of [semFlag, semTexto]) {
+        const b = browser(() => build({ cfg }));
+        expect(await (await b.call('GET', '/legal/versions')).json()).toMatchObject({ ready: false });
+        const res = await b.call(
+          'POST',
+          '/auth/register',
+          person({ acceptedTermsVersion: '2026-10', acceptedPrivacyVersion: '2026-10' }),
+        );
+        expect(res.status).toBe(503);
+        expect((await errorOf(res)).codigo).toBe('cadastro_indisponivel');
+      }
+      expect((await sql('select count(*)::int as n from users')).rows[0].n).toBe(0);
+    });
+
+    it('em produção com os três textos publicados e SIGNUP_OPEN=true, o cadastro funciona e registra as versões', async () => {
+      const cfg = config({ ...prodBase(), SIGNUP_OPEN: 'true', LEGAL_CONTENT_DIR: legalDir(OFFICIAL) });
+      const b = browser(() => build({ cfg }));
+      expect(await (await b.call('GET', '/legal/versions')).json()).toEqual({
+        terms: '2026-10',
+        privacy: '2026-10',
+        termsDate: '2026-10-01',
+        privacyDate: '2026-10-01',
+        ready: true,
+        provisional: false,
+      });
+      const res = await b.call(
         'POST',
         '/auth/register',
         person({ acceptedTermsVersion: '2026-10', acceptedPrivacyVersion: '2026-10' }),
       );
       expect(res.status).toBe(201);
       expect(res.headers.get('set-cookie')).toMatch(/Secure/i); // fora do ambiente local o cookie é Secure
+      const consent = (await sql('select terms_version, privacy_version, accepted_at from consents')).rows;
+      expect(consent).toHaveLength(1);
+      expect(consent[0]).toMatchObject({ terms_version: '2026-10', privacy_version: '2026-10' });
+      expect(consent[0].accepted_at).toBeInstanceOf(Date);
+      // Versão diferente da publicada: recusa e pede novo aceite.
+      const old = await browser(() => build({ cfg })).call(
+        'POST',
+        '/auth/register',
+        person({ acceptedTermsVersion: '2026-09', acceptedPrivacyVersion: '2026-10' }),
+      );
+      expect(old.status).toBe(409);
     });
 
     it('informa as versões em vigor e marca as fictícias como provisórias', async () => {
       const res = await browser().call('GET', '/legal/versions');
-      expect(await res.json()).toEqual({ terms: 'ficticio-0', privacy: 'ficticio-0', ready: true, provisional: true });
+      expect(await res.json()).toEqual({
+        terms: 'ficticio-0',
+        privacy: 'ficticio-0',
+        termsDate: null,
+        privacyDate: null,
+        ready: true,
+        provisional: true,
+      });
+    });
+
+    it('fora de produção, versões informadas sem o texto oficial continuam provisórias (aviso de homologação)', async () => {
+      const cfg = config({ TERMS_VERSION: 'v9', PRIVACY_VERSION: 'v9' });
+      const res = await browser(() => build({ cfg })).call('GET', '/legal/versions');
+      expect(await res.json()).toMatchObject({ terms: 'v9', ready: true, provisional: true });
+    });
+
+    it('SIGNUP_OPEN=false fecha o cadastro também fora de produção', async () => {
+      const cfg = config({ SIGNUP_OPEN: 'false' });
+      const res = await browser(() => build({ cfg })).call('POST', '/auth/register', person());
+      expect(res.status).toBe(503);
     });
   });
 

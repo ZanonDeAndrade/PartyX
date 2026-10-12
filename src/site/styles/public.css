@@ -265,6 +265,42 @@ body.px-dark .px-footer {
     grid-template-columns: 1.2fr 1fr 1fr;
   }
 }
+.px-footer-contact a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--px-touch);
+  color: var(--px-on-ink) !important;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- manutenção (G06) ---------- */
+.px-maint {
+  min-height: 100vh;
+  background: var(--px-ink);
+  color: var(--px-on-ink);
+}
+.px-maint-in {
+  max-width: 34rem;
+  padding-top: var(--px-s-10);
+  padding-bottom: var(--px-s-10);
+}
+.px-maint h1 {
+  margin: var(--px-s-6) 0 var(--px-s-3);
+}
+.px-maint h2 {
+  font-size: var(--px-t-lg);
+  margin: var(--px-s-6) 0 var(--px-s-2);
+}
+.px-maint a {
+  color: var(--px-on-ink);
+  overflow-wrap: anywhere;
+}
+.px-maint-dim {
+  color: var(--px-on-ink-3);
+}
+.px-maint .px-btn {
+  margin-top: var(--px-s-6);
+}
 
 /* ---------- bloco de data (cartaz) ---------- */
 .px-stub {
@@ -1156,6 +1192,9 @@ body.px-dark .px-event-side .px-fine {
   text-wrap: balance;
 }
 .px-legal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--px-s-1) var(--px-s-4);
   margin: 0 0 var(--px-s-5);
   color: var(--px-text-3);
   font-size: var(--px-t-md);

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { loadConfig } from '../config';
+import { replyToFor } from './outbox';
 import {
   composeCadastro,
   composeCompra,
   composePagamentoSemEstoque,
   composeRecuperacao,
   EMAIL_LOGO_PATH,
+  footerLines,
   type MailContext,
   type PurchaseData,
 } from './templates';
@@ -129,5 +132,66 @@ describe('e-mails (RF-36, RF-67)', () => {
     expect(m.html).toContain('Noite &lt;Neon&gt;'); // escapado
     expect(m.html).not.toContain('<Neon>');
     expect(`${m.subject}${m.text}${m.html}`).not.toMatch(/—/); // sem travessão
+  });
+
+  describe('rodapé com os dados da PartyX (D-16)', () => {
+    const partyx = loadConfig({
+      PARTYX_LEGAL_NAME: 'Empresa Exemplo Ltda',
+      PARTYX_CNPJ: '11222333000181',
+      PARTYX_ADDRESS: 'Rua Exemplo, 100, São Paulo, SP',
+      PARTYX_SUPPORT_EMAIL: 'atendimento@exemplo.test',
+      PARTYX_SUPPORT_WHATSAPP: '+55 11 91234-5678',
+      PARTYX_SUPPORT_HOURS: 'Segunda a sexta, das 10h às 18h',
+    }).partyx;
+    const none = loadConfig({}).partyx;
+
+    it('com a configuração: razão social, CNPJ, endereço e canais, em todos os modelos, texto e HTML', () => {
+      const c: MailContext = { ...ctx, partyx };
+      expect(footerLines(c)).toEqual([
+        'PartyX · Empresa Exemplo Ltda · CNPJ 11.222.333/0001-81',
+        'Rua Exemplo, 100, São Paulo, SP',
+        'Atendimento da PartyX: e-mail atendimento@exemplo.test · WhatsApp +55 11 91234-5678 (Segunda a sexta, das 10h às 18h)',
+      ]);
+      for (const m of [
+        composeCadastro({ name: 'Marina' }, c),
+        composeRecuperacao({ name: 'Marina', link: 'https://partyx.exemplo.test/redefinir-senha#t' }, c),
+        composeCompra(purchase, c),
+      ]) {
+        expect(m.text).toContain('CNPJ 11.222.333/0001-81');
+        expect(m.text).toContain('atendimento@exemplo.test');
+        expect(m.html).toContain('Empresa Exemplo Ltda · CNPJ 11.222.333/0001-81<br>Rua Exemplo');
+        expect(`${m.text}${m.html}`).not.toMatch(/a fornecer|—/);
+      }
+    });
+
+    it('o rodapé é escapado no HTML', () => {
+      const c: MailContext = { ...ctx, partyx: { ...partyx, legalName: 'Empresa & <b>Filhos</b>' } };
+      const m = composeCadastro({ name: 'Marina' }, c);
+      expect(m.html).toContain('Empresa &amp; &lt;b&gt;Filhos&lt;/b&gt;');
+      expect(m.html).not.toContain('<b>Filhos');
+    });
+
+    it('produção sem dados: só "PartyX", sem "a fornecer" e sem texto inventado', () => {
+      expect(footerLines({ ...ctx, partyx: none })).toEqual(['PartyX']);
+      expect(composeCompra(purchase, { ...ctx, partyx: none }).text).not.toMatch(/a fornecer/);
+    });
+
+    it('homologação sem dados: pendência identificada', () => {
+      expect(footerLines({ ...ctx, environmentLabel: 'HOMOLOGAÇÃO', partyx: none })).toEqual([
+        'PartyX',
+        'Razão social e CNPJ da PartyX: a fornecer.',
+        'Canais de atendimento da PartyX: a fornecer.',
+      ]);
+    });
+
+    it('Reply-To: o configurado ou, na falta, o atendimento da PartyX', () => {
+      expect(replyToFor(loadConfig({}))).toBeUndefined();
+      expect(replyToFor(loadConfig({ PARTYX_SUPPORT_EMAIL: 'atendimento@exemplo.test' }))).toBe(
+        'atendimento@exemplo.test',
+      );
+      expect(
+        replyToFor(loadConfig({ PARTYX_SUPPORT_EMAIL: 'atendimento@exemplo.test', EMAIL_REPLY_TO: 'sac@exemplo.test' })),
+      ).toBe('sac@exemplo.test');
+    });
   });
 });

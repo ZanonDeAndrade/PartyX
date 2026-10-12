@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { type EventCard, type SaleKind, type TypeState } from './api';
+import { api, type EventCard, type MaintenanceContact, type SaleKind, type SiteInfo, type TypeState } from './api';
 import { brl, dateParts, eventPath, searchPath, timeOf } from './format';
 import { IconClose, IconMenu, IconSearch } from './icons';
 import { m, staggerIn, useReducedMotion } from './motion';
@@ -209,7 +209,68 @@ export function Header() {
   );
 }
 
+/** Informações públicas do site (ambiente, dados da PartyX). Uma busca por carregamento da página, compartilhada entre as telas. */
+export function useSiteInfo(): SiteInfo | null {
+  const [site, setSite] = useState<SiteInfo | null>(null);
+  useEffect(() => {
+    let live = true;
+    api
+      .siteCached()
+      .then(s => {
+        if (live) setSite(s);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return site;
+}
+
+/** Link do WhatsApp a partir do número com DDI que a PartyX informou. */
+export const whatsappHref = (phone: string) => `https://wa.me/${phone.replace(/\D/g, '')}`;
+
+/**
+ * "Fale com a PartyX" com o canal que a PartyX informou na configuração (D-16): e-mail e WhatsApp, quando existirem. Sem nenhum canal,
+ * só o texto. Nunca mostra contato da contratada: o dado vem só de `PARTYX_SUPPORT_*`.
+ */
+export function PartyxContact({ lead = 'fale com a PartyX' }: { lead?: string }) {
+  const p = useSiteInfo()?.partyx;
+  const email = p?.supportEmail ?? null;
+  const whatsapp = p?.supportWhatsapp ?? null;
+  if (!email && !whatsapp) return <>{lead}</>;
+  return (
+    <>
+      {lead} pelo{' '}
+      {email ? (
+        <>
+          e-mail <a href={`mailto:${email}`}>{email}</a>
+        </>
+      ) : null}
+      {email && whatsapp ? ' ou pelo ' : null}
+      {whatsapp ? (
+        <>
+          WhatsApp{' '}
+          <a href={whatsappHref(whatsapp)} target="_blank" rel="noopener noreferrer">
+            {whatsapp}
+          </a>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Rodapé com os dados e contatos públicos da PartyX vindos da configuração (D-16). Fora de produção, o que faltar aparece como
+ * "a fornecer pela PartyX"; em produção, o item ausente é omitido, sem texto inventado.
+ */
 export function Footer() {
+  const site = useSiteInfo();
+  const p = site?.partyx;
+  const testing = site ? site.environment !== 'producao' : false;
+  const pending = (label: string) =>
+    testing ? <span className="px-footer-dim">{label}: a fornecer pela PartyX</span> : null;
+  const hasContact = Boolean(p?.supportEmail || p?.supportWhatsapp);
   return (
     <footer className="px-footer">
       <div className="px-wrap px-footer-in">
@@ -217,14 +278,28 @@ export function Footer() {
           <span className="px-logo px-logo-sm">
             <img src={LOGO} width={58} height={32} alt="PartyX" loading="lazy" decoding="async" />
           </span>
-          <span>Razão social e CNPJ: a fornecer pela PartyX</span>
+          {p?.legalName ? <span>{p.legalName}</span> : pending('Razão social')}
+          {p?.cnpj ? <span>CNPJ {p.cnpj}</span> : pending('CNPJ')}
+          {p?.address ? <span className="px-footer-dim">{p.address}</span> : null}
         </div>
-        <div className="px-footer-col">
-          <b>Atendimento ao comprador</b>
-          <span>E-mail: a fornecer pela PartyX</span>
-          <span>WhatsApp: a fornecer pela PartyX</span>
-          <span className="px-footer-dim">Horário de atendimento: a definir</span>
-        </div>
+        {hasContact || testing ? (
+          <div className="px-footer-col px-footer-contact">
+            <b>Atendimento ao comprador</b>
+            {p?.supportEmail ? <a href={`mailto:${p.supportEmail}`}>E-mail: {p.supportEmail}</a> : pending('E-mail')}
+            {p?.supportWhatsapp ? (
+              <a href={whatsappHref(p.supportWhatsapp)} target="_blank" rel="noopener noreferrer">
+                WhatsApp: {p.supportWhatsapp}
+              </a>
+            ) : (
+              pending('WhatsApp')
+            )}
+            {p?.supportHours ? (
+              <span className="px-footer-dim">Horário de atendimento: {p.supportHours}</span>
+            ) : (
+              pending('Horário de atendimento')
+            )}
+          </div>
+        ) : null}
         <nav className="px-footer-col px-footer-links" aria-label="Documentos">
           <b>Documentos</b>
           <Link to="/termos-de-uso">Termos de Uso</Link>
@@ -548,5 +623,46 @@ export function ToastHost() {
         </p>
       ))}
     </div>
+  );
+}
+
+/**
+ * Manutenção (G06), quando a API responde `manutencao` com o site já aberto. Sem cabeçalho nem rodapé, que chamariam a API de novo. O
+ * contato é o da PartyX que veio na resposta. Sem prazo de retorno e sem prometer atendimento 24 horas.
+ */
+export function MaintenanceScreen({ message, contact }: { message: string; contact: MaintenanceContact | null }) {
+  usePageTitle('Em manutenção · PartyX');
+  return (
+    <main id="conteudo" className="px-maint" data-screen="G06">
+      <div className="px-wrap px-maint-in">
+        <img src={LOGO} width={65} height={36} alt="PartyX" />
+        <h1>Site em manutenção</h1>
+        <p>{message || 'O site da PartyX está em manutenção. Tente novamente mais tarde.'}</p>
+        {contact && (contact.email || contact.whatsapp) ? (
+          <>
+            <h2>Atendimento da PartyX</h2>
+            <ul>
+              {contact.email ? (
+                <li>
+                  E-mail: <a href={`mailto:${contact.email}`}>{contact.email}</a>
+                </li>
+              ) : null}
+              {contact.whatsapp ? (
+                <li>
+                  WhatsApp:{' '}
+                  <a href={whatsappHref(contact.whatsapp)} target="_blank" rel="noopener noreferrer">
+                    {contact.whatsapp}
+                  </a>
+                </li>
+              ) : null}
+            </ul>
+            {contact.hours ? <p className="px-maint-dim">Horário de atendimento: {contact.hours}.</p> : null}
+          </>
+        ) : null}
+        <button type="button" className="px-btn px-btn-pri" onClick={() => window.location.reload()}>
+          Tentar novamente
+        </button>
+      </div>
+    </main>
   );
 }

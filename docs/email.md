@@ -45,6 +45,8 @@ A fila **não guarda token**. O link é criado **no momento do envio**; se o env
 
 ## SPF, DKIM e DMARC (a fazer quando houver domínio)
 
+> **11/10/2026:** o modelo dos registros a criar no DNS, as variáveis e o segredo `smtp-url` e o roteiro do teste de entrega real em homologação estão em `operacao/email.md`. O rodapé dos e-mails passou a usar os dados da PartyX (`PARTYX_*`) e o `Reply-To` cai no `PARTYX_SUPPORT_EMAIL` quando `EMAIL_REPLY_TO` está vazio.
+
 Quando o cliente definir o domínio remetente (D-08, D-09), o provedor escolhido informa os registros. Em linhas gerais:
 
 | Registro | Onde | Exemplo | Observação |

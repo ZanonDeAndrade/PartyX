@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError } from './api';
 import { Field, PasswordField } from './authPages';
-import { Layout, usePageTitle } from './components';
+import { Layout, PartyxContact, usePageTitle } from './components';
 import { MeShell } from './ticketPages';
 import { useRouter } from './router';
 import { useSession } from './session';
@@ -191,7 +191,8 @@ export function MyAccountPage() {
             ) : null}
           </div>
           <p className="px-hint">
-            E-mail e CPF não podem ser alterados por aqui. Para corrigir, fale com o atendimento da PartyX.
+            E-mail e CPF não podem ser alterados por aqui. Para corrigir,{' '}
+            <PartyxContact lead="fale com o atendimento da PartyX" />.
           </p>
           {general ? (
             <p className="px-notice px-notice-err" role="alert">

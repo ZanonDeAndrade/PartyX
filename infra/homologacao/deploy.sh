@@ -48,8 +48,11 @@ vars=(NODE_ENV=production APP_ENV=homologacao ENABLE_PROTOTYPE=true DB_POOL_MAX=
 [ "${HML_GATEWAY_FICTICIO:-false}" != "true" ] || vars+=(PAYMENT_GATEWAY=mock HOMOLOGACAO_GATEWAY_FICTICIO=true)
 [ -z "${EMAIL_FROM:-}" ] || vars+=("EMAIL_FROM=$EMAIL_FROM")
 # Cadência da conciliação e contato da PartyX: só entram se definidos (os padrões estão no código, server/src/config.ts).
+# Textos legais: a imagem leva conteudo-legal/ (fora do Git); sem os arquivos, as páginas mostram o aviso de homologação.
+vars+=("LEGAL_CONTENT_DIR=/app/legal" "MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}")
 for v in RECONCILE_TASK_OFFSETS_SECONDS RECONCILE_TASK_MARGIN_SECONDS RECONCILE_LATE_OFFSETS_SECONDS RECONCILE_LOCK_SECONDS \
-         PARTYX_SUPPORT_EMAIL PARTYX_SUPPORT_WHATSAPP; do
+         PARTYX_SUPPORT_EMAIL PARTYX_SUPPORT_WHATSAPP PARTYX_LEGAL_NAME PARTYX_CNPJ PARTYX_ADDRESS PARTYX_SUPPORT_HOURS \
+         TERMS_VERSION PRIVACY_VERSION CANCELLATION_VERSION TERMS_DATE PRIVACY_DATE CANCELLATION_DATE EMAIL_REPLY_TO; do
   [ -z "${!v:-}" ] || vars+=("$v=${!v}")
 done
 joined="$(IFS='#'; echo "${vars[*]}")"

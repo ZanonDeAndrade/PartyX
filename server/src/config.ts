@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { z } from 'zod';
 import { parseQrKeys, type QrKeys } from './domain/ticketCode';
+import { formatCnpj, isValidCnpj } from './domain/cnpj';
 
 /** Lê uma lista de esperas da conciliação sob demanda (segundos). Nula se inválida (fora da faixa, fora de ordem, repetida). */
 export function parseOffsets(
@@ -14,6 +15,20 @@ export function parseOffsets(
   if (nums.some((n, i) => i > 0 && n <= nums[i - 1]!)) return null;
   return nums;
 }
+
+/** Data de vigência de um texto legal: AAAA-MM-DD, data real do calendário. */
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'use AAAA-MM-DD')
+  .refine(v => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().startsWith(v), 'data inválida');
+/** Texto público de uma linha (rodapé, e-mails, página de manutenção): sem quebra de linha nem sinais de marcação. */
+const publicLine = (max: number) =>
+  z
+    .string()
+    .trim()
+    .min(2)
+    .max(max)
+    .refine(v => !/[\r\n<>]/.test(v), 'uma linha, sem < nem >');
 
 /**
  * Configuração lida do ambiente e validada na partida.
@@ -40,6 +55,23 @@ const schema = z
     PRIVACY_VERSION: z.string().min(1).optional(),
     /** Versão vigente da Política de Cancelamento. Obrigatória para vender em produção (D-11). */
     CANCELLATION_VERSION: z.string().min(1).optional(),
+    /**
+     * Data em que cada versão passou a valer (AAAA-MM-DD), informada pela PartyX junto com o texto. Aparece na página do documento ao
+     * lado da versão. Em produção, sem a data, o documento não conta como publicado e o cadastro fica fechado.
+     */
+    TERMS_DATE: isoDate.optional(),
+    PRIVACY_DATE: isoDate.optional(),
+    CANCELLATION_DATE: isoDate.optional(),
+    /**
+     * Abre o cadastro de compradores. Padrão: aberto fora de produção, **fechado em produção**. Mesmo com `true`, produção só cadastra com os
+     * três textos oficiais publicados (arquivo, versão e data): ver `signupBlockers` em `legal/documents.ts`.
+     */
+    SIGNUP_OPEN: z.enum(['true', 'false']).optional(),
+    /**
+     * Manutenção (G06): `true` troca o site inteiro pela página de indisponibilidade (503), com o contato da PartyX. Continuam no ar só a
+     * saúde, o webhook do gateway e as rotinas internas, para nenhum pagamento se perder. Painel e portaria também fecham.
+     */
+    MAINTENANCE_MODE: z.enum(['true', 'false']).optional(),
     /** Pasta com os textos legais fornecidos pela PartyX (`termos-de-uso.txt`, `privacidade.txt`, `cancelamento.txt`, `meia-entrada.txt`). Fora do Git. */
     LEGAL_CONTENT_DIR: z.string().min(1).optional(),
     /** `true` só depois da aprovação escrita da proposta visual pelo cliente (CA-33, D-10). Sem ela, o tema segue provisório e a venda real em produção fica bloqueada. */
@@ -165,6 +197,18 @@ const schema = z
       .regex(/^\+?[0-9][0-9 ()-]{7,22}$/, 'use só números, espaços, parênteses, hífen e o + inicial')
       .refine(v => v.replace(/\D/g, '').length >= 10 && v.replace(/\D/g, '').length <= 15, 'de 10 a 15 dígitos com DDI')
       .optional(),
+    /**
+     * Dados cadastrais públicos **da PartyX** (D-16, insumo 4), mostrados no rodapé do site, nos e-mails e na página de manutenção.
+     * Fornecidos pela PartyX. Sem eles, fora de produção aparece "a fornecer"; em produção o item é omitido. Nunca dados da contratada.
+     */
+    PARTYX_LEGAL_NAME: publicLine(160).optional(),
+    PARTYX_CNPJ: z
+      .string()
+      .refine(isValidCnpj, 'CNPJ inválido (dígitos verificadores)')
+      .optional(),
+    PARTYX_ADDRESS: publicLine(240).optional(),
+    /** Horário de atendimento ao comprador como a PartyX informar (ex.: "Segunda a sexta, das 10h às 18h"). */
+    PARTYX_SUPPORT_HOURS: publicLine(120).optional(),
     /** Chaves do HMAC dos QR Codes, "versão:chave" separados por vírgula (chave em base64url, 32+ bytes). Vêm do Secret Manager. Obrigatória fora do local. Para rotacionar, **acrescente** a versão nova e troque `QR_HMAC_CURRENT`: as antigas continuam valendo para ingressos já emitidos. */
     QR_HMAC_KEYS: z.string().min(1).optional(),
     /** Versão usada para assinar os ingressos novos. */
@@ -173,6 +217,7 @@ const schema = z
     SMTP_URL: z.string().min(1).optional(),
     /** Remetente, ex.: `PartyX <ingressos@dominio>`. O domínio precisa ter SPF, DKIM e DMARC (docs/email.md). Obrigatório com SMTP_URL. */
     EMAIL_FROM: z.string().min(3).optional(),
+    /** Endereço de resposta. Vazio: usa PARTYX_SUPPORT_EMAIL, para a resposta do comprador chegar ao atendimento da PartyX. */
     EMAIL_REPLY_TO: z.string().min(3).optional(),
     /** Quantos proxies confiáveis existem na frente da API (Cloud Run direto: 1). Define qual IP do X-Forwarded-For vale. */
     TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
@@ -323,6 +368,15 @@ export type Config = Omit<
   | 'RECONCILE_LOCK_SECONDS'
   | 'PARTYX_SUPPORT_EMAIL'
   | 'PARTYX_SUPPORT_WHATSAPP'
+  | 'PARTYX_LEGAL_NAME'
+  | 'PARTYX_CNPJ'
+  | 'PARTYX_ADDRESS'
+  | 'PARTYX_SUPPORT_HOURS'
+  | 'TERMS_DATE'
+  | 'PRIVACY_DATE'
+  | 'CANCELLATION_DATE'
+  | 'SIGNUP_OPEN'
+  | 'MAINTENANCE_MODE'
 > & {
   /** Chaves de assinatura dos QR por versão, e a versão usada nos ingressos novos. */
   qr: { keys: QrKeys; currentVersion: number };
@@ -345,7 +399,25 @@ export type Config = Omit<
   reconcile: ReconcileSchedule;
   /** Contato de atendimento da PartyX para o comprador. Nulo quando a PartyX ainda não forneceu nenhum. */
   partyxSupport: SupportContact | null;
+  /** Dados e contatos públicos da PartyX (rodapé, e-mails, manutenção). Cada campo nulo enquanto a PartyX não informar. */
+  partyx: PartyxPublicInfo;
+  /** Data de vigência (AAAA-MM-DD) de cada texto legal, quando informada. */
+  legalDates: { terms: string | null; privacy: string | null; cancellation: string | null };
+  /** O cadastro de compradores está aberto por configuração (produção ainda exige os textos: `signupBlockers`). */
+  signupOpen: boolean;
+  /** Página de manutenção ligada (G06). */
+  maintenance: boolean;
 };
+
+export interface PartyxPublicInfo {
+  legalName: string | null;
+  /** Já formatado: 00.000.000/0000-00. */
+  cnpj: string | null;
+  address: string | null;
+  supportEmail: string | null;
+  supportWhatsapp: string | null;
+  supportHours: string | null;
+}
 
 export interface ReconcileSchedule {
   /** Esperas, em segundos desde a criação da cobrança, de cada verificação sob demanda. */
@@ -398,6 +470,15 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     RECONCILE_LOCK_SECONDS,
     PARTYX_SUPPORT_EMAIL,
     PARTYX_SUPPORT_WHATSAPP,
+    PARTYX_LEGAL_NAME,
+    PARTYX_CNPJ,
+    PARTYX_ADDRESS,
+    PARTYX_SUPPORT_HOURS,
+    TERMS_DATE,
+    PRIVACY_DATE,
+    CANCELLATION_DATE,
+    SIGNUP_OPEN,
+    MAINTENANCE_MODE,
     ...rest
   } = raw;
   const salesOpen = SALES_OPEN ? SALES_OPEN === 'true' : raw.APP_ENV !== 'producao';
@@ -445,5 +526,16 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       PARTYX_SUPPORT_EMAIL || PARTYX_SUPPORT_WHATSAPP
         ? { email: PARTYX_SUPPORT_EMAIL ?? null, whatsapp: PARTYX_SUPPORT_WHATSAPP ?? null }
         : null,
+    partyx: {
+      legalName: PARTYX_LEGAL_NAME ?? null,
+      cnpj: PARTYX_CNPJ ? formatCnpj(PARTYX_CNPJ) : null,
+      address: PARTYX_ADDRESS ?? null,
+      supportEmail: PARTYX_SUPPORT_EMAIL ?? null,
+      supportWhatsapp: PARTYX_SUPPORT_WHATSAPP ?? null,
+      supportHours: PARTYX_SUPPORT_HOURS ?? null,
+    },
+    legalDates: { terms: TERMS_DATE ?? null, privacy: PRIVACY_DATE ?? null, cancellation: CANCELLATION_DATE ?? null },
+    signupOpen: SIGNUP_OPEN ? SIGNUP_OPEN === 'true' : raw.APP_ENV !== 'producao',
+    maintenance: MAINTENANCE_MODE === 'true',
   };
 }
