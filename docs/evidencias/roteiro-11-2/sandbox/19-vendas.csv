@@ -1,0 +1,15 @@
+﻿Evento;Tipo de ingresso;Ingressos;Valor (R$)
+Festival Roteiro E2E;Pista;5;400,00
+Festival Roteiro E2E;VIP;1;150,00
+Outro Evento E2E;Pista;1;50,00
+
+TOTAL;;7;600,00
+Soma dos pedidos pagos (R$);;;600,00
+Conciliação;confere
+Receita bruta (inclui estornados e contestados) (R$);;;600,00
+Estornados (R$);;0;0,00
+Contestados (R$);;0;0,00
+Receita líquida (R$);;;600,00
+Critério;Pedidos com status Pago, pela data original da aprovação do pagamento, no fuso do evento.
+Filtros aplicados;"Evento: Todos; Período de aprovação: 01/10/2026 a 12/10/2026"
+Gerado em;12/10/2026 13:47

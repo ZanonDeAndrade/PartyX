@@ -1,0 +1,10 @@
+﻿Comprador;CPF (mascarado);E-mail;Pedidos;Ingressos;Cancelados;Entraram;Valor pago (R$)
+APRO Ana Souza Fictícia;***.007.001-**;ana.roteiro@exemplo.com;1;1;0;1;80,00
+APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@exemplo.com;1;2;1;2;310,00
+APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@exemplo.com;1;1;1;0;160,00
+
+Total de compradores listados;3
+Ingressos (não cancelados);4
+Soma do valor pago (R$);550,00
+Filtros aplicados;Evento: Festival Roteiro E2E
+Gerado em;12/10/2026 13:45

@@ -23,10 +23,14 @@ export function useFetch<T>(
     }
     const controller = new AbortController();
     setState({ status: 'loading' });
+    // Busca cancelada não grava nada: o cancelamento no meio da leitura do corpo fazia `request` devolver `null` como se fosse
+    // sucesso, e a tela recebia `{ status: 'ok', data: null }` (ex.: formulário de evento sem `meta`, tela em branco).
     load(controller.signal)
-      .then(data => setState({ status: 'ok', data }))
+      .then(data => {
+        if (!controller.signal.aborted) setState({ status: 'ok', data });
+      })
       .catch((e: { name?: string; status?: number }) => {
-        if (e?.name === 'AbortError') return;
+        if (e?.name === 'AbortError' || controller.signal.aborted) return;
         setState({ status: 'error', code: e?.status ?? 0 });
       });
     return () => controller.abort();

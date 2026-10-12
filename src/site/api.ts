@@ -132,7 +132,11 @@ export async function request<T>(method: string, path: string, body?: unknown, s
     throw new ApiError(0, 'Sem conexão. Verifique a internet e tente de novo.', 'sem_conexao');
   }
   if (res.status === 204) return undefined as T;
-  const data = (await res.json().catch(() => null)) as {
+  const data = (await res.json().catch((e: { name?: string }) => {
+    // Cancelada durante a leitura do corpo: é cancelamento, não resposta vazia.
+    if (e?.name === 'AbortError') throw e;
+    return null;
+  })) as {
     erro?: { codigo?: string; mensagem?: string; detalhes?: unknown };
   } | null;
   if (!res.ok) {

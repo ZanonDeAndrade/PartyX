@@ -1,0 +1,14 @@
+﻿Código;Tipo;Titular;CPF (mascarado);E-mail do comprador;Pedido;Situação do ingresso;Entrou em;Validador;Motivo do cancelamento
+PX-2HAA-SWE7;Pista;APRO Ana Souza Fictícia;***.007.001-**;ana.roteiro@exemplo.com;PX-10001;Utilizado;12/10/2026 13:46;Rafael Validador Fictício;
+PX-6ZQ4-3PC9;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@exemplo.com;PX-10002;Utilizado;12/10/2026 13:46;Rafael Validador Fictício;
+PX-9UFF-VESS;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@exemplo.com;PX-10002;Utilizado;12/10/2026 13:46;Rafael Validador Fictício;
+PX-HV8Z-J4E8;VIP;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@exemplo.com;PX-10002;Cancelado;;;Roteiro 11.2: caso cancelado
+PX-65DU-KJJ6;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@exemplo.com;PX-10005;Cancelado;;;Roteiro 11.2: pedido do comprador registrado pela PartyX
+PX-UGCH-GX56;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@exemplo.com;PX-10005;Válido;;;
+
+Total de ingressos listados;6
+Válidos;1
+Utilizados;3
+Cancelados;2
+Filtros aplicados;"Evento: Festival Roteiro E2E; Situação: todas"
+Gerado em;12/10/2026 13:47

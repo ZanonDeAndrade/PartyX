@@ -34,3 +34,14 @@ dist-server
 
 # Textos legais da PartyX: entram na imagem pelo build, não no Git (D-61, docs/visual-e-legal.md)
 /conteudo-legal/
+
+# Testes ponta a ponta: banco, servidor e resultados de cada rodada (as evidências vão para docs/evidencias)
+/e2e/.run/
+
+# Capturas das evidências (imagens e PDF): ficam em docs/evidencias/**/img/, fora do Git, e são guardadas num zip à parte.
+# No repositório só as tabelas (CSV, JSON, TXT) e os .md. As outras linhas evitam que uma imagem solta entre por engano.
+docs/evidencias/**/img/
+docs/evidencias/**/*.jpg
+docs/evidencias/**/*.jpeg
+docs/evidencias/**/*.png
+docs/evidencias/**/*.pdf

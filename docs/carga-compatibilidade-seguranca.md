@@ -1,5 +1,7 @@
 # Carga, compatibilidade e segurança (Prompt 24)
 
+> **Atualização de 12/10/2026:** roteiro 11.2 completo pela interface (Playwright, com o sandbox do Mercado Pago e com o fictício), varredura de rolagem horizontal em 152 estados × 4 larguras e carga com k6 em `docs/evidencias/` (ver `docs/evidencias/README.md`). Os scripts deste documento continuam em `infra/testes/`.
+
 Executado em 05/10/2026, **só no ambiente local**: um processo Node, PostgreSQL 16 na mesma máquina, gateway **fictício**, sem rede de verdade. **Nada foi executado em homologação** (sem gateway sandbox, D-01) **nem em produção**, e **nenhum aparelho real foi usado**. Scripts em `infra/testes/` (repetíveis em homologação). A suíte do repositório segue verde: 628 testes, tipos limpos.
 
 ## O que não foi executado (não confundir com aprovado)
