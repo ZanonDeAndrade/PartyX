@@ -55,7 +55,7 @@ Preparação do plano de desenvolvimento (Prompt 01). Tudo aqui é registro e ra
 | 08 | Vitrine pública | Concluído em 01/10/2026 (API, Open Graph e páginas); WhatsApp real e aparelhos reais pendentes |
 | 09 | Carrinho, reserva e estoque | Concluído em 01/10/2026 (API); telas, pagamento e rotina agendada pendentes |
 | 10 | Checkout e interface do gateway | Concluído em 01/10/2026 (checkout, contrato do gateway e adaptador fictício); gateway real depende da escolha do cliente |
-| 11 | Pix e cartão no gateway escolhido | **Bloqueado**: o cliente não escolheu o gateway (D-01); estrutura pronta (Prompt 10) |
+| 11 | Pix e cartão no gateway escolhido | Feito com o Mercado Pago em 11/10/2026 (etapa 06), **premissa: Mercado Pago, aguardando confirmação escrita da PartyX** (D-01); webhook, estorno e contestação no ambiente de teste em 12/10/2026 (etapa 07). Falta a compra real de baixo valor (13.1) |
 | 12 | Webhook e reconciliação | Concluído em 01/10/2026 com o gateway fictício; falta o gateway real e a emissão dos ingressos (Prompt 13) |
 | 13 | Ingresso, QR e PDF | Concluído em 01/10/2026; aparelhos reais, fonte Unicode no PDF e envio por e-mail pendentes |
 | 14 | E-mails transacionais | Concluído em 01/10/2026 (fila, modelos, SMTP e telas de recuperação); **entrega real, SPF/DKIM/DMARC e identidade final pendentes do cliente** |

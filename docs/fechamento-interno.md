@@ -4,12 +4,14 @@
 
 > **Adendo de 06/10/2026 (leia junto com o veredito abaixo).** Depois do fechamento: (1) a homologação foi **atualizada** e agora roda a versão atual atrás do Firebase Hosting (`partyx-hml.web.app`), então o motivo 1 do veredito mudou (ver `README-DEPLOY.md`, seção 11); (2) o Prompt 25 foi executado **na homologação** (backup diário e restauração testada: `backup.md`), mas **não em produção**; (3) gateway sandbox, insumos do cliente e aparelhos reais continuam pendentes. **O veredito "NÃO PRONTO" para a comunicação formal permanece**, porque o roteiro 11.2 ainda não pode ser rodado com Pix e cartão em sandbox (D-01).
 
+> **Adendo de 12/10/2026 (gateway).** Gateway: **premissa: Mercado Pago, aguardando confirmação escrita da PartyX (D-01)**. Pix e cartão foram integrados pela API de Orders (etapa 06, 11/10/2026) e provados no ambiente de teste do Mercado Pago, com webhook e estorno (etapa 07, 12/10/2026; a contestação foi simulada, porque o ambiente de teste não a gera; `pagamento-mercadopago.md`). Por isso as linhas abaixo que diziam "gateway não escolhido" foram atualizadas com a data. Continuam pendentes a confirmação escrita da PartyX e a compra real de baixo valor (13.1). O veredito de 05/10 fica como registro histórico.
+
 ## Veredito de prontidão
 
 **NÃO PRONTO para a comunicação formal de entrega.** Nada foi enviado ao cliente e **os 10 dias corridos de homologação não começaram**. Motivos, em ordem de gravidade:
 
 1. **A homologação publicada está desatualizada.** O serviço `partyx-hml` serve a revisão `partyx-hml-00003-6sg`, de 01/10/2026 (Prompt 04). Nela, `/api/public/site`, `/api/gate/events`, `/api/admin/reports/fee`, `/api/webhooks/payments`, as rotinas internas, as exportações e `/api/privacy/requests` devolvem **404** (conferido em 05/10/2026). Tudo o que foi construído a partir do Prompt 05 só existe local. A seção 12.1 exige "publicar a versão final em homologação e rodar de novo o roteiro 11.2": **isso não foi feito**. Publicar exige rodar migrações no Neon de homologação, trocar a revisão e configurar rotinas e segredos novos; não fiz sem autorização.
-2. **Não existe gateway sandbox (D-01).** Sem ele, Pix e cartão não podem ser aprovados em homologação (o adaptador fictício é bloqueado fora do local), então os itens 4 e 5 do roteiro e CA-P1, CA-P2 e CA-P5 não podem ser provados lá.
+2. **Não existe gateway sandbox (D-01).** Sem ele, Pix e cartão não podem ser aprovados em homologação (o adaptador fictício é bloqueado fora do local), então os itens 4 e 5 do roteiro e CA-P1, CA-P2 e CA-P5 não podem ser provados lá. *(12/10/2026: superado no ambiente de teste do Mercado Pago; premissa: Mercado Pago, aguardando confirmação escrita da PartyX (D-01).)*
 3. **Backup e restauração (Prompt 25) não foram executados** (pulado a pedido do responsável). O critério "backup/restauração" do fechamento está **não executado**: existe só o primeiro `pg_dump` manual de 01/10 (60 KB, lido com `pg_restore --list`); não há cópia diária, retenção verificada nem restauração testada.
 4. Insumos do cliente pendentes que bloqueiam itens obrigatórios: identidade visual e textos legais (D-10, D-11), domínio e remetente de e-mail (D-08, D-09).
 5. Aparelhos reais (CA-26) e leitura de câmera real não testados.
@@ -35,7 +37,7 @@
 | Suíte do repositório | Aprovado | 36 arquivos, 628 testes, 05/10/2026 |
 | HTTPS | Aprovado na revisão antiga | Homologação em HTTPS com HSTS (`strict-transport-security`), conferido em 05/10/2026; a versão nova não foi publicada |
 | Três perfis (cliente, validador, administrador) | Aprovado (local) | Matriz de acesso nos testes e na rodada integrada: 403/403/401 |
-| Gateway sandbox | **Bloqueado por cliente** | D-01 |
+| Gateway sandbox | Aprovado no ambiente de teste do Mercado Pago (11 e 12/10/2026) | premissa: Mercado Pago, aguardando confirmação escrita da PartyX (D-01); `pagamento-mercadopago.md` |
 | E-mails | **Bloqueado por cliente** (entrega real) / Aprovado (fila, modelos, captura local) | D-08, D-09 |
 | QR, portaria, relatórios, contingência | Aprovado (local) | `gate`, `reports`, `exports` e rodada integrada; aparelhos reais **não executado** |
 | **Backup e restauração** | **Não executado** | Prompt 25 pulado; ver motivo 3 acima |
@@ -52,8 +54,8 @@ Reexecutado por: suíte completa (628 testes) e `infra/testes/round.mjs` (28/28)
 | 1 | Cadastro com CPF válido, inválido e repetido | Aprovado | `auth.integration.test.ts`; rodada (CPF repetido recusado com mensagem clara) |
 | 2 | Login, logout e recuperação de senha | Aprovado | `auth.integration.test.ts`, `mail.integration.test.ts` |
 | 3 | Evento com três tipos e períodos de venda diferentes | Aprovado | `events.integration.test.ts`, `public.integration.test.ts` |
-| 4 | 1 ingresso por Pix aprovado em sandbox | **Bloqueado (D-01)**; aprovado com o fictício | `reconcile.integration.test.ts`, rodada |
-| 5 | 3 ingressos por cartão aprovado em sandbox | **Bloqueado (D-01)**; 3 ingressos aprovados com o fictício | `reconcile.integration.test.ts`, `tickets.integration.test.ts` |
+| 4 | 1 ingresso por Pix aprovado em sandbox | Aprovado no ambiente de teste do Mercado Pago em 11/10/2026 (premissa: Mercado Pago, aguardando confirmação escrita da PartyX (D-01)); antes, só com o fictício | `reconcile.integration.test.ts`, rodada |
+| 5 | 3 ingressos por cartão aprovado em sandbox | Aprovado no ambiente de teste do Mercado Pago em 11/10/2026 (premissa: Mercado Pago, aguardando confirmação escrita da PartyX (D-01)); antes, só com o fictício | `reconcile.integration.test.ts`, `tickets.integration.test.ts` |
 | 6 | Cartão recusado: pedido não pago e estoque liberado | Aprovado (fictício) | `reconcile.integration.test.ts`, rodada |
 | 7 | Pix não pago até expirar: estoque liberado | Aprovado (fictício) | `checkout.integration.test.ts`, `stock.integration.test.ts`, rodada |
 | 8 | Cupom de promoter válido e inválido | Aprovado | `checkout.integration.test.ts`, `reports.integration.test.ts` |
@@ -109,7 +111,7 @@ Evidência resumida; o detalhe está em `rastreabilidade/matriz-requisitos.md` (
 | RF-31 | Aprovado |  | `server/src/api/checkout.integration.test.ts`, `server/src/domain/checkout.test.ts` |
 | RF-32 | Aprovado |  | `server/src/api/checkout.integration.test.ts`, `server/src/api/payment.integration.test.ts` |
 | RF-33 | Aprovado |  | `server/src/api/checkout.integration.test.ts`, `server/src/api/payment.integration.test.ts` |
-| RF-34 | Bloqueado por cliente | D-01: gateway não escolhido; só o adaptador fictício existe | `server/src/api/checkout.integration.test.ts`, `server/src/api/payment.integration.test.ts`, `server/src/payments/mockGateway.test.ts` |
+| RF-34 | Aprovado no ambiente de teste (11/10/2026) | premissa: Mercado Pago, aguardando confirmação escrita da PartyX (D-01); compra real de baixo valor pendente (13.1) | `server/src/api/checkout.integration.test.ts`, `server/src/api/payment.integration.test.ts`, `server/src/payments/mockGateway.test.ts` |
 | RF-35 | Aprovado | provado com o gateway fictício; assinatura e eventos do real a conferir | `server/src/api/reconcile.integration.test.ts`, `server/src/api/tickets.integration.test.ts` |
 | RF-36 | Bloqueado por cliente | D-08, D-09: sem domínio, remetente e provedor de e-mail; só a captura local | `server/src/api/mail.integration.test.ts`, `server/src/mail/templates.test.ts` |
 | RF-37 | Aprovado | estados do gateway real a conferir | `server/src/api/reconcile.integration.test.ts`, `docs/webhook-e-conciliacao.md` |
@@ -177,11 +179,11 @@ Evidência resumida; o detalhe está em `rastreabilidade/matriz-requisitos.md` (
 | CA-31 | Não executado | abrir o CSV no Excel real, por pessoa | `server/src/api/exports.integration.test.ts`, `server/src/exports/csv.test.ts`, `docs/exportacoes.md` |
 | CA-32 | Aprovado | 360 px em 3 motores e emulados; aparelho real não | `docs/visual-e-legal.md`, `server/src/legal/documents.test.ts` |
 | CA-33 | Bloqueado por cliente | D-10: proposta visual preparada e **não enviada**; sem aprovação escrita | `docs/proposta-visual.md`, `docs/registros/aprovacao-visual.md` |
-| CA-P1 | Bloqueado por cliente | D-01: exige Pix e cartão em sandbox do gateway escolhido | `server/src/api/reconcile.integration.test.ts` |
-| CA-P2 | Bloqueado por cliente | D-01: exige cartão recusado em sandbox do gateway escolhido | `server/src/api/reconcile.integration.test.ts` |
+| CA-P1 | Aprovado no ambiente de teste (11/10/2026) | premissa: Mercado Pago, aguardando confirmação escrita da PartyX (D-01); Pix e cartão aprovados; ver matriz | `server/src/api/reconcile.integration.test.ts` |
+| CA-P2 | Aprovado no ambiente de teste (11/10/2026) | premissa: Mercado Pago, aguardando confirmação escrita da PartyX (D-01); cartões recusados; ver matriz | `server/src/api/reconcile.integration.test.ts` |
 | CA-P3 | Aprovado | provado com o fictício | `server/src/api/reconcile.integration.test.ts` |
 | CA-P4 | Aprovado | assinatura do fictício; a do gateway real a conferir | `server/src/api/reconcile.integration.test.ts` |
-| CA-P5 | Bloqueado por cliente | D-01: exige estorno feito no painel de um gateway real | `server/src/api/reconcile.integration.test.ts` |
+| CA-P5 | Aprovado no ambiente de teste (12/10/2026) | premissa: Mercado Pago, aguardando confirmação escrita da PartyX (D-01); estorno pela API equivalente ao botão do painel, que não foi clicado | `server/src/api/reconcile.integration.test.ts` |
 
 ## Defeitos e achados desta etapa
 
@@ -192,7 +194,7 @@ Evidência resumida; o detalhe está em `rastreabilidade/matriz-requisitos.md` (
 ## Para ficar pronto (ordem sugerida)
 
 1. **Decidir se posso publicar a versão atual em homologação** (migrações no Neon de homologação, nova revisão, rotinas do Scheduler, segredos `jobs`). Sem isso, nada do roteiro pode ser provado lá.
-2. Cliente escolher o gateway (D-01) e fornecer a conta sandbox, para Prompt 11.
+2. ~~Cliente escolher o gateway (D-01) e fornecer a conta sandbox, para Prompt 11.~~ Feito com o Mercado Pago (11 e 12/10/2026); falta a PartyX **confirmar por escrito** (premissa) e a compra real de baixo valor (13.1).
 3. Cliente enviar identidade visual, textos legais, domínio e remetente (D-08 a D-11) e aprovar por escrito a proposta visual (CA-33).
 4. Executar o Prompt 25 (backup diário e restauração testada).
 5. Ensaio de portaria com aparelhos reais e conferência do CSV no Excel.

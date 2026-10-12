@@ -8,6 +8,8 @@
 #   reconciliacao_falhou    a rotina agendada não conseguiu consultar o gateway
 #   pagamento_divergente    valor, conta ou pedido diferentes do esperado
 #   estorno_fora_de_fluxo   estorno ou chargeback sem aprovação local
+#   estorno_parcial         estorno parcial no gateway: nada cancelado sozinho; cancelar no ADM15 o ingresso correspondente (D-82)
+#   cobranca_duplicada      segunda cobrança para o mesmo pedido: a PartyX estorna a cobrança em dobro (D-83, aba Exceções)
 #   email_falhou            e-mail transacional não entregue
 #   conciliacao_revisao_manual  pagamento sem estado conclusivo no gateway depois da última verificação tardia (24 h)
 #   fila_conciliacao_falhou     não foi possível agendar a verificação no Cloud Tasks (a rotina diária cobre)
@@ -26,7 +28,7 @@ if [ -z "$CH" ]; then
   CH="$(g alpha monitoring channels create --display-name="PartyX operação ($NOTIFY_EMAIL)" --type=email --channel-labels="email_address=$NOTIFY_EMAIL" --format='value(name)')"
 fi
 
-for sig in pago_sem_estoque webhook_falhou reconciliacao_falhou pagamento_divergente estorno_fora_de_fluxo email_falhou conciliacao_revisao_manual fila_conciliacao_falhou fila_email_falhou verificacao_humana_indisponivel limite_global_atingido; do
+for sig in pago_sem_estoque webhook_falhou reconciliacao_falhou pagamento_divergente estorno_fora_de_fluxo estorno_parcial cobranca_duplicada email_falhou conciliacao_revisao_manual fila_conciliacao_falhou fila_email_falhou verificacao_humana_indisponivel limite_global_atingido; do
   metric="partyx_alerta_${sig}"
   filter="resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"$SERVICE\" AND jsonPayload.alert=\"$sig\""
   exists g logging metrics describe "$metric" || g logging metrics create "$metric" --description="PartyX: alerta $sig" --log-filter="$filter"
@@ -45,4 +47,4 @@ JSON
     g alpha monitoring policies create --policy-from-file="${TMPDIR:-/tmp}/policy-$sig.json" >/dev/null
   fi
 done
-echo "ok: 11 métricas e 11 políticas para $SERVICE em $PROJECT, avisando $NOTIFY_EMAIL"
+echo "ok: 13 métricas e 13 políticas para $SERVICE em $PROJECT, avisando $NOTIFY_EMAIL"

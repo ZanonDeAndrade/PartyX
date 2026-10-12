@@ -48,6 +48,8 @@ Cada um é um log JSON com o campo `alert`; `infra/operacao/alerts.sh` cria mét
 | `reconciliacao_falhou` | A rotina agendada não conseguiu consultar o gateway | `runbooks/gateway.md` |
 | `pagamento_divergente` | Valor, conta, moeda ou pedido diferentes do esperado. Nada foi aprovado | `runbooks/gateway.md`; **não** forçar a aprovação |
 | `estorno_fora_de_fluxo` | Estorno ou chargeback de pedido que nunca foi aprovado aqui | Conferir no gateway; revisão manual |
+| `estorno_parcial` | Estorno parcial feito no Mercado Pago. Nenhum ingresso cancelado sozinho (D-82, proposta a confirmar) | Cancelar manualmente no ADM15 o ingresso correspondente, conforme a PartyX indicar. `runbooks/gateway.md` |
+| `cobranca_duplicada` | Segunda cobrança para o mesmo pedido; nada emitido por ela (D-83) | A PartyX estorna **a cobrança em dobro** (não a do pedido) e marca como tratada em Exceções. O estorno faz o alerta aparecer de novo, sem efeito. `runbooks/gateway.md` |
 | `email_falhou` | E-mail que esgotou as 4 tentativas (+2, +10, +30 min por Cloud Tasks): revisão manual | `runbooks/email.md` |
 | `backup_falhou` / `backup ausente` | O job de backup falhou, ou nenhum backup bem-sucedido em 25 h | `docs/backup.md`; rodar `check-backup.sh` e executar o job à mão |
 | `verificacao_humana_indisponivel` | A Cloudflare (Turnstile) não respondeu: cadastro e recuperação ficam **recusados** (falha fechada) | Conferir o status da Cloudflare; não desligar a verificação |
