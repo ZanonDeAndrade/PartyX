@@ -5,7 +5,7 @@ import { requireAdmin } from '../auth/permissions';
 import type { AuthDeps, AuthVariables } from '../auth/types';
 import { auditLog, orders } from '../db/schema';
 import { AppError } from '../domain/errors';
-import { listPaidWithoutStock, markTreated } from '../payments/exceptions';
+import { listDuplicateCharges, listPaidWithoutStock, markDuplicateTreated, markTreated } from '../payments/exceptions';
 import { parseJson } from './validate';
 import type { MockGateway } from '../payments/mockGateway';
 
@@ -35,14 +35,31 @@ export function paymentAdminRoutes(deps: AuthDeps) {
       .orderBy(desc(auditLog.createdAt))
       .limit(100);
 
+    const cobrancasDuplicadas = await listDuplicateCharges(deps.db);
+
     return c.json({
       semEstoque,
       abertos: semEstoque.filter(x => !x.treated).length,
+      cobrancasDuplicadas,
+      duplicadasAbertas: cobrancasDuplicadas.filter(x => !x.treated).length,
       divergencias,
       foraDeFluxo,
       orientacao:
-        'Pagamento sem estoque: o cliente estorna no painel do gateway. A PartyX não estorna nem decide pelo cliente. Depois de tratar, marque o caso como tratado com o motivo.',
+        'Pagamento sem estoque ou cobrança em dobro: o cliente estorna no painel do gateway. A PartyX não estorna nem decide pelo cliente. Depois de tratar, marque o caso como tratado com o motivo.',
     });
+  });
+
+  /** Marca uma cobrança em dobro (D-83) como tratada: motivo obrigatório, na trilha. Não estorna nem muda o pedido. */
+  app.post('/admin/payments/exceptions/:orderId/duplicates/:chargeId/treat', async c => {
+    const orderId = z.uuid().safeParse(c.req.param('orderId'));
+    const chargeId = z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/)
+      .safeParse(c.req.param('chargeId'));
+    if (!orderId.success || !chargeId.success) throw new AppError(404, 'nao_encontrado', 'Cobrança não encontrada.');
+    const body = await parseJson(c, z.object({ reason: z.string().max(600) }));
+    const result = await markDuplicateTreated(deps, { id: c.get('auth')!.user.id }, orderId.data, chargeId.data, body.reason);
+    return c.json(result);
   });
 
   /** Marca um caso de pagamento sem estoque como tratado (motivo obrigatório, na trilha). Não estorna nem muda o pedido. */

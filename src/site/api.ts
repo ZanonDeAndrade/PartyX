@@ -313,9 +313,26 @@ export interface PaidWithoutStockCase {
   gatewayRef: string | null;
   treated: { at: string; reason: string; by: string | null } | null;
 }
+/** Cobrança em dobro de um pedido (D-83): a PartyX estorna no gateway e marca como tratada. */
+export interface DuplicateChargeCase {
+  orderId: string;
+  number: number;
+  totalCents: number;
+  event: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerCpf: string | null;
+  gatewayRef: string | null;
+  duplicateRef: string;
+  duplicateStatus: string | null;
+  detectedAt: string;
+  treated: { at: string; reason: string; by: string | null } | null;
+}
 export interface PaymentExceptions {
   semEstoque: PaidWithoutStockCase[];
   abertos: number;
+  cobrancasDuplicadas: DuplicateChargeCase[];
+  duplicadasAbertas: number;
   orientacao: string;
 }
 export interface AdminOrderRow {
@@ -865,6 +882,12 @@ export const api = {
       get<PromoterRanking>(`/admin/reports/promoters?${query}`, signal),
     feeReport: (query: string, signal?: AbortSignal) => get<FeeReport>(`/admin/reports/fee?${query}`, signal),
     paymentExceptions: (signal?: AbortSignal) => get<PaymentExceptions>('/admin/payments/exceptions', signal),
+    treatDuplicateCharge: (orderId: string, chargeId: string, reason: string) =>
+      request<{ orderId: string; chargeId: string; treated: { at: string; reason: string } }>(
+        'POST',
+        `/admin/payments/exceptions/${encodeURIComponent(orderId)}/duplicates/${encodeURIComponent(chargeId)}/treat`,
+        { reason },
+      ),
     treatException: (orderId: string, reason: string) =>
       request<{ orderId: string; treated: { at: string; reason: string } }>(
         'POST',

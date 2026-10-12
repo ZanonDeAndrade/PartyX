@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import {
   api,
   ApiError,
+  type DuplicateChargeCase,
   type PaidWithoutStockCase,
   type AdminOrderDetail,
   type AdminTicketRow,
@@ -50,8 +51,8 @@ const EXCEPTIONS_CHANGED = 'px-excecoes-mudaram';
  * Casos de pagamento aprovado sem ingresso ainda não tratados. Alimenta o contador da aba e o alerta que fica em todas as páginas do
  * painel até cada caso ser marcado como tratado. Falha ao buscar não bloqueia o painel (o alerta só não aparece).
  */
-function useOpenExceptions(): number {
-  const [open, setOpen] = useState(0);
+function useOpenExceptions(): { semEstoque: number; duplicadas: number } {
+  const [open, setOpen] = useState({ semEstoque: 0, duplicadas: 0 });
   const [version, setVersion] = useState(0);
   useEffect(() => {
     const bump = () => setVersion(v => v + 1);
@@ -62,7 +63,7 @@ function useOpenExceptions(): number {
     const controller = new AbortController();
     api.admin
       .paymentExceptions(controller.signal)
-      .then(r => setOpen(r.abertos))
+      .then(r => setOpen({ semEstoque: r.abertos, duplicadas: r.duplicadasAbertas ?? 0 }))
       .catch(() => {});
     return () => controller.abort();
   }, [version]);
@@ -149,7 +150,8 @@ function AdminNav({ active, open, onNavigate }: { active: AdminTab; open: number
 
 /** Painel administrativo: menu lateral no computador e gaveta no celular (o botão "Menu do painel" abre). */
 function AdminShell({ children, active }: { children: ReactNode; active: AdminTab }) {
-  const open = useOpenExceptions();
+  const pending = useOpenExceptions();
+  const open = pending.semEstoque + pending.duplicadas;
   const [drawer, setDrawer] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const label =
@@ -196,7 +198,18 @@ function AdminShell({ children, active }: { children: ReactNode; active: AdminTa
           </div>
           {open > 0 && active !== 'excecoes' ? (
             <p className="px-notice px-notice-err" role="alert">
-              <b>{open}</b> {open === 1 ? 'pagamento aprovado' : 'pagamentos aprovados'} sem ingresso disponível{' '}
+              {pending.semEstoque > 0 ? (
+                <>
+                  <b>{pending.semEstoque}</b> {pending.semEstoque === 1 ? 'pagamento aprovado' : 'pagamentos aprovados'}{' '}
+                  sem ingresso disponível
+                </>
+              ) : null}
+              {pending.semEstoque > 0 && pending.duplicadas > 0 ? ' e ' : null}
+              {pending.duplicadas > 0 ? (
+                <>
+                  <b>{pending.duplicadas}</b> {pending.duplicadas === 1 ? 'cobrança em dobro' : 'cobranças em dobro'}
+                </>
+              ) : null}{' '}
               {open === 1 ? 'aguarda' : 'aguardam'} tratamento: o estorno é feito pela PartyX no gateway.{' '}
               <Link to="/admin/excecoes">Ver exceções</Link>
             </p>
@@ -1334,10 +1347,18 @@ export function AdminExceptionsPage() {
   const access = useAdmin('/admin/excecoes');
   const [state, retry] = useFetch(s => api.admin.paymentExceptions(s), access === 'ok' ? 'excecoes' : 'espera');
   const [target, setTarget] = useState<PaidWithoutStockCase | null>(null);
+  const [dupTarget, setDupTarget] = useState<DuplicateChargeCase | null>(null);
   const [done, setDone] = useState('');
   const data = state.status === 'ok' ? state.data : null;
   const open = data?.semEstoque.filter(c => !c.treated) ?? [];
   const treated = data?.semEstoque.filter(c => c.treated) ?? [];
+  const dupOpen = data?.cobrancasDuplicadas.filter(c => !c.treated) ?? [];
+  const dupTreated = data?.cobrancasDuplicadas.filter(c => c.treated) ?? [];
+  const changed = (message: string) => {
+    setDone(message);
+    window.dispatchEvent(new Event(EXCEPTIONS_CHANGED));
+    retry();
+  };
   return (
     <Gate access={access} active="excecoes">
       <h1 className="px-h1">Exceções de pagamento</h1>
@@ -1363,18 +1384,44 @@ export function AdminExceptionsPage() {
               <ExceptionTable rows={treated} />
             </>
           ) : null}
+          <h2 className="px-h2">Cobranças em dobro</h2>
+          <p>
+            Um mesmo pedido foi cobrado duas vezes no gateway. Os ingressos são emitidos uma vez só, pela cobrança que
+            vale para o pedido. A PartyX estorna a cobrança em dobro no painel do gateway, usando a referência abaixo, e
+            depois marca o caso como tratado.
+          </p>
+          <h3 className="px-h3">Em aberto ({dupOpen.length})</h3>
+          {dupOpen.length === 0 ? <p className="px-muted">Nenhuma cobrança em dobro em aberto.</p> : null}
+          {dupOpen.length > 0 ? <DuplicateChargeTable rows={dupOpen} onTreat={setDupTarget} /> : null}
+          {dupTreated.length > 0 ? (
+            <>
+              <h3 className="px-h3">Tratadas ({dupTreated.length})</h3>
+              <DuplicateChargeTable rows={dupTreated} />
+            </>
+          ) : null}
         </>
       ) : null}
       {target ? (
         <TreatDialog
-          item={target}
+          title={`Marcar o pedido PX-${target.number} como tratado`}
+          note="A marcação só registra que o caso foi tratado. O pedido continua como pago sem estoque, nenhum estorno é feito pela plataforma e o relatório da taxa não muda."
           onCancel={() => setTarget(null)}
           onConfirm={async reason => {
             await api.admin.treatException(target.orderId, reason);
             setTarget(null);
-            setDone(`Pedido PX-${target.number} marcado como tratado.`);
-            window.dispatchEvent(new Event(EXCEPTIONS_CHANGED));
-            retry();
+            changed(`Pedido PX-${target.number} marcado como tratado.`);
+          }}
+        />
+      ) : null}
+      {dupTarget ? (
+        <TreatDialog
+          title={`Marcar a cobrança em dobro do pedido PX-${dupTarget.number} como tratada`}
+          note="A marcação só registra que o caso foi tratado. O pedido e os ingressos não mudam, nenhum estorno é feito pela plataforma e o relatório da taxa não muda."
+          onCancel={() => setDupTarget(null)}
+          onConfirm={async reason => {
+            await api.admin.treatDuplicateCharge(dupTarget.orderId, dupTarget.duplicateRef, reason);
+            setDupTarget(null);
+            changed(`Cobrança em dobro do pedido PX-${dupTarget.number} marcada como tratada.`);
           }}
         />
       ) : null}
@@ -1442,13 +1489,96 @@ function ExceptionTable({
   );
 }
 
+const GATEWAY_STATUS: Record<string, string> = {
+  aprovado: 'aprovada',
+  pendente: 'em aberto',
+  estornado: 'estornada',
+  contestado: 'contestada',
+};
+
+function DuplicateChargeTable({
+  rows,
+  onTreat,
+}: {
+  rows: DuplicateChargeCase[];
+  onTreat?: (c: DuplicateChargeCase) => void;
+}) {
+  return (
+    <TableWrap>
+      <table className="px-table">
+        <thead>
+          <tr>
+            <th>Pedido</th>
+            <th>Comprador</th>
+            <th>Valor do pedido</th>
+            <th>Detectada em</th>
+            <th>Cobrança em dobro (estornar)</th>
+            <th>Cobrança do pedido</th>
+            <th>{onTreat ? 'Ação' : 'Tratamento'}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(c => (
+            <tr key={`${c.orderId}:${c.duplicateRef}`}>
+              <td>
+                <Link to={`/admin/pedidos/${c.orderId}`}>PX-{c.number}</Link>
+                <br />
+                <span className="px-small px-muted">{c.event}</span>
+              </td>
+              <td>
+                {c.buyerName}
+                <br />
+                <span className="px-small px-muted">{c.buyerEmail}</span>
+              </td>
+              <td>{brl(c.totalCents)}</td>
+              <td>
+                {dateShort(c.detectedAt)} {timeOf(c.detectedAt)}
+              </td>
+              <td>
+                <code>{c.duplicateRef}</code>
+                {c.duplicateStatus ? (
+                  <>
+                    <br />
+                    <span className="px-small px-muted">
+                      {GATEWAY_STATUS[c.duplicateStatus] ?? c.duplicateStatus} quando detectada
+                    </span>
+                  </>
+                ) : null}
+              </td>
+              <td>
+                <code>{c.gatewayRef ?? 'não informada'}</code>
+              </td>
+              <td>
+                {c.treated ? (
+                  <>
+                    {dateShort(c.treated.at)} {timeOf(c.treated.at)}
+                    {c.treated.by ? ` por ${c.treated.by}` : ''}
+                    <br />
+                    <span className="px-small px-muted">{c.treated.reason}</span>
+                  </>
+                ) : onTreat ? (
+                  <button type="button" className="px-btn" onClick={() => onTreat(c)}>
+                    Marcar como tratada
+                  </button>
+                ) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableWrap>
+  );
+}
+
 /** Marcação de "tratado": motivo obrigatório, que fica na trilha de auditoria. Não estorna nem muda o pedido. */
 function TreatDialog({
-  item,
+  title,
+  note,
   onCancel,
   onConfirm,
 }: {
-  item: PaidWithoutStockCase;
+  title: string;
+  note: string;
   onCancel: () => void;
   onConfirm: (reason: string) => Promise<void>;
 }) {
@@ -1484,12 +1614,9 @@ function TreatDialog({
         onClick={e => e.stopPropagation()}
       >
         <h2 id="treat-title" className="px-h3">
-          Marcar o pedido PX-{item.number} como tratado
+          {title}
         </h2>
-        <p>
-          A marcação só registra que o caso foi tratado. O pedido continua como pago sem estoque, nenhum estorno é feito
-          pela plataforma e o relatório da taxa não muda.
-        </p>
+        <p>{note}</p>
         <div className="px-field">
           <label htmlFor="motivo-tratado">Motivo (fica na trilha de auditoria)</label>
           <textarea

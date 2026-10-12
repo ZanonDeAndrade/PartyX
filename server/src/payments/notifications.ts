@@ -79,11 +79,7 @@ export async function handleNotification(deps: ReconcileDeps, input: Notificatio
   const { subject } = check;
   const [linked] =
     subject.kind === 'payment'
-      ? await deps.db
-          .select({ id: orders.id })
-          .from(orders)
-          .where(eq(orders.gatewayPaymentId, subject.id))
-          .limit(1)
+      ? await deps.db.select({ id: orders.id }).from(orders).where(eq(orders.gatewayPaymentId, subject.id)).limit(1)
       : [];
   const payload: EventPayload =
     subject.kind === 'payment'
@@ -141,7 +137,10 @@ async function processEvent(deps: ReconcileDeps, eventId: string, payload: Event
       .update(paymentEvents)
       .set({
         processedAt: deps.clock.now(),
-        processingError: result.outcome === 'divergente' || result.outcome === 'sem_pedido' ? result.outcome : null,
+        processingError:
+          result.outcome === 'divergente' || result.outcome === 'sem_pedido' || result.outcome === 'cobranca_duplicada'
+            ? result.outcome
+            : null,
         orderId: result.orderId ?? undefined,
       })
       .where(eq(paymentEvents.id, eventId));
@@ -195,12 +194,20 @@ export interface ReconcileRunOptions {
   limit?: number;
   /** Só pedidos criados nas últimas N horas (pelo relógio da aplicação). Padrão: 72 (a rotina diária). */
   windowHours?: number;
+  /**
+   * Pedidos já pagos (ou contestados, ou pagos sem estoque) de eventos que ainda não passaram: reconsulta cada um, no máximo uma
+   * vez a cada tantos segundos, para pegar estorno ou contestação cujo webhook se perdeu. Padrão: 20 h, até 200 por execução.
+   */
+  reversalIntervalSeconds?: number;
+  reversalLimit?: number;
 }
 
 export interface RunSummary {
   expired: { reservations: number; orders: number };
   events: { tried: number; done: number };
   orders: { checked: number; failed: number; outcomes: Partial<Record<ReconcileOutcome, number>> };
+  /** Reconsulta dos pedidos pagos (estorno ou contestação sem webhook). */
+  paid: { checked: number; failed: number; outcomes: Partial<Record<ReconcileOutcome, number>> };
 }
 
 /**
@@ -230,9 +237,35 @@ export async function runReconciliation(deps: ReconcileDeps, options: ReconcileR
         for update skip locked)
     returning gateway_payment_id`);
 
+  const open = await reconsultAll(deps, claimed.rows);
+
+  // Estorno ou contestação feitos no painel do gateway cujo webhook nunca chegou: sem isto, o ingresso de quem recebeu o dinheiro de
+  // volta continuaria valendo na portaria. Só eventos que ainda não passaram (até 1 dia depois do início), em rodízio pelo carimbo.
+  const eventFrom = new Date(deps.clock.now().getTime() - 86_400_000);
+  const paidClaimed = await deps.db.execute<{ gateway_payment_id: string }>(sql`
+    update orders set updated_at = now()
+     where id in (
+       select o.id from orders o join events e on e.id = o.event_id
+        where o.gateway_payment_id is not null
+          and o.status in ('pago', 'contestado', 'pago_sem_estoque')
+          and e.starts_at > ${eventFrom}
+          and o.updated_at <= now() - make_interval(secs => ${options.reversalIntervalSeconds ?? 72_000})
+        order by o.updated_at asc
+        limit ${options.reversalLimit ?? 200}
+        for update of o skip locked)
+    returning gateway_payment_id`);
+  const paid = await reconsultAll(deps, paidClaimed.rows);
+  // Vence as reservas DEPOIS de reconsultar: a expiração renova o carimbo de conferência (`updated_at`), e vencer antes deixaria de
+  // fora desta execução justamente o pedido que ninguém abriu e cujas tarefas falharam. A aprovação de um pedido ainda "pendente" com
+  // reserva vencida já segue o caminho tardio (emite se houver estoque, senão "pago sem estoque").
+  const expired = await expireOverdue(deps);
+  return { expired, events, orders: open, paid };
+}
+
+async function reconsultAll(deps: ReconcileDeps, rows: { gateway_payment_id: string }[]) {
   const outcomes: Partial<Record<ReconcileOutcome, number>> = {};
   let failed = 0;
-  for (const row of claimed.rows) {
+  for (const row of rows) {
     try {
       const { outcome } = await reconcilePayment(deps, row.gateway_payment_id);
       outcomes[outcome] = (outcomes[outcome] ?? 0) + 1;
@@ -244,9 +277,5 @@ export async function runReconciliation(deps: ReconcileDeps, options: ReconcileR
       });
     }
   }
-  // Vence as reservas DEPOIS de reconsultar: a expiração renova o carimbo de conferência (`updated_at`), e vencer antes deixaria de
-  // fora desta execução justamente o pedido que ninguém abriu e cujas tarefas falharam. A aprovação de um pedido ainda "pendente" com
-  // reserva vencida já segue o caminho tardio (emite se houver estoque, senão "pago sem estoque").
-  const expired = await expireOverdue(deps);
-  return { expired, events, orders: { checked: claimed.rows.length, failed, outcomes } };
+  return { checked: rows.length, failed, outcomes };
 }

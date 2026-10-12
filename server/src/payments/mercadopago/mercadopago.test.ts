@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { checkSnapshotAgainstOrder, type GatewayStatus } from '../../domain/payment';
 import { createFakeClock } from '../../providers/clock';
-import { GatewayError, GatewayRejectedError } from '../gateway';
+import { GatewayError, GatewayKeyReusedError, GatewayRejectedError } from '../gateway';
 import { createMercadoPagoGateway, SANDBOX_PAYER_EMAIL } from './index';
 import {
   amountFromCents,
@@ -298,15 +298,56 @@ describe('Mercado Pago: adaptador (HTTP)', () => {
     expect(calls.map(c => c.headers['X-Idempotency-Key'])).toEqual([card.idempotencyKey, card.idempotencyKey]);
   });
 
-  it('chave já usada com outro corpo (409): recusa definitiva, para a próxima tentativa usar chave nova', async () => {
-    const { gateway } = make([
+  it('chave já usada com outro corpo (409): NÃO é recusa (a primeira cobrança pode existir); sem repetir', async () => {
+    const { gateway, calls } = make([
       jsonResponse(409, {
         errors: [{ code: 'idempotency_key_already_used', message: 'X-Idempotency-Key already used.' }],
       }),
     ]);
     const error = await gateway.createCard(card).catch(e => e);
-    expect(error).toBeInstanceOf(GatewayRejectedError);
-    expect(error.reason).toBe('mercadopago_409_idempotency_key_already_used');
+    expect(error).toBeInstanceOf(GatewayKeyReusedError);
+    expect(error).not.toBeInstanceOf(GatewayRejectedError);
+    expect(error.retryable).toBe(false);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('busca de orders pela referência: data de início e fim, referência conferida de novo, páginas', async () => {
+    const ref = '0b6f2f0e-6a65-4d55-9a3c-6a1f7e2b9c10';
+    const order = (id: string, external_reference: string) => ({
+      id,
+      status: 'processed',
+      external_reference,
+      total_amount: '80.00',
+      currency: 'BRL',
+      user_id: '123456789',
+      transactions: {
+        payments: [{ id: 'PAY01X', status: 'processed', payment_method: { id: 'pix', type: 'bank_transfer' } }],
+      },
+    });
+    const { gateway, calls } = make([
+      jsonResponse(200, {
+        data: [
+          order('ORDTST01AAAAAAAAAAAAAAAAAAAAAAAA', ref),
+          order('ORDTST01BBBBBBBBBBBBBBBBBBBBBBBB', 'outro-pedido'),
+        ],
+        paging: { total: '3', total_pages: '2', offset: '0', limit: '50' },
+      }),
+      jsonResponse(200, {
+        data: [order('ORDTST01CCCCCCCCCCCCCCCCCCCCCCCC', ref)],
+        paging: { total: '3', total_pages: '2', offset: '50', limit: '50' },
+      }),
+    ]);
+    const found = await gateway.findPaymentsByOrderRef!(ref, new Date('2026-10-10T14:50:00Z'));
+    expect(found.map(f => f.gatewayPaymentId)).toEqual([
+      'ORDTST01AAAAAAAAAAAAAAAAAAAAAAAA',
+      'ORDTST01CCCCCCCCCCCCCCCCCCCCCCCC',
+    ]);
+    const url = new URL(calls[0]!.url);
+    expect(url.pathname).toBe('/v1/orders');
+    expect(url.searchParams.get('external_reference')).toBe(ref);
+    expect(url.searchParams.get('begin_date')).toBe('2026-10-10T14:45:00.000Z');
+    expect(url.searchParams.get('end_date')).toBeTruthy();
+    expect(new URL(calls[1]!.url).searchParams.get('page')).toBe('2');
   });
 
   it('5xx e tempo esgotado: "não confirmado" (erro que pode repetir), nunca aprovado; sem dado do comprador na mensagem', async () => {

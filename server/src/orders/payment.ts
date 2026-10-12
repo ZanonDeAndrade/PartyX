@@ -1,10 +1,16 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { orders, reservations, users } from '../db/schema';
 import { AppError } from '../domain/errors';
-import { looksLikeCardNumber, type DeclineReason, type PaymentMethod } from '../domain/payment';
+import { looksLikeCardNumber, type DeclineReason, type GatewayStatus, type PaymentMethod } from '../domain/payment';
 import { logger } from '../logger';
 import { delayUntil, nextCheck } from '../domain/reconcileSchedule';
-import { GatewayError, GatewayRejectedError, type CreatedPayment, type PaymentGateway } from '../payments/gateway';
+import {
+  GatewayError,
+  GatewayKeyReusedError,
+  GatewayRejectedError,
+  type CreatedPayment,
+  type PaymentGateway,
+} from '../payments/gateway';
 import { enqueueSafely } from '../payments/taskQueue';
 import { expireOverdue, type OrdersDeps } from './service';
 
@@ -273,29 +279,35 @@ export async function startPayment(
   try {
     created = await call(); // chamada externa: fora de qualquer transação
   } catch (error) {
-    await unclaim(deps, orderId, error instanceof GatewayRejectedError);
-    if (error instanceof GatewayRejectedError) {
-      logger.warn('gateway recusou a criação da cobrança', {
+    if (error instanceof GatewayKeyReusedError) {
+      // A primeira criação com esta chave deu tempo esgotado aqui, mas pode ter dado certo no gateway; o navegador mandou um token
+      // novo e o corpo mudou. Nunca abre tentativa nova sem antes achar a primeira cobrança: seria cobrar duas vezes.
+      created = await recoverCharge(gateway, { id: orderId, createdAt: order.createdAt }, input.method);
+    } else {
+      await unclaim(deps, orderId, error instanceof GatewayRejectedError);
+      if (error instanceof GatewayRejectedError) {
+        logger.warn('gateway recusou a criação da cobrança', {
+          orderId,
+          provider: capabilities.providerId,
+          reason: error.reason,
+        });
+        throw new AppError(
+          422,
+          'pagamento_nao_criado',
+          'Não foi possível iniciar o pagamento. Confira os dados e tente de novo.',
+        );
+      }
+      logger.error('falha ao falar com o gateway', {
         orderId,
         provider: capabilities.providerId,
-        reason: error.reason,
+        error: error instanceof GatewayError ? error.name : 'desconhecido',
       });
       throw new AppError(
-        422,
-        'pagamento_nao_criado',
-        'Não foi possível iniciar o pagamento. Confira os dados e tente de novo.',
+        503,
+        'gateway_indisponivel',
+        'O pagamento está instável no momento. Tente novamente em instantes.',
       );
     }
-    logger.error('falha ao falar com o gateway', {
-      orderId,
-      provider: capabilities.providerId,
-      error: error instanceof GatewayError ? error.name : 'desconhecido',
-    });
-    throw new AppError(
-      503,
-      'gateway_indisponivel',
-      'O pagamento está instável no momento. Tente novamente em instantes.',
-    );
   }
 
   // A cobrança precisa referir este pedido e este valor; resposta estranha do gateway nunca vira vínculo.
@@ -355,6 +367,50 @@ export async function startPayment(
     }
   }
   return { payment: present(created, input.method) };
+}
+
+/** Ordem de preferência ao escolher entre cobranças do mesmo pedido: a aprovada; depois a recusada (o cartão já respondeu); a aberta. */
+const RECOVERY_RANK: Partial<Record<GatewayStatus, number>> = { aprovado: 3, recusado: 2, pendente: 1 };
+
+/**
+ * Acha no gateway a cobrança que a criação anterior deixou sem resposta (mesma chave de idempotência, corpo diferente) e devolve
+ * como se a criação tivesse respondido agora: o vínculo e a conciliação seguem o caminho normal. Não achou (a busca do gateway leva
+ * alguns segundos para indexar): a forma continua escolhida e a tentativa NÃO muda, para a próxima chamada repetir a busca.
+ */
+async function recoverCharge(
+  gateway: PaymentGateway,
+  order: { id: string; createdAt: Date },
+  method: PaymentMethod,
+): Promise<CreatedPayment> {
+  try {
+    const found = (await gateway.findPaymentsByOrderRef?.(order.id, order.createdAt)) ?? [];
+    const best = found
+      .filter(p => p.method === method && RECOVERY_RANK[p.status] !== undefined)
+      .sort((a, b) => (RECOVERY_RANK[b.status] ?? 0) - (RECOVERY_RANK[a.status] ?? 0))[0];
+    if (best) {
+      // A listagem da busca pode vir resumida (sem o QR do Pix): a cobrança é reconsultada inteira.
+      const snapshot = await gateway.getPayment(best.gatewayPaymentId);
+      logger.info('cobrança anterior recuperada pela busca no gateway', {
+        orderId: order.id,
+        candidates: found.length,
+      });
+      return { gatewayPaymentId: snapshot.gatewayPaymentId, status: snapshot.status, redirectUrl: null, snapshot };
+    }
+    logger.warn('cobrança anterior ainda não encontrada no gateway', {
+      orderId: order.id,
+      alert: 'cobranca_sem_resposta',
+    });
+  } catch (error) {
+    logger.warn('busca da cobrança anterior falhou', {
+      orderId: order.id,
+      error: error instanceof GatewayError ? error.name : 'desconhecido',
+    });
+  }
+  throw new AppError(
+    503,
+    'pagamento_em_verificacao',
+    'Estamos conferindo uma tentativa de pagamento anterior deste pedido. Aguarde alguns segundos e tente de novo.',
+  );
 }
 
 /** Situação do pagamento do pedido, consultada no gateway (mostra o Pix de novo ao recarregar a página). */

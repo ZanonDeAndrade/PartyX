@@ -1,4 +1,4 @@
-import { GatewayError, GatewayRejectedError } from '../gateway';
+import { GatewayError, GatewayKeyReusedError, GatewayRejectedError } from '../gateway';
 
 /**
  * Chamadas HTTP à API do Mercado Pago (`https://api.mercadopago.com`), com `fetch` e sem SDK. Tudo do Mercado Pago fica
@@ -91,6 +91,8 @@ export function createMpHttp(options: MpHttpOptions) {
       throw new GatewayError(`mercadopago: credencial recusada (HTTP ${res.status})`, false);
     }
     if (res.status === 404) throw new GatewayRejectedError('mercadopago_nao_encontrado');
+    // Mesma chave, corpo diferente: a primeira criação pode ter dado certo no Mercado Pago (provado no ambiente de teste, 12/10/2026).
+    if (res.status === 409 && errorCode(body) === 'idempotency_key_already_used') throw new GatewayKeyReusedError();
     throw new GatewayRejectedError(`mercadopago_${res.status}_${errorCode(body)}`);
   }
 

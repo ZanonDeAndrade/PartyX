@@ -24,7 +24,7 @@ Sem sessão, sem CSRF (é servidor para servidor); registrado antes do contexto 
 | Falha ao consultar o gateway ou erro interno | 503 (o gateway reenvia) | Evento pendente, `attempts` e erro; a conciliação reprocessa (até 10 tentativas, depois fica para revisão com log `alert=webhook_falhou`) |
 | Corpo acima de 256 KB | 413 | — |
 
-Um evento forjado **não ocupa** o id de um evento verdadeiro (a unicidade vale só entre eventos válidos). Pagamento desconhecido: processado com o motivo `sem_pedido`.
+Um evento forjado **não ocupa** o id de um evento verdadeiro (a unicidade vale só entre eventos válidos). Pagamento desconhecido: a reconsulta diz a referência; pedido aberto e sem cobrança, com valor, moeda, conta e forma conferindo, recebe o vínculo e segue o caminho normal; pedido com outra cobrança vira `cobranca_duplicada` (trilha e alerta, D-83); sem pedido, `sem_pedido` (etapa 07, 12/10/2026).
 
 Decisão D-38: o webhook responde **depois** de processar (uma consulta e uma transação curta), porque o Cloud Run não garante processamento depois da resposta.
 
@@ -63,6 +63,7 @@ Eventos **fora de ordem** são inofensivos porque cada notificação reconsulta 
 - **Autenticação:** token OIDC do Google em nome da conta `partyx-scheduler`, com o endereço do serviço como `audience`. O serviço confere assinatura, audience e e-mail (`JOBS_AUDIENCE`, `JOBS_CALLER_EMAIL`). Sem segredo compartilhado. Qualquer falha: 401 igual. Sem configuração: 503. **Atenção:** se `PUBLIC_BASE_URL` mudar para um domínio próprio, o `audience` do job precisa acompanhar.
 - **Segura com execuções simultâneas:** cada pedido é "reservado" para uma execução (`FOR UPDATE SKIP LOCKED` e carimbo de `updated_at`, intervalo mínimo de 60 s), então duas execuções pegam lotes diferentes; e mesmo que pegassem o mesmo, a confirmação é idempotente (testado com 5 e 6 execuções paralelas).
 - Falha numa consulta não impede as outras (log `alert=reconciliacao_falhou`).
+- **Pedidos já pagos (etapa 07, 12/10/2026):** a mesma rotina reconsulta pedidos `pago`, `contestado` e `pago_sem_estoque` de eventos que ainda não passaram (até 1 dia depois do início), cada um no máximo a cada 20 h e até 200 por execução, para pegar estorno ou contestação cujo webhook se perdeu. Resumo em `paid` na resposta da rotina.
 
 ## Simulação local
 
@@ -79,7 +80,7 @@ O teste no navegador mostrou que respostas **privadas** (pedido, conta, painel) 
 ## O que **não** foi verificado
 
 - Qualquer gateway real: assinatura, formato de evento, tempo de resposta, limite de chamadas, comportamento de Pix vencido e de estorno parcial.
-- Estorno **parcial** (hoje qualquer `estornado` cancela o pedido inteiro) e vários pagamentos por pedido.
+- Estorno **parcial**: no Mercado Pago a order segue `processed` com `partially_refunded`; desde a etapa 07 vira trilha e alerta, sem cancelar ingresso (D-82). Vários pagamentos por pedido continuam fora do fluxo.
 - Scheduler real, token OIDC real e logs no Cloud Logging; o alerta no Cloud Monitoring não foi criado (D-41).
 - Carga (Prompt 24) e o comportamento do `SKIP LOCKED` na conexão **pooled** do Neon.
 - Emissão dos ingressos de verdade (Prompt 13): o teste usa um emissor de teste na mesma transação.
@@ -93,9 +94,15 @@ A decisão D-13 (canal, responsável e prazo) segue **pendente**. Foi implementa
 - **Comprador:** a tela do pedido mostra o contato **da PartyX** se `PARTYX_SUPPORT_EMAIL` e/ou `PARTYX_SUPPORT_WHATSAPP` estiverem configurados (o servidor só manda o contato nesse estado de pedido). Sem configuração, mensagem neutra, sem prazo e sem promessa. Nunca há contato da contratada.
 - **Taxa (D-54):** a fórmula **não mudou**. O relatório mensal ganhou a seção **"Exceções para análise"** (pedido, unidades, valor, referência no gateway, tratado ou em aberto, totais), também no extrato `ops:fee`.
 
+## Etapa 07 no ambiente de teste do Mercado Pago (12/10/2026)
+
+Cobrança em dobro (D-83) aparece também na aba **Exceções**, seção "Cobranças em dobro", com o mesmo "marcar como tratada" com motivo (`POST /api/admin/payments/exceptions/:pedido/duplicates/:cobranca/treat`); entra no contador e no alerta do painel.
+
+Os casos difíceis abaixo foram repetidos contra o ambiente de teste real, com quatro correções (cobrança em dobro depois de resposta perdida, cobrança órfã, estorno sem webhook e estorno parcial). Evidência e separação entre real e simulado: `pagamento-mercadopago.md`, seção "Etapa 07".
+
 ## Decisões abertas
 
-D-01 a D-04 (gateway), D-14 (reposição de estoque), D-38, D-39, D-40 (chargeback ganho) e D-41 (canal do aviso de "pago sem estoque").
+D-01 a D-04 (gateway), D-14 (reposição de estoque), D-38, D-39, D-40 (chargeback ganho), D-41 (canal do aviso de "pago sem estoque"), D-82 (estorno parcial) e D-83 (cobrança em dobro).
 
 
 ## Casos difíceis (Prompt 22, 05/10/2026)
@@ -116,4 +123,4 @@ Só testes e verificação; **nenhuma correção de código foi necessária**. A
 
 Já cobertos antes e mantidos: webhook duplicado, fora de ordem, assinatura falsa, pedido/valor/conta/moeda divergentes, webhook perdido recuperado, gateway fora do ar/timeout, cartão recusado, estorno repetido, ingresso utilizado.
 
-**Não verificado:** sandbox ou simulador fiel de um gateway real; reordenação e atraso reais de notificações; estorno parcial como regra de negócio (hoje cai em divergência); chargeback ganho pelo cliente (D-40).
+**Não verificado:** sandbox ou simulador fiel de um gateway real; reordenação e atraso reais de notificações; estorno parcial como regra de negócio (no gateway fictício cai em divergência; com o Mercado Pago, desde 12/10/2026, trilha e alerta próprios que orientam o cancelamento manual pelo ADM15, D-82); chargeback ganho pelo cliente (D-40).

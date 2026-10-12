@@ -8,6 +8,7 @@ import { createFakeClock } from '../providers/clock';
 import { MemoryEmailSender } from '../providers/email';
 import { argon2Hasher } from '../providers/passwordHasher';
 import { createMercadoPagoGateway } from '../payments/mercadopago';
+import { runReconciliation } from '../payments/notifications';
 import { createTicketIssuer } from '../tickets/issuer';
 
 const ADMIN_URL = process.env.TEST_DATABASE_URL;
@@ -93,6 +94,14 @@ function fakeMercadoPago() {
       keys.set(key, { body: raw, id, status });
       return json(status, status === 402 ? { errors: [{ code: 'failed' }], data: order } : order);
     }
+    if ((init?.method ?? 'GET') === 'GET' && url.pathname === '/v1/orders') {
+      // Busca: o Mercado Pago exige o período; aqui só a referência importa.
+      if (!url.searchParams.get('begin_date') || !url.searchParams.get('end_date'))
+        return json(400, { errors: [{ code: 'missing_required_params' }] });
+      const ref = url.searchParams.get('external_reference');
+      const data = [...orders.values()].filter(o => !ref || o.external_reference === ref);
+      return json(200, { data, paging: { total: String(data.length), total_pages: '1', offset: '0', limit: '50' } });
+    }
     const m = /^\/v1\/orders\/(ORD[A-Z0-9]+)$/.exec(url.pathname);
     if ((init?.method ?? 'GET') === 'GET' && m) {
       const order = orders.get(m[1]!);
@@ -107,8 +116,37 @@ function fakeMercadoPago() {
     order.transactions.payments[0].status = status;
     order.transactions.payments[0].status_detail = detail;
   }
+  /** Order criada fora da plataforma (para simular a resposta de criação perdida), já no estado pedido. */
+  function external(ref: string, amount: string, status: string, method: { id: string; type: string }) {
+    const id = `ORDTST01${randomBytes(12).toString('hex').toUpperCase()}`;
+    const order: any = {
+      id,
+      external_reference: ref,
+      total_amount: amount,
+      currency: 'BRL',
+      user_id: COLLECTOR,
+      transactions: { payments: [{ id: `PAY01${id.slice(8)}`, amount, payment_method: method }] },
+    };
+    set(order, status, status === 'processed' ? 'accredited' : 'waiting_transfer');
+    orders.set(id, order);
+    return id;
+  }
+  /** A próxima criação chega ao Mercado Pago, mas a resposta se perde (nas duas tentativas do adaptador). */
+  let loseResponses = 0;
+  const lossyFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const res = await fetchImpl(input, init);
+    if (loseResponses > 0 && init?.method === 'POST') {
+      loseResponses--;
+      throw Object.assign(new Error('tempo esgotado'), { name: 'TimeoutError' });
+    }
+    return res;
+  }) as typeof fetch;
   return {
-    fetchImpl,
+    fetchImpl: lossyFetch,
+    loseNextCreation: () => {
+      loseResponses = 2;
+    },
+    external,
     created,
     orders,
     setStatus: (id: string, status: string, detail: string) => set(orders.get(id), status, detail),
@@ -147,14 +185,15 @@ describe.skipIf(!ADMIN_URL)('Mercado Pago (API de Orders) de ponta a ponta, com 
   };
   let app: ReturnType<typeof build>;
 
-  async function buyer(target = app) {
+  async function buyer(target = app, role: 'cliente' | 'administrador' = 'cliente') {
     const i = ++n;
     const email = `mp${i}@exemplo.com`;
-    await sql("insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,'cliente')", [
+    await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5)', [
       `Maria ${i} Fictícia`,
       email,
       String(30000000000 + i),
       hash,
+      role,
     ]);
     let cookie = '';
     let csrf = '';
@@ -421,6 +460,177 @@ describe.skipIf(!ADMIN_URL)('Mercado Pago (API de Orders) de ponta a ponta, com 
       'cancelado',
       'cancelado',
     ]);
+  });
+
+  it('resposta da criação perdida e nova tentativa com token novo (409): acha a cobrança e não cobra de novo', async () => {
+    const s = await buyer();
+    const e = await event();
+    const id = await newOrder(s, e, 1);
+    mp.loseNextCreation();
+    expect((await s.post(`/orders/${id}/payment`, card('tok-aprovado'))).status).toBe(503);
+    expect(await orderRow(id)).toMatchObject({ status: 'pendente', gateway_payment_id: null, payment_attempt: 0 });
+    // Token novo, mesma chave: 409 no Mercado Pago. Antes, era "recusa" e abria tentativa nova (segunda cobrança).
+    const retry = await s.post(`/orders/${id}/payment`, card('tok-aprovado-2'));
+    expect(retry.status).toBe(201);
+    expect(((await retry.json()) as any).payment).toMatchObject({ status: 'aprovado' });
+    expect(mp.created).toHaveLength(1); // uma única order criada
+    expect(await orderRow(id)).toMatchObject({ status: 'pago', payment_attempt: 0 });
+    expect(await ticketQrs(id)).toHaveLength(1);
+  });
+
+  it('409 sem a cobrança aparecer na busca: pede para esperar, sem tentativa nova', async () => {
+    const s = await buyer();
+    const e = await event();
+    const id = await newOrder(s, e, 1);
+    mp.loseNextCreation();
+    expect((await s.post(`/orders/${id}/payment`, card('tok-aprovado'))).status).toBe(503);
+    const lost = [...mp.orders.keys()][0]!;
+    mp.orders.get(lost).external_reference = 'ainda-nao-indexada';
+    const res = await s.post(`/orders/${id}/payment`, card('tok-aprovado-2'));
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as any).erro.codigo).toBe('pagamento_em_verificacao');
+    expect(await orderRow(id)).toMatchObject({ status: 'pendente', gateway_payment_id: null, payment_attempt: 0 });
+    mp.orders.get(lost).external_reference = id;
+    expect((await s.post(`/orders/${id}/payment`, card('tok-aprovado-3'))).status).toBe(201);
+    expect(mp.created).toHaveLength(1);
+    expect(await orderRow(id)).toMatchObject({ status: 'pago' });
+  });
+
+  it('cobrança órfã: vinculada pelo webhook se conferir; valor errado não vincula; segunda cobrança vira alerta', async () => {
+    const s = await buyer();
+    const e = await event();
+    const pix = { id: 'pix', type: 'bank_transfer' };
+    // a) Órfã correta: vincula e emite.
+    const a = await newOrder(s, e, 1);
+    const ga = mp.external(a, '80.00', 'processed', pix);
+    expect(await (await notify(ga, 'order.processed')).json()).toMatchObject({ outcome: 'confirmado' });
+    expect(await orderRow(a)).toMatchObject({ status: 'pago', gateway_payment_id: ga });
+    expect(await ticketQrs(a)).toHaveLength(1);
+    // b) Valor errado: não vincula; divergência na trilha.
+    const b = await newOrder(s, e, 1);
+    const gb = mp.external(b, '1.00', 'processed', pix);
+    expect(await (await notify(gb, 'order.processed')).json()).toMatchObject({ outcome: 'divergente' });
+    expect(await orderRow(b)).toMatchObject({ status: 'pendente', gateway_payment_id: null });
+    // c) Segunda cobrança aprovada para o pedido já pago: nada emitido, trilha uma vez.
+    const gc = mp.external(a, '80.00', 'processed', pix);
+    expect(await (await notify(gc, 'order.processed')).json()).toMatchObject({ outcome: 'cobranca_duplicada' });
+    expect(await (await notify(gc, 'order.updated')).json()).toMatchObject({ outcome: 'cobranca_duplicada' });
+    expect(await orderRow(a)).toMatchObject({ gateway_payment_id: ga });
+    expect(await ticketQrs(a)).toHaveLength(1);
+    const trail = await sql("select count(*)::int as n from audit_log where action = 'pagamento.cobranca_duplicada'");
+    expect(trail.rows[0].n).toBe(1);
+    // d) Referência que não é pedido: nada.
+    const gd = mp.external('nao-e-pedido', '80.00', 'processed', pix);
+    expect(await (await notify(gd, 'order.processed')).json()).toMatchObject({ outcome: 'sem_pedido' });
+  });
+
+  it('cobrança em dobro aparece em Exceções e é marcada como tratada com motivo, sem mudar pedido nem ingressos (D-83)', async () => {
+    const s = await buyer();
+    const adm = await buyer(app, 'administrador');
+    const e = await event();
+    const pix = { id: 'pix', type: 'bank_transfer' };
+    const id = await newOrder(s, e, 2);
+    const ga = mp.external(id, '160.00', 'processed', pix);
+    expect(await (await notify(ga, 'order.processed')).json()).toMatchObject({ outcome: 'confirmado' });
+    const gd = mp.external(id, '160.00', 'processed', pix);
+    expect(await (await notify(gd, 'order.processed')).json()).toMatchObject({ outcome: 'cobranca_duplicada' });
+
+    // Comprador não vê Exceções.
+    expect((await s.get('/admin/payments/exceptions')).status).toBe(403);
+    const list = async () => (await (await adm.get('/admin/payments/exceptions')).json()) as any;
+    const before = await list();
+    expect(before.duplicadasAbertas).toBe(1);
+    const item = before.cobrancasDuplicadas.find((c: any) => c.orderId === id);
+    expect(item).toMatchObject({
+      totalCents: 16000,
+      gatewayRef: ga,
+      duplicateRef: gd,
+      duplicateStatus: 'aprovado',
+      treated: null,
+    });
+    expect(item.buyerCpf).toMatch(/^\*\*\*\./); // CPF sempre mascarado
+
+    const treat = (charge: string, reason: string) =>
+      adm.post(`/admin/payments/exceptions/${id}/duplicates/${charge}/treat`, { reason });
+    expect(
+      (await s.post(`/admin/payments/exceptions/${id}/duplicates/${gd}/treat`, { reason: 'estornado' })).status,
+    ).toBe(403);
+    expect((await treat(gd, 'ok')).status).toBe(422); // motivo curto
+    expect((await treat(ga, 'cobrança do próprio pedido')).status).toBe(409); // não é a cobrança em dobro
+    expect((await treat('nao..valida', 'qualquer motivo')).status).toBe(404);
+    const ok = await treat(gd, '  Estornado   no painel do Mercado Pago ');
+    expect(ok.status).toBe(200);
+    expect((await treat(gd, 'de novo, outro admin')).status).toBe(409);
+
+    const after = await list();
+    expect(after.duplicadasAbertas).toBe(0);
+    expect(after.cobrancasDuplicadas.find((c: any) => c.orderId === id).treated).toMatchObject({
+      reason: 'Estornado no painel do Mercado Pago',
+      by: expect.stringContaining('Fictícia'),
+    });
+    // Só uma linha na trilha: o pedido, a cobrança vinculada e os ingressos não mudam.
+    expect(await orderRow(id)).toMatchObject({ status: 'pago', gateway_payment_id: ga });
+    expect(await ticketQrs(id)).toHaveLength(2);
+    const trail = await sql(
+      "select count(*)::int as n from audit_log where action = 'pagamento.cobranca_duplicada_tratada' and entity_id = $1",
+      [id],
+    );
+    expect(trail.rows[0].n).toBe(1);
+  });
+
+  it('estorno com o webhook perdido: a rotina diária reconsulta pedidos pagos e cancela; paid_at fica', async () => {
+    const s = await buyer();
+    const e = await event();
+    const id = await newOrder(s, e, 2);
+    expect((await s.post(`/orders/${id}/payment`, card('tok-aprovado'))).status).toBe(201);
+    const paidAt = (await sql('select paid_at from orders where id = $1', [id])).rows[0].paid_at;
+    mp.setStatus((await orderRow(id)).gateway_payment_id, 'refunded', 'refunded');
+    const deps = {
+      db: createDrizzle(testDb.pool),
+      clock,
+      gateway: createMercadoPagoGateway({
+        accessToken: 'APP_USR-token-ficticio-de-teste-000000',
+        publicKey: 'APP_USR-chave-publica-ficticia-0000',
+        webhookSecret: SECRET,
+        collectorId: COLLECTOR,
+        liveMode: false,
+        clock,
+        http: { fetchImpl: mp.fetchImpl, sleep: async () => {} },
+      }),
+    };
+    // Recém-conferido: a passagem pelos pagos respeita o intervalo (20 h no padrão).
+    expect((await runReconciliation(deps)).paid.checked).toBe(0);
+    const summary = await runReconciliation(deps, { reversalIntervalSeconds: 0 });
+    expect(summary.paid.outcomes).toEqual({ estornado: 1 });
+    expect(await orderRow(id)).toMatchObject({ status: 'estornado' });
+    expect((await sql('select status from tickets where order_id = $1', [id])).rows.map(r => r.status)).toEqual([
+      'cancelado',
+      'cancelado',
+    ]);
+    expect((await sql('select paid_at from orders where id = $1', [id])).rows[0].paid_at).toEqual(paidAt);
+  });
+
+  it('estorno parcial no painel (order segue processed, partially_refunded): nada cancelado, trilha e alerta uma vez', async () => {
+    const s = await buyer();
+    const e = await event();
+    const id = await newOrder(s, e, 2);
+    expect((await s.post(`/orders/${id}/payment`, card('tok-aprovado'))).status).toBe(201);
+    const gid = (await orderRow(id)).gateway_payment_id as string;
+    mp.setStatus(gid, 'processed', 'partially_refunded');
+    expect(await (await notify(gid, 'order.refunded')).json()).toMatchObject({ outcome: 'ignorado' });
+    expect(await (await notify(gid, 'order.updated')).json()).toMatchObject({ outcome: 'ignorado' });
+    expect(await orderRow(id)).toMatchObject({ status: 'pago' });
+    expect((await sql('select status from tickets where order_id = $1', [id])).rows.map(r => r.status)).toEqual([
+      'valido',
+      'valido',
+    ]);
+    const trail = await sql(
+      "select count(*)::int as n, max(reason) as reason from audit_log where action = 'pagamento.estorno_parcial' and entity_id = $1",
+      [id],
+    );
+    expect(trail.rows[0].n).toBe(1);
+    // D-82: o alerta orienta o cancelamento manual pelo ADM15; nada é cancelado sozinho.
+    expect(trail.rows[0].reason).toMatch(/cancele manualmente.*ADM15/);
   });
 
   it('dado de cartão no corpo continua recusado antes de qualquer chamada ao gateway', async () => {

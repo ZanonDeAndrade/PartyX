@@ -86,6 +86,11 @@ export interface PaymentGateway {
   createCard(input: CreateCardInput): Promise<CreatedPayment>;
   /** Consulta o estado real no gateway. É a fonte da verdade antes de aprovar qualquer pedido. */
   getPayment(gatewayPaymentId: string): Promise<PaymentSnapshot>;
+  /**
+   * Cobranças criadas no gateway para um pedido nosso (referência externa), desde um instante. Serve para achar a cobrança cuja
+   * resposta de criação se perdeu (tempo esgotado depois de o gateway criar). Opcional: sem ela, a recuperação fica com o webhook.
+   */
+  findPaymentsByOrderRef?(orderId: string, since: Date): Promise<PaymentSnapshot[]>;
   /** Autentica a notificação segundo o método do provedor, sobre o corpo **bruto** recebido e os parâmetros da URL. */
   verifyNotification(input: { headers: Headers; rawBody: string; query: URLSearchParams }): Promise<NotificationCheck>;
   /** Conta do provedor que deve receber (a da PartyX). Usada na conferência antes de aprovar. */
@@ -99,6 +104,18 @@ export class GatewayError extends Error {
     super(message);
     this.name = 'GatewayError';
     this.retryable = retryable;
+  }
+}
+
+/**
+ * A chave de idempotência já foi usada com outro corpo (ex.: o navegador gerou um token de cartão novo depois de a primeira
+ * criação ter dado tempo esgotado). **Não é recusa:** a primeira cobrança pode existir e até estar aprovada. Quem chama procura a
+ * cobrança pela referência antes de abrir uma tentativa nova, para nunca cobrar duas vezes.
+ */
+export class GatewayKeyReusedError extends GatewayError {
+  constructor() {
+    super('chave de idempotência já usada com outro corpo', false);
+    this.name = 'GatewayKeyReusedError';
   }
 }
 

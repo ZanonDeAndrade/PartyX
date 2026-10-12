@@ -168,6 +168,38 @@ export function createMercadoPagoGateway(o: MercadoPagoOptions): MercadoPagoGate
       return snapshot;
     },
 
+    /**
+     * Busca de orders (`GET /v1/orders`, com `begin_date`, `end_date` e `external_reference`; até 3 páginas de 50). A busca do
+     * Mercado Pago indexa a order com alguns segundos de atraso (observado no ambiente de teste em 12/10/2026): vazio não prova
+     * que a order não existe, só que ainda não apareceu.
+     */
+    async findPaymentsByOrderRef(orderId: string, since: Date) {
+      const begin = new Date(since.getTime() - 5 * 60_000).toISOString();
+      const end = new Date(o.clock.now().getTime() + 60_000).toISOString();
+      const found: ReturnType<typeof snapshotFrom>[] = [];
+      for (let page = 1; page <= 3; page++) {
+        const params = new URLSearchParams({
+          begin_date: begin,
+          end_date: end,
+          external_reference: orderId,
+          page: String(page),
+          page_size: '50',
+        });
+        const res = await http.request<{ data?: MpOrder[] | null; paging?: { total_pages?: unknown } | null }>({
+          method: 'GET',
+          path: `/v1/orders?${params.toString()}`,
+          idempotent: true,
+        });
+        for (const order of res.data ?? []) {
+          const snapshot = snapshotFrom(order);
+          // A busca é filtrada pelo Mercado Pago, mas a referência é conferida de novo aqui.
+          if (snapshot.orderRef === orderId && ORDER_ID.test(snapshot.gatewayPaymentId)) found.push(snapshot);
+        }
+        if (page >= Number(res.paging?.total_pages ?? 1)) break;
+      }
+      return found;
+    },
+
     async verifyNotification({ headers, rawBody, query }): Promise<NotificationCheck> {
       const body = parseNotification(rawBody);
       const queryId = query.get('data.id');

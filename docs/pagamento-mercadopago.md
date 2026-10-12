@@ -68,6 +68,7 @@ documentação atual marca `/v1/payments` como legado e recomenda Orders para in
 | `failed` | recusado | pedido "não concluído", reserva liberada, motivo guardado |
 | `canceled`, `expired` (inclusive Pix vencido) | expirado | pedido expirado, reserva encerrada |
 | `refunded` | estornado | ingressos válidos cancelados |
+| `processed` com detalhe `partially_refunded` | aprovado | estorno parcial: nada cancelado; trilha e alerta (D-82) |
 | `charged_back` | contestado | ingressos válidos cancelados |
 | `created`, `processing`, `action_required`, `in_review` | aguardando | nada; a tela diz "em análise" ou mostra o Pix |
 | outro | aguardando, marcado `estado_desconhecido` | nunca aprova |
@@ -83,7 +84,8 @@ autorizou, cartão desabilitado, segurança, limite de tentativas, autenticaçã
 - `X-Idempotency-Key` = `order:<pedido>:<forma>` (primeira tentativa) ou `order:<pedido>:<forma>:<n>`. Reenvio da mesma tentativa
   (clique duplo, falha de rede) repete a chave e o Mercado Pago devolve a mesma order (provado no teste: 201 com a mesma order).
   A tentativa (`orders.payment_attempt`) sobe só quando o gateway **recusa criar** a cobrança (ex.: token inválido); recusa do
-  cartão encerra o pedido, e a nova tentativa é um pedido novo, com chave nova. Mesma chave com corpo diferente: 409.
+  cartão encerra o pedido, e a nova tentativa é um pedido novo, com chave nova. Mesma chave com corpo diferente: 409, que **não** é
+  recusa (a primeira order pode existir): o servidor procura a order pela referência e a vincula (etapa 07).
 - Antes de aprovar, a order reconsultada precisa conferir: `external_reference`, `total_amount`, `currency` BRL, `user_id` (conta da
   PartyX) e forma (uma transação Pix ou cartão). Divergência: não aprova, trilha `pagamento.divergente` e alerta.
 - O dinheiro vai para a conta da PartyX (a das credenciais). A contratada não recebe nem repassa nada.
@@ -136,3 +138,82 @@ como "aguardando".
   3 QR distintos, recusa com estoque liberado, tentativa e chave de idempotência, Pix aprovado por webhook sem duplicar, Pix vencido,
   CA-P4, simulação do painel, divergência, contestação, dado de cartão recusado, Pix fora com reserva curta.
 - Fixtures em `server/src/payments/mercadopago/fixtures/`: formato da documentação, ids fictícios, nenhum dado real.
+
+## Etapa 07: webhook, estorno e contestação no ambiente de teste (12/10/2026)
+
+Suíte `server/src/api/mercadopago.sandbox.test.ts`, rodada com `npm run test:sandbox` (lê as credenciais de teste do `.env.local` e o
+banco do `.env.test`; fica fora do `npm test` porque cria orders de verdade). Recusa rodar se a conta das credenciais não for usuário
+de teste (`GET /users/me`, etiqueta `test_user`). **13 casos aprovados em duas rodadas seguidas** (06:13 e 06:15 UTC, cerca de 66 s
+cada), com PostgreSQL real e o servidor inteiro em processo (`createApp`).
+
+### O que é real e o que é simulado
+
+| Parte | Real ou simulado | Por quê |
+| --- | --- | --- |
+| Criação das orders, aprovação do cartão APRO, recusa, busca de orders, chaves de idempotência (409) | **Real** (`api.mercadopago.com`, credenciais de teste) | |
+| Reconsulta `GET /v1/orders/{id}` antes de qualquer decisão | **Real** | |
+| Estorno total | **Real**, pela API de reembolsos (`POST /v1/orders/{id}/refund`), a mesma operação do botão do painel | As compras feitas com as credenciais de teste não aparecem no painel da conta real; o botão em si não foi clicado |
+| Entrega do webhook | **Montada** no formato do Mercado Pago e assinada com a assinatura secreta da aplicação da PartyX | As notificações das compras de teste vêm assinadas pela aplicação do usuário de teste, cuja assinatura o painel não mostra (limitação da etapa 06) |
+| Tempo esgotado na reconsulta | **Real**: a chamada ao Mercado Pago é abortada em 1 ms | |
+| Resposta da criação perdida | **Simulada**: a chamada chega ao Mercado Pago e é processada; a resposta é descartada | Não há como provocar a perda de verdade |
+| Queda no meio da emissão | **Simulada**: o emissor de ingressos falha uma vez | |
+| Contestação (chargeback) | **Simulada**: a order real aprovada é lida e só o estado volta trocado para `charged_back` | O ambiente de teste não gera contestação |
+
+**Pix no ambiente de teste:** às 02:24 UTC o Pix com pagador APRO aprovou sozinho em menos de 10 s; a partir de 06:02 UTC todas as orders
+Pix (inclusive uma mínima criada direto na API) ficaram presas em `processing/in_process` por mais de 10 min. A plataforma tratou como
+"aguardando" (correto: não aprova nem libera). Por isso os casos usam o cartão Visa de teste com titular APRO (aprovado na criação) e
+a conciliação imediata adiada por tempo esgotado real: o pedido fica "pendente" com a order já aprovada no Mercado Pago, o mesmo
+estado de um Pix pago à espera do webhook. Observado também: CPF inválido no pagador faz a order falhar com `processing_error`;
+o antifraude do ambiente de teste recusa rajadas (`high_risk`), então a suíte espaça as criações em 6 s.
+
+### Casos (ids de order de teste; nenhum dado pessoal)
+
+| # | Caso | Resultado no banco |
+| --- | --- | --- |
+| 1 | Aprovação + a mesma notificação 2 vezes + 6 notificações diferentes ao mesmo tempo (CA-P3) | `ORDTST01M4QC06HRSHQNJV5TJK8AKQP1`: 1 pedido `pago`, 2 ingressos, 2 QR distintos, vendidos 2, reserva convertida; 2ª entrega `duplicada` |
+| 2 | Fora de ordem: notificação antiga (`order.action_required`) depois da aprovação | `ignorado`; `paid_at` igual |
+| 3 | Assinatura falsa, `ts` vencido, assinatura ausente (CA-P4) | 401 nas três; 3 linhas só com metadados (sem id da order nem vínculo com pedido); pedido e ingressos intocados |
+| 4 | Webhook perdido; a verificação do Cloud Tasks reconsulta | `ORDTST01M4QC0CAYACRNYEKJ1AZWM768`: tarefa `conciliado`, pedido pago, 1 ingresso |
+| 5 | Tempo esgotado nas duas tentativas da reconsulta | 503, evento pendente (`gateway_indisponivel`, 1 tentativa), pedido pendente com reserva ativa e nenhum ingresso; a repetição da mesma notificação conclui (`ORDTST01M4QC0JAMW8V257PXTS4GJFWK`, 2 ingressos) |
+| 6 | Resposta da criação perdida nas duas tentativas e nova tentativa com token novo | 2 respostas 409 reais (`idempotency_key_already_used`); 1ª nova tentativa responde `pagamento_em_verificacao`, a seguinte acha a order pela busca e conclui; **uma** order no Mercado Pago para o pedido (`ORDTST01M4QC0RQJHJY8PVQ73YV24ZAD`) |
+| 7 | Queda no meio da emissão | 503; transação inteira desfeita (pendente, `paid_at` nulo, 0 ingresso, vendidos 0); a rotina diária retomou (1 evento, 1 concluído): 3 ingressos |
+| 8 | Valor divergente (order de R$ 1,00 para pedido de R$ 40,00), segunda cobrança aprovada para pedido já pago, referência inexistente, órfã correta | `divergente` sem vincular (trilha `valor`); `cobranca_duplicada` sem emitir; `sem_pedido`; órfã vinculada e emitida |
+| 9 | Estorno total (CA-P5, CA-29), com um ingresso já usado | `estornado`; ingressos `utilizado` e `cancelado` (estorno); portaria `cancelado` (vermelho); `paid_at` igual; vendidos 2 (D-14); aprovação antiga e estorno repetido chegando depois: `ignorado`; taxa do mês conta as 10 unidades emitidas |
+| 10 | Estorno com o webhook perdido | rotina diária: 5 pagos reconsultados, 1 `estornado`, 4 `ignorado`; ingresso cancelado, `paid_at` igual |
+| 11 | Contestação **simulada** sobre a order real do caso 5 | `contestado`; 2 ingressos cancelados (chargeback); portaria `cancelado`; taxa: 2 "Cancelado (contestação)" |
+| 12 | Estorno antes de a plataforma ver a aprovação (notificações invertidas) | nada emitido, `paid_at` nulo, 1 trilha `estorno_fora_de_fluxo` (não repete); vencida a reserva, `expirado` e as 2 unidades voltam à venda |
+| Banco | Ao fim | 0 `gateway_payment_id` repetido, 0 QR repetido, 0 item com mais ingressos que a quantidade, `quantity_sold` = ingressos emitidos em todos os tipos, `paid_at` só em pedido aprovado, nenhum tipo acima da capacidade; 16 notificações válidas, 16 processadas; 3 inválidas, 0 processadas |
+
+### Defeitos achados e corrigidos
+
+1. **Segunda cobrança depois de resposta perdida.** O token de cartão vale uma vez: se a criação dava tempo esgotado depois de o Mercado
+   Pago criar a order, a nova tentativa ia com token novo, a mesma chave e corpo diferente, e o Mercado Pago responde **409**. O
+   adaptador tratava 409 como recusa, a tentativa subia, a chave mudava e a terceira tentativa criava **outra** order (duas cobranças,
+   a primeira sem vínculo). Agora o 409 vira `GatewayKeyReusedError` (não é recusa): o servidor procura a order pela referência
+   (`GET /v1/orders` com `begin_date`, `end_date` e `external_reference`; a busca indexa com alguns segundos de atraso) e a vincula;
+   se ainda não aparecer, responde 503 `pagamento_em_verificacao` sem mudar a tentativa.
+2. **Cobrança órfã.** Notificação de uma order que nenhum pedido conhece era só `sem_pedido`. Agora a reconsulta diz a referência; se
+   o pedido estiver aberto e sem cobrança **e** valor, moeda, conta e forma conferirem, a order é vinculada (trilha
+   `pagamento.vinculado_pela_reconsulta`) e segue o caminho normal. Valor errado: `divergente`, sem vincular. Pedido que já tem outra
+   cobrança: `cobranca_duplicada`, nada emitido, trilha e alerta (D-83); o caso aparece na aba Exceções do painel até ser marcado
+   como tratado, com motivo, depois de a PartyX estornar no gateway.
+3. **Estorno ou contestação com o webhook perdido.** A rotina diária só reconsultava pedidos em aberto; um estorno sem webhook deixava o
+   ingresso valendo na portaria. Agora ela também reconsulta pedidos `pago`, `contestado` e `pago_sem_estoque` de eventos que ainda
+   não passaram (até 1 dia depois do início), cada um no máximo a cada 20 h, até 200 por execução, em rodízio pelo carimbo
+   `updated_at`. Limite conhecido: com mais de 200 pedidos pagos por dia em eventos futuros, a volta completa leva mais de um dia;
+   o Mercado Pago também reenvia as notificações que não receberam resposta.
+4. **Estorno parcial.** No Mercado Pago a order continua `processed` com detalhe `partially_refunded` (observado: estorno de R$ 30,00
+   numa order de R$ 80,00; depois do resto, `refunded`). Antes nada acontecia. Agora: trilha `pagamento.estorno_parcial` e alerta,
+   uma vez por pedido; nenhum ingresso cancelado sozinho. O alerta orienta o administrador a cancelar manualmente, pelo ADM15, o
+   ingresso correspondente (D-82, proposta a confirmar com a PartyX).
+5. A trilha `pagamento.estorno_fora_de_fluxo` não se repete mais a cada reconsulta do mesmo pedido.
+
+Testes de integração com o Mercado Pago falso cobrem as correções 1 a 4 (`mercadopago.integration.test.ts`, 5 testes novos);
+mutações conferidas: desfazendo a correção do 409, falham 2; desligando a passagem pelos pagos, falha 1.
+
+### Não verificado nesta etapa
+
+- O botão de estorno do painel e a notificação real do estorno (só a operação equivalente pela API e uma notificação montada).
+- Contestação real (o ambiente de teste não gera) e contestação resolvida a favor da PartyX (D-40).
+- Pix aprovado nesta rodada (o ambiente de teste deixou o Pix em `processing`); o Pix aprovado foi provado na etapa 06.
+- Retentativas reais do Mercado Pago (intervalos e quantidade) e o comportamento com o Cloud Tasks e o Scheduler reais.
