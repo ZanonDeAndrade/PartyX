@@ -17,14 +17,34 @@ Conclusão: **hoje o domínio não resolve nada**. Não há site, MX, SPF, DMARC
 - Nenhum endereço `@partyx.com.br` recebe e-mail agora (não existe MX). O item `*@partyx.com.br` da lista de permitidos só terá efeito quando a PartyX tiver caixas nesse domínio.
 - Se a PartyX tinha e-mail ou verificações nessa zona antes de junho, eles já estão fora do ar. **Antes do passo 1, confirmar com a PartyX** se existe cópia dos registros antigos (painel da Cloudflare) ou algum serviço que dependa do domínio.
 
-## 1. Primeiro passo obrigatório: consertar a delegação
+## 1. Primeiro passo obrigatório: trocar os servidores DNS para os do Registro.br
 
-Sem isso, nenhum registro abaixo é visto por ninguém. Duas saídas; a tabela do item 5 vale para as duas.
+Decisão do responsável em 13/10/2026: usar o DNS do próprio Registro.br (ele faz a troca). Sem isso, nenhum registro abaixo é visto por ninguém.
 
-- **A (proposta, é o que o pedido indica): DNS do Registro.br.** No painel do Registro.br: domínio `partyx.com.br` > **DNS** > "Utilizar os servidores DNS do Registro.br" (passam a ser `a.auto.dns.br` e `b.auto.dns.br`) e, depois, **Configurar zona DNS** para criar os registros. Só o titular (ou contato autorizado) do domínio consegue fazer.
-- **B: manter a Cloudflare.** Recriar a zona `partyx.com.br` numa conta da Cloudflare; ela informa dois servidores de nomes, que podem ser diferentes dos atuais e, nesse caso, precisam ser trocados no Registro.br. Se usar a Cloudflare, os registros do Firebase e do Resend ficam **sem proxy** ("DNS only", nuvem cinza).
+Antes de começar: só o titular do domínio, ou um contato com permissão no painel, consegue alterar. Confirmar com a PartyX se alguém guarda os registros antigos da Cloudflare; hoje nada resolve, então a troca não derruba nada que esteja funcionando.
 
-Conferir: `dig +short NS partyx.com.br` devolve os servidores novos e `dig SOA partyx.com.br` responde `NOERROR`. Prazo: o Registro.br publica alterações em ciclos de cerca de 30 minutos; a delegação antiga pode ficar em cache por até 1 hora (TTL de 3600 s no `.br`).
+1. Entrar em https://registro.br com o usuário titular (ou o contato administrativo ou técnico) do domínio.
+2. Em **Domínios**, abrir `partyx.com.br`.
+3. Na seção **DNS**, clicar em **Alterar servidores DNS**.
+4. Escolher **Utilizar os servidores DNS do Registro.br** e salvar. Os servidores passam a ser `a.auto.dns.br` e `b.auto.dns.br`, e os dois da Cloudflare (`daphne.ns.cloudflare.com` e `sean.ns.cloudflare.com`) saem.
+5. Aguardar a publicação. A opção de editar a zona pode demorar alguns minutos (o painel avisa quando a zona está ativa).
+6. Na mesma seção, clicar em **Configurar zona DNS** (ou **Editar zona**) e ativar o **modo avançado**, que permite TXT, MX e registros em subdomínios.
+7. Criar os registros da tabela do item 5, um por vez, com **Adicionar registro** (tipo, nome e valor). No Registro.br o nome é só o prefixo (`hml`, `send.hml`, `_dmarc`); para o próprio domínio, deixar o nome vazio. Salvar a zona ao final.
+8. DNSSEC: o DNS do Registro.br assina a zona sozinho. Não é preciso configurar nada.
+
+Os nomes dos botões podem variar um pouco no painel; se algum passo estiver diferente, anote e corrija este roteiro.
+
+Conferir depois da troca:
+
+```bash
+dig +short NS partyx.com.br          # esperado: a.auto.dns.br. e b.auto.dns.br.
+dig +noall +comments SOA partyx.com.br | grep status     # esperado: NOERROR (hoje: SERVFAIL)
+dig +norecurse +short NS partyx.com.br @a.dns.br          # a delegação no .br já com os servidores novos
+```
+
+Prazo: o Registro.br publica alterações em ciclos de cerca de 30 minutos; a delegação antiga pode ficar em cache por até 1 hora (TTL de 3600 s no `.br`). Se depois de 2 horas ainda vier SERVFAIL, conferir no painel se a troca foi salva.
+
+Alternativa não escolhida: recriar a zona numa conta da Cloudflare. Nesse caso os registros do Firebase e do Resend ficam sem proxy ("DNS only").
 
 ## 2. Resend (e-mail)
 
@@ -54,7 +74,7 @@ Fonte: https://firebase.google.com/docs/hosting/custom-domain
 
 Mesmo procedimento no projeto `partyx-hml`. Convive com o uso do mesmo nome no Resend (o Resend só usa `send.hml` e `resend._domainkey.hml`). **Custo de adotar:** a regra de Host aceita um endereço só; ao trocar a homologação para `hml.partyx.com.br`, o endereço `partyx-hml.web.app` passa a responder 403, e é preciso atualizar o webhook de teste do Mercado Pago e os scripts que travam o endereço da homologação (`infra/testes/roteiro-hml.sh`, `e2e/support/roteiro-setup.ts`, `infra/carga/run-carga-hml.sh`, `infra/carga/carga.k6.js`, `infra/testes/alertas-hml.mjs`, `infra/homologacao/scheduler.sh`). Recomendação: deixar para depois do aceite, ou não fazer.
 
-## 5. Tabela única de registros (zona `partyx.com.br`)
+## 5. Tabela final de registros (zona `partyx.com.br`, no DNS do Registro.br)
 
 "Console" = o valor exato só aparece no painel do serviço; não copiar de exemplo. Nomes relativos à zona (`@` é o próprio `partyx.com.br`).
 
@@ -84,7 +104,7 @@ A variável do endereço público chama-se `PUBLIC_BASE_URL` (não existe `PUBLI
 **Homologação** (`infra/homologacao/env.hml.yaml`, depois `./infra/homologacao/deploy.sh`):
 
 - `EMAIL_FROM: "PartyX Homologação <ingressos@hml.partyx.com.br>"`
-- `EMAIL_ALLOWLIST: "<e-mail do responsável>,*@partyx.com.br,bbittencourt085@gmail.com"` (o e-mail do responsável veio como marcador sem preencher: **pendente**)
+- `EMAIL_ALLOWLIST: "<e-mail do responsável>,*@partyx.com.br,bbittencourt085@gmail.com"` (o e-mail do responsável veio três vezes como marcador sem preencher: **pendente**). A lista só existe no código a partir da próxima release; a homologação de hoje (`release-2026-10-13`) ainda não a conhece
 - `smtp-url` novo por `bash scripts/setup-smtp-homologacao.sh`, antes do deploy
 - `PUBLIC_BASE_URL` continua `https://partyx-hml.web.app`, a não ser que o item 4 seja adotado
 - Mercado Pago, modo de **teste**: continua `https://partyx-hml.web.app/api/webhooks/payments`
@@ -101,7 +121,7 @@ A variável do endereço público chama-se `PUBLIC_BASE_URL` (não existe `PUBLI
 
 | Passo | Comando | Esperado | Prazo usual |
 |---|---|---|---|
-| Delegação | `dig +short NS partyx.com.br` e `dig SOA partyx.com.br` | servidores novos, `NOERROR` | 30 min a 1 h |
+| Delegação | `dig +short NS partyx.com.br` e `dig SOA partyx.com.br` | `a.auto.dns.br` e `b.auto.dns.br`, `NOERROR` | 30 min a 1 h |
 | Hosting, verificação | `dig +short TXT partyx.com.br` | o TXT do console | minutos; até 24 h |
 | Hosting, apontamento | `dig +short A partyx.com.br` e `dig +short www.partyx.com.br` | IP do console | minutos; até 24 h |
 | Hosting, certificado | console: estado **Connected**; `curl -sI https://partyx.com.br/api/health` | 200 com certificado válido | minutos a horas; até 24 h |

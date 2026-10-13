@@ -21,8 +21,15 @@ REQUIRED = [
     'JOBS_AUDIENCE', 'JOBS_CALLER_EMAIL', 'TASKS_QUEUE', 'TASKS_INVOKER_EMAIL', 'TURNSTILE_ENABLED', 'PAYMENT_GATEWAY',
     'LEGAL_CONTENT_DIR', 'MAINTENANCE_MODE',
 ]
+# Em produção, venda, cadastro e aprovação visual precisam estar ESCRITOS no arquivo (nunca valer por padrão do código).
+REQUIRED_PRODUCAO = ['SALES_OPEN', 'SIGNUP_OPEN', 'VISUAL_APPROVED', 'QR_HMAC_CURRENT', 'GLOBAL_SIGNUPS_PER_HOUR',
+                     'SIGNUPS_PER_IP_PER_HOUR', 'GLOBAL_RECOVERIES_PER_HOUR', 'RESERVATION_MINUTES']
+# Sempre exportadas para o deploy.sh (vazias quando ausentes); as demais variáveis do arquivo também saem, com o mesmo prefixo.
 EXPORT = ['APP_ENV', 'PUBLIC_BASE_URL', 'PUBLIC_HOST_CHECK', 'PAYMENT_GATEWAY', 'GATEWAY_ENVIRONMENT', 'MP_COLLECTOR_ID',
-          'HOMOLOGACAO_GATEWAY_FICTICIO', 'JOBS_AUDIENCE', 'NODE_OPTIONS', 'EMAIL_FROM', 'TURNSTILE_ENABLED', 'TURNSTILE_SITE_KEY']
+          'HOMOLOGACAO_GATEWAY_FICTICIO', 'JOBS_AUDIENCE', 'NODE_OPTIONS', 'EMAIL_FROM', 'TURNSTILE_ENABLED', 'TURNSTILE_SITE_KEY',
+          'SALES_OPEN', 'SIGNUP_OPEN', 'VISUAL_APPROVED', 'MAINTENANCE_MODE', 'TERMS_VERSION', 'TERMS_DATE', 'PRIVACY_VERSION',
+          'PRIVACY_DATE', 'CANCELLATION_VERSION', 'CANCELLATION_DATE', 'BANNER_BUCKET', 'TASKS_QUEUE', 'JOBS_CALLER_EMAIL',
+          'TASKS_INVOKER_EMAIL']
 
 
 def main() -> int:
@@ -47,7 +54,7 @@ def main() -> int:
             if SECRET_LIKE.search(name) and name not in PUBLIC_OK:
                 problems.append(f'linha {n}: {name} parece segredo; segredos ficam no Secret Manager')
             values[name] = value
-    for name in REQUIRED + extra:
+    for name in REQUIRED + (REQUIRED_PRODUCAO if env == 'producao' else []) + extra:
         if not values.get(name):
             problems.append(f'{name} obrigatória e vazia ou ausente')
     if values.get('APP_ENV') and values['APP_ENV'] != env:
@@ -68,6 +75,17 @@ def main() -> int:
         for name, bad in (('GATEWAY_ENVIRONMENT', 'sandbox'), ('ENABLE_PROTOTYPE', 'true'), ('PUBLIC_HOST_CHECK', 'false')):
             if values.get(name) == bad:
                 problems.append(f'{name}={bad} é proibido em produção')
+        for name in ('SALES_OPEN', 'SIGNUP_OPEN', 'VISUAL_APPROVED', 'MAINTENANCE_MODE', 'TURNSTILE_ENABLED'):
+            if values.get(name) not in (None, '', 'true', 'false'):
+                problems.append(f'{name} precisa ser "true" ou "false"')
+        if values.get('TURNSTILE_SITE_KEY', '').startswith(('1x', '2x', '3x')):
+            problems.append('TURNSTILE_SITE_KEY é a chave de TESTE da Cloudflare: não vale em produção')
+        if not values.get('PUBLIC_BASE_URL', '').startswith('https://'):
+            problems.append('PUBLIC_BASE_URL de produção precisa ser https')
+        if 'hml' in values.get('PUBLIC_BASE_URL', '') or 'hml' in values.get('BANNER_BUCKET', '') or 'hml' in values.get('TASKS_QUEUE', ''):
+            problems.append('endereço, bucket ou fila de HOMOLOGAÇÃO no arquivo de produção')
+    if env == 'homologacao' and 'producao' in (values.get('BANNER_BUCKET', '') + values.get('TASKS_QUEUE', '') + values.get('PUBLIC_BASE_URL', '')):
+        problems.append('endereço, bucket ou fila de PRODUÇÃO no arquivo de homologação')
     if env == 'producao' and 'EMAIL_ALLOWLIST' in values:
         problems.append('EMAIL_ALLOWLIST é proibida em produção (lá todos os destinatários recebem)')
     if values.get('TURNSTILE_ENABLED') == 'true' and not values.get('TURNSTILE_SITE_KEY'):
@@ -80,7 +98,7 @@ def main() -> int:
         for p in problems:
             print(f'  - {p}', file=sys.stderr)
         return 1
-    for name in EXPORT:
+    for name in dict.fromkeys(EXPORT + list(values)):
         print(f'ENVF_{name}={shlex.quote(values.get(name, ""))}')
     return 0
 

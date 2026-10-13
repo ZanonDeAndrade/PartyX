@@ -7,7 +7,11 @@
 #   roles        cria os papéis partyx_app (aplicação) e partyx_backup (só leitura) NO NEON e grava as URLs nos segredos. ANTES da 1ª migração
 #   backup       backup diário: imagem, job, agendamento às 03:00 e alertas (infra/backup/setup.sh). Depois de `roles` e do `setup`
 #   migrate      roda as migrações (Cloud Run Job com a conexão direta do Neon)
-#   deploy       build + migração + publicação no Cloud Run + teste rápido
+#   conferir     confere o arquivo de variáveis, os segredos, a conta do gateway e a marca do banco. Não muda nada
+#   build        constrói a imagem da tag RELEASE (git archive da tag, nunca a pasta de trabalho)
+#   candidata    publica a imagem como revisão SEM tráfego (tag "candidata") e roda o teste rápido nela
+#   virar        passa 100% do tráfego para a candidata, mantém a anterior e imprime o comando de rollback
+#   deploy       atalho: conferir + build + migração + candidata (sem tráfego); a virada é sempre o comando `virar`
 #   hosting      publica o firebase.json (rewrites para o Cloud Run) no Firebase Hosting
 #   evento-on    min-instances=1: instância sempre quente (use ANTES do evento)
 #   evento-off   min-instances=0: volta a escalar a zero (use DEPOIS do evento)
@@ -20,7 +24,10 @@
 #   PROJECT           id do projeto de produção (ex.: partyx-prod)
 #   BILLING_ACCOUNT   conta de faturamento (só no `setup`)
 # Opcionais:   REGION=southamerica-east1  SERVICE=partyx  BUDGET_BRL=30  CREATE_PROJECT=1
-#   PUBLIC_BASE_URL   endereço público em HTTPS (obrigatório no `deploy`): https://seudominio.com.br
+#   RELEASE           tag do Git a publicar (obrigatória em build, migrate, candidata e deploy), ex.: release-2026-10-13
+#   ENV_FILE=infra/producao/env.prod.yaml   variáveis NÃO secretas do serviço: a ÚNICA fonte (endereço, venda, cadastro, gateway,
+#                    limites, textos legais). O que estiver no ambiente com valor diferente do arquivo é recusado
+#   BACKUP_DONE=sim  NO_FICTITIOUS_DATA=sim   confirmações de cada publicação (candidata, deploy)
 #   TRUSTED_PROXY_HOPS=2   MEDIDO atrás do Firebase Hosting em 05/10/2026 (ver README-DEPLOY.md). Direto no Cloud Run seria 1.
 #   MIN_INSTANCES=0  MAX_INSTANCES=3  NOTIFY_EMAIL=<e-mail dos alertas>
 #   MEMORY=512Mi  NODE_HEAP_MB=320  CONCURRENCY=80   memória, heap do V8 e requisições por instância (docs/operacao/memoria.md);
@@ -145,7 +152,7 @@ cmd_setup() {
 # aprovação tardia são tarefas POR PEDIDO no Cloud Tasks (1, 2, 4, 8 min, fim da reserva, e 15 min, 30 min, 1 h, 3 h, 8 h, 24 h), sem cron:
 # sem pedido em aberto, nada roda e o Neon dorme (D-78). Com o backup das 03:00, são 2 jobs no Scheduler. Rodar depois do 1º deploy.
 cmd_varredura() {
-  : "${PUBLIC_BASE_URL:?informe PUBLIC_BASE_URL para o X-Forwarded-Host da varredura}"
+  load_env_file   # o X-Forwarded-Host da varredura sai do PUBLIC_BASE_URL do arquivo de variáveis
   local url host; url="$(run_url)"; host="$(public_host)"
   local verb=create; exists g scheduler jobs describe "$SWEEP_JOB" --location="$REGION" && verb=update
   g scheduler jobs "$verb" http "$SWEEP_JOB" --location="$REGION" --schedule="0 4 * * *" --time-zone="America/Sao_Paulo" \
@@ -179,7 +186,7 @@ cmd_roles() {
 cmd_backup() { NOTIFY_EMAIL="${NOTIFY_EMAIL:?informe NOTIFY_EMAIL}" PROJECT="$PROJECT" REGION="$REGION" ./infra/backup/setup.sh; }
 
 cmd_migrate() {
-  : "${IMAGE:?use via 'deploy', ou informe IMAGE=<imagem>}"
+  local IMAGE="${IMAGE:-$(release_image)}"   # a imagem da tag RELEASE (rode 'build' antes), ou IMAGE=<imagem>
   local verb=create; exists g run jobs describe "$JOB" --region="$REGION" && verb=update
   g run jobs "$verb" "$JOB" --region="$REGION" --image="$IMAGE" --service-account="$(sa $DEPLOY_SA)" \
     --set-secrets=DATABASE_URL_DIRECT=database-url-direct:latest --set-env-vars=APP_ENV=producao \
@@ -187,111 +194,189 @@ cmd_migrate() {
   g run jobs execute "$JOB" --region="$REGION" --wait
 }
 
-cmd_deploy() {
-  : "${PUBLIC_BASE_URL:?informe PUBLIC_BASE_URL (https://seudominio.com.br; antes do domínio, https://${PROJECT}.web.app)}"
-  local sales="${SALES_OPEN:-false}" gateway="${PAYMENT_GATEWAY:-none}"
-  # Proteção contra ambiente trocado (cada uma recusa ANTES do build):
-  #  1) o banco precisa declarar que é de PRODUÇÃO (marca no próprio banco) e as URLs pooled e direta precisam ser do mesmo banco;
-  #  2) credenciais de gateway de SANDBOX nunca entram em produção; com gateway real, GATEWAY_ENVIRONMENT=producao é obrigatório.
-  [ "${GATEWAY_ENVIRONMENT:-}" != "sandbox" ] || { echo "Recuso: credenciais de SANDBOX do gateway em produção." >&2; exit 1; }
-  [ "${PAYMENT_GATEWAY:-none}" = "none" ] || [ "${GATEWAY_ENVIRONMENT:-}" = "producao" ] || { echo "Recuso: com gateway configurado, informe GATEWAY_ENVIRONMENT=producao." >&2; exit 1; }
-  [ "${PAYMENT_GATEWAY:-none}" != "mock" ] || { echo "Recuso: o gateway fictício não existe em produção." >&2; exit 1; }
-  # Mercado Pago (D-01): os três segredos gravados por scripts/setup-mp-credentials-producao.sh e o id da conta da PartyX.
-  if [ "${PAYMENT_GATEWAY:-none}" = "mercadopago" ]; then
-    [[ "${MP_COLLECTOR_ID:-}" =~ ^[0-9]+$ ]] || { echo "Recuso: informe MP_COLLECTOR_ID (id da conta da PartyX no Mercado Pago)." >&2; exit 1; }
+# --- Publicação (13/10/2026): variáveis do arquivo versionado, imagem construída de uma TAG do Git, revisão candidata SEM tráfego,
+# --- virada e rollback como comandos separados. Nada aqui abre venda nem cadastro: isso é o arquivo de variáveis que decide.
+ENV_FILE="${ENV_FILE:-infra/producao/env.prod.yaml}"
+CANDIDATE_TAG="candidata"
+has_version() { [ -n "$(g secrets versions list "$1" --limit=1 --filter='state=ENABLED' --format='value(name)' 2>/dev/null)" ]; }
+
+# Lê e confere o arquivo (formato, obrigatórias, nada com cara de segredo, nada de homologação). As variáveis de configuração vêm SÓ
+# do arquivo: se a mesma variável estiver no ambiente com outro valor, recusa (evita publicar algo diferente do que foi revisado).
+load_env_file() {
+  local checked v file_value
+  checked="$(python3 -I infra/env-check.py "$ENV_FILE" producao)" || exit 1
+  eval "$checked"
+  for v in PUBLIC_BASE_URL SALES_OPEN SIGNUP_OPEN PAYMENT_GATEWAY GATEWAY_ENVIRONMENT MP_COLLECTOR_ID TURNSTILE_ENABLED TURNSTILE_SITE_KEY \
+           VISUAL_APPROVED MAINTENANCE_MODE TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE EMAIL_FROM; do
+    file_value="$(eval "printf %s \"\${ENVF_$v:-}\"")"
+    if [ -n "${!v:-}" ] && [ "${!v}" != "$file_value" ]; then
+      echo "Recuso: $v está no ambiente com valor diferente do $ENV_FILE. Mude o arquivo, não a linha de comando." >&2; exit 1
+    fi
+    printf -v "$v" %s "$file_value"
+  done
+  [ "$ENVF_NODE_OPTIONS" = "--max-old-space-size=$NODE_HEAP_MB" ] \
+    || { echo "Recuso: NODE_OPTIONS do $ENV_FILE ($ENVF_NODE_OPTIONS) não combina com MEMORY=$MEMORY (heap $NODE_HEAP_MB MB)." >&2; exit 1; }
+}
+
+# Todas as conferências que não mudam nada. Roda sozinha (`conferir`) e antes de cada passo que publica.
+cmd_conferir() {
+  load_env_file
+  local url; url="$(run_url)"
+  [ "$ENVF_JOBS_AUDIENCE" = "$url" ] || { echo "Recuso: JOBS_AUDIENCE do $ENV_FILE difere de $url." >&2; exit 1; }
+  [ "$ENVF_BANNER_BUCKET" = "$BANNERS" ] || { echo "Recuso: BANNER_BUCKET do $ENV_FILE difere de $BANNERS." >&2; exit 1; }
+  [ "$ENVF_TASKS_QUEUE" = "projects/$PROJECT/locations/$REGION/queues/$QUEUE" ] || { echo "Recuso: TASKS_QUEUE do $ENV_FILE não é a fila deste projeto." >&2; exit 1; }
+  # Mercado Pago (D-01): os três segredos, e a conta do token precisa ser a do arquivo e NÃO ser usuário de teste.
+  if [ "$PAYMENT_GATEWAY" = "mercadopago" ]; then
+    local s account
     for s in mp-access-token mp-public-key mp-webhook-secret; do
-      [ -n "$(g secrets versions list "$s" --limit=1 --filter='state=ENABLED' --format='value(name)' 2>/dev/null)" ] \
-        || { echo "Recuso: o segredo $s precisa ter valor (scripts/setup-mp-credentials-producao.sh)." >&2; exit 1; }
+      has_version "$s" || { echo "Recuso: o segredo $s precisa ter valor (scripts/setup-mp-credentials-producao.sh)." >&2; exit 1; }
     done
+    # O token vai pelo stdin do curl, nunca na linha de comando nem na saída.
+    account="$(g secrets versions access latest --secret=mp-access-token \
+      | { IFS= read -r t || [ -n "$t" ]; printf 'header = "Authorization: Bearer %s"\n' "$t"; } \
+      | curl -sS --max-time 15 -K - https://api.mercadopago.com/users/me \
+      | python3 -I -c 'import json,sys; d=json.load(sys.stdin); print("TESTE" if "test_user" in (d.get("tags") or []) else d.get("id",""))' 2>/dev/null || true)"
+    [ "$account" != "TESTE" ] || { echo "Recuso: mp-access-token é de usuário de TESTE do Mercado Pago." >&2; exit 1; }
+    [[ "$account" =~ ^[0-9]+$ ]] || { echo "Recuso: não foi possível conferir a conta do mp-access-token na API do Mercado Pago." >&2; exit 1; }
+    [ "$account" = "$MP_COLLECTOR_ID" ] || { echo "Recuso: MP_COLLECTOR_ID do $ENV_FILE difere da conta do mp-access-token." >&2; exit 1; }
   fi
-  # Turnstile: OPCIONAL e DESLIGADO por padrão em produção (decisão de 06/10/2026). Para ligar: TURNSTILE_ENABLED=true com as DUAS chaves
-  # (README-DEPLOY.md, seção 8b). Ligado sem as chaves, recusa aqui, antes do build e da migração. A chave de TESTE da Cloudflare não vale em produção.
-  if [ "${TURNSTILE_ENABLED:-false}" = "true" ]; then
-    [ -n "${TURNSTILE_SITE_KEY:-}" ] || { echo "Recuso: TURNSTILE_ENABLED=true exige TURNSTILE_SITE_KEY (chave PÚBLICA do site)." >&2; exit 1; }
-    [ -n "$(g secrets versions list turnstile-secret --limit=1 --filter='state=ENABLED' --format='value(name)' 2>/dev/null)" ] \
-      || { echo "Recuso: TURNSTILE_ENABLED=true exige o segredo turnstile-secret com valor (chave SECRETA)." >&2; exit 1; }
+  # Turnstile: opcional e desligado por padrão (README-DEPLOY 8b). Ligado, exige a chave do site (arquivo) e a secreta (segredo).
+  if [ "$TURNSTILE_ENABLED" = "true" ]; then
+    has_version turnstile-secret || { echo "Recuso: TURNSTILE_ENABLED=true exige o segredo turnstile-secret com valor." >&2; exit 1; }
   fi
+  ! has_version smtp-url || [ -n "$EMAIL_FROM" ] || { echo "Recuso: o segredo smtp-url tem valor e EMAIL_FROM não está no $ENV_FILE." >&2; exit 1; }
+  # Banco: precisa declarar que é de PRODUÇÃO, e as URLs pooled e direta precisam ser do mesmo banco.
   local direct pooled
   direct="$(g secrets versions access latest --secret=database-url-direct 2>/dev/null || true)"; pooled="$(g secrets versions access latest --secret=database-url 2>/dev/null || true)"
   { [ -n "$direct" ] && [ -n "$pooled" ]; } || { echo "Recuso: database-url e database-url-direct precisam ter valor (rode 'roles')." >&2; exit 1; }
   DATABASE_URL_DIRECT="$direct" DATABASE_URL_POOLED="$pooled" npm run -s db:env -- check producao || { echo "Recuso: o banco apontado NÃO é o de produção." >&2; exit 1; }
-  # Travas de TODA publicação (a migração só se desfaz restaurando backup):
-  [ "${BACKUP_DONE:-}" = "sim" ] || { echo "Recuso: backup diário ativo e restauração testada são PRÉ-REQUISITO (BACKUP_DONE=sim). Prompt 25." >&2; exit 1; }
-  [ "${NO_FICTITIOUS_DATA:-}" = "sim" ] || { echo "Recuso: confirme banco sem dados fictícios (NO_FICTITIOUS_DATA=sim)." >&2; exit 1; }
   # Textos legais (D-11): vão na imagem a partir de conteudo-legal/ (fora do Git). Cadastro aberto exige os três publicados.
-  local legal_dir="conteudo-legal" k
-  for k in termos-de-uso privacidade cancelamento meia-entrada; do
-    [ ! -s "$legal_dir/$k.txt" ] || echo "   texto legal $k.txt: sha256 $(sha256sum "$legal_dir/$k.txt" | cut -c1-16)"
-  done
-  if [ "${SIGNUP_OPEN:-false}" = "true" ]; then
+  local legal_dir="conteudo-legal" k v
+  if [ "$SIGNUP_OPEN" = "true" ]; then
     for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE; do
-      [ -n "${!v:-}" ] || { echo "Recuso: SIGNUP_OPEN=true exige $v (texto legal fornecido pela PartyX)." >&2; exit 1; }
+      [ -n "${!v:-}" ] || { echo "Recuso: SIGNUP_OPEN=true exige $v no $ENV_FILE (texto legal fornecido pela PartyX)." >&2; exit 1; }
     done
     for k in termos-de-uso privacidade cancelamento; do
       [ -s "$legal_dir/$k.txt" ] || { echo "Recuso: SIGNUP_OPEN=true sem $legal_dir/$k.txt (texto oficial da PartyX)." >&2; exit 1; }
     done
   fi
-  if [ "$sales" = "true" ]; then   # travas extras para ABRIR A VENDA (go-live)
-    [ "$gateway" != "none" ] || { echo "Recuso: venda aberta sem gateway real." >&2; exit 1; }
+  if [ "$SALES_OPEN" = "true" ]; then   # travas extras para ABRIR A VENDA (go-live)
+    [ "$PAYMENT_GATEWAY" != "none" ] || { echo "Recuso: venda aberta sem gateway real." >&2; exit 1; }
     for v in TERMS_VERSION PRIVACY_VERSION CANCELLATION_VERSION GO_LIVE_CONFIRMED; do [ -n "${!v:-}" ] || { echo "Recuso: $v é obrigatório para abrir a venda." >&2; exit 1; }; done
     [ "$GO_LIVE_CONFIRMED" = "sim-aceite-e-autorizacao-registrados" ] || { echo "Recuso: registre aceite/autorização e use GO_LIVE_CONFIRMED=sim-aceite-e-autorizacao-registrados." >&2; exit 1; }
-    [ "${VISUAL_APPROVED:-}" = "true" ] || { echo "Recuso: identidade visual sem aprovação escrita (CA-33)." >&2; exit 1; }
+    [ "$VISUAL_APPROVED" = "true" ] || { echo "Recuso: identidade visual sem aprovação escrita (CA-33)." >&2; exit 1; }
   fi
-  local tag="${TAG:-$(date -u +%Y%m%d-%H%M%S)}" url host; url="$(run_url)"; host="$(public_host)"
-  export IMAGE="$REGION-docker.pkg.dev/$PROJECT/$REPO/partyx-api:$tag"
+  echo "ok: $ENV_FILE conferido. Venda: $SALES_OPEN; cadastro: $SIGNUP_OPEN; gateway: $PAYMENT_GATEWAY; endereço: $PUBLIC_BASE_URL"
+}
 
-  echo "== build $tag (Cloud Build, manual: só roda quando você chama)"
-  g builds submit . --region="$REGION" --tag="$IMAGE" --quiet
+# Travas de TODA publicação que mexe em banco ou serviço (a migração só se desfaz restaurando backup).
+require_confirmations() {
+  [ "${BACKUP_DONE:-}" = "sim" ] || { echo "Recuso: backup manual feito e restauração testada são PRÉ-REQUISITO (BACKUP_DONE=sim)." >&2; exit 1; }
+  [ "${NO_FICTITIOUS_DATA:-}" = "sim" ] || { echo "Recuso: confirme banco sem dados fictícios (NO_FICTITIOUS_DATA=sim)." >&2; exit 1; }
+}
+
+# A imagem sai SEMPRE de uma tag do Git (RELEASE), nunca da pasta de trabalho: publica exatamente o que foi validado em homologação.
+release_image() {
+  : "${RELEASE:?informe RELEASE=<tag do Git a publicar, ex.: release-2026-10-13>}"
+  local sha; sha="$(git rev-parse --short "refs/tags/$RELEASE^{commit}" 2>/dev/null)" || { echo "Recuso: a tag $RELEASE não existe." >&2; exit 1; }
+  echo "$REGION-docker.pkg.dev/$PROJECT/$REPO/partyx-api:$RELEASE-$sha"
+}
+cmd_build() {
+  local image tmp k; image="$(release_image)"
+  BUILD_TMP="$(mktemp -d)"; tmp="$BUILD_TMP"; trap 'rm -rf "${BUILD_TMP:-}"' EXIT
+  git archive --format=tar "refs/tags/$RELEASE" | tar -x -C "$tmp"
+  # Textos legais ficam fora do Git: entram no contexto do build quando existirem (sem eles, a imagem leva a pasta vazia).
+  if [ -d conteudo-legal ]; then
+    cp -r conteudo-legal "$tmp/conteudo-legal"
+    for k in termos-de-uso privacidade cancelamento meia-entrada; do
+      [ ! -s "conteudo-legal/$k.txt" ] || echo "   texto legal $k.txt: sha256 $(sha256sum "conteudo-legal/$k.txt" | cut -c1-16)"
+    done
+  fi
+  echo "== build de $RELEASE -> $image (Cloud Build, manual: só roda quando você chama)"
+  g builds submit "$tmp" --region="$REGION" --tag="$image" --quiet
   # O Cloud Build guarda o código enviado num bucket próprio (criado no 1º build); limpa depois de 7 dias para não acumular custo.
   echo '{"rule":[{"action":{"type":"Delete"},"condition":{"age":7}}]}' > "${TMPDIR:-/tmp}/cb-lifecycle.json"
   gcloud storage buckets update "gs://${PROJECT}_cloudbuild" --lifecycle-file="${TMPDIR:-/tmp}/cb-lifecycle.json" >/dev/null 2>&1 || true
-  echo "== migração (job com a conexão direta; só a conta de deploy lê o segredo)"
-  cmd_migrate
+  echo "imagem pronta: $image"
+}
 
-  echo "== deploy (venda aberta: $sales)"
-  # Variáveis em uma lista; o delimitador do gcloud é "#" (os valores têm vírgulas e e-mails com "@").
-  local vars=(NODE_ENV=production "NODE_OPTIONS=--max-old-space-size=$NODE_HEAP_MB" APP_ENV=producao "DB_POOL_MAX=5" "TRUSTED_PROXY_HOPS=${TRUSTED_PROXY_HOPS:-2}"
-    "PUBLIC_BASE_URL=$PUBLIC_BASE_URL" "BANNER_BUCKET=$BANNERS" "JOBS_AUDIENCE=$url"
-    "JOBS_CALLER_EMAIL=$(sa $SCHED_SA),$(sa $TASKS_SA)"
-    "TASKS_QUEUE=projects/$PROJECT/locations/$REGION/queues/$QUEUE" "TASKS_INVOKER_EMAIL=$(sa $TASKS_SA)"
-    "TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-false}" "GLOBAL_SIGNUPS_PER_HOUR=${GLOBAL_SIGNUPS_PER_HOUR:-1000}" "SIGNUPS_PER_IP_PER_HOUR=${SIGNUPS_PER_IP_PER_HOUR:-100}" "GLOBAL_RECOVERIES_PER_HOUR=${GLOBAL_RECOVERIES_PER_HOUR:-60}"
-    ${GATEWAY_ENVIRONMENT:+"GATEWAY_ENVIRONMENT=$GATEWAY_ENVIRONMENT"} ${MP_COLLECTOR_ID:+"MP_COLLECTOR_ID=$MP_COLLECTOR_ID"}
-    "QR_HMAC_CURRENT=${QR_HMAC_CURRENT:-1}" "SALES_OPEN=$sales" "PAYMENT_GATEWAY=$gateway" "VISUAL_APPROVED=${VISUAL_APPROVED:-false}"
-    "LEGAL_CONTENT_DIR=/app/legal" "SIGNUP_OPEN=${SIGNUP_OPEN:-false}" "MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}")
-  for v in TERMS_VERSION PRIVACY_VERSION CANCELLATION_VERSION EMAIL_FROM EMAIL_REPLY_TO RESERVATION_MINUTES MAX_TICKETS_PER_ORDER \
-           RETENTION_LOGIN_ATTEMPTS_DAYS RETENTION_SESSIONS_DAYS RETENTION_PASSWORD_RESETS_DAYS GATE_SCANS_PER_MINUTE GATE_SEARCHES_PER_MINUTE \
-           RECONCILE_TASK_OFFSETS_SECONDS RECONCILE_TASK_MARGIN_SECONDS RECONCILE_LATE_OFFSETS_SECONDS RECONCILE_LOCK_SECONDS \
-           PARTYX_SUPPORT_EMAIL PARTYX_SUPPORT_WHATSAPP PARTYX_LEGAL_NAME PARTYX_CNPJ PARTYX_ADDRESS PARTYX_SUPPORT_HOURS \
-           TERMS_DATE PRIVACY_DATE CANCELLATION_DATE; do
-    [ -z "${!v:-}" ] || vars+=("$v=${!v}")
+# Teste rápido de uma revisão pelo endereço dela (candidata ou serviço), com o X-Forwarded-Host do domínio público.
+smoke() { # base
+  local base="$1" host i code; host="$(public_host)"
+  for i in 1 2 3 4 5; do
+    curl -fsS "$base/api/health/ready" | grep -q '"database":"ok"' && break
+    [ "$i" = 5 ] && { echo "FALHOU: /api/health/ready" >&2; return 1; }; sleep 3
   done
-  [ "${TURNSTILE_ENABLED:-false}" != "true" ] || vars+=("TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY")
-  local joined; joined="$(IFS='#'; echo "${vars[*]}")"
-  # Cobrança por requisição (CPU só durante a requisição), 1 vCPU/512 MiB (heap 320 MB), concorrência 80, teto de 3 instâncias (teto REAL de gasto).
-  # Precisa aceitar chamadas sem login: o Firebase Hosting, o Cloud Tasks e o Scheduler chamam por HTTPS; quem protege é o código (OIDC/sessão).
+  check() { # descrição, esperado, argumentos do curl...
+    local what="$1" want="$2"; shift 2
+    code="$(curl -s -o /dev/null -w '%{http_code}' "$@")"
+    [ "$code" = "$want" ] && echo "   ok   $what ($code)" || { echo "   FALHOU $what: $code, esperado $want" >&2; return 1; }
+  }
+  check "saúde" 200 "$base/api/health" || return 1
+  check "página inicial pelo domínio" 200 -H "X-Forwarded-Host: $host" "$base/" || return 1
+  check "/entrar" 200 -H "X-Forwarded-Host: $host" "$base/entrar" || return 1
+  check "/admin sem login redireciona" 302 -H "X-Forwarded-Host: $host" "$base/admin" || return 1
+  check "run.app sem o cabeçalho do domínio" 403 "$base/" || return 1
+  check "webhook com assinatura inválida" 401 -X POST -H "X-Forwarded-Host: $host" -H 'content-type: application/json' \
+    -H 'x-signature: ts=1,v1=00' -H 'x-request-id: teste-de-publicacao' -d '{"type":"order","data":{"id":"ORD000"}}' \
+    "$base/api/webhooks/payments?data.id=ORD000&type=order" || return 1
+  curl -fsS -H "X-Forwarded-Host: $host" "$base/api/public/site" | grep -q "\"salesOpen\":$SALES_OPEN" || { echo "   FALHOU: salesOpen difere do arquivo" >&2; return 1; }
+  echo "   ok   salesOpen=$SALES_OPEN"
+  curl -fsSI "$base/api/health" | tr -d '\r' | grep -qi '^cache-control: private, no-store' || { echo "   FALHOU: /api sem Cache-Control private, no-store" >&2; return 1; }
+}
+
+# Nova revisão SEM tráfego, com a tag "candidata": o público continua na revisão anterior até o comando `virar`.
+cmd_candidata() {
+  cmd_conferir; require_confirmations
+  local image; image="${IMAGE:-$(release_image)}"
   # Segredos obrigatórios sempre; SMTP e Turnstile só entram se o segredo já tem valor (o Cloud Run recusa montar segredo sem versão).
   local secrets="DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,QR_HMAC_KEYS=qr-hmac-keys:latest"
-  local pairs=(SMTP_URL=smtp-url); [ "${TURNSTILE_ENABLED:-false}" != "true" ] || pairs+=(TURNSTILE_SECRET=turnstile-secret)
-  [ "$gateway" != "mercadopago" ] || secrets="$secrets,MP_ACCESS_TOKEN=mp-access-token:latest,MP_PUBLIC_KEY=mp-public-key:latest,MP_WEBHOOK_SECRET=mp-webhook-secret:latest"
-  for pair in "${pairs[@]}"; do
-    [ -z "$(g secrets versions list "${pair#*=}" --limit=1 --format='value(name)' 2>/dev/null)" ] || secrets="$secrets,${pair%%=*}=${pair#*=}:latest"
-  done
-  g run deploy "$SERVICE" --region="$REGION" --image="$IMAGE" --service-account="$(sa $APP_SA)" \
+  [ "$PAYMENT_GATEWAY" != "mercadopago" ] || secrets="$secrets,MP_ACCESS_TOKEN=mp-access-token:latest,MP_PUBLIC_KEY=mp-public-key:latest,MP_WEBHOOK_SECRET=mp-webhook-secret:latest"
+  ! has_version smtp-url || secrets="$secrets,SMTP_URL=smtp-url:latest"
+  [ "$TURNSTILE_ENABLED" != "true" ] || secrets="$secrets,TURNSTILE_SECRET=turnstile-secret:latest"
+  echo "== revisão candidata, sem tráfego (venda: $SALES_OPEN; cadastro: $SIGNUP_OPEN)"
+  # Cobrança por requisição, 1 vCPU/512 MiB (heap 320 MB), concorrência 80, teto de 3 instâncias (teto REAL de gasto).
+  # Aceita chamadas sem login: o Firebase Hosting, o Cloud Tasks e o Scheduler chamam por HTTPS; quem protege é o código (OIDC/sessão).
+  g run deploy "$SERVICE" --region="$REGION" --image="$image" --service-account="$(sa $APP_SA)" \
+    --no-traffic --tag="$CANDIDATE_TAG" \
     --allow-unauthenticated --port=8080 --cpu=1 --memory="$MEMORY" --concurrency="${CONCURRENCY:-80}" --timeout=60 --cpu-throttling --cpu-boost \
     --min-instances="${MIN_INSTANCES:-0}" --max-instances="${MAX_INSTANCES:-3}" \
-    --set-env-vars="^#^${joined}" \
-    --set-secrets="$secrets" \
+    --env-vars-file="$ENV_FILE" --set-secrets="$secrets" \
     --labels="$LABELS" --quiet
+  local base; base="$(g run services describe "$SERVICE" --region="$REGION" --format=json \
+    | python3 -I -c 'import json,sys; print(next((t["url"] for t in json.load(sys.stdin)["status"]["traffic"] if t.get("tag")=="'"$CANDIDATE_TAG"'"), ""))')"
+  [ -n "$base" ] || { echo "FALHOU: endereço da revisão candidata não encontrado." >&2; exit 1; }
+  echo "== teste rápido da candidata em $base (o público continua na revisão anterior)"
+  smoke "$base" || { echo "A candidata NÃO passou. Nada mudou para o público. Não rode 'virar'." >&2; exit 1; }
+  echo "candidata aprovada no teste rápido. Para colocar no ar: ./infra/producao/deploy.sh virar"
+}
 
-  echo "== teste rápido em $url (sem abrir venda pública)"
-  for i in 1 2 3 4 5; do
-    curl -fsS "$url/api/health/ready" | grep -q '"database":"ok"' && break
-    [ "$i" = 5 ] && { echo "FALHOU: /api/health/ready" >&2; exit 1; }; sleep 3
-  done
-  curl -fsS "$url/api/health" >/dev/null
-  curl -fsS -H "X-Forwarded-Host: $host" "$url/api/public/site" | grep -q "\"salesOpen\":$sales" || { echo "FALHOU: salesOpen difere do esperado" >&2; exit 1; }
-  curl -fsSI "$url/api/health" | tr -d '\r' | grep -qi '^cache-control: private, no-store' || { echo "FALHOU: /api sem Cache-Control private, no-store" >&2; exit 1; }
-  echo "pronto. Ajuda para voltar: ./infra/producao/deploy.sh rollback"
+# Passa 100% do tráfego para a candidata. A revisão anterior continua existindo: o comando de volta sai impresso aqui.
+cmd_virar() {
+  load_env_file
+  local current target
+  current="$(g run services describe "$SERVICE" --region="$REGION" --format=json \
+    | python3 -I -c 'import json,sys; print(next((t["revisionName"] for t in json.load(sys.stdin)["status"]["traffic"] if t.get("percent")==100), ""))')"
+  target="$(g run services describe "$SERVICE" --region="$REGION" --format=json \
+    | python3 -I -c 'import json,sys; print(next((t["revisionName"] for t in json.load(sys.stdin)["status"]["traffic"] if t.get("tag")=="'"$CANDIDATE_TAG"'"), ""))')"
+  [ -n "$target" ] || { echo "Recuso: não há revisão com a tag $CANDIDATE_TAG (rode 'candidata' antes)." >&2; exit 1; }
+  [ "$target" != "$current" ] || { echo "A candidata $target já recebe 100% do tráfego." ; return 0; }
+  echo "Atual: $current -> nova: $target"
+  echo "ROLLBACK, se precisar: PROJECT=$PROJECT REVISAO=$current ./infra/producao/deploy.sh rollback"
+  g run services update-traffic "$SERVICE" --region="$REGION" --to-revisions="$target=100" --quiet
+  echo "== teste rápido do serviço no ar"
+  smoke "$(run_url)" || { echo "FALHOU depois da virada. Volte: PROJECT=$PROJECT REVISAO=$current ./infra/producao/deploy.sh rollback" >&2; exit 1; }
+  echo "no ar: $target. Revisão anterior mantida: $current"
+}
+
+# Atalho: conferências, build, migração e candidata SEM tráfego. A virada é sempre um comando à parte (`virar`).
+cmd_deploy() {
+  cmd_conferir; require_confirmations
+  cmd_build
+  export IMAGE; IMAGE="$(release_image)"
+  echo "== migração (job com a conexão direta; só a conta de deploy lê o segredo)"
+  cmd_migrate
+  cmd_candidata
 }
 
 cmd_hosting() {
@@ -359,7 +444,8 @@ cmd_alertas() { : "${NOTIFY_EMAIL:?informe NOTIFY_EMAIL}"; PROJECT="$PROJECT" SE
 
 case "${1:-}" in
   setup) cmd_setup ;; roles) cmd_roles ;; backup) cmd_backup ;; varredura) cmd_varredura ;; migrate) cmd_migrate ;; deploy) cmd_deploy ;; hosting) cmd_hosting ;;
+  conferir) cmd_conferir ;; build) cmd_build ;; candidata) cmd_candidata ;; virar) cmd_virar ;;
   evento-on) cmd_evento_on ;; evento-off) cmd_evento_off ;; rollback) cmd_rollback ;; status) cmd_status ;; alertas) cmd_alertas ;;
   manutencao) cmd_manutencao "${2:-}" ;;
-  *) sed -n '2,33p' "$0"; exit 1 ;;
+  *) sed -n '2,40p' "$0"; exit 1 ;;
 esac
