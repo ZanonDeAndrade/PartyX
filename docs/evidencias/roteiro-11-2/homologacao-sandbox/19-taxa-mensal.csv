@@ -1,0 +1,37 @@
+﻿Código do ingresso;Pedido;Evento;Pagamento aprovado em;Situação atual
+PX-6WCD-Y379;PX-10001;[FICTÍCIO] Homologação ponta a ponta;05/10/2026 21:43;Válido
+PX-U4VF-WZNP;PX-10001;[FICTÍCIO] Homologação ponta a ponta;05/10/2026 21:43;Válido
+PX-2DZ5-MH62;PX-10002;[FICTÍCIO] Homologação ponta a ponta;05/10/2026 21:43;Utilizado
+PX-6F9B-JTYE;PX-10002;[FICTÍCIO] Homologação ponta a ponta;05/10/2026 21:43;Válido
+PX-M3BM-Q3P4;PX-10002;[FICTÍCIO] Homologação ponta a ponta;05/10/2026 21:43;Válido
+PX-28K5-SBEV;PX-10005;[FICTÍCIO] Homologação ponta a ponta;05/10/2026 22:42;Válido
+PX-ET3V-FXKS;PX-10005;[FICTÍCIO] Homologação ponta a ponta;05/10/2026 22:42;Válido
+PX-3JTH-RTSG;PX-10007;[FICTÍCIO] Homologação ponta a ponta;06/10/2026 12:21;Utilizado
+PX-Q2SQ-VFAL;PX-10007;[FICTÍCIO] Homologação ponta a ponta;06/10/2026 12:21;Válido
+PX-XL7D-2T7A;PX-10007;[FICTÍCIO] Homologação ponta a ponta;06/10/2026 12:21;Válido
+PX-ELHD-MVQL;PX-10010;Festival Roteiro E2E TMUWX6;13/10/2026 14:37;Válido
+PX-DRP8-8KHE;PX-10011;Festival Roteiro E2E TMUWX6;13/10/2026 14:38;Válido
+PX-G827-GB6Z;PX-10011;Festival Roteiro E2E TMUWX6;13/10/2026 14:38;Válido
+PX-TCPU-6J3S;PX-10011;Festival Roteiro E2E TMUWX6;13/10/2026 14:38;Válido
+PX-PTFD-GQ68;PX-10014;Festival Roteiro E2E TMUWX6;13/10/2026 14:39;Válido
+PX-TW79-A6W9;PX-10014;Festival Roteiro E2E TMUWX6;13/10/2026 14:39;Válido
+PX-YMP8-CA6S;PX-10016;Festival Roteiro E2E TMV8VL;13/10/2026 19:00;Válido
+PX-QZKC-2ZZD;PX-10017;Festival Roteiro E2E TMV9WK;13/10/2026 19:18;Utilizado
+PX-JCLZ-CPTF;PX-10018;Festival Roteiro E2E TMV9WK;13/10/2026 19:18;Utilizado
+PX-SY5K-HDW4;PX-10018;Festival Roteiro E2E TMV9WK;13/10/2026 19:18;Utilizado
+PX-UY2W-8WHK;PX-10018;Festival Roteiro E2E TMV9WK;13/10/2026 19:18;Cancelado (administrador)
+PX-4D2Q-HCDS;PX-10021;Festival Roteiro E2E TMV9WK;13/10/2026 19:19;Cancelado (administrador)
+PX-ASPU-H5TU;PX-10021;Festival Roteiro E2E TMV9WK;13/10/2026 19:19;Válido
+PX-PPHY-VRT2;PX-10023;Outro Evento E2E TMV9WK;13/10/2026 19:22;Válido
+
+Mês de aprovação;10/2026
+Ingressos apurados (unidades);24
+Valor por ingresso (R$);1,00
+Valor da taxa no mês (R$);24,00
+Pedidos de origem;12
+Conciliação;confere
+Pagamentos aprovados sem estoque (fora da contagem);0
+Receita aprovada bruta (R$);2030,00
+Receita líquida (R$);2030,00
+Critério;Ingressos vendidos no mês = ingressos emitidos de pedidos aprovados cuja data original de aprovação (paid_at) está no mês, no fuso do evento, independentemente da situação atual do ingresso ou do pedido. Cancelados, reembolsados e estornados continuam contando (Cl. 6.3).
+Gerado em;13/10/2026 19:24

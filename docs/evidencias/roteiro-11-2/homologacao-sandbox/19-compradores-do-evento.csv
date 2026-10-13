@@ -1,0 +1,10 @@
+﻿Comprador;CPF (mascarado);E-mail;Pedidos;Ingressos;Cancelados;Entraram;Valor pago (R$)
+APRO Ana Souza Fictícia;***.305.281-**;ana.roteiro.tmv9wk@partyx.test;1;1;0;1;80,00
+APRO Bruno Lima Fictício;***.305.282-**;bruno.roteiro.tmv9wk@partyx.test;1;2;1;2;310,00
+APRO Davi Cupom Fictício;***.305.284-**;davi.roteiro.tmv9wk@partyx.test;1;1;1;0;160,00
+
+Total de compradores listados;3
+Ingressos (não cancelados);4
+Soma do valor pago (R$);550,00
+Filtros aplicados;Evento: Festival Roteiro E2E TMV9WK
+Gerado em;13/10/2026 19:24

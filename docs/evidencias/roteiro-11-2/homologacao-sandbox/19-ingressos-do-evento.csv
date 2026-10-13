@@ -1,0 +1,14 @@
+﻿Código;Tipo;Titular;CPF (mascarado);E-mail do comprador;Pedido;Situação do ingresso;Entrou em;Validador;Motivo do cancelamento
+PX-QZKC-2ZZD;Pista;APRO Ana Souza Fictícia;***.305.281-**;ana.roteiro.tmv9wk@partyx.test;PX-10017;Utilizado;13/10/2026 19:23;Rafael Validador Fictício;
+PX-JCLZ-CPTF;Pista;APRO Bruno Lima Fictício;***.305.282-**;bruno.roteiro.tmv9wk@partyx.test;PX-10018;Utilizado;13/10/2026 19:23;Rafael Validador Fictício;
+PX-SY5K-HDW4;Pista;APRO Bruno Lima Fictício;***.305.282-**;bruno.roteiro.tmv9wk@partyx.test;PX-10018;Utilizado;13/10/2026 19:23;Rafael Validador Fictício;
+PX-UY2W-8WHK;VIP;APRO Bruno Lima Fictício;***.305.282-**;bruno.roteiro.tmv9wk@partyx.test;PX-10018;Cancelado;;;Roteiro 11.2: caso cancelado
+PX-4D2Q-HCDS;Pista;APRO Davi Cupom Fictício;***.305.284-**;davi.roteiro.tmv9wk@partyx.test;PX-10021;Cancelado;;;Roteiro 11.2: pedido do comprador registrado pela PartyX
+PX-ASPU-H5TU;Pista;APRO Davi Cupom Fictício;***.305.284-**;davi.roteiro.tmv9wk@partyx.test;PX-10021;Válido;;;
+
+Total de ingressos listados;6
+Válidos;1
+Utilizados;3
+Cancelados;2
+Filtros aplicados;"Evento: Festival Roteiro E2E TMV9WK; Situação: todas"
+Gerado em;13/10/2026 19:24
