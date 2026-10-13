@@ -15,19 +15,19 @@ Motivo: limites lidos na página oficial em 13/10/2026, sem marca no e-mail, reg
 
 ## Remetente
 
-`PartyX Homologação <ingressos@hml.[SEU DOMÍNIO]>`, com o domínio verificado no provedor sendo o subdomínio `hml.[SEU DOMÍNIO]`. Um subdomínio isola a reputação do domínio principal. O prefixo **[HOMOLOGAÇÃO]** no assunto é do código (`server/src/mail/templates.ts`, por `APP_ENV=homologacao`) e não muda com o provedor.
+`PartyX Homologação <ingressos@hml.partyx.com.br>`, com o domínio verificado no provedor sendo o subdomínio `hml.partyx.com.br`. Um subdomínio isola a reputação do domínio principal. O prefixo **[HOMOLOGAÇÃO]** no assunto é do código (`server/src/mail/templates.ts`, por `APP_ENV=homologacao`) e não muda com o provedor.
 
 ## Passo a passo da conta (responsável)
 
 1. Criar a conta em https://resend.com com um e-mail seu.
-2. **Domains > Add Domain**: `hml.[SEU DOMÍNIO]`, região **São Paulo (sa-east-1)**.
+2. **Domains > Add Domain**: `hml.partyx.com.br`, região **São Paulo (sa-east-1)**.
 3. Criar no DNS os registros que o painel mostrar (tabela abaixo) e clicar em **Verify**. Costuma verificar em minutos; pode levar horas.
-4. **API Keys > Create API Key**: permissão **Sending access**, restrita ao domínio `hml.[SEU DOMÍNIO]`. A chave aparece uma vez só. Não cole em chat, chamado nem arquivo.
+4. **API Keys > Create API Key**: permissão **Sending access**, restrita ao domínio `hml.partyx.com.br`. A chave aparece uma vez só. Não cole em chat, chamado nem arquivo.
 5. Avisar no chat que a conta e o DNS estão prontos. A chave entra só no passo "Gravação do segredo", por digitação oculta.
 
 ## Registros DNS
 
-Os valores exatos **vêm do painel do Resend**; a chave DKIM é única por domínio. Formato esperado para o domínio `hml.[SEU DOMÍNIO]` (o nome completo fica `...hml.[SEU DOMÍNIO]`; muitos painéis de DNS pedem só o prefixo):
+Os valores exatos **vêm do painel do Resend**; a chave DKIM é única por domínio. Formato esperado para o domínio `hml.partyx.com.br` (o nome completo fica `...hml.partyx.com.br`; muitos painéis de DNS pedem só o prefixo):
 
 | Função | Tipo | Nome | Valor |
 |---|---|---|---|
