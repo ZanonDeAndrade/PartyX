@@ -267,6 +267,24 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
       ).toBe(200);
     });
 
+    it('em homologação, a mesma barreira só com PUBLIC_HOST_CHECK=true', async () => {
+      const hml = { ...config, APP_ENV: 'homologacao' as const, PUBLIC_BASE_URL: 'https://partyx-hml.example.com' };
+      const off = createApp({ config: { ...hml, publicHostCheck: false }, clock });
+      expect((await off.request('https://servico.run.app/', { headers: { host: 'servico.run.app' } })).status).toBe(200);
+      const on = createApp({ config: { ...hml, publicHostCheck: true }, clock });
+      expect((await on.request('https://servico.run.app/', { headers: { host: 'servico.run.app' } })).status).toBe(403);
+      expect(
+        (
+          await on.request('https://servico.run.app/', {
+            headers: { host: 'servico.run.app', 'x-forwarded-host': 'partyx-hml.example.com' },
+          })
+        ).status,
+      ).toBe(200);
+      expect((await on.request('https://servico.run.app/api/health', { headers: { host: 'servico.run.app' } })).status).toBe(
+        200,
+      );
+    });
+
     it('HTML restrito: visitante redireciona; validador só entra na portaria; cliente recebe G04', async () => {
       const dir = await mkdtemp(path.join(tmpdir(), 'partyx-shell-'));
       try {

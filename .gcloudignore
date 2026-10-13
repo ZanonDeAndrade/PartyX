@@ -10,3 +10,4 @@
 !.env.example
 .data
 /assets-originais
+/e2e/.run

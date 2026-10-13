@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cloud Scheduler de HOMOLOGAÇÃO: rotina diária de segurança da conciliação. NÃO FOI EXECUTADO.
+# Cloud Scheduler de HOMOLOGAÇÃO: rotina diária de segurança da conciliação (mesmo nome e cabeçalho da produção).
 # Pré-requisitos: `setup.sh` já rodou (cria a conta `partyx-scheduler`) e o serviço está publicado com JOBS_AUDIENCE e
 # JOBS_CALLER_EMAIL (ver deploy.sh). Idempotente.
 #
@@ -15,11 +15,15 @@ PROJECT="${PROJECT:-partyx-hml}"
 REGION="${REGION:-southamerica-east1}"
 SERVICE="${SERVICE:-partyx-hml}"
 SCHED_SA="partyx-scheduler@${PROJECT}.iam.gserviceaccount.com"
-JOB="partyx-reconcile-payments"          # mesmo nome do job antigo (a cada 2 min): passa a rodar uma vez por dia
-OLD_PENDING_JOB="partyx-reconcile-pending"   # varredura de 5 min de uma versão anterior deste script: removida
+JOB="partyx-varredura-diaria"            # mesmo nome da produção (runbooks)
+OLD_JOBS="partyx-reconcile-payments partyx-reconcile-pending"   # nomes de versões anteriores deste script: removidos se existirem
 SCHEDULE="${SCHEDULE:-0 4 * * *}"
+PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-https://partyx-hml.web.app}"
+# Com PUBLIC_HOST_CHECK=true (deploy.sh), chamada direta ao run.app sem X-Forwarded-Host recebe 403, como em produção.
+HOST="$(python3 -I -c 'import sys,urllib.parse as u; print(u.urlsplit(sys.argv[1]).netloc)' "$PUBLIC_BASE_URL")"
 
-URL="$(gcloud run services describe "$SERVICE" --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
+# A URL com o número do projeto: é a JOBS_AUDIENCE que o deploy.sh grava no serviço (a URL curta do status.url seria recusada).
+URL="https://${SERVICE}-$(gcloud projects describe "$PROJECT" --format='value(projectNumber)').${REGION}.run.app"
 TARGET="${URL}/api/internal/jobs/reconcile-payments"
 
 if gcloud scheduler jobs describe "$JOB" --project="$PROJECT" --location="$REGION" >/dev/null 2>&1; then
@@ -29,13 +33,15 @@ else
 fi
 gcloud scheduler jobs "$VERB" http "$JOB" --project="$PROJECT" --location="$REGION" \
   --schedule="$SCHEDULE" --time-zone="America/Sao_Paulo" \
-  --uri="$TARGET" --http-method=POST \
+  --uri="$TARGET" --http-method=POST --headers="X-Forwarded-Host=$HOST" \
   --oidc-service-account-email="$SCHED_SA" --oidc-token-audience="$URL" \
   --attempt-deadline=120s --max-retry-attempts=1 --min-backoff=30s
 echo "Job $JOB ($VERB, $SCHEDULE) apontando para $TARGET"
 
-if gcloud scheduler jobs describe "$OLD_PENDING_JOB" --project="$PROJECT" --location="$REGION" >/dev/null 2>&1; then
-  gcloud scheduler jobs delete "$OLD_PENDING_JOB" --project="$PROJECT" --location="$REGION" --quiet
-  echo "Removido o job $OLD_PENDING_JOB (varredura de 5 min)."
-fi
+for old in $OLD_JOBS; do
+  if gcloud scheduler jobs describe "$old" --project="$PROJECT" --location="$REGION" >/dev/null 2>&1; then
+    gcloud scheduler jobs delete "$old" --project="$PROJECT" --location="$REGION" --quiet
+    echo "Removido o job antigo $old."
+  fi
+done
 echo "Conferir: gcloud scheduler jobs run $JOB --project=$PROJECT --location=$REGION  e os logs do serviço (alert=reconciliacao_falhou)."

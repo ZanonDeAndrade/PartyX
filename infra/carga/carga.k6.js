@@ -2,8 +2,9 @@
 // - visitantes: VISITANTES usuários simultâneos (padrão 200) abrindo a página do evento (HTML + API do evento), com pausa de leitura;
 // - compras: COMPRAS_POR_MIN compras por minuto (padrão 50) em taxa de chegada constante: login, pedido com reserva (2 unidades),
 //   Pix, confirmação do gateway FICTÍCIO pelo caminho do webhook e Meus ingressos.
-// Só contra o servidor LOCAL (run-carga.sh): a confirmação usa a rota do gateway fictício, que não existe em homologação nem em
-// produção. Nunca apontar para produção.
+// Alvos: o servidor LOCAL (run-carga.sh, gateway fictício) ou a HOMOLOGAÇÃO com ALVO=homologacao (run-carga-hml.sh, Mercado Pago de
+// TESTE). Na homologação não há rota do fictício: a confirmação é a real (o Mercado Pago aprova o Pix do pagador APRO e a conciliação
+// do Cloud Tasks, 1 min depois da cobrança, emite os ingressos); o k6 só consulta o pedido até ficar pago. Nunca apontar para produção.
 import http from 'k6/http';
 import { check, fail, sleep } from 'k6';
 import exec from 'k6/execution';
@@ -14,7 +15,18 @@ const SLUG = __ENV.SLUG;
 const TYPE = __ENV.TYPE_ID;
 const DURACAO = __ENV.DURACAO || '3m';
 const QTD = 2;
-if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(BASE || '')) fail(`recusado: BASE_URL precisa ser o servidor local (recebido: ${BASE})`);
+const HML = __ENV.ALVO === 'homologacao';
+// Homologação: compras direto no run.app (cada usuário virtual com o seu IP no X-Forwarded-For, que o Hosting descartaria) com o
+// X-Forwarded-Host do domínio público (barreira de Host); visitantes pelo Hosting, como o público.
+const VISIT_BASE = HML ? __ENV.VISIT_BASE : BASE;
+const PUBLIC_HOST = HML ? __ENV.PUBLIC_HOST : null;
+const ORIGIN = HML ? `https://${PUBLIC_HOST}` : BASE;
+const TAG = __ENV.TAG || '';
+const CONFIRM_MAX_S = Number(__ENV.CONFIRM_MAX_S || 300);
+if (HML) {
+  if (!/^https:\/\/partyx-hml-[a-z0-9-]+\.run\.app$/.test(BASE || '')) fail(`recusado: BASE_URL precisa ser o run.app da homologação (recebido: ${BASE})`);
+  if (VISIT_BASE !== 'https://partyx-hml.web.app' || PUBLIC_HOST !== 'partyx-hml.web.app') fail('recusado: VISIT_BASE e PUBLIC_HOST da homologação');
+} else if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(BASE || '')) fail(`recusado: BASE_URL precisa ser o servidor local (recebido: ${BASE})`);
 
 const iniciadas = new Counter('compras_iniciadas');
 const concluidas = new Counter('compras_concluidas');
@@ -38,6 +50,8 @@ export const options = {
       preAllocatedVUs: 20,
       maxVUs: 80,
       exec: 'compra',
+      // Homologação: cada compra espera a conciliação real (pelo menos 1 min); as iniciadas no fim terminam depois do DURACAO.
+      ...(HML ? { gracefulStop: `${CONFIRM_MAX_S + 30}s` } : {}),
     },
   },
   thresholds: {
@@ -54,7 +68,8 @@ export const options = {
     'http_req_duration{etapa:compra_5_meus_ingressos}': ['p(95)<5000'],
     'http_req_failed{etapa:evento_html}': ['rate<0.01'],
     'http_req_failed{etapa:evento_api}': ['rate<0.01'],
-    compra_completa_ms: ['p(95)<10000'],
+    // Local: confirmação imediata pelo fictício. Homologação: inclui a espera pela conciliação do Cloud Tasks (1 min ou mais).
+    compra_completa_ms: [HML ? `p(95)<${CONFIRM_MAX_S * 1000}` : 'p(95)<10000'],
     // Só para o resumo trazer a contagem de cada etapa.
     ...Object.fromEntries(
       ['evento_html', 'evento_api', 'compra_1_login', 'compra_2_pedido_reserva', 'compra_3_pix', 'compra_4_confirmacao', 'compra_5_meus_ingressos'].map(
@@ -69,9 +84,9 @@ export const options = {
 const ip = n => `10.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
 
 export function visitante() {
-  const headers = { 'x-forwarded-for': ip(exec.vu.idInTest) };
-  const html = http.get(`${BASE}/eventos/${SLUG}`, { headers, tags: { etapa: 'evento_html' } });
-  const api = http.get(`${BASE}/api/public/events/${SLUG}`, { headers, tags: { etapa: 'evento_api' } });
+  const headers = HML ? {} : { 'x-forwarded-for': ip(exec.vu.idInTest) };
+  const html = http.get(`${VISIT_BASE}/eventos/${SLUG}`, { headers, tags: { etapa: 'evento_html' } });
+  const api = http.get(`${VISIT_BASE}/api/public/events/${SLUG}`, { headers, tags: { etapa: 'evento_api' } });
   if (!check(html, { 'página do evento 200': r => r.status === 200 }) || !check(api, { 'API do evento 200': r => r.status === 200 }))
     errosInesperados.add(1, { etapa: 'visitante' });
   sleep(1 + Math.random() * 2);
@@ -82,13 +97,18 @@ export function compra() {
   const t0 = Date.now();
   iniciadas.add(1);
   http.cookieJar().clear(BASE);
-  const headers = { origin: BASE, 'x-forwarded-for': ip(100000 + n), 'content-type': 'application/json' };
+  const headers = {
+    origin: ORIGIN,
+    'x-forwarded-for': ip(100000 + n),
+    'content-type': 'application/json',
+    ...(HML ? { 'x-forwarded-host': PUBLIC_HOST } : {}),
+  };
   const bad = (etapa, r) => {
     errosInesperados.add(1, { etapa });
     console.error(`compra ${n}: ${etapa} ${r.status} ${String(r.body).slice(0, 200)}`);
   };
 
-  const login = http.post(`${BASE}/api/auth/login`, JSON.stringify({ email: `carga${n}@exemplo.com`, password: 'festa2026Forte' }), {
+  const login = http.post(`${BASE}/api/auth/login`, JSON.stringify({ email: `carga${n}${TAG}@exemplo.com`, password: 'festa2026Forte' }), {
     headers,
     tags: { etapa: 'compra_1_login' },
   });
@@ -115,8 +135,21 @@ export function compra() {
   });
   if (pix.status !== 201) return bad('pix', pix);
 
-  const conf = http.post(`${BASE}/api/dev/mock-gateway/${id}/aprovado`, null, { headers: auth, tags: { etapa: 'compra_4_confirmacao' } });
-  if (conf.status !== 200 || conf.json('outcome') !== 'confirmado') return bad('confirmacao', conf);
+  if (HML) {
+    // Sem atalho: espera o pedido ficar pago pela conciliação real (consulta a cada 5 s, como a página do pedido).
+    let status = '';
+    let last = null;
+    for (let waited = 0; waited <= CONFIRM_MAX_S && status !== 'pago'; waited += 5) {
+      sleep(5);
+      last = http.get(`${BASE}/api/orders/${id}`, { headers: auth, tags: { etapa: 'compra_4_confirmacao' } });
+      status = last.status === 200 ? last.json('order.status') : '';
+      if (status && status !== 'pendente' && status !== 'pago') break;
+    }
+    if (status !== 'pago') return bad('confirmacao', last);
+  } else {
+    const conf = http.post(`${BASE}/api/dev/mock-gateway/${id}/aprovado`, null, { headers: auth, tags: { etapa: 'compra_4_confirmacao' } });
+    if (conf.status !== 200 || conf.json('outcome') !== 'confirmado') return bad('confirmacao', conf);
+  }
 
   const ing = http.get(`${BASE}/api/tickets`, { headers: auth, tags: { etapa: 'compra_5_meus_ingressos' } });
   const meus = ing.status === 200 ? (ing.json('tickets') || []).filter(t => t.orderId === id).length : -1;

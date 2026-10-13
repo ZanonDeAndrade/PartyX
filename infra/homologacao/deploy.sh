@@ -22,6 +22,34 @@ case "$MEMORY" in 512Mi) NODE_HEAP_MB="${NODE_HEAP_MB:-320}";; *) : "${NODE_HEAP
 # Proteção contra ambiente trocado (o inverso da produção): recusa ANTES do build.
 case "$PROJECT" in *prod*) echo "Recuso: PROJECT parece de PRODUÇÃO: $PROJECT" >&2; exit 1;; esac
 [ "${GATEWAY_ENVIRONMENT:-sandbox}" = "sandbox" ] || { echo "Recuso: credenciais de PRODUÇÃO do gateway em homologação." >&2; exit 1; }
+
+# Gateway de homologação (PDF 7.1: sandbox). HML_GATEWAY=mercadopago|ficticio|none. Padrão: Mercado Pago de TESTE se os segredos mp-*
+# existirem (scripts/setup-mp-credentials-homologacao.sh); o fictício só com HML_GATEWAY=ficticio (ou HML_GATEWAY_FICTICIO=true, nome antigo).
+has_version() { [ -n "$(gcloud secrets versions list "$1" --project="$PROJECT" --filter=state=ENABLED --limit=1 --format='value(name)' 2>/dev/null)" ]; }
+if [ -z "${HML_GATEWAY:-}" ]; then
+  if [ "${HML_GATEWAY_FICTICIO:-false}" = "true" ]; then HML_GATEWAY=ficticio
+  elif has_version mp-access-token; then HML_GATEWAY=mercadopago
+  else HML_GATEWAY=none; fi
+fi
+case "$HML_GATEWAY" in
+  mercadopago)
+    for s in mp-access-token mp-public-key mp-webhook-secret; do
+      has_version "$s" || { echo "Recuso: o segredo $s precisa ter valor (scripts/setup-mp-credentials-homologacao.sh)." >&2; exit 1; }
+    done
+    # Só usuário de TESTE do Mercado Pago. O token vai pelo stdin do curl, nunca na linha de comando nem na saída.
+    collector="$(gcloud secrets versions access latest --secret=mp-access-token --project="$PROJECT" \
+      | { IFS= read -r t || [ -n "$t" ]; printf 'header = "Authorization: Bearer %s"\n' "$t"; } \
+      | curl -sS --max-time 15 -K - https://api.mercadopago.com/users/me \
+      | python3 -I -c 'import json,sys; d=json.load(sys.stdin); print(d["id"] if "test_user" in (d.get("tags") or []) else "")' 2>/dev/null || true)"
+    [[ "$collector" =~ ^[0-9]+$ ]] || { echo "Recuso: mp-access-token não é de usuário de TESTE do Mercado Pago (ou a API não respondeu)." >&2; exit 1; }
+    [ -z "${MP_COLLECTOR_ID:-}" ] || [ "$MP_COLLECTOR_ID" = "$collector" ] || { echo "Recuso: MP_COLLECTOR_ID difere da conta do token." >&2; exit 1; }
+    MP_COLLECTOR_ID="$collector" ;;
+  ficticio | none) ;;
+  *) echo "HML_GATEWAY inválido: $HML_GATEWAY (mercadopago, ficticio ou none)" >&2; exit 1 ;;
+esac
+# O fictício guarda estado na memória: UMA instância. Com o Mercado Pago, escala de 0 a 3 (sem custo parado).
+if [ "$HML_GATEWAY" = "ficticio" ]; then MIN_INSTANCES="${MIN_INSTANCES:-1}"; MAX_INSTANCES="${MAX_INSTANCES:-1}"; fi
+echo "== gateway de homologação: $HML_GATEWAY"
 DIRECT="$(gcloud secrets versions access latest --secret=database-url-direct --project="$PROJECT")"
 POOLED="$(gcloud secrets versions access latest --secret=database-url --project="$PROJECT")"
 ( cd "$(dirname "$0")/../.." && DATABASE_URL_DIRECT="$DIRECT" DATABASE_URL_POOLED="$POOLED" npm run -s db:env -- check homologacao ) \
@@ -48,9 +76,12 @@ vars=(NODE_ENV=production "NODE_OPTIONS=--max-old-space-size=$NODE_HEAP_MB" APP_
   "BANNER_BUCKET=${PROJECT}-banners" "JOBS_AUDIENCE=$RUN_URL" "JOBS_CALLER_EMAIL=${SCHED_SA},${TASKS_SA}"
   "TASKS_QUEUE=projects/$PROJECT/locations/$REGION/queues/partyx-conciliacao" "TASKS_INVOKER_EMAIL=$TASKS_SA"
   "TURNSTILE_ENABLED=${TURNSTILE_ENABLED:-true}" "TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-1x00000000000000000000AA}")   # homologação mantém o Turnstile LIGADO, com a chave de TESTE da Cloudflare (aceita qualquer token)
-# Homologação SEM sandbox de gateway (D-01 em aberto): HML_GATEWAY_FICTICIO=true liga o adaptador fictício (só administrador usa o simulador).
-# O estado do fictício fica na memória: nesse modo, use UMA instância (MIN_INSTANCES=1 MAX_INSTANCES=1).
-[ "${HML_GATEWAY_FICTICIO:-false}" != "true" ] || vars+=(PAYMENT_GATEWAY=mock HOMOLOGACAO_GATEWAY_FICTICIO=true)
+case "$HML_GATEWAY" in
+  ficticio) vars+=(PAYMENT_GATEWAY=mock HOMOLOGACAO_GATEWAY_FICTICIO=true) ;;   # só administrador usa o simulador
+  mercadopago) vars+=(PAYMENT_GATEWAY=mercadopago GATEWAY_ENVIRONMENT=sandbox "MP_COLLECTOR_ID=$MP_COLLECTOR_ID") ;;
+esac
+# Barreira de Host igual à de produção: o teste rápido pelo Hosting prova que o X-Forwarded-Host chega (PUBLIC_HOST_CHECK=false desliga).
+vars+=("PUBLIC_HOST_CHECK=${PUBLIC_HOST_CHECK:-true}")
 [ -z "${EMAIL_FROM:-}" ] || vars+=("EMAIL_FROM=$EMAIL_FROM")
 # Cadência da conciliação e contato da PartyX: só entram se definidos (os padrões estão no código, server/src/config.ts).
 # Textos legais: a imagem leva conteudo-legal/ (fora do Git); sem os arquivos, as páginas mostram o aviso de homologação.
@@ -63,6 +94,7 @@ done
 joined="$(IFS='#'; echo "${vars[*]}")"
 secrets="DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,QR_HMAC_KEYS=qr-hmac-keys:latest,TURNSTILE_SECRET=turnstile-secret:latest"
 [ -z "$(gcloud secrets versions list smtp-url --project="$PROJECT" --limit=1 --format='value(name)' 2>/dev/null)" ] || secrets="$secrets,SMTP_URL=smtp-url:latest"
+[ "$HML_GATEWAY" != "mercadopago" ] || secrets="$secrets,MP_ACCESS_TOKEN=mp-access-token:latest,MP_PUBLIC_KEY=mp-public-key:latest,MP_WEBHOOK_SECRET=mp-webhook-secret:latest"
 gcloud run deploy "$SERVICE" --project="$PROJECT" --region="$REGION" --image="$IMAGE" --service-account="$APP_SA" \
   --allow-unauthenticated --port=8080 --cpu=1 --memory="$MEMORY" --concurrency="${CONCURRENCY:-80}" --timeout=60 \
   --min-instances="${MIN_INSTANCES:-0}" --max-instances="${MAX_INSTANCES:-3}" \
@@ -71,9 +103,17 @@ gcloud run deploy "$SERVICE" --project="$PROJECT" --region="$REGION" --image="$I
 
 URL="$(gcloud run services describe "$SERVICE" --project="$PROJECT" --region="$REGION" --format='value(status.url)')"
 echo "== teste rápido em $URL"
+ready=false
 for i in 1 2 3 4 5; do
-  if curl -fsS "$URL/api/health/ready" | grep -q '"database":"ok"'; then echo "pronto"; exit 0; fi
+  if curl -fsS "$URL/api/health/ready" | grep -q '"database":"ok"'; then ready=true; break; fi
   sleep 3
 done
-echo "FALHOU: /api/health/ready não respondeu com banco ok" >&2
-exit 1
+$ready || { echo "FALHOU: /api/health/ready não respondeu com banco ok" >&2; exit 1; }
+if [ "${PUBLIC_HOST_CHECK:-true}" = "true" ]; then
+  host="$(python3 -I -c 'import sys,urllib.parse as u; print(u.urlsplit(sys.argv[1]).netloc)' "$PUBLIC_BASE_URL")"
+  direct="$(curl -s -o /dev/null -w '%{http_code}' "$URL/")"
+  forwarded="$(curl -s -o /dev/null -w '%{http_code}' -H "X-Forwarded-Host: $host" "$URL/")"
+  [ "$direct" = "403" ] && [ "$forwarded" = "200" ] \
+    || { echo "FALHOU: barreira de Host (run.app sem cabeçalho: $direct, esperado 403; com X-Forwarded-Host: $forwarded, esperado 200)" >&2; exit 1; }
+fi
+echo "pronto"

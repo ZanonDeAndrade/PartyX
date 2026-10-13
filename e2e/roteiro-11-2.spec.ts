@@ -17,6 +17,7 @@ import {
   sql,
   waitForEmail,
 } from './support/helpers';
+import { mailLinks, waitForMail } from './support/mailbox';
 import { payments, type Notification } from './support/payments';
 import { readState } from './support/roteiro-setup';
 import { ROOT } from './support/server';
@@ -28,7 +29,11 @@ import { ROOT } from './support/server';
  */
 const S = readState();
 const pay = payments(S);
-const EVID = path.join(ROOT, 'docs/evidencias/roteiro-11-2', S.gateway);
+const EVID = path.join(ROOT, 'docs/evidencias/roteiro-11-2', S.remote ? 'homologacao-sandbox' : S.gateway);
+// Identificadores da rodada: no local, os de sempre; em homologação, sufixados (o banco recebe várias rodadas).
+const R = S.run;
+const EVENT = R.eventName;
+const mail = (who: string) => `${who}.roteiro${R.emailTag}@exemplo.com`;
 // Capturas e PDF ficam em img/, fora do Git (.gitignore): no repositório só as tabelas (CSV) e o resultado.md.
 const IMG = path.join(EVID, 'img');
 mkdirSync(IMG, { recursive: true });
@@ -46,12 +51,12 @@ const day = (offset: number) => {
 // Compradores fictícios. "APRO" no começo do nome: no ambiente de teste do Mercado Pago o Pix desse pagador é aprovado sozinho.
 // Carlos não tem APRO de propósito: o Pix dele fica sem pagar (item 7).
 const buyers = {
-  ana: { name: 'APRO Ana Souza Fictícia', email: 'ana.roteiro@exemplo.com', cpf: cpfFor(7001), password: PASSWORD_BUYER },
-  bruno: { name: 'APRO Bruno Lima Fictício', email: 'bruno.roteiro@exemplo.com', cpf: cpfFor(7002), password: PASSWORD_BUYER },
-  carlos: { name: 'Carlos Pendente Fictício', email: 'carlos.roteiro@exemplo.com', cpf: cpfFor(7003), password: PASSWORD_BUYER },
-  duda: { name: 'APRO Davi Cupom Fictício', email: 'davi.roteiro@exemplo.com', cpf: cpfFor(7004), password: PASSWORD_BUYER },
-  eva: { name: 'APRO Eva Disputa Fictícia', email: 'eva.roteiro@exemplo.com', cpf: cpfFor(7005), password: PASSWORD_BUYER },
-  fabio: { name: 'APRO Fábio Disputa Fictício', email: 'fabio.roteiro@exemplo.com', cpf: cpfFor(7006), password: PASSWORD_BUYER },
+  ana: { name: 'APRO Ana Souza Fictícia', email: mail('ana'), cpf: cpfFor(7001 + R.cpfOffset), password: PASSWORD_BUYER },
+  bruno: { name: 'APRO Bruno Lima Fictício', email: mail('bruno'), cpf: cpfFor(7002 + R.cpfOffset), password: PASSWORD_BUYER },
+  carlos: { name: 'Carlos Pendente Fictício', email: mail('carlos'), cpf: cpfFor(7003 + R.cpfOffset), password: PASSWORD_BUYER },
+  duda: { name: 'APRO Davi Cupom Fictício', email: mail('davi'), cpf: cpfFor(7004 + R.cpfOffset), password: PASSWORD_BUYER },
+  eva: { name: 'APRO Eva Disputa Fictícia', email: mail('eva'), cpf: cpfFor(7005 + R.cpfOffset), password: PASSWORD_BUYER },
+  fabio: { name: 'APRO Fábio Disputa Fictício', email: mail('fabio'), cpf: cpfFor(7006 + R.cpfOffset), password: PASSWORD_BUYER },
 };
 type Buyer = (typeof buyers)[keyof typeof buyers];
 
@@ -75,9 +80,9 @@ async function as(who: Buyer | 'admin' | 'validador', opts: Parameters<Browser['
   const ctx = await context(opts);
   const [email, password] =
     who === 'admin'
-      ? ['admin@exemplo.com', PASSWORD_TEAM]
+      ? [R.admin, PASSWORD_TEAM]
       : who === 'validador'
-        ? ['validador@exemplo.com', PASSWORD_TEAM]
+        ? [R.validador, PASSWORD_TEAM]
         : [who.email, who.password];
   await apiLogin(ctx.request, S.base, email, password);
   return { ctx, page: await ctx.newPage() };
@@ -94,6 +99,8 @@ async function register(b: Buyer) {
     acceptedTermsVersion: lv.terms,
     acceptedPrivacyVersion: lv.privacy,
     accept: true,
+    // Homologação mantém o Turnstile ligado com a chave de TESTE da Cloudflare: aceita este token fictício da documentação dela.
+    ...(S.remote ? { captchaToken: 'XXXX.DUMMY.TOKEN.XXXX' } : {}),
   });
   expect(r.status, JSON.stringify(r.json)).toBe(201);
   await ctx.close();
@@ -134,9 +141,11 @@ test.afterAll(async () => {
   for (const c of contexts) await c.close().catch(() => {});
   await browser.close();
   const lines = [
-    `# Roteiro 11.2: resultado da rodada (${S.gateway === 'sandbox' ? 'Mercado Pago, ambiente de teste' : 'gateway fictício'})`,
+    `# Roteiro 11.2: resultado da rodada (${S.remote ? 'homologação, ' : ''}${S.gateway === 'sandbox' ? 'Mercado Pago, ambiente de teste' : 'gateway fictício'})`,
     '',
-    `Gerado em ${new Date().toISOString()} pelo Playwright (e2e/roteiro-11-2.spec.ts), servidor local ${S.base}, banco de teste descartável.`,
+    S.remote
+      ? `Gerado em ${new Date().toISOString()} pelo Playwright (e2e/roteiro-11-2.spec.ts), contra a HOMOLOGAÇÃO ${S.base}, rodada ${R.id} (dados fictícios sufixados pela rodada, no banco de homologação).`
+      : `Gerado em ${new Date().toISOString()} pelo Playwright (e2e/roteiro-11-2.spec.ts), servidor local ${S.base}, banco de teste descartável.`,
     `Gateway: **${pay.label}**.`,
     '',
     '| Item | Verificação | Observações |',
@@ -171,7 +180,7 @@ item(1, 'Cadastro com CPF válido, inválido e repetido', async () => {
     await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
   };
   // Inválido: dígitos verificadores errados.
-  await fillForm({ name: 'Inválido Fictício', email: 'invalido.roteiro@exemplo.com', cpf: '123.456.789-00' });
+  await fillForm({ name: 'Inválido Fictício', email: mail('invalido'), cpf: '123.456.789-00' });
   await expect(page.locator('#cpf')).toHaveAttribute('aria-invalid', 'true');
   await expect(page.getByText(/CPF/).and(page.locator('.px-error'))).toBeVisible();
   await shot(page, '01-cpf-invalido');
@@ -182,13 +191,17 @@ item(1, 'Cadastro com CPF válido, inválido e repetido', async () => {
   await shot(page, '01-cpf-valido-conta-criada');
   // Repetido: outro e-mail, mesmo CPF (em outra sessão, sem estar conectado).
   await ctx.clearCookies();
-  await fillForm({ name: 'Repetido Fictício', email: 'repetido.roteiro@exemplo.com', cpf: formatCpf(buyers.ana.cpf) });
+  await fillForm({ name: 'Repetido Fictício', email: mail('repetido'), cpf: formatCpf(buyers.ana.cpf) });
   await expect(page.locator('#cpf')).toHaveAttribute('aria-invalid', 'true');
   const msg = await page.locator('.px-error').first().innerText();
   expect(msg).toMatch(/CPF/i);
   await shot(page, '01-cpf-repetido');
   note(1, `CPF repetido: ${msg}`);
-  const users = await sql<{ n: number }>(S.db, `select count(*)::int as n from users where role = 'cliente'`);
+  const users = await sql<{ n: number }>(
+    S.db,
+    `select count(*)::int as n from users where role = 'cliente' and (email = any($1) or cpf = $2)`,
+    [[buyers.ana.email, mail('invalido'), mail('repetido')], buyers.ana.cpf],
+  );
   expect(users[0]!.n).toBe(1);
   note(1, 'Banco: 1 cliente criado (o inválido e o repetido não criaram conta).');
 });
@@ -214,14 +227,22 @@ item(2, 'Login, logout e recuperação de senha', async () => {
   await page.getByRole('button', { name: 'Sair da conta' }).click();
   await expect.poll(async () => (await ctx.request.get(`${S.base}/api/auth/me`)).status()).toBe(401);
   note(2, 'Login e logout: /api/auth/me 200 depois de entrar e 401 depois de sair.');
-  // Recuperação: pedido, e-mail capturado pelo servidor local, link, nova senha, login com ela.
+  // Recuperação: pedido, e-mail capturado (servidor local ou caixa de captura da homologação), link, nova senha, login com ela.
+  const asked = new Date();
   await page.goto(`${S.base}/recuperar-senha`);
   await page.getByLabel('E-mail').fill(buyers.ana.email);
   await page.getByRole('button', { name: 'Enviar link' }).click();
   await expect(page.getByRole('heading').first()).toBeVisible();
-  const mail = await waitForEmail(ctx.request, S.base, buyers.ana.email, 'recuperacao_senha');
-  expect(mail.link).toContain('/redefinir-senha?token=');
-  await page.goto(mail.link!.replace(/^https?:\/\/[^/]+/, S.base));
+  const reset = S.remote
+    ? {
+        link:
+          mailLinks(await waitForMail(buyers.ana.email, /Criar nova senha/, asked), S.base).find(l =>
+            l.includes('/redefinir-senha?token='),
+          ) ?? null,
+      }
+    : await waitForEmail(ctx.request, S.base, buyers.ana.email, 'recuperacao_senha');
+  expect(reset.link).toContain('/redefinir-senha?token=');
+  await page.goto(reset.link!.replace(/^https?:\/\/[^/]+/, S.base));
   const nova = 'novaSenha2026Forte';
   await page.getByLabel('Nova senha', { exact: true }).fill(nova);
   await page.getByLabel('Confirmar nova senha').fill(nova);
@@ -232,10 +253,10 @@ item(2, 'Login, logout e recuperação de senha', async () => {
   await login(nova);
   await expect(page).not.toHaveURL(/\/entrar/);
   // O link vale uma vez só.
-  await page.goto(mail.link!.replace(/^https?:\/\/[^/]+/, S.base));
+  await page.goto(reset.link!.replace(/^https?:\/\/[^/]+/, S.base));
   const reused = page.getByRole('heading', { name: /não é válido|já foi usado|utilizado|expirou/i });
   await expect(reused).toBeVisible();
-  note(2, `Recuperação: e-mail recebido (captura local), senha trocada pelo link, login com a nova senha; link reutilizado: "${(await reused.textContent())?.trim()}".`);
+  note(2, `Recuperação: e-mail recebido (${S.remote ? 'caixa de captura da homologação' : 'captura local'}), senha trocada pelo link, login com a nova senha; link reutilizado: "${(await reused.textContent())?.trim()}".`);
 });
 
 // ------------------------------------------------------------------------------------------------------------------------
@@ -258,13 +279,13 @@ item(3, 'Criação de evento com três tipos de ingresso e períodos de venda di
   const ctx = await context();
   const page = await ctx.newPage();
   await page.goto(`${S.base}/entrar?voltar=/admin`);
-  await page.getByLabel('E-mail').fill('admin@exemplo.com');
+  await page.getByLabel('E-mail').fill(R.admin);
   await page.locator('#senha, input[type=password]').first().fill(PASSWORD_TEAM);
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await expect(page).toHaveURL(`${S.base}/admin`);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await page.goto(`${S.base}/admin/eventos/novo`);
-  await page.getByLabel('Nome do evento').fill('Festival Roteiro E2E');
+  await page.getByLabel('Nome do evento').fill(EVENT);
   await page.getByLabel('Data', { exact: true }).fill(day(15));
   await page.getByLabel('Horário de início').fill('22:00');
   await page.getByLabel('Local', { exact: true }).fill('Galpão Fictício do Roteiro');
@@ -393,7 +414,7 @@ item(8, 'Compra com cupom de promoter válido e com cupom inválido', async () =
   const total = await page.locator('.px-ck-aside').innerText();
   for (const [code, why] of [
     ['NAOEXISTE', 'inexistente'],
-    ['LEO', 'desativado'],
+    [R.leo, 'desativado'],
   ] as const) {
     await page.getByLabel('Código', { exact: true }).fill(code);
     await page.getByRole('button', { name: 'Aplicar' }).click();
@@ -402,17 +423,17 @@ item(8, 'Compra com cupom de promoter válido e com cupom inválido', async () =
     note(8, `Código ${why} (${code}): "${(await err.innerText()).trim()}".`);
   }
   await shot(page, '08-cupom-invalido');
-  const id = await reserve(page, 'DUDA');
+  const id = await reserve(page, R.duda);
   orderOf.duda = id;
   await shot(page, '08-cupom-valido-pedido');
   await pay.startPix(page);
   await pay.approvePix(page, id);
   await expect(page.getByRole('heading', { name: 'Compra confirmada' })).toBeVisible({ timeout: 30_000 });
   const o = await orderRow(id);
-  expect(o.promoter).toBe('DUDA');
+  expect(o.promoter).toBe(R.duda);
   expect(o.total_cents).toBe(2 * 8000); // sem desconto: o código só atribui a venda
   expect(total).toContain('160,00');
-  note(8, 'Código DUDA aceito: "aplicado. Total inalterado."; pedido pago atribuído ao promoter DUDA com total R$ 160,00 (sem desconto).');
+  note(8, `Código ${R.duda} aceito: "aplicado. Total inalterado."; pedido pago atribuído ao promoter ${R.duda} com total R$ 160,00 (sem desconto).`);
 });
 
 // ------------------------------------------------------------------------------------------------------------------------
@@ -513,6 +534,20 @@ item(11, 'Webhook recebido duas vezes: ingressos não duplicados', async () => {
 
 // ------------------------------------------------------------------------------------------------------------------------
 item(12, 'E-mail de confirmação recebido com link para os ingressos', async () => {
+  if (S.remote) {
+    // Homologação: o e-mail real enviado pelo SMTP do serviço, lido na caixa de captura (Ethereal) por IMAP.
+    const m = await waitForMail(buyers.ana.email, /^Compra confirmada/, new Date(Date.now() - 3_600_000));
+    const links = mailLinks(m, S.base);
+    expect(links.length).toBeGreaterThanOrEqual(1);
+    const { page } = await as(buyers.ana);
+    await page.setContent(m.html);
+    await shot(page, '12-email-de-confirmacao');
+    await page.goto(links[0]!);
+    await expect(page.locator('main')).toContainText(EVENT);
+    await shot(page, '12-link-do-email');
+    note(12, `E-mail "${m.subject}" entregue pelo SMTP da homologação e lido na caixa de captura; link ${new URL(links[0]!).pathname} abre os ingressos de Ana.`);
+    return;
+  }
   // Sem SMTP no ambiente local: o servidor grava cada e-mail enviado (HTML e texto) em .data/emails. É o mesmo conteúdo do envio real.
   const dir = path.join(ROOT, 'e2e/.run/roteiro/server/.data/emails');
   const mine = readdirSync(dir)
@@ -527,7 +562,7 @@ item(12, 'E-mail de confirmação recebido com link para os ingressos', async ()
   await page.setContent(html);
   await shot(page, '12-email-de-confirmacao');
   await page.goto(links[0]!);
-  await expect(page.locator('main')).toContainText('Festival Roteiro E2E');
+  await expect(page.locator('main')).toContainText(EVENT);
   await shot(page, '12-link-do-email');
   note(12, `E-mail "${/Assunto: (.*)/.exec(txt)?.[1]}" capturado pelo servidor local (sem SMTP real); link ${new URL(links[0]!).pathname} abre os ingressos de Ana.`);
 });
@@ -548,7 +583,7 @@ item(13, 'Download do PDF e exibição no celular', async () => {
   const bytes = readFileSync(file);
   expect(bytes.subarray(0, 4).toString()).toBe('%PDF');
   const text = execFileSync('pdftotext', [file, '-']).toString();
-  expect(text).toContain('Festival Roteiro E2E');
+  expect(text).toContain(EVENT);
   expect(text.replace(/\D/g, '')).not.toContain(buyers.bruno.cpf);
   // Miniatura da primeira página, como aparece no visualizador do celular.
   execFileSync('pdftoppm', ['-jpeg', '-r', '60', '-singlefile', file, path.join(IMG, '13-ingresso-pdf')]);
@@ -582,7 +617,7 @@ item(14, 'Validação: válido, já utilizado, cancelado, de outro evento, códi
     ['adulterado', adulterated, 'err', 'Inválido'],
   ];
   for (const [name, qr, tone, title] of cases) {
-    const scan = await scanQr(S.base, eventId, qr);
+    const scan = await scanQr(S.base, eventId, qr, { email: R.validador });
     try {
       await shot(scan.page, `14-portaria-${name}`);
       expect(scan.result!.title).toBe(title);
@@ -636,7 +671,7 @@ item(16, 'Contador de entradas e acompanhamento em tempo real no painel', async 
   const before = Number(await count.innerText());
   await shot(page, '16-entradas-antes');
   const ana = (await ticketsOf(orderOf.ana!))[0]!;
-  const scan = await scanQr(S.base, eventId, ana.qr_payload);
+  const scan = await scanQr(S.base, eventId, ana.qr_payload, { email: R.validador });
   expect(scan.result!.title).toBe('Válido');
   const gateCounter = /Entradas (\d+) de (\d+)/.exec(scan.result!.text.replace(/\s+/g, ' '));
   await scan.close();
@@ -660,7 +695,7 @@ item(17, 'Cancelamento de ingresso pelo administrador e leitura posterior (verme
   await expect(page.getByText(/cancelado/i).first()).toBeVisible();
   await shot(page, '17-cancelado-no-painel');
   expect((await sql<{ status: string }>(S.db, `select status from tickets where id = $1`, [t.id]))[0]!.status).toBe('cancelado');
-  const scan = await scanQr(S.base, eventId, t.qr_payload);
+  const scan = await scanQr(S.base, eventId, t.qr_payload, { email: R.validador });
   try {
     await shot(scan.page, '17-portaria-vermelho');
     expect(scan.result!.title).toBe('Cancelado');
@@ -687,7 +722,7 @@ item(18, 'Relatórios: vendas por evento, por tipo, por promoter, mensal da taxa
   await page.goto(`${S.base}/admin/relatorios/vendas`);
   await page.waitForLoadState('networkidle');
   for (const d of db) {
-    const row = page.getByRole('row').filter({ hasText: 'Festival Roteiro E2E' }).filter({ hasText: d.type });
+    const row = page.getByRole('row').filter({ hasText: EVENT }).filter({ hasText: d.type });
     await expect(row.getByRole('cell').nth(2)).toHaveText(String(d.n));
     await expect(row.getByRole('cell').nth(3)).toContainText((d.cents / 100).toFixed(2).replace('.', ','));
   }
@@ -699,15 +734,16 @@ item(18, 'Relatórios: vendas por evento, por tipo, por promoter, mensal da taxa
   const promo = await sql<{ n: number; cents: number }>(
     S.db,
     `select count(t.id)::int as n, (select sum(total_cents) from orders o2 join promoters p2 on p2.id = o2.promoter_id
-                                     where p2.coupon_code = 'DUDA' and o2.status = 'pago')::int as cents
+                                     where p2.coupon_code = $1 and o2.status = 'pago')::int as cents
        from tickets t join orders o on o.id = t.order_id join promoters p on p.id = o.promoter_id
-      where p.coupon_code = 'DUDA' and o.status = 'pago'`,
+      where p.coupon_code = $1 and o.status = 'pago'`,
+    [R.duda],
   );
-  const dudaRow = page.getByRole('row').filter({ hasText: 'DUDA' });
+  const dudaRow = page.getByRole('row').filter({ hasText: R.duda });
   await expect(dudaRow).toContainText(String(promo[0]!.n));
   await expect(dudaRow).toContainText((promo[0]!.cents / 100).toFixed(2).replace('.', ','));
   await shot(page, '18-relatorio-promoters');
-  note(18, `Promoters: DUDA com ${promo[0]!.n} ingressos e R$ ${brl(promo[0]!.cents)} atribuídos (sem desconto); linha "${(await dudaRow.innerText()).replace(/\s+/g, ' ')}".`);
+  note(18, `Promoters: ${R.duda} com ${promo[0]!.n} ingressos e R$ ${brl(promo[0]!.cents)} atribuídos (sem desconto); linha "${(await dudaRow.innerText()).replace(/\s+/g, ' ')}".`);
 
   await page.goto(`${S.base}/admin/relatorios/taxa-mensal`);
   await page.waitForLoadState('networkidle');

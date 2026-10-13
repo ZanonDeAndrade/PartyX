@@ -63,7 +63,8 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
   // O Hosting foi medido enviando Host=*.run.app e X-Forwarded-Host=<domínio público>. O segundo cabeçalho pode ser
   // forjado por quem chama o run.app direto; esta barreira reduz acesso casual, enquanto limites globais protegem o banco.
   app.use('*', async (c, next) => {
-    if (config.APP_ENV === 'producao' && !['/api/health', '/api/health/ready'].includes(c.req.path)) {
+    const hostCheck = config.APP_ENV === 'producao' || config.publicHostCheck;
+    if (hostCheck && !['/api/health', '/api/health/ready'].includes(c.req.path)) {
       const expected = new URL(config.PUBLIC_BASE_URL!).host.toLowerCase();
       const host = requestAuthority(c.req.header('host'));
       const forwardedHost = requestAuthority(c.req.header('x-forwarded-host'));

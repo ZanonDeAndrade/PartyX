@@ -20,6 +20,12 @@ jobs:
     environment: homologacao
     steps:
       - uses: actions/checkout@v4
+      # O deploy.sh confere o banco com `npm run db:env` (tsx e pg) antes do build: precisa das dependências.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}

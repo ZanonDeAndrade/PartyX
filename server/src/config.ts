@@ -72,6 +72,11 @@ const schema = z
      * saúde, o webhook do gateway e as rotinas internas, para nenhum pagamento se perder. Painel e portaria também fecham.
      */
     MAINTENANCE_MODE: z.enum(['true', 'false']).optional(),
+    /**
+     * Barreira de Host (só `Host` do domínio público ou `X-Forwarded-Host` do Firebase Hosting). Sempre ligada em produção; em homologação,
+     * `PUBLIC_HOST_CHECK=true` liga a mesma regra para o teste rápido pelo Hosting provar que o cabeçalho chega. Exige `PUBLIC_BASE_URL`.
+     */
+    PUBLIC_HOST_CHECK: z.enum(['true', 'false']).optional(),
     /** Pasta com os textos legais fornecidos pela PartyX (`termos-de-uso.txt`, `privacidade.txt`, `cancelamento.txt`, `meia-entrada.txt`). Fora do Git. */
     LEGAL_CONTENT_DIR: z.string().min(1).optional(),
     /** `true` só depois da aprovação escrita da proposta visual pelo cliente (CA-33, D-10). Sem ela, o tema segue provisório e a venda real em produção fica bloqueada. */
@@ -226,6 +231,12 @@ const schema = z
     if (env.APP_ENV === 'producao' && !env.PUBLIC_BASE_URL) {
       ctx.addIssue({ code: 'custom', path: ['PUBLIC_BASE_URL'], message: 'obrigatória em produção' });
     }
+    if (env.PUBLIC_HOST_CHECK === 'true' && !env.PUBLIC_BASE_URL) {
+      ctx.addIssue({ code: 'custom', path: ['PUBLIC_BASE_URL'], message: 'obrigatória com PUBLIC_HOST_CHECK=true' });
+    }
+    if (env.APP_ENV === 'producao' && env.PUBLIC_HOST_CHECK === 'false') {
+      ctx.addIssue({ code: 'custom', path: ['PUBLIC_HOST_CHECK'], message: 'a barreira de Host não pode ser desligada em produção' });
+    }
     if (env.APP_ENV === 'producao' && env.ENABLE_PROTOTYPE === 'true') {
       ctx.addIssue({ code: 'custom', path: ['ENABLE_PROTOTYPE'], message: 'proibido em produção' });
     }
@@ -377,6 +388,7 @@ export type Config = Omit<
   | 'CANCELLATION_DATE'
   | 'SIGNUP_OPEN'
   | 'MAINTENANCE_MODE'
+  | 'PUBLIC_HOST_CHECK'
 > & {
   /** Chaves de assinatura dos QR por versão, e a versão usada nos ingressos novos. */
   qr: { keys: QrKeys; currentVersion: number };
@@ -407,6 +419,8 @@ export type Config = Omit<
   signupOpen: boolean;
   /** Página de manutenção ligada (G06). */
   maintenance: boolean;
+  /** Barreira de Host ligada: sempre em produção; em homologação só com `PUBLIC_HOST_CHECK=true`. */
+  publicHostCheck: boolean;
 };
 
 export interface PartyxPublicInfo {
@@ -479,6 +493,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     CANCELLATION_DATE,
     SIGNUP_OPEN,
     MAINTENANCE_MODE,
+    PUBLIC_HOST_CHECK,
     ...rest
   } = raw;
   const salesOpen = SALES_OPEN ? SALES_OPEN === 'true' : raw.APP_ENV !== 'producao';
@@ -537,5 +552,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     legalDates: { terms: TERMS_DATE ?? null, privacy: PRIVACY_DATE ?? null, cancellation: CANCELLATION_DATE ?? null },
     signupOpen: SIGNUP_OPEN ? SIGNUP_OPEN === 'true' : raw.APP_ENV !== 'producao',
     maintenance: MAINTENANCE_MODE === 'true',
+    publicHostCheck: raw.APP_ENV === 'producao' || PUBLIC_HOST_CHECK === 'true',
   };
 }

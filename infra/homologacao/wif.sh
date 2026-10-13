@@ -30,5 +30,13 @@ for sa in "partyx-app@$PROJECT.iam.gserviceaccount.com" "$DEPLOY_SA"; do
   gcloud iam service-accounts add-iam-policy-binding "$sa" --project="$PROJECT" --member="serviceAccount:$DEPLOY_SA" --role=roles/iam.serviceAccountUser >/dev/null
 done
 
+# O deploy.sh lê o token de TESTE do Mercado Pago só para conferir que a conta é de usuário de teste (e obter o id da conta).
+if gcloud secrets describe mp-access-token --project="$PROJECT" >/dev/null 2>&1; then
+  gcloud secrets add-iam-policy-binding mp-access-token --project="$PROJECT" --member="serviceAccount:$DEPLOY_SA" \
+    --role=roles/secretmanager.secretAccessor >/dev/null
+fi
+# Lista de segredos para o deploy definir no serviço (o papel run.admin não dá leitura de segredos ao runtime; isso é do partyx-app).
+gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$DEPLOY_SA" --role=roles/secretmanager.viewer --condition=None >/dev/null
+
 echo "GCP_WIF_PROVIDER=projects/$NUMBER/locations/global/workloadIdentityPools/$POOL/providers/$PROVIDER"
 echo "GCP_DEPLOY_SA=$DEPLOY_SA"

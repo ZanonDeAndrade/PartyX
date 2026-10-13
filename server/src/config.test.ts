@@ -29,6 +29,16 @@ describe('loadConfig', () => {
     expect(loadConfig({ PORT: '3000' }).PORT).toBe(3000);
   });
 
+  it('barreira de Host: sempre em produção; em homologação só com PUBLIC_HOST_CHECK=true e PUBLIC_BASE_URL', () => {
+    const hml = { APP_ENV: 'homologacao', DATABASE_URL: 'postgres://x', SESSION_SECRET: SECRET, QR_HMAC_KEYS: QR };
+    expect(loadConfig(hml).publicHostCheck).toBe(false);
+    expect(() => loadConfig({ ...hml, PUBLIC_HOST_CHECK: 'true' })).toThrow(/PUBLIC_BASE_URL/);
+    expect(loadConfig({ ...hml, PUBLIC_HOST_CHECK: 'true', PUBLIC_BASE_URL: 'https://partyx-hml.web.app' }).publicHostCheck).toBe(
+      true,
+    );
+    expect(() => loadConfig({ ...hml, APP_ENV: 'producao', PUBLIC_HOST_CHECK: 'false' })).toThrow(/PUBLIC_HOST_CHECK/);
+  });
+
   it('exige DATABASE_URL fora do ambiente local', () => {
     expect(() => loadConfig({ APP_ENV: 'homologacao' })).toThrow(/DATABASE_URL/);
     expect(() => loadConfig({ APP_ENV: 'producao' })).toThrow(/DATABASE_URL/);
