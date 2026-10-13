@@ -7,6 +7,7 @@
 # Travas: o banco de destino precisa se chamar restore_* (ou teste_*), estar VAZIO e não estar em PROTECTED_HOSTS (lista de hosts
 # separados por vírgula, ex.: o host do Neon de produção). O cliente do PostgreSQL (pg_restore) precisa ser da versão do servidor ou maior.
 # PG_DOCKER=1 roda psql e pg_restore pela imagem postgres:18-alpine (para quem não tem o cliente do PostgreSQL 18 instalado; usa --network host).
+#       MIGRACOES_ESPERADAS=N  só para cópia anterior a uma release: o banco restaurado deve ter exatamente N migrações.
 # Saída: 0 = restaurado e todas as verificações OK; 1 = falhou; 2 = uso errado ou trava acionada.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -42,4 +43,5 @@ F="$WORK/$(basename "$SRC")"
 echo "SHA-256 confere. Restaurando em $HOST/$DBNAME ..."
 pgtool pg_restore --no-owner --no-privileges --exit-on-error --jobs=2 --dbname="$TARGET_URL" "$F"
 echo "Restaurado em $(( $(date +%s) - START )) s. Conferindo..."
-DATABASE_URL="$TARGET_URL" npm run -s backup:verify -- "$WORK/$(basename "$BASE").manifest.json"
+# MIGRACOES_ESPERADAS=N: só para cópia tirada ANTES de uma release (menos migrações que o repositório, de propósito).
+DATABASE_URL="$TARGET_URL" npm run -s backup:verify -- "$WORK/$(basename "$BASE").manifest.json" ${MIGRACOES_ESPERADAS:+--migracoes-esperadas=$MIGRACOES_ESPERADAS}

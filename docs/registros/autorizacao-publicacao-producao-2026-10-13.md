@@ -12,5 +12,6 @@
 
 Observações:
 
+- Conta do Mercado Pago de produção: id `3563483345`, confirmada pelo Bernardo como da PartyX (informado pelo responsável em 13/10/2026).
 - O gateway de produção (Mercado Pago) segue como premissa D-01 sem confirmação escrita arquivada (`decisoes-pendentes.md`). Esta publicação liga o gateway com as vendas fechadas; nenhuma cobrança real é possível até a abertura.
 - O registro da execução (revisão, migrações, horários, teste rápido e rollback) fica em `publicacao-producao-2026-10-13.md`, gerado ao final.

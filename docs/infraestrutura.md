@@ -90,7 +90,7 @@ Fluxo de branches: `main` produção (protegida), `develop` homologação, `feat
 
 ## Checklist da etapa 10 (infra de homologação e backup)
 
-Itens da etapa 10 da sequência de fechamento. **Executados em 13/10/2026** (registro em `operacao/registro-rotinas.md`, inventário em `operacao/inventario-homologacao.md`); falta só o responsável confirmar o recebimento dos e-mails dos dois alertas (item 6).
+Itens da etapa 10 da sequência de fechamento. **Executados em 13/10/2026** (registro em `operacao/registro-rotinas.md`, inventário em `operacao/inventario-homologacao.md`); o responsável confirmou em 13/10/2026 o recebimento dos e-mails dos dois alertas (item 6). Checklist completo.
 
 ### Alertas por log: 13 sinais em HOMOLOGAÇÃO, com disparo de propósito
 
@@ -117,7 +117,7 @@ Pedido do responsável em 12/10/2026. **Em produção os alertas não são criad
   - Script de disparo: `infra/testes/alertas-hml.sh` (13/10/2026). Usa cartão de teste APRO no lugar do Pix, que oscilou no ambiente de teste, e entrega as notificações assinadas pelo Hosting.
   - Esperado: pedido continua `pago`, nenhum ingresso cancelado, trilha `pagamento.estorno_parcial` com o texto do ADM15 no histórico do pedido.
 - [x] **5. Disparar `cobranca_duplicada` de propósito:** criar pela API uma segunda order aprovada com a **mesma referência externa** de um pedido já pago e o mesmo valor, e entregar a notificação assinada. Esperado: nada emitido, caso na aba **Exceções > Cobranças em dobro**; marcar como tratada com motivo.
-- [ ] **6. Confirmar que o aviso chega:** e-mail do Cloud Monitoring na `NOTIFY_EMAIL` para os dois sinais. Na medição de 06/10, o tempo do log ao alerta aberto foi de 3 a 4,5 min. Conferir também o incidente aberto no console. Só o responsável vê a caixa de entrada.
+- [x] **6. Confirmar que o aviso chega (verificado em 13/10/2026: o responsável confirmou o recebimento dos dois e-mails, `estorno_parcial` e `cobranca_duplicada`):** e-mail do Cloud Monitoring na `NOTIFY_EMAIL` para os dois sinais. Na medição de 06/10, o tempo do log ao alerta aberto foi de 3 a 4,5 min. Conferir também o incidente aberto no console. Só o responsável vê a caixa de entrada.
 - [x] **7. Registrar a evidência** em `operacao/registro-rotinas.md`: data, sinais, horário do log, horário do e-mail e pedidos de teste usados. Sem token, assinatura, CPF nem endereço de caixa real. Os incidentes fecham sozinhos em 24 h (`autoClose`).
 
 Uma linha de log falsa (`gcloud logging write`) provaria só o caminho do alerta, não o código. Não vale como disparo de propósito.

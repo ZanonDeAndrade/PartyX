@@ -104,7 +104,7 @@ A variável do endereço público chama-se `PUBLIC_BASE_URL` (não existe `PUBLI
 **Homologação** (`infra/homologacao/env.hml.yaml`, depois `./infra/homologacao/deploy.sh`):
 
 - `EMAIL_FROM: "PartyX Homologação <ingressos@hml.partyx.com.br>"`
-- `EMAIL_ALLOWLIST: "<e-mail do responsável>,*@partyx.com.br,bbittencourt085@gmail.com"` (o e-mail do responsável veio três vezes como marcador sem preencher: **pendente**). A lista só existe no código a partir da próxima release; a homologação de hoje (`release-2026-10-13`) ainda não a conhece
+- `EMAIL_ALLOWLIST: "zanondea@gmail.com,*@partyx.com.br,bbittencourt085@gmail.com"` (definida em 13/10/2026). A lista só existe no código a partir da próxima release; a homologação de hoje (`release-2026-10-13`) ainda não a conhece
 - `smtp-url` novo por `bash scripts/setup-smtp-homologacao.sh`, antes do deploy
 - `PUBLIC_BASE_URL` continua `https://partyx-hml.web.app`, a não ser que o item 4 seja adotado
 - Mercado Pago, modo de **teste**: continua `https://partyx-hml.web.app/api/webhooks/payments`

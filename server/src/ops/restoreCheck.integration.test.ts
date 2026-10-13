@@ -80,6 +80,21 @@ describe.skipIf(!ADMIN_URL)('conferência da restauração do backup (integraç�
     expect(failing(await verifyRestore(testDb.pool, m, JOURNAL + 1))).toEqual(['migrações aplicadas']);
   });
 
+  it('cópia anterior a uma release: com o número esperado informado, passa só se restaurado = manifesto = informado', async () => {
+    const m = await manifest();
+    // O repositório "ganhou" 4 migrações depois da cópia: sem o parâmetro reprova; com o número certo passa.
+    expect(failing(await verifyRestore(testDb.pool, m, JOURNAL + 4))).toEqual(['migrações aplicadas']);
+    const ok = await verifyRestore(testDb.pool, m, JOURNAL + 4, { exactMigrations: JOURNAL });
+    expect(failing(ok)).toEqual([]);
+    expect(ok.find(c => c.name === 'migrações aplicadas')!.detail).toContain(`${JOURNAL} esperadas`);
+    // Número informado errado, para mais ou para menos, e manifesto divergente continuam reprovando.
+    expect(failing(await verifyRestore(testDb.pool, m, JOURNAL + 4, { exactMigrations: JOURNAL - 1 }))).toEqual(['migrações aplicadas']);
+    expect(failing(await verifyRestore(testDb.pool, m, JOURNAL + 4, { exactMigrations: JOURNAL + 1 }))).toEqual(['migrações aplicadas']);
+    expect(
+      failing(await verifyRestore(testDb.pool, { ...m, migrations: JOURNAL - 1 }, JOURNAL + 4, { exactMigrations: JOURNAL })),
+    ).toEqual(['migrações aplicadas']);
+  });
+
   it('estoque divergente: vendidos diferente dos ingressos emitidos', async () => {
     const h = await healthy();
     await sql('update ticket_types set quantity_sold = quantity_sold + 1 where id = $1', [h.type]);

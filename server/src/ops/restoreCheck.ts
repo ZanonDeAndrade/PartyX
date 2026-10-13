@@ -39,17 +39,35 @@ export interface Check {
   detail: string;
 }
 
-export async function verifyRestore(pool: pg.Pool, manifest: Manifest, expectedMigrations: number): Promise<Check[]> {
+/**
+ * `expectedMigrations`: quantas migrações o repositório tem. `opts.exactMigrations`: para restaurar um backup ANTERIOR a uma release
+ * (o banco restaurado tem menos migrações que o repositório, de propósito), informe quantas a cópia deve ter; a conferência passa a
+ * exigir exatamente esse número, igual ao do manifesto.
+ */
+export async function verifyRestore(
+  pool: pg.Pool,
+  manifest: Manifest,
+  expectedMigrations: number,
+  opts: { exactMigrations?: number } = {},
+): Promise<Check[]> {
   const checks: Check[] = [];
   const add = (name: string, ok: boolean, detail: string) => checks.push({ name, ok, detail });
   const num = async (sql: string) => Number(((await pool.query(sql)).rows[0] as { n: string | number }).n);
 
   const migrations = await num('select count(*) as n from drizzle.__drizzle_migrations');
-  add(
-    'migrações aplicadas',
-    migrations === manifest.migrations && migrations >= expectedMigrations,
-    `${migrations} restauradas, ${manifest.migrations} no manifesto, ${expectedMigrations} no repositório`,
-  );
+  if (opts.exactMigrations === undefined) {
+    add(
+      'migrações aplicadas',
+      migrations === manifest.migrations && migrations >= expectedMigrations,
+      `${migrations} restauradas, ${manifest.migrations} no manifesto, ${expectedMigrations} no repositório`,
+    );
+  } else {
+    add(
+      'migrações aplicadas',
+      migrations === manifest.migrations && migrations === opts.exactMigrations,
+      `${migrations} restauradas, ${manifest.migrations} no manifesto, ${opts.exactMigrations} esperadas (informado: cópia anterior a uma release; o repositório tem ${expectedMigrations})`,
+    );
+  }
 
   for (const table of APPEND_ONLY_TABLES) {
     const expected = manifest.tables[table];
