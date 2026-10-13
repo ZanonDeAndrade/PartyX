@@ -19,6 +19,7 @@
     "e2e:roteiro:sandbox": "vite build && E2E_GATEWAY=sandbox playwright test -c e2e/roteiro.config.ts",
     "e2e:roteiro:ficticio": "vite build && E2E_GATEWAY=ficticio playwright test -c e2e/roteiro.config.ts",
     "e2e:responsivo": "vite build && playwright test -c e2e/responsivo.config.ts",
+    "e2e:turnstile": "vite build && playwright test -c e2e/turnstile.config.ts",
     "carga": "bash infra/carga/run-carga.sh",
     "preview": "vite preview",
     "db:generate": "drizzle-kit generate",

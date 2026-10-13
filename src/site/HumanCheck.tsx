@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import { HUMAN_FAILED_MESSAGE, HUMAN_TIMEOUT_MS, type HumanState } from './humanGate';
 
 /**
  * Desafio Cloudflare Turnstile no cadastro e na recuperação de senha. A chave PÚBLICA vem de `/api/public/site`; sem ela
@@ -34,14 +35,13 @@ function loadScript(): Promise<void> {
   return loading;
 }
 
-export interface HumanState {
-  /** O servidor vai exigir o token. */
-  required: boolean;
-  token: string | null;
-}
+export type { HumanState } from './humanGate';
 
 export function HumanCheck({ onChange, resetKey = 0 }: { onChange: (s: HumanState) => void; resetKey?: number }) {
   const [siteKey, setSiteKey] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  // "Tentar de novo" monta o widget outra vez (e recarrega o script, se foi ele que falhou).
+  const [attempt, setAttempt] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const report = useRef(onChange);
   report.current = onChange;
@@ -52,9 +52,10 @@ export function HumanCheck({ onChange, resetKey = 0 }: { onChange: (s: HumanStat
       .site(c.signal)
       .then(s => {
         setSiteKey(s.turnstileSiteKey);
-        report.current({ required: Boolean(s.turnstileSiteKey), token: null });
+        if (!s.turnstileSiteKey) report.current({ required: false, token: null, phase: 'desligado' });
       })
-      .catch(() => report.current({ required: false, token: null }));
+      // Sem a configuração, a tela segue sem desafio; se o servidor exigir, ele recusa com mensagem clara.
+      .catch(() => report.current({ required: false, token: null, phase: 'desligado' }));
     return () => c.abort();
   }, []);
 
@@ -62,25 +63,66 @@ export function HumanCheck({ onChange, resetKey = 0 }: { onChange: (s: HumanStat
     if (!siteKey || !box.current) return;
     let id: string | undefined;
     let dead = false;
-    report.current({ required: true, token: null });
+    let got = false;
+    const fail = () => {
+      if (dead) return;
+      setFailed(true);
+      report.current({ required: true, token: null, phase: 'falhou' });
+    };
+    // O token precisa chegar no prazo; se chegar depois (rede lenta), ainda vale.
+    let timer = window.setTimeout(() => !got && fail(), HUMAN_TIMEOUT_MS);
+    setFailed(false);
+    report.current({ required: true, token: null, phase: 'verificando' });
     loadScript()
       .then(() => {
         if (dead || !box.current || !window.turnstile) return;
         id = window.turnstile.render(box.current, {
           sitekey: siteKey,
           language: 'pt-br',
-          callback: (token: string) => report.current({ required: true, token }),
-          'expired-callback': () => report.current({ required: true, token: null }),
-          'error-callback': () => report.current({ required: true, token: null }),
+          callback: (token: string) => {
+            got = true;
+            window.clearTimeout(timer);
+            setFailed(false);
+            report.current({ required: true, token, phase: 'pronto' });
+          },
+          // Token vencido: o widget busca outro sozinho; o botão volta a esperar, com novo prazo.
+          'expired-callback': () => {
+            got = false;
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => !got && fail(), HUMAN_TIMEOUT_MS);
+            report.current({ required: true, token: null, phase: 'verificando' });
+          },
+          'error-callback': () => {
+            window.clearTimeout(timer);
+            fail();
+          },
         });
       })
-      .catch(() => report.current({ required: true, token: null }));
+      .catch(() => {
+        window.clearTimeout(timer);
+        fail();
+      });
     return () => {
       dead = true;
+      window.clearTimeout(timer);
       if (id && window.turnstile) window.turnstile.remove(id);
     };
-  }, [siteKey, resetKey]);
+  }, [siteKey, resetKey, attempt]);
 
   if (!siteKey) return null;
-  return <div ref={box} className="px-human" role="group" aria-label="Verificação de que você não é um robô" />;
+  return (
+    <div className="px-human-wrap">
+      <div ref={box} key={attempt} className="px-human" role="group" aria-label="Verificação de que você não é um robô" />
+      {failed ? (
+        <div className="px-human-fail">
+          <p className="px-notice px-notice-err" role="alert">
+            {HUMAN_FAILED_MESSAGE}
+          </p>
+          <button type="button" className="px-btn px-btn-ghost" onClick={() => setAttempt(n => n + 1)}>
+            Tentar de novo
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }

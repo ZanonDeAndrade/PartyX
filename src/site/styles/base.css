@@ -573,6 +573,11 @@ body.px-dark .px-fine {
   display: flex;
   align-items: center;
 }
+.px-human-fail {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
 .px-money {
   display: flex;
   align-items: center;

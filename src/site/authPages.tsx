@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, type LegalKind, type LegalVersions } from './api';
 import { Layout, PartyxContact, usePageTitle } from './components';
 import { calendarDate, cpfInput, maskEmail, phoneInput } from './format';
-import { HumanCheck, type HumanState } from './HumanCheck';
+import { HumanCheck } from './HumanCheck';
+import { HUMAN_INITIAL, humanGate, type HumanState } from './humanGate';
 import { IconBack } from './icons';
 import { Link, useRouter } from './router';
 import { safeReturnPath, takeSessionExpired, useSession } from './session';
@@ -265,7 +266,7 @@ export function SignupPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [general, setGeneral] = useState('');
   const [busy, setBusy] = useState(false);
-  const [human, setHuman] = useState<HumanState>({ required: false, token: null });
+  const [human, setHuman] = useState<HumanState>(HUMAN_INITIAL);
   const [humanReset, setHumanReset] = useState(0);
   // Depois do cadastro a pessoa já está conectada: a tela "Conta criada" aparece antes de seguir, sem redirecionar de imediato.
   const [created, setCreated] = useState<string | null>(null);
@@ -452,9 +453,9 @@ export function SignupPage() {
             <button
               type="submit"
               className="px-btn px-btn-pri px-btn-lg px-field-wide"
-              disabled={busy || !legal || !legal.ready || (human.required && !human.token)}
+              disabled={busy || !legal || !legal.ready || humanGate(human).blocked}
             >
-              {busy ? 'Criando…' : 'Criar conta'}
+              {busy ? 'Criando…' : humanGate(human).checking ? 'Verificando…' : 'Criar conta'}
             </button>
           </form>
           <div className="px-alt px-alt-row">
@@ -537,7 +538,7 @@ export function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [human, setHuman] = useState<HumanState>({ required: false, token: null });
+  const [human, setHuman] = useState<HumanState>(HUMAN_INITIAL);
   const [humanReset, setHumanReset] = useState(0);
 
   const submit = async (e: FormEvent) => {
@@ -620,9 +621,9 @@ export function ForgotPasswordPage() {
             <button
               type="submit"
               className="px-btn px-btn-pri px-btn-lg"
-              disabled={busy || !email.trim() || (human.required && !human.token)}
+              disabled={busy || !email.trim() || humanGate(human).blocked}
             >
-              {busy ? 'Enviando…' : 'Enviar link'}
+              {busy ? 'Enviando…' : humanGate(human).checking ? 'Verificando…' : 'Enviar link'}
             </button>
           </form>
         </section>
