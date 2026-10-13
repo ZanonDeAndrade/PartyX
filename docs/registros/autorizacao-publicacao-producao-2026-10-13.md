@@ -5,7 +5,7 @@
 | Quem autorizou | Bernardo (PartyX) |
 | Data | 13/10/2026 |
 | Canal | WhatsApp |
-| Como chegou a este registro | Informado pelo responsável da contratada (Arthur) em 13/10/2026. **A mensagem original não está arquivada neste repositório**; guardar a captura ou a exportação da conversa junto aos documentos do contrato |
+| Como chegou a este registro | Informado pelo responsável da contratada (Arthur) em 13/10/2026. **A captura da conversa existe e fica guardada pelo responsável, fora deste repositório**, porque contém número de telefone. Local de guarda: a informar pelo responsável (não foi indicado até o fechamento deste registro) |
 | O que foi autorizado, conforme informado | Publicar em produção a versão validada em homologação, com **cadastro e vendas fechados** |
 | O que **não** está coberto | Abertura de cadastro e de vendas (etapa posterior, separada, com checklist próprio em `checklist-abertura-de-vendas.md`) |
 | Versão | tag `release-2026-10-13`, commit `e9e31e9`, a mesma da revisão `partyx-hml-00012-tqz` validada pelo roteiro 11.2 (21 de 21) em 13/10/2026 |
