@@ -539,7 +539,8 @@ item(11, 'Webhook recebido duas vezes: ingressos não duplicados', async () => {
 item(12, 'E-mail de confirmação recebido com link para os ingressos', async () => {
   if (S.remote) {
     // Homologação: o e-mail real enviado pelo SMTP do serviço, lido na caixa de captura (Ethereal) por IMAP.
-    const m = await waitForMail(buyers.ana.email, /^Compra confirmada/, new Date(Date.now() - 3_600_000));
+    // Fora do local o assunto leva o prefixo do ambiente ("[HOMOLOGAÇÃO] Compra confirmada · …"): sem âncora no início.
+    const m = await waitForMail(buyers.ana.email, /Compra confirmada · /, new Date(Date.now() - 3_600_000));
     const links = mailLinks(m, S.base);
     expect(links.length).toBeGreaterThanOrEqual(1);
     const { page } = await as(buyers.ana);
