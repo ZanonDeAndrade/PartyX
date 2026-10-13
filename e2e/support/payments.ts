@@ -99,11 +99,14 @@ export function payments(state: RoteiroState) {
       }
       const gid = await gatewayId(orderId);
       let status = '';
-      for (let i = 0; i < 60 && status !== 'processed'; i++) {
+      // Local: 3 min. Homologação: 10 min (em 13/10/2026 o ambiente de teste levou 3 min 54 s para aprovar um Pix APRO; a
+      // conciliação do Cloud Tasks emitiu o ingresso sozinha logo depois, antes desta notificação).
+      const tries = state.remote ? 200 : 60;
+      for (let i = 0; i < tries && status !== 'processed'; i++) {
         status = (await mpOrder(gid)).status ?? '';
         if (status !== 'processed') await sleep(3000);
       }
-      expect(status, 'o Mercado Pago (teste) não aprovou o Pix do pagador APRO em 3 min').toBe('processed');
+      expect(status, `o Mercado Pago (teste) não aprovou o Pix do pagador APRO em ${(tries * 3) / 60} min`).toBe('processed');
       const n = notification(gid, 'order.processed');
       expect((await n.send()).status).toBe(200);
       return n;

@@ -13,7 +13,8 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   retries: 0,
-  timeout: 300_000,
+  // Homologação: cada Pix pode esperar até 10 min pela aprovação do Mercado Pago de teste (o item 14 faz mais uma compra).
+  timeout: process.env.E2E_BASE_URL ? 900_000 : 300_000,
   expect: { timeout: 10_000 },
   outputDir: '.run/roteiro/resultados',
   reporter: [['list'], ['json', { outputFile: '.run/roteiro/resultado.json' }]],
