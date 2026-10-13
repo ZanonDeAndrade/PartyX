@@ -41,7 +41,7 @@ describe('mascaramento de logs', () => {
     expect(redactText('cartão 4111 1111 1111 1111 recusado')).toBe('cartão [pan] recusado');
     expect(redactText('pedido 1234567890123 ok')).toBe('pedido 1234567890123 ok'); // 13 dígitos sem Luhn: não é cartão
     expect(redactText('cpf 529.982.247-25 e 52998224725')).toBe('cpf ***.***.***-25 e *******25');
-    expect(redactText('de maria.souza@exemplo.com para x')).toBe('de m***@exemplo.com para x');
+    expect(redactText('de maria.souza@partyx.test para x')).toBe('de m***@partyx.test para x');
     expect(redactText('Authorization: Bearer abcdef1234567890')).toContain('Bearer [token]');
     expect(redactText('postgres://app:SenhaSecreta@host/db')).toBe('postgres://app:[redigido]@host/db');
     expect(redactText('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.abcDEF')).toBe('[jwt]');
@@ -53,7 +53,7 @@ describe('mascaramento de logs', () => {
     const orig = process.stdout.write.bind(process.stdout);
     process.stdout.write = ((chunk: string) => (lines.push(String(chunk)), true)) as typeof process.stdout.write;
     try {
-      logger.info('login de 52998224725 por ana@exemplo.com', { password: 'festa2026', token: 'abc', orderId: 'o1' });
+      logger.info('login de 52998224725 por ana@partyx.test', { password: 'festa2026', token: 'abc', orderId: 'o1' });
     } finally {
       process.stdout.write = orig;
     }

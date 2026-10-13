@@ -14,7 +14,7 @@ await c.connect();
 const { rows } = await c.query(
   `select o.number, o.status, o.payment_method, o.gateway_payment_id as gid, o.created_at
      from orders o join users u on u.id = o.user_id where u.email like $1 order by o.created_at`,
-  [`%.${run}@exemplo.com`],
+  [`%.${run}@partyx.test`],
 );
 await c.end();
 for (const r of rows) {

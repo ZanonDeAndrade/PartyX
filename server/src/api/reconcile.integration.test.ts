@@ -72,7 +72,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
 
   async function user(role: 'cliente' | 'administrador' | 'validador' = 'cliente', target = app) {
     const i = ++n;
-    const email = `${role}${i}@exemplo.com`;
+    const email = `${role}${i}@partyx.test`;
     await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5)', [
       `Pessoa ${i} Teste`,
       email,
@@ -1692,7 +1692,7 @@ describe.skipIf(!ADMIN_URL)('simulador de homologação (gateway fictício atrá
     });
   };
   const login = async (app: ReturnType<typeof appFor>, role: 'cliente' | 'administrador', n: number) => {
-    const email = `${role}${n}@sim.exemplo.com`;
+    const email = `${role}${n}@sim.partyx.test`;
     await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5) on conflict do nothing', [`P ${n}`, email, role === 'cliente' ? String(30000000000 + n) : null, hash, role]);
     const raw = (m: string, p: string, b?: unknown, h: Record<string, string> = {}) =>
       app.request(`/api${p}`, { method: m, headers: { origin: 'http://localhost', 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.9', ...h }, body: b === undefined ? undefined : JSON.stringify(b) });

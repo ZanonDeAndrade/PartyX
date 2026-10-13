@@ -48,7 +48,7 @@ describe.skipIf(!ADMIN_URL)('rotinas de operação (integração)', () => {
     const u = (
       await sql("insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,'cliente') returning id", [
         `Cliente ${++n} Teste`,
-        `c${n}@exemplo.com`,
+        `c${n}@partyx.test`,
         String(60000000000 + n),
         hash,
       ])
@@ -98,7 +98,7 @@ describe.skipIf(!ADMIN_URL)('rotinas de operação (integração)', () => {
       expect(text).toContain('**R$ 6,00**');
       expect(text).toContain('R$ 156,00'); // 150,00 + 6,00
       expect(text).toContain('**Confere.**');
-      expect(text).not.toMatch(/@exemplo\.com/); // sem dado pessoal
+      expect(text).not.toMatch(/@partyx\.test/); // sem dado pessoal
     });
 
     it('sem mensalidade informada, não inventa o valor; pagamento sem estoque é exceção e não entra', async () => {
@@ -157,7 +157,7 @@ describe.skipIf(!ADMIN_URL)('rotinas de operação (integração)', () => {
       expect(r.reservationsActiveButExpired).toBe(1);
       expect(r.attention.length).toBe(9);
       const text = renderWeeklyReview(r);
-      expect(text).not.toMatch(/@exemplo\.com|Cliente \d+ Teste/);
+      expect(text).not.toMatch(/@partyx\.test|Cliente \d+ Teste/);
     });
   });
 
@@ -191,7 +191,7 @@ describe.skipIf(!ADMIN_URL)('rotinas de operação (integração)', () => {
       expect(by('eventos.csv').content).toContain("'=HYPERLINK"); // fórmula neutralizada
       expect(by('ingressos.csv').rows).toBe(2);
       expect(by('pedidos.csv').rows).toBe(1);
-      expect(by('usuarios.csv').content).toContain('@exemplo.com');
+      expect(by('usuarios.csv').content).toContain('@partyx.test');
       // Toda tabela do esquema exportada tem as colunas listadas à mão (nada de select *).
       for (const spec of CLOSURE_SPECS) expect(spec.columns.some(c => /password|hash|token|qr_payload/.test(c.sql) || c.sql === 'code')).toBe(false);
     });

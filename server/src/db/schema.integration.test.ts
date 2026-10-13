@@ -34,7 +34,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
     const i = next();
     const row = {
       name: `Pessoa ${i}`,
-      email: `pessoa${i}@exemplo.com`,
+      email: `pessoa${i}@partyx.test`,
       cpf: String(10_000_000_000 + i),
       password_hash: 'hash',
       role: 'cliente',
@@ -150,9 +150,9 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
 
   describe('usuários', () => {
     it('e-mail é único sem diferenciar maiúsculas e sempre minúsculo', async () => {
-      await user({ email: 'maria@exemplo.com' });
-      await violates(user({ email: 'maria@exemplo.com' }), PG.unique);
-      await violates(user({ email: 'Joana@Exemplo.com' }), PG.check);
+      await user({ email: 'maria@partyx.test' });
+      await violates(user({ email: 'maria@partyx.test' }), PG.unique);
+      await violates(user({ email: 'Joana@PartyX.test' }), PG.check);
     });
 
     it('CPF é único, tem 11 dígitos e é obrigatório para cliente', async () => {

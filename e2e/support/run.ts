@@ -22,9 +22,9 @@ export function roteiroRun(id?: string): RoteiroRun {
   if (!id) {
     return {
       id: null,
-      admin: 'admin@exemplo.com',
-      validador: 'validador@exemplo.com',
-      validador2: 'validador2@exemplo.com',
+      admin: 'admin@partyx.test',
+      validador: 'validador@partyx.test',
+      validador2: 'validador2@partyx.test',
       duda: 'DUDA',
       leo: 'LEO',
       cpfOffset: 0,
@@ -38,9 +38,9 @@ export function roteiroRun(id?: string): RoteiroRun {
   const up = id.toUpperCase();
   return {
     id,
-    admin: `admin.${id}@exemplo.com`,
-    validador: `validador.${id}@exemplo.com`,
-    validador2: `validador2.${id}@exemplo.com`,
+    admin: `admin.${id}@partyx.test`,
+    validador: `validador.${id}@partyx.test`,
+    validador2: `validador2.${id}@partyx.test`,
     duda: `DUDA${up}`,
     leo: `LEO${up}`,
     // Até 800 milhões: cabe nos 9 dígitos-base do cpfFor junto com os números dos compradores (7001 a 7006).

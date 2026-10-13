@@ -16,8 +16,8 @@ WORK = Path(sys.argv[1])
 BASE = 'http://localhost:8099'
 S = json.loads((WORK / 'state-ui.json').read_text())
 EV = S['events']
-LOGINS = {'marina': ('marina@exemplo.com', 'festa2026Forte'), 'admin': ('admin@exemplo.com', 'festa2026'),
-          'validador': ('validador@exemplo.com', 'festa2026')}
+LOGINS = {'marina': ('marina@partyx.test', 'festa2026Forte'), 'admin': ('admin@partyx.test', 'festa2026'),
+          'validador': ('validador@partyx.test', 'festa2026')}
 ROUTES = [
     (None, '/'), (None, '/eventos'), (None, '/eventos/noite-roxa-warehouse'), (None, '/eventos/halloween-ficticio'),
     (None, '/entrar'), (None, '/criar-conta'), (None, '/termos-de-uso'), (None, '/nao-existe'),

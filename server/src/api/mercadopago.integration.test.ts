@@ -187,7 +187,7 @@ describe.skipIf(!ADMIN_URL)('Mercado Pago (API de Orders) de ponta a ponta, com 
 
   async function buyer(target = app, role: 'cliente' | 'administrador' = 'cliente') {
     const i = ++n;
-    const email = `mp${i}@exemplo.com`;
+    const email = `mp${i}@partyx.test`;
     await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5)', [
       `Maria ${i} Fictícia`,
       email,

@@ -38,7 +38,7 @@ TYPE_ID=$(node -e "console.log(require('$WORK/seed.json').typeId)")
 # Mesmo tamanho de pool de conexões de homologação e produção (DB_POOL_MAX=5 nos scripts de deploy).
 (cd "$WORK/server" && exec env -i PATH="$PATH" HOME="$HOME" APP_ENV=local NODE_ENV=production PAYMENT_GATEWAY=mock PORT=$PORT \
   DATABASE_URL="$URL" DATABASE_URL_DIRECT="$URL" DB_POOL_MAX=5 WEB_DIST_DIR="$ROOT/dist" PUBLIC_BASE_URL="http://localhost:$PORT" \
-  TRUSTED_PROXY_HOPS=1 RESERVATION_MINUTES=30 PARTYX_SUPPORT_EMAIL=atendimento@exemplo.com CARGA_MEMORIA_ARQUIVO="$WORK/memoria.txt" \
+  TRUSTED_PROXY_HOPS=1 RESERVATION_MINUTES=30 PARTYX_SUPPORT_EMAIL=atendimento@partyx.test CARGA_MEMORIA_ARQUIVO="$WORK/memoria.txt" \
   node $HEAP_FLAG --import "$ROOT/infra/carga/memoria.mjs" "$ROOT/dist-server/index.js" > "$WORK/server.log" 2>&1) &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null || true; kill $SAMPLER 2>/dev/null || true' EXIT

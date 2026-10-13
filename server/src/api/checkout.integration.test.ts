@@ -28,7 +28,7 @@ describe.skipIf(!ADMIN_URL)('carrinho, reserva e estoque (integração)', () => 
   /** Navegador simulado de um comprador (ou da equipe) com sessão e CSRF. */
   async function buyer(role: 'cliente' | 'validador' | 'administrador' = 'cliente', target = app) {
     const i = ++n;
-    const email = `${role}${i}@exemplo.com`;
+    const email = `${role}${i}@partyx.test`;
     const { rows } = await sql(
       `insert into users (name, email, cpf, password_hash, role) values ($1,$2,$3,$4,$5) returning id`,
       [`Pessoa ${i} Teste`, email, role === 'cliente' ? String(10000000000 + i) : null, hash.value, role],

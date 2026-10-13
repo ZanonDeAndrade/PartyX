@@ -23,7 +23,7 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
   type Role = 'cliente' | 'validador' | 'administrador';
   async function session(role: Role = 'administrador', name?: string) {
     const i = ++n;
-    const email = `${role}${i}@exemplo.com`;
+    const email = `${role}${i}@partyx.test`;
     const id = (
       await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5) returning id', [
         name ?? `Pessoa ${role} ${i}`,
@@ -94,7 +94,7 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
   ) {
     const i = ++n;
     const name = o.buyer?.name ?? 'Marina Costa';
-    const email = o.buyer?.email ?? `comprador${i}@exemplo.com`;
+    const email = o.buyer?.email ?? `comprador${i}@partyx.test`;
     const userId = (
       await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5) returning id', [
         name,
@@ -292,26 +292,26 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
       const a = await event('Evento A');
       const b = await event('Evento B');
       const o1 = await order(a, {
-        buyer: { name: 'Ana Souza', email: 'ana@exemplo.com', cpf: '52998224725' },
+        buyer: { name: 'Ana Souza', email: 'ana@partyx.test', cpf: '52998224725' },
         status: 'pago',
         createdAt: '2026-12-10T12:00:00Z',
         paidAt: '2026-12-10T12:05:00Z',
         coupon: 'JOAO10',
       });
       const o2 = await order(a, {
-        buyer: { name: 'José da Conceição', email: 'jose@exemplo.com' },
+        buyer: { name: 'José da Conceição', email: 'jose@partyx.test' },
         status: 'expirado',
         createdAt: '2026-12-11T12:00:00Z',
       });
       const o3 = await order(b, {
-        buyer: { name: 'Beatriz Lopes', email: 'bia@exemplo.com' },
+        buyer: { name: 'Beatriz Lopes', email: 'bia@partyx.test' },
         status: 'estornado',
         createdAt: '2026-12-12T02:30:00Z',
         paidAt: '2026-12-12T02:35:00Z',
         items: [['Pista', 1]],
       });
       const o4 = await order(b, {
-        buyer: { name: 'Carlos Dias', email: 'carlos@exemplo.com' },
+        buyer: { name: 'Carlos Dias', email: 'carlos@partyx.test' },
         status: 'contestado',
         createdAt: '2026-12-12T13:00:00Z',
         paidAt: '2026-12-12T13:05:00Z',
@@ -377,7 +377,7 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
     it('CPF sempre mascarado, cupom do promoter e contagem de ingressos cancelados', async () => {
       const { adm, o1 } = await seed();
       await sql("update tickets set status = 'cancelado', cancelled_at = now() where id = $1", [o1.tickets[0]!.id]);
-      const r = await json(await adm.get('/admin/orders?q=ana@exemplo'));
+      const r = await json(await adm.get('/admin/orders?q=ana@partyx'));
       const ana = r.orders[0];
       expect(ana.buyer.cpf).toBe('***.982.247-**');
       expect(JSON.stringify(r)).not.toMatch(/52998224725|529\.982/);
@@ -453,7 +453,7 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
       const e = await event('Evento A');
       const other = await event('Evento B');
       const ana = await order(e, {
-        buyer: { name: 'Ana Souza', email: 'ana@exemplo.com', cpf: '52998224725' },
+        buyer: { name: 'Ana Souza', email: 'ana@partyx.test', cpf: '52998224725' },
         items: [
           ['Pista', 2],
           ['VIP', 1],
@@ -485,7 +485,7 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
     it('ingressos emitidos: filtros por situação, tipo e busca, com quem validou e o motivo do cancelamento', async () => {
       const e = await event();
       const o = await order(e, {
-        buyer: { name: 'Marina Costa', email: 'marina@exemplo.com' },
+        buyer: { name: 'Marina Costa', email: 'marina@partyx.test' },
         items: [
           ['Pista', 2],
           ['VIP', 1],
@@ -832,8 +832,8 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
   describe('compradores, ingresso e promoter (ADM09, ADM12, ADM13, ADM15)', () => {
     it('lista de compradores: busca por nome sem acento, e-mail e CPF completo; CPF sempre mascarado', async () => {
       const e = await event();
-      await order(e, { buyer: { name: 'Márcia Lopes', email: 'marcia@exemplo.com', cpf: '52998224725' } });
-      await order(e, { buyer: { name: 'João Pedro', email: 'joao@exemplo.com' } });
+      await order(e, { buyer: { name: 'Márcia Lopes', email: 'marcia@partyx.test', cpf: '52998224725' } });
+      await order(e, { buyer: { name: 'João Pedro', email: 'joao@partyx.test' } });
       const adm = await session();
       const all = await json(await adm.get('/admin/buyers'));
       expect(all.total).toBe(2);
@@ -852,10 +852,10 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
 
     it('detalhe do comprador: dados, pedidos, ingressos e correções (sem os valores antigos); CPF completo só sob demanda, na trilha', async () => {
       const e = await event('Festa Detalhe');
-      const o = await order(e, { buyer: { name: 'Márcia Lopes', email: 'marcia@exemplo.com', cpf: '52998224725' } });
+      const o = await order(e, { buyer: { name: 'Márcia Lopes', email: 'marcia@partyx.test', cpf: '52998224725' } });
       const adm = await session();
       const d = await json(await adm.get(`/admin/buyers/${o.userId}`));
-      expect(d.buyer).toMatchObject({ name: 'Márcia Lopes', email: 'marcia@exemplo.com', cpf: '***.982.247-**' });
+      expect(d.buyer).toMatchObject({ name: 'Márcia Lopes', email: 'marcia@partyx.test', cpf: '***.982.247-**' });
       expect(d.orders).toHaveLength(1);
       expect(d.orders[0]).toMatchObject({ id: o.id, status: 'pago', units: 2, event: { name: 'Festa Detalhe' } });
       expect(d.tickets).toHaveLength(2);
@@ -863,15 +863,15 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
 
       // Correção de e-mail pelo administrador (rota já existente), com motivo: aparece no histórico sem os valores.
       const fix = await adm.raw('PATCH', `/admin/users/${o.userId}/identity`, {
-        email: 'marcia.lopes@exemplo.com',
+        email: 'marcia.lopes@partyx.test',
         reason: 'Pedido da compradora por e-mail',
       });
       expect(fix.status).toBe(200);
       const d2 = await json(await adm.get(`/admin/buyers/${o.userId}`));
-      expect(d2.buyer.email).toBe('marcia.lopes@exemplo.com');
+      expect(d2.buyer.email).toBe('marcia.lopes@partyx.test');
       expect(d2.corrections).toHaveLength(1);
       expect(d2.corrections[0]).toMatchObject({ fields: ['email'], reason: 'Pedido da compradora por e-mail' });
-      expect(JSON.stringify(d2.corrections)).not.toContain('marcia@exemplo.com');
+      expect(JSON.stringify(d2.corrections)).not.toContain('marcia@partyx.test');
 
       const shown = await adm.post(`/admin/buyers/${o.userId}/cpf`);
       expect(await json(shown)).toEqual({ cpf: '52998224725' });

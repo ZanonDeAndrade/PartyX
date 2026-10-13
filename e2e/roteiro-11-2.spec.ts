@@ -34,7 +34,7 @@ const EVID = path.join(ROOT, 'docs/evidencias/roteiro-11-2', S.remote ? 'homolog
 // Identificadores da rodada: no local, os de sempre; em homologação, sufixados (o banco recebe várias rodadas).
 const R = S.run;
 const EVENT = R.eventName;
-const mail = (who: string) => `${who}.roteiro${R.emailTag}@exemplo.com`;
+const mail = (who: string) => `${who}.roteiro${R.emailTag}@partyx.test`;
 // Capturas e PDF ficam em img/, fora do Git (.gitignore): no repositório só as tabelas (CSV) e o resultado.md.
 const IMG = path.join(EVID, 'img');
 mkdirSync(IMG, { recursive: true });

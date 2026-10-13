@@ -5,7 +5,7 @@ const SP = process.argv[2]!;
 const db = await createTestDatabase('postgres://partyx:partyx_test_only@127.0.0.1:55432/postgres');
 const sql = (t: string, p: unknown[] = []) => db.pool.query(t, p);
 const hash = await argon2Hasher.hash('festa2026');
-await sql("insert into users (name,email,password_hash,role,must_change_password) values ('Admin Ficticio','admin@exemplo.com',$1,'administrador',false),('Carlos Portaria','validador@exemplo.com',$1,'validador',false)", [hash]);
+await sql("insert into users (name,email,password_hash,role,must_change_password) values ('Admin Ficticio','admin@partyx.test',$1,'administrador',false),('Carlos Portaria','validador@partyx.test',$1,'validador',false)", [hash]);
 const ev = (await sql(`insert into events (slug,name,starts_at,venue,address,description,age_rating,status) values ('carga-ficticia','[FICTÍCIO] Evento de carga',now() + interval '30 day','Arena de Teste','Rua 1','Descrição fictícia','Livre','publicado') returning id`)).rows[0].id;
 const mk = async (name: string, total: number) => (await sql(`insert into ticket_types (event_id,name,price_cents,quantity_total,sales_start_at,sales_end_at) values ($1,$2,8000,$3,now() - interval '10 day',now() + interval '29 day') returning id`, [ev, name, total])).rows[0].id;
 const pista = await mk('Pista', 100000); const vip = await mk('VIP', 100000);

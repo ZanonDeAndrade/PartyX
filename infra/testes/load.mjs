@@ -18,7 +18,7 @@ async function purchase(i) {
   const c = new Client(); const t = performance.now();
   try {
     const t0 = performance.now(); const lv = (await c.get('/api/legal/versions')).json;
-    const r = await c.post('/api/auth/register', { name: `Carga ${i} Ficticio`, email: `carga${i}-${Date.now()}@exemplo.com`, cpf: (await import('./lib.mjs')).cpfFor(+(process.env.CPF_BASE ?? 50000) + i), phone: '11987654321', password: 'festa2026Forte!', acceptedTermsVersion: lv.terms, acceptedPrivacyVersion: lv.privacy, accept: true });
+    const r = await c.post('/api/auth/register', { name: `Carga ${i} Ficticio`, email: `carga${i}-${Date.now()}@partyx.test`, cpf: (await import('./lib.mjs')).cpfFor(+(process.env.CPF_BASE ?? 50000) + i), phone: '11987654321', password: 'festa2026Forte!', acceptedTermsVersion: lv.terms, acceptedPrivacyVersion: lv.privacy, accept: true });
     rec('compra_1_cadastro', { status: r.status, ms: performance.now() - t0 }); if (r.status !== 201) throw 0;
     c.csrf = (await c.get('/api/auth/me')).json.csrfToken;
     const o = await c.post('/api/orders', { eventSlug: seed.slug, items: [{ ticketTypeId: i % 2 ? seed.pista : seed.vip, quantity: 2 }] }); rec('compra_2_pedido_reserva', o); if (o.status !== 201) throw 0;

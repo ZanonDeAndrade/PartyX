@@ -39,6 +39,20 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ...hml, APP_ENV: 'producao', PUBLIC_HOST_CHECK: 'false' })).toThrow(/PUBLIC_HOST_CHECK/);
   });
 
+  it('EMAIL_ALLOWLIST: só fora de produção; produção recusa subir com ela; itens malformados são recusados sem repetir o valor', () => {
+    const hml = { APP_ENV: 'homologacao', DATABASE_URL: 'postgres://x', SESSION_SECRET: SECRET, QR_HMAC_KEYS: QR };
+    expect(loadConfig(hml).emailAllowlist).toBeNull();
+    expect(loadConfig({ ...hml, EMAIL_ALLOWLIST: 'Ana@Dominio.com, *@equipe.partyx.test' }).emailAllowlist).toEqual([
+      'ana@dominio.com',
+      '*@equipe.partyx.test',
+    ]);
+    expect(() => loadConfig({ ...hml, EMAIL_ALLOWLIST: 'ana@dominio.com,valor-ruim' })).toThrow(/EMAIL_ALLOWLIST: item 2/);
+    expect(() => loadConfig({ ...hml, EMAIL_ALLOWLIST: 'ana@dominio.com,valor-ruim' })).not.toThrow(/valor-ruim/);
+    expect(() =>
+      loadConfig({ ...hml, APP_ENV: 'producao', PUBLIC_BASE_URL: 'https://partyx.example.com', EMAIL_ALLOWLIST: 'ana@dominio.com' }),
+    ).toThrow(/EMAIL_ALLOWLIST: proibida em produção/);
+  });
+
   it('exige DATABASE_URL fora do ambiente local', () => {
     expect(() => loadConfig({ APP_ENV: 'homologacao' })).toThrow(/DATABASE_URL/);
     expect(() => loadConfig({ APP_ENV: 'producao' })).toThrow(/DATABASE_URL/);

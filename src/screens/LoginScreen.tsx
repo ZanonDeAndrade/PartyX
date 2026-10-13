@@ -77,7 +77,7 @@ export function LoginScreen({ vm }: { vm: ViewModel }) {
               autoComplete="email"
               value={vm.au?.email ?? ''}
               onChange={vm.au?.onEmail}
-              placeholder="nome@exemplo.com"
+              placeholder="nome@example.com"
               style={{
                 height: '48px',
                 border: '1px solid #D4D4DE',

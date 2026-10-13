@@ -7,7 +7,8 @@ import { createApp } from '../app';
 import { loadConfig } from '../config';
 import { createDrizzle } from '../db/client';
 import { createTestDatabase } from '../db/testing';
-import { enqueueEmail, handleEmailTask, MAX_ATTEMPTS, processOutbox, type OutboxDeps } from '../mail/outbox';
+import { NOT_ALLOWED_REASON } from '../mail/allowlist';
+import { enqueueEmail, handleEmailTask, listEmails, MAX_ATTEMPTS, processOutbox, type OutboxDeps } from '../mail/outbox';
 import { MemoryTaskQueue } from '../payments/taskQueue';
 import { createFakeClock } from '../providers/clock';
 import { smtpEmailSender, MemoryEmailSender, type EmailSender, type OutgoingEmail } from '../providers/email';
@@ -69,7 +70,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
 
   async function insertUser(role: 'cliente' | 'administrador' = 'cliente', name = 'Marina Costa') {
     const i = ++n;
-    const email = `${role}${i}@exemplo.com`;
+    const email = `${role}${i}@partyx.test`;
     const id = (
       await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5) returning id', [
         name,
@@ -176,6 +177,37 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
       expect((await emails())[0]).toMatchObject({ status: 'enviado', attempts: 1, last_error: null });
     });
 
+    it('lista de homologação (EMAIL_ALLOWLIST): fora da lista não sai e fica registrado, sem alerta; dentro da lista sai', async () => {
+      const dentro = await insertUser();
+      const fora = await insertUser();
+      const sender = new MemoryEmailSender();
+      const d = deps(sender, { EMAIL_ALLOWLIST: `${dentro.email}, *@liberado.partyx.test` });
+      for (const u of [dentro, fora])
+        await enqueueEmail(d.db, clock, { userId: u.id, template: 'cadastro', idempotencyKey: `cadastro:${u.id}` });
+      const err = vi.spyOn(process.stderr, 'write');
+      try {
+        expect(await processOutbox(d)).toMatchObject({ claimed: 2, sent: 1, skipped: 1, failed: 0 });
+        expect(err.mock.calls.map(c => String(c[0])).join('')).not.toContain('"alert"');
+      } finally {
+        err.mockRestore();
+      }
+      expect(sender.sent.map(m => m.to)).toEqual([dentro.email]);
+      const row = async (id: string) =>
+        (await sql('select status, last_error, sent_at from email_log where user_id = $1', [id])).rows[0];
+      expect(await row(dentro.id)).toMatchObject({ status: 'enviado', last_error: null });
+      expect(await row(fora.id)).toMatchObject({ status: 'falhou', last_error: NOT_ALLOWED_REASON, sent_at: null });
+      const listed = (await listEmails(d.db, { status: 'falhou' })).find(e => e.lastError === NOT_ALLOWED_REASON);
+      expect(listed?.note).toBe('não enviado (fora da lista de homologação)');
+      // Nada é reenviado sozinho: a fila não pega o item de novo.
+      clock.advance(24 * 60 * MINUTE);
+      expect(await processOutbox(d)).toMatchObject({ claimed: 0, sent: 0 });
+      // Sem a lista (como em produção), o mesmo destinatário recebe.
+      const semLista = deps(sender);
+      const outro = await insertUser();
+      await enqueueEmail(semLista.db, clock, { userId: outro.id, template: 'cadastro', idempotencyKey: `cadastro:${outro.id}` });
+      expect(await processOutbox(semLista)).toMatchObject({ sent: 1, skipped: 0 });
+    });
+
     it('execuções simultâneas da fila enviam cada item uma única vez', async () => {
       const users = await Promise.all(Array.from({ length: 40 }, () => insertUser()));
       const sender = new MemoryEmailSender();
@@ -274,6 +306,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
         'id',
         'lastError',
         'nextAttemptAt',
+        'note',
         'orderId',
         'sentAt',
         'status',
@@ -610,7 +643,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
         headers: { origin: 'http://localhost', 'content-type': 'application/json' },
         body: JSON.stringify({
           name: 'Marina Costa',
-          email: 'marina@exemplo.com',
+          email: 'marina@partyx.test',
           cpf: '52998224725',
           phone: '55998124470',
           password: PASSWORD,
@@ -625,7 +658,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
       await processOutbox(deps(sender));
       expect(sender.delivered).toHaveLength(1);
       expect(sender.delivered[0]).toMatchObject({
-        to: 'marina@exemplo.com',
+        to: 'marina@partyx.test',
         subject: '[LOCAL] Sua conta PartyX foi criada',
       });
     });
@@ -711,7 +744,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
       const sender = new MemoryEmailSender();
       const app = build(sender);
       const u = await insertUser();
-      const ghost = await forgot(app, 'ninguem@exemplo.com');
+      const ghost = await forgot(app, 'ninguem@partyx.test');
       const real = await forgot(app, u.email);
       expect([ghost.status, real.status]).toEqual([202, 202]);
       expect(await json(ghost)).toEqual(await json(real));
@@ -830,7 +863,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
       });
     const outgoing = (over: Partial<OutgoingEmail> = {}): OutgoingEmail => ({
       template: 'cadastro',
-      to: 'marina@exemplo.com',
+      to: 'marina@partyx.test',
       data: {},
       subject: 'Sua conta PartyX foi criada',
       text: 'Olá em texto',
@@ -845,7 +878,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
       const m = received[0]!;
       expect(m.from?.value[0]).toMatchObject({ name: 'PartyX', address: 'ingressos@partyx.exemplo.test' });
       expect(m.replyTo?.text).toBe('atendimento@partyx.exemplo.test');
-      expect(m.to).toMatchObject({ text: 'marina@exemplo.com' });
+      expect(m.to).toMatchObject({ text: 'marina@partyx.test' });
       expect(m.subject).toBe('Sua conta PartyX foi criada');
       expect(m.text).toContain('Olá em texto');
       expect(m.html).toContain('Olá em HTML');
@@ -867,7 +900,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
     });
 
     it('quebra de linha no assunto ou no destinatário não vira cabeçalho extra', async () => {
-      await sender().send(outgoing({ subject: 'Oi\r\nBcc: mal@mal.test', to: 'marina@exemplo.com' }));
+      await sender().send(outgoing({ subject: 'Oi\r\nBcc: mal@mal.test', to: 'marina@partyx.test' }));
       expect(received[0]!.headers.get('bcc')).toBeUndefined();
       expect(received[0]!.subject).not.toMatch(/[\r\n]/);
     });

@@ -24,11 +24,11 @@ const roxa = 'noite-roxa-warehouse';
 const T = R.types[roxa]!;
 
 const LOGINS: Record<string, [string, string]> = {
-  marina: ['marina@exemplo.com', 'festa2026Forte'],
-  lucas: ['lucas@exemplo.com', 'festa2026Forte'],
-  admin: ['admin@exemplo.com', 'festa2026'],
-  validador: ['validador@exemplo.com', 'festa2026'],
-  primeiro: ['primeiro@exemplo.com', 'festa2026'],
+  marina: ['marina@partyx.test', 'festa2026Forte'],
+  lucas: ['lucas@partyx.test', 'festa2026Forte'],
+  admin: ['admin@partyx.test', 'festa2026'],
+  validador: ['validador@partyx.test', 'festa2026'],
+  primeiro: ['primeiro@partyx.test', 'festa2026'],
 };
 
 type Step = (page: Page) => Promise<unknown>;
@@ -135,20 +135,20 @@ const SCREENS: Screen[] = [
     id: 'A01',
     route: '/entrar',
     state: 'credenciais incorretas',
-    action: seq(fill('E-mail', 'ana@exemplo.com'), fill('Senha', 'senha-errada-1'), click('Entrar', 'button', true)),
+    action: seq(fill('E-mail', 'ana@partyx.test'), fill('Senha', 'senha-errada-1'), click('Entrar', 'button', true)),
   },
   {
     id: 'A01',
     route: '/entrar',
     state: 'bloqueio temporario',
     before: fulfill('**/api/auth/login', { erro: { codigo: 'login_bloqueado', mensagem: 'Muitas tentativas.' } }, 429),
-    action: seq(fill('E-mail', 'marina@exemplo.com'), fill('Senha', 'x'), click('Entrar', 'button', true)),
+    action: seq(fill('E-mail', 'marina@partyx.test'), fill('Senha', 'x'), click('Entrar', 'button', true)),
   },
   {
     id: 'A01',
     route: '/entrar',
     state: 'conta desativada',
-    action: seq(fill('E-mail', 'validador2@exemplo.com'), fill('Senha', 'festa2026'), click('Entrar', 'button', true)),
+    action: seq(fill('E-mail', 'validador2@partyx.test'), fill('Senha', 'festa2026'), click('Entrar', 'button', true)),
   },
   { id: 'A01', route: `/entrar?voltar=/checkout/${roxa}`, state: 'retorno ao checkout' },
   { id: 'A02', route: '/criar-conta', state: 'padrao' },
@@ -159,7 +159,7 @@ const SCREENS: Screen[] = [
     state: 'cpf invalido e email ja cadastrado',
     action: seq(
       fill('Nome completo', 'Teste Fictício'),
-      fill('E-mail', 'marina@exemplo.com'),
+      fill('E-mail', 'marina@partyx.test'),
       fill('CPF', '111.111.111-11'),
       fill('Telefone com DDD', '119'),
       fill('Senha', 'curta'),
@@ -168,7 +168,7 @@ const SCREENS: Screen[] = [
   },
   { id: 'A02', route: `/criar-conta?voltar=/checkout/${roxa}`, state: 'retorno ao checkout' },
   { id: 'A03', route: '/recuperar-senha', state: 'padrao' },
-  { id: 'A04', route: '/recuperar-senha', state: 'confirmacao neutra', action: seq(fill('E-mail', 'alguem@exemplo.com'), click('Enviar link')) },
+  { id: 'A04', route: '/recuperar-senha', state: 'confirmacao neutra', action: seq(fill('E-mail', 'alguem@partyx.test'), click('Enviar link')) },
   { id: 'A05', route: '/redefinir-senha?token=invalido', state: 'link invalido' },
   { id: 'A05', route: '/redefinir-senha?token=x', state: 'link expirado', before: fulfill('**/api/auth/password/check', { estado: 'expirado' }) },
   { id: 'A05', route: '/redefinir-senha?token=x', state: 'link ja utilizado', before: fulfill('**/api/auth/password/check', { estado: 'utilizado' }) },

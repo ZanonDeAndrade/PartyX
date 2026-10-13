@@ -84,12 +84,12 @@ export function authV(app: PartyXLogic, { s, db, route, mob, role, u }: ViewCtx)
         app.login();
       },
       demo: [
-        ['Cliente: Marina', 'marina.costa@exemplo.com', 'demo1234'],
+        ['Cliente: Marina', 'marina.costa@partyx.test', 'demo1234'],
         ['Administrador: Carla', 'carla.menezes@partyx.exemplo', 'demo1234'],
         ['Validador: Rafael', 'rafael.lima@partyx.exemplo', 'demo1234'],
         ['Conta desativada: Bruno', 'bruno.teixeira@partyx.exemplo', 'demo1234'],
         ['Primeiro acesso: Paulo', 'paulo.reis@partyx.exemplo', 'temp1234'],
-        ['Senha errada', 'marina.costa@exemplo.com', 'errada00'],
+        ['Senha errada', 'marina.costa@partyx.test', 'errada00'],
       ].map(([l, e, p]) => ({ label: l, onClick: fill(e, p) })),
     };
   }
@@ -153,7 +153,7 @@ export function authV(app: PartyXLogic, { s, db, route, mob, role, u }: ViewCtx)
       fillOk: () =>
         app.up('reg', {
           name: 'Bianca Moreira',
-          email: 'bianca.moreira@exemplo.com',
+          email: 'bianca.moreira@partyx.test',
           cpf: fmtCPF(cpfFull('987654321')),
           phone: '(55) 99623-1180',
           pw: 'festa2026',
@@ -162,7 +162,7 @@ export function authV(app: PartyXLogic, { s, db, route, mob, role, u }: ViewCtx)
       fillBad: () =>
         app.up('reg', {
           name: 'Bianca Moreira',
-          email: 'bianca.moreira@exemplo.com',
+          email: 'bianca.moreira@partyx.test',
           cpf: '123.456.789-00',
           phone: '(55) 9962',
           pw: 'festa2026',
@@ -171,7 +171,7 @@ export function authV(app: PartyXLogic, { s, db, route, mob, role, u }: ViewCtx)
       fillDup: () =>
         app.up('reg', {
           name: 'Marina Costa',
-          email: 'marina.costa@exemplo.com',
+          email: 'marina.costa@partyx.test',
           cpf: fmtCPF(db.customers[0].cpf),
           phone: '(55) 99812-4470',
           pw: 'festa2026',
@@ -233,7 +233,7 @@ export function authV(app: PartyXLogic, { s, db, route, mob, role, u }: ViewCtx)
         label: 'A05 Definir nova senha',
         eyebrow: '',
         title: 'Criar nova senha',
-        text: 'Escolha uma senha nova para a conta ' + maskEmail(r.email || 'marina.costa@exemplo.com') + '.',
+        text: 'Escolha uma senha nova para a conta ' + maskEmail(r.email || 'marina.costa@partyx.test') + '.',
         pw: r.pw,
         pw2: r.pw2,
         onPw: e => app.up('rec', { pw: e.target.value, err2: {} }),

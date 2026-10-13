@@ -1,3 +1,4 @@
+import { isRecipientAllowed, NOT_ALLOWED_NOTE, NOT_ALLOWED_REASON } from './allowlist';
 import { createHash } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import type { Config } from '../config';
@@ -50,7 +51,7 @@ export interface OutboxDeps {
   db: Db;
   clock: Clock;
   mailer: EmailSender;
-  config: Pick<Config, 'APP_ENV' | 'PUBLIC_BASE_URL' | 'PORT'> & Partial<Pick<Config, 'partyx'>>;
+  config: Pick<Config, 'APP_ENV' | 'PUBLIC_BASE_URL' | 'PORT'> & Partial<Pick<Config, 'partyx' | 'emailAllowlist'>>;
   /** Agenda o reenvio no Cloud Tasks. Ausente (local, testes): só a varredura retoma o item. */
   taskQueue?: TaskQueue;
 }
@@ -259,6 +260,13 @@ export async function processOutbox(
         result.skipped++;
         continue;
       }
+      // Homologação com entrega real: fora da lista, nada sai. Fica registrado, sem alerta e sem erro para quem usa a tela;
+      // o administrador pode reabrir depois de a lista mudar. Em produção a lista é sempre nula.
+      if (deps.config.APP_ENV !== 'producao' && !isRecipientAllowed(deps.config.emailAllowlist, composed.to)) {
+        await deps.db.update(emailLog).set({ status: 'falhou', lastError: NOT_ALLOWED_REASON }).where(eq(emailLog.id, row.id));
+        result.skipped++;
+        continue;
+      }
       const message: OutgoingEmail = {
         template: row.template,
         to: composed.to,
@@ -395,5 +403,6 @@ export async function listEmails(db: Db, filter: { status?: 'pendente' | 'enviad
     .where(filter.status ? eq(emailLog.status, filter.status) : undefined)
     .orderBy(sql`${emailLog.createdAt} desc`)
     .limit(200);
-  return rows;
+  // O estado do banco só tem pendente, enviado e falhou: o item barrado pela lista de homologação sai com a explicação.
+  return rows.map(r => ({ ...r, note: r.lastError === NOT_ALLOWED_REASON ? NOT_ALLOWED_NOTE : null }));
 }

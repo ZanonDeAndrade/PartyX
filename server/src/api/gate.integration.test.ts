@@ -29,7 +29,7 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
     extra: { mustChange?: boolean; cpf?: string; email?: string } = {},
   ) {
     const i = ++n;
-    const email = extra.email ?? `${role}${i}@exemplo.com`;
+    const email = extra.email ?? `${role}${i}@partyx.test`;
     const id = (
       await sql(
         'insert into users (name,email,cpf,password_hash,role,must_change_password) values ($1,$2,$3,$4,$5,$6) returning id',
@@ -826,7 +826,7 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
       for (const bad of [
         b.tickets[0]!.short_code,
         b.tickets[0]!.code,
-        'https://exemplo.com',
+        'https://partyx.test',
         'texto qualquer',
         signQr(config.qr.keys, 1, e.id, newTicketCode()),
       ]) {
@@ -862,11 +862,11 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
   describe('busca manual (RF-52)', () => {
     async function setup() {
       const e = await event();
-      const ana = await buyer(e, { name: 'Ana Souza', cpf: '52998224725', email: 'ana.souza@exemplo.com' });
+      const ana = await buyer(e, { name: 'Ana Souza', cpf: '52998224725', email: 'ana.souza@partyx.test' });
       const jose = await buyer(e, {
         name: 'José da Conceição',
         cpf: '39053344705',
-        email: 'jose@exemplo.com',
+        email: 'jose@partyx.test',
         items: [['Pista', 2]],
       });
       const v = await session();
@@ -897,7 +897,7 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
       expect((await hits(await v.search(e.id, code.toLowerCase().slice(0, 8)))).length).toBeGreaterThanOrEqual(1);
       expect((await hits(await v.search(e.id, '529.982.247-25')))[0].holderName).toBe('Ana Souza');
       expect((await hits(await v.search(e.id, '52998224725')))[0].holderName).toBe('Ana Souza');
-      expect((await hits(await v.search(e.id, 'ANA.SOUZA@exemplo.com')))[0].holderName).toBe('Ana Souza');
+      expect((await hits(await v.search(e.id, 'ANA.SOUZA@partyx.test')))[0].holderName).toBe('Ana Souza');
     });
 
     it('acesso limitado: CPF e e-mail só inteiros; consulta curta ou longa recusada', async () => {
@@ -907,8 +907,8 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
         '529.982',
         '5299822472',
         'ana@',
-        '@exemplo.com',
-        'ana.souza@exemplo',
+        '@partyx.test',
+        'ana.souza@partyx',
         'ab',
         '  ',
         'x'.repeat(101),
@@ -925,13 +925,13 @@ describe.skipIf(!ADMIN_URL)('portaria (integração)', () => {
       const text = JSON.stringify(await json(res));
       expect(text).toContain('***.982.247-**');
       expect(text).toContain('a***');
-      expect(text).not.toMatch(/52998224725|529\.982\.247-25|ana\.souza@exemplo\.com/);
+      expect(text).not.toMatch(/52998224725|529\.982\.247-25|ana\.souza@partyx\.test/);
     });
 
     it('só procura no evento selecionado', async () => {
       const { e, v } = await setup();
       const other = await event('Outro evento');
-      await buyer(other, { name: 'Ana Souza Outra', cpf: '11144477735', email: 'outra@exemplo.com' });
+      await buyer(other, { name: 'Ana Souza Outra', cpf: '11144477735', email: 'outra@partyx.test' });
       expect((await hits(await v.search(e.id, 'Ana'))).map(h => h.holderName)).toEqual(['Ana Souza']);
       expect(await hits(await v.search(e.id, '111.444.777-35'))).toEqual([]);
     });

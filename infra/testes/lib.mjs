@@ -43,7 +43,7 @@ export class Client {
   async signup(i) {
     const lv = (await this.get('/api/legal/versions')).json;
     const r = await this.post('/api/auth/register', {
-      name: `Comprador ${i} Ficticio`, email: `comp${i}-${Date.now()}@exemplo.com`, cpf: cpfFor(i + 1000), phone: '11987654321',
+      name: `Comprador ${i} Ficticio`, email: `comp${i}-${Date.now()}@partyx.test`, cpf: cpfFor(i + 1000), phone: '11987654321',
       password: 'festa2026Forte!', acceptedTermsVersion: lv.terms, acceptedPrivacyVersion: lv.privacy, accept: true,
     });
     if (r.status !== 201) throw new Error('signup ' + r.status + ' ' + JSON.stringify(r.json));

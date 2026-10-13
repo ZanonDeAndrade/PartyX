@@ -40,7 +40,7 @@ const cpf = n => { const d = String(100000000 + n).padStart(9, '0').split('').ma
 async function signup(label, n) {
   const c = new Client();
   const lv = await c.get('/api/legal/versions');
-  const email = `${label}-${Date.now()}@exemplo.com`;
+  const email = `${label}-${Date.now()}@partyx.test`;
   const r = await c.post('/api/auth/register', { name: `Comprador ${label} Ficticio`, email, cpf: cpf(700000 + n + (Date.now() % 100000)), phone: '11987654321', password: 'festa2026Forte!', acceptedTermsVersion: lv.json.terms, acceptedPrivacyVersion: lv.json.privacy, accept: true, captchaToken: CAPTCHA });
   step(`cadastro ${label} (inclui verificação Turnstile na Cloudflare)`, r);
   if (r.status !== 201) throw new Error('cadastro ' + r.status + JSON.stringify(r.json));
@@ -64,11 +64,11 @@ async function fase1() {
   console.log('== negativos do Turnstile e login (sem desafio)');
   const anon = new Client();
   const lv = await anon.get('/api/legal/versions');
-  const body = { name: 'Sem Token Ficticio', email: `semtoken-${Date.now()}@exemplo.com`, cpf: cpf(1), phone: '11987654321', password: 'festa2026Forte!', acceptedTermsVersion: lv.json.terms, acceptedPrivacyVersion: lv.json.privacy, accept: true };
+  const body = { name: 'Sem Token Ficticio', email: `semtoken-${Date.now()}@partyx.test`, cpf: cpf(1), phone: '11987654321', password: 'festa2026Forte!', acceptedTermsVersion: lv.json.terms, acceptedPrivacyVersion: lv.json.privacy, accept: true };
   const r1 = await anon.post('/api/auth/register', body); step('cadastro SEM token: recusado', r1, r1.json?.erro?.codigo);
   const r2 = await anon.post('/api/auth/register', { ...body, captchaToken: 'x'.repeat(2100) }); step('cadastro com token de 2100 caracteres: recusado', r2, r2.json?.erro?.codigo);
-  const r3 = await anon.post('/api/auth/password/forgot', { email: 'ninguem@exemplo.com' }); step('recuperação SEM token: recusada', r3, r3.json?.erro?.codigo);
-  const r4 = await anon.post('/api/auth/password/forgot', { email: 'ninguem@exemplo.com', captchaToken: CAPTCHA }); step('recuperação com token: aceita (resposta igual para conta inexistente)', r4);
+  const r3 = await anon.post('/api/auth/password/forgot', { email: 'ninguem@partyx.test' }); step('recuperação SEM token: recusada', r3, r3.json?.erro?.codigo);
+  const r4 = await anon.post('/api/auth/password/forgot', { email: 'ninguem@partyx.test', captchaToken: CAPTCHA }); step('recuperação com token: aceita (resposta igual para conta inexistente)', r4);
   state.negativos = [r1.json?.erro?.codigo, r2.json?.erro?.codigo, r3.json?.erro?.codigo, r4.status];
 
   console.log('== vitrine, cadastro e checkout');

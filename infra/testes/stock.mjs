@@ -2,7 +2,7 @@ import { Client, seed, cpfFor } from './lib.mjs';
 import { readFileSync } from 'node:fs';
 const cam = readFileSync(process.env.SP + '/cam.id', 'utf8').trim().split('\n')[0].split('|')[0];
 const users = await Promise.all(Array.from({ length: 80 }, async (_, i) => { const c = new Client(); const lv = (await c.get('/api/legal/versions')).json;
-  const r = await c.post('/api/auth/register', { name: `Disputa ${i} Ficticio`, email: `disp${i}-${Date.now()}@exemplo.com`, cpf: cpfFor(400000 + i), phone: '11987654321', password: 'festa2026Forte!', acceptedTermsVersion: lv.terms, acceptedPrivacyVersion: lv.privacy, accept: true });
+  const r = await c.post('/api/auth/register', { name: `Disputa ${i} Ficticio`, email: `disp${i}-${Date.now()}@partyx.test`, cpf: cpfFor(400000 + i), phone: '11987654321', password: 'festa2026Forte!', acceptedTermsVersion: lv.terms, acceptedPrivacyVersion: lv.privacy, accept: true });
   if (r.status !== 201) throw new Error('signup ' + r.status); c.csrf = (await c.get('/api/auth/me')).json.csrfToken; return c; }));
 const res = await Promise.all(users.map(c => c.post('/api/orders', { eventSlug: seed.slug, items: [{ ticketTypeId: cam, quantity: 1 }] })));
 const codes = {}; res.forEach(r => codes[r.status] = (codes[r.status] || 0) + 1);

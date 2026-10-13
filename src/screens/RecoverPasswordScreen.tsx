@@ -46,7 +46,7 @@ export function RecoverPasswordScreen({ vm }: { vm: ViewModel }) {
               type="email"
               value={vm.rc?.email ?? ''}
               onChange={vm.rc?.onEmail}
-              placeholder="nome@exemplo.com"
+              placeholder="nome@example.com"
               style={
                 {
                   height: '48px',

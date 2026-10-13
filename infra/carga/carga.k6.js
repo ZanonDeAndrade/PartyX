@@ -108,7 +108,7 @@ export function compra() {
     console.error(`compra ${n}: ${etapa} ${r.status} ${String(r.body).slice(0, 200)}`);
   };
 
-  const login = http.post(`${BASE}/api/auth/login`, JSON.stringify({ email: `carga${n}${TAG}@exemplo.com`, password: 'festa2026Forte' }), {
+  const login = http.post(`${BASE}/api/auth/login`, JSON.stringify({ email: `carga${n}${TAG}@partyx.test`, password: 'festa2026Forte' }), {
     headers,
     tags: { etapa: 'compra_1_login' },
   });

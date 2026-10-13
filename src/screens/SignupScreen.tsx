@@ -155,7 +155,7 @@ export function SignupScreen({ vm }: { vm: ViewModel }) {
                   autoComplete="email"
                   value={vm.rg?.email ?? ''}
                   onChange={vm.rg?.onEmail}
-                  placeholder="nome@exemplo.com"
+                  placeholder="nome@example.com"
                   style={
                     {
                       height: '48px',

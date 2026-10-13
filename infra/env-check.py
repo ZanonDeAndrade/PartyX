@@ -68,6 +68,8 @@ def main() -> int:
         for name, bad in (('GATEWAY_ENVIRONMENT', 'sandbox'), ('ENABLE_PROTOTYPE', 'true'), ('PUBLIC_HOST_CHECK', 'false')):
             if values.get(name) == bad:
                 problems.append(f'{name}={bad} é proibido em produção')
+    if env == 'producao' and 'EMAIL_ALLOWLIST' in values:
+        problems.append('EMAIL_ALLOWLIST é proibida em produção (lá todos os destinatários recebem)')
     if values.get('TURNSTILE_ENABLED') == 'true' and not values.get('TURNSTILE_SITE_KEY'):
         problems.append('TURNSTILE_ENABLED=true exige TURNSTILE_SITE_KEY')
     from_ = values.get('EMAIL_FROM', '')

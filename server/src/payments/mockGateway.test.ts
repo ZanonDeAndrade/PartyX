@@ -10,7 +10,7 @@ const clock = createFakeClock('2026-10-10T15:00:00Z');
 const pixInput = (over: Record<string, unknown> = {}) => ({
   orderId: 'ped-1',
   amountCents: 16000,
-  payer: { name: 'Ana Teste', email: 'ana@exemplo.com', cpf: '12345678909' },
+  payer: { name: 'Ana Teste', email: 'ana@partyx.test', cpf: '12345678909' },
   description: 'Pedido de teste',
   idempotencyKey: 'order:ped-1:pix',
   expiresAt: new Date('2026-10-10T15:10:00Z'),

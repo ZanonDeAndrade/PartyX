@@ -10,6 +10,8 @@ Padrões de nome por rodada `<r>` (`<R>` em maiúsculas):
 | Carga (`infra/carga/run-carga-hml.sh`) | `carga<i>.<r>@exemplo.com` | | `carga-hml-<r>` (fora da vitrine) | idem |
 | Disparo de alertas (`infra/testes/alertas-hml.sh`) | `alerta.<r>@exemplo.com` | | `alertas-hml-<r>` (fora da vitrine) | idem, mais uma order em dobro e um estorno parcial no Mercado Pago de teste |
 
+A partir da rodada seguinte à `tmv8vl`, os endereços usam `@partyx.test` no lugar de `@exemplo.com` (decisão de 13/10/2026); as rodadas `tmuvkr`, `tmuwx6` e `tmv8vl` ficaram com `@exemplo.com`.
+
 As mensagens também ficam na caixa de captura Ethereal (`smtp-url`), que não entrega a ninguém.
 
 ## Rodadas

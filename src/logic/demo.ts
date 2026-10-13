@@ -79,7 +79,7 @@ export function indexGroups(app: PartyXLogic) {
           'A01',
           'Erro de credenciais',
           J(null, 'A01', {
-            auth: { ...app.state.auth, err: 'cred', returnTo: null, email: 'marina.costa@exemplo.com' },
+            auth: { ...app.state.auth, err: 'cred', returnTo: null, email: 'marina.costa@partyx.test' },
           }),
         ),
         I(
@@ -117,7 +117,7 @@ export function indexGroups(app: PartyXLogic) {
           app.jump(null, 'A02', {
             reg: {
               name: 'Bianca Moreira',
-              email: 'marina.costa@exemplo.com',
+              email: 'marina.costa@partyx.test',
               cpf: '123.456.789-00',
               phone: '(55) 9962',
               pw: 'festa',
@@ -138,7 +138,7 @@ export function indexGroups(app: PartyXLogic) {
         I(
           'A04',
           'Confirmação neutra',
-          J(null, 'A04', { rec: { ...app.state.rec, email: 'marina.costa@exemplo.com' } }),
+          J(null, 'A04', { rec: { ...app.state.rec, email: 'marina.costa@partyx.test' } }),
         ),
         I(
           'A05',
@@ -281,7 +281,7 @@ export function indexGroups(app: PartyXLogic) {
           J('admin', 'ADM13', {
             buyer: 'c1',
             modal: { kind: 'corr', id: 'ADM13 › correção' },
-            corr: { email: 'marina.costa@exemplo.com', cpf: '123.456.789-09', why: '', err: {} },
+            corr: { email: 'marina.costa@partyx.test', cpf: '123.456.789-09', why: '', err: {} },
           }),
         ),
         I('ADM14', 'Ingressos por evento', J('admin', 'ADM14')),

@@ -117,7 +117,7 @@ const qrOf = async (c: Client, ticketId: string) => (await c.get(`/api/tickets/$
 
 // ---------- equipe e banners ----------
 const admin = new Client();
-await admin.login('admin@exemplo.com');
+await admin.login('admin@partyx.test');
 const looks: [string, Parameters<typeof banner>[0], number][] = [
   ['noite-roxa-warehouse', 'roxo', 3],
   ['baile-do-ambar', 'ambar', 9],
@@ -136,13 +136,13 @@ for (const [slug, look, s] of looks) {
 }
 
 // ---------- compradores ----------
-const marina = await buyer('Marina Costa Fictícia', 'marina@exemplo.com');
-const joao = await buyer('João Pereira Fictício', 'joao@exemplo.com');
-const ana = await buyer('Ana Souza Fictícia', 'ana@exemplo.com');
-const bruno = await buyer('Bruno Lima Fictício', 'bruno@exemplo.com');
-const bia = await buyer('Beatriz Rocha Fictícia', 'beatriz@exemplo.com');
-const marina2 = await buyer('Marina Costa Fictícia', 'marina.costa2@exemplo.com'); // homônima (V04)
-await buyer('Lucas Novo Fictício', 'lucas@exemplo.com'); // sem compras (estados vazios)
+const marina = await buyer('Marina Costa Fictícia', 'marina@partyx.test');
+const joao = await buyer('João Pereira Fictício', 'joao@partyx.test');
+const ana = await buyer('Ana Souza Fictícia', 'ana@partyx.test');
+const bruno = await buyer('Bruno Lima Fictício', 'bruno@partyx.test');
+const bia = await buyer('Beatriz Rocha Fictícia', 'beatriz@partyx.test');
+const marina2 = await buyer('Marina Costa Fictícia', 'marina.costa2@partyx.test'); // homônima (V04)
+await buyer('Lucas Novo Fictício', 'lucas@partyx.test'); // sem compras (estados vazios)
 
 const S: Record<string, string> = {};
 // Marina: pedido pago com 3 unidades (válido, utilizado, cancelado), com promoter.
@@ -195,7 +195,7 @@ await pay(bia, S.orderHeld, 'pix');
 
 // ---------- portaria ----------
 const gate = new Client();
-await gate.login('validador@exemplo.com');
+await gate.login('validador@partyx.test');
 const roxa = ev('noite-roxa-warehouse').id;
 must(await gate.post('/api/gate/scan', { eventId: roxa, qr: S.qrUsed }), 'leitura válida');
 for (const t of await ticketsOf(joao, S.orderJoao)) {
@@ -221,7 +221,7 @@ for (const t of ((await joao.get('/api/tickets')).json.tickets as { id: string; 
   fresh.push(await qrOf(joao, t.id));
 
 // ---------- recuperação de senha (e-mail E02) ----------
-must(await new Client().post('/api/auth/password/forgot', { email: 'marina@exemplo.com' }), 'recuperação', [202]);
+must(await new Client().post('/api/auth/password/forgot', { email: 'marina@partyx.test' }), 'recuperação', [202]);
 
 // ---------- datas: Halloween vira evento passado e encerrado ----------
 const pool = new pg.Pool({ connectionString: seed.url });

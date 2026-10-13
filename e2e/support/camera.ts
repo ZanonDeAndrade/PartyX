@@ -73,7 +73,7 @@ export async function scanQr(
     timezoneId: 'America/Sao_Paulo',
   });
   await prepareContext(ctx);
-  await apiLogin(ctx.request, base, opts.email ?? 'validador@exemplo.com', opts.password ?? PASSWORD_TEAM);
+  await apiLogin(ctx.request, base, opts.email ?? 'validador@partyx.test', opts.password ?? PASSWORD_TEAM);
   const page = await ctx.newPage();
   if (opts.before) await opts.before(page);
   await page.goto(`${base}/portaria/${eventId}`);

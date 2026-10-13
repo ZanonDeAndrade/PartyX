@@ -47,7 +47,7 @@ export function buildData(): Database {
   ];
   const customers: Customer[] = names.map((n, i) => {
     const base = norm(n).replace(/\s+/g, '.');
-    const email = i === 4 ? 'pedroh.santos@exemplo.com' : base + '@exemplo.com';
+    const email = i === 4 ? 'pedroh.santos@partyx.test' : base + '@partyx.test';
     const n9 = i === 0 ? '123456789' : String(100000000 + Math.floor(r() * 899999999));
     return {
       id: 'c' + (i + 1),

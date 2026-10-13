@@ -34,12 +34,12 @@ done_ids: set[str] = set()
 
 PASS = {'admin': 'festa2026', 'validador': 'festa2026', 'primeiro': 'festa2026'}
 LOGINS = {
-    'marina': ('marina@exemplo.com', 'festa2026Forte'),
-    'lucas': ('lucas@exemplo.com', 'festa2026Forte'),
-    'joao': ('joao@exemplo.com', 'festa2026Forte'),
-    'admin': ('admin@exemplo.com', 'festa2026'),
-    'validador': ('validador@exemplo.com', 'festa2026'),
-    'primeiro': ('primeiro@exemplo.com', 'festa2026'),
+    'marina': ('marina@partyx.test', 'festa2026Forte'),
+    'lucas': ('lucas@partyx.test', 'festa2026Forte'),
+    'joao': ('joao@partyx.test', 'festa2026Forte'),
+    'admin': ('admin@partyx.test', 'festa2026'),
+    'validador': ('validador@partyx.test', 'festa2026'),
+    'primeiro': ('primeiro@partyx.test', 'festa2026'),
 }
 # Sem a abertura em vídeo nas capturas comuns (ela tem captura própria).
 NO_INTRO = "try { sessionStorage.setItem('partyx_intro_seen', '1') } catch (e) {}"
@@ -207,23 +207,23 @@ SCREENS = [
     # ----- acesso -----
     ('A01', '/entrar', 'padrao', None, None, None),
     ('A01', '/entrar', 'credenciais incorretas', None, None,
-     seq(fill('E-mail', 'ana@exemplo.com'), fill('Senha', 'senha-errada-1'), click('Entrar', exact=True))),
+     seq(fill('E-mail', 'ana@partyx.test'), fill('Senha', 'senha-errada-1'), click('Entrar', exact=True))),
     ('A01', '/entrar', 'bloqueio temporario', None,
      lambda p: p.route('**/api/auth/login', lambda r: r.fulfill(status=429, content_type='application/json', body=json.dumps(
          {'erro': {'codigo': 'login_bloqueado', 'mensagem': 'Muitas tentativas.'}}))),
-     seq(fill('E-mail', 'marina@exemplo.com'), fill('Senha', 'x'), click('Entrar', exact=True))),
+     seq(fill('E-mail', 'marina@partyx.test'), fill('Senha', 'x'), click('Entrar', exact=True))),
     ('A01', '/entrar', 'conta desativada', None, None,
-     seq(fill('E-mail', 'validador2@exemplo.com'), fill('Senha', 'festa2026'), click('Entrar', exact=True))),
+     seq(fill('E-mail', 'validador2@partyx.test'), fill('Senha', 'festa2026'), click('Entrar', exact=True))),
     ('A01', f'/entrar?voltar=/checkout/{roxa}', 'retorno ao checkout', None, None, None),
     ('A02', '/criar-conta', 'padrao', None, None, None),
     ('A02', '/criar-conta', 'campos incompletos', None, None, click('Criar conta', exact=True)),
     ('A02', '/criar-conta', 'cpf invalido e email ja cadastrado', None, None,
-     seq(fill('Nome completo', 'Teste Fictício'), fill('E-mail', 'marina@exemplo.com'), fill('CPF', '111.111.111-11'),
+     seq(fill('Nome completo', 'Teste Fictício'), fill('E-mail', 'marina@partyx.test'), fill('CPF', '111.111.111-11'),
          fill('Telefone com DDD', '119'), fill('Senha', 'curta'), click('Criar conta', exact=True))),
     ('A02', f'/criar-conta?voltar=/checkout/{roxa}', 'retorno ao checkout', None, None, None),
     ('A03', '/recuperar-senha', 'padrao', None, None, None),
     ('A04', '/recuperar-senha', 'confirmacao neutra', None, None,
-     seq(fill('E-mail', 'alguem@exemplo.com'), click('Enviar link'))),
+     seq(fill('E-mail', 'alguem@partyx.test'), click('Enviar link'))),
     ('A05', '/redefinir-senha?token=invalido', 'link invalido', None, None, None),
     ('A05', '/redefinir-senha?token=x', 'link expirado', None,
      fulfill('**/api/auth/password/check', {'estado': 'expirado'}), None),

@@ -24,7 +24,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
   let mailer: MemoryEmailSender;
 
   const config = (extra: Record<string, string> = {}): Config =>
-    loadConfig({ APP_ENV: 'local', PUBLIC_BASE_URL: 'https://homolog.exemplo.com', ...extra });
+    loadConfig({ APP_ENV: 'local', PUBLIC_BASE_URL: 'https://homolog.partyx.test', ...extra });
 
   /** Monta a API contra o banco de teste. */
   const build = (opts: { cfg?: Config; mail?: EmailSender; human?: HumanVerifier } = {}) => {
@@ -81,7 +81,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
     const i = ++n;
     return {
       name: 'Marina Costa',
-      email: `marina${i}@exemplo.com`,
+      email: `marina${i}@partyx.test`,
       cpf: CPF_A,
       phone: '(55) 99812-4470',
       password: 'festa2026',
@@ -341,7 +341,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       const p = await signup();
       const wrongPassword = await browser().call('POST', '/auth/login', { email: p.email, password: 'errada123' });
       const unknown = await browser().call('POST', '/auth/login', {
-        email: 'ninguem@exemplo.com',
+        email: 'ninguem@partyx.test',
         password: 'errada123',
       });
       expect(wrongPassword.status).toBe(401);
@@ -380,7 +380,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
 
     it('o bloqueio de um e-mail não afeta outro', async () => {
       const p = await signup();
-      const q = await signup({ email: 'outra@exemplo.com' });
+      const q = await signup({ email: 'outra@partyx.test' });
       for (let i = 0; i < 5; i++)
         await browser().call('POST', '/auth/login', { email: p.email, password: 'errada123' });
       expect((await browser().call('POST', '/auth/login', { email: q.email, password: q.password })).status).toBe(200);
@@ -504,7 +504,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
         'POST',
         '/auth/login',
         { email: 'a@b.com', password: 'x' },
-        { origin: 'https://homolog.exemplo.com' },
+        { origin: 'https://homolog.partyx.test' },
       );
       expect(res.status).toBe(401); // chegou à autenticação
     });
@@ -529,7 +529,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
     it('resposta idêntica para e-mail existente e inexistente; só o existente recebe o link (CA-04)', async () => {
       const { p } = await registered();
       const known = await browser().call('POST', '/auth/password/forgot', { email: p.email });
-      const unknown = await browser().call('POST', '/auth/password/forgot', { email: 'ninguem@exemplo.com' });
+      const unknown = await browser().call('POST', '/auth/password/forgot', { email: 'ninguem@partyx.test' });
       expect(known.status).toBe(202);
       expect(unknown.status).toBe(202);
       expect(await known.json()).toEqual(await unknown.json());
@@ -762,7 +762,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
           (
             await call(
               '/auth/password/forgot',
-              { email: 'ninguem@exemplo.com', captchaToken: `bom-${i}` },
+              { email: 'ninguem@partyx.test', captchaToken: `bom-${i}` },
               '203.0.113.99',
             )
           ).status,
@@ -844,7 +844,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
     it('cadastro: tentativa INVÁLIDA não gasta o limite (CPF repetido, senha fraca, sem aceite), então lixo em massa não bloqueia quem se cadastra de verdade', async () => {
       expect((await signup(1)).status).toBe(201);
       for (let k = 0; k < 15; k++) {
-        const dup = await signup(1, `192.0.2.${k + 1}`, { email: `outro${k}@exemplo.com` }); // CPF já cadastrado
+        const dup = await signup(1, `192.0.2.${k + 1}`, { email: `outro${k}@partyx.test` }); // CPF já cadastrado
         expect(dup.status).toBe(422);
       }
       expect((await signup(2, '192.0.2.200', { password: '123' })).status).toBe(422);
@@ -866,13 +866,13 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       const real = person();
       expect((await signup(1, '198.51.100.1', { email: real.email })).status).toBe(201);
       const first = await post('/auth/password/forgot', { email: real.email }, '10.0.0.1');
-      const unknown = await post('/auth/password/forgot', { email: 'ninguem@exemplo.com' }, '10.0.0.2');
+      const unknown = await post('/auth/password/forgot', { email: 'ninguem@partyx.test' }, '10.0.0.2');
       expect([first.status, unknown.status]).toEqual([202, 202]);
       expect(await first.json()).toEqual(await unknown.json());
       for (let i = 3; i <= 5; i++)
-        expect((await post('/auth/password/forgot', { email: `x${i}@exemplo.com` }, `10.0.0.${i}`)).status).toBe(202);
+        expect((await post('/auth/password/forgot', { email: `x${i}@partyx.test` }, `10.0.0.${i}`)).status).toBe(202);
       const over = await post('/auth/password/forgot', { email: real.email }, '10.0.0.99');
-      const overUnknown = await post('/auth/password/forgot', { email: 'ninguem@exemplo.com' }, '10.0.0.98');
+      const overUnknown = await post('/auth/password/forgot', { email: 'ninguem@partyx.test' }, '10.0.0.98');
       expect([over.status, overUnknown.status]).toEqual([429, 429]); // existir ou não a conta não muda nada
       expect((await errorOf(over)).codigo).toBe('limite_global');
       clock.advance(61 * 60_000);
@@ -905,14 +905,14 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       try {
         for (let i = 1; i <= 3; i++) await signup(i);
         for (let i = 4; i <= 14; i++) await signup(i, `203.0.113.${i}`);
-        for (let i = 1; i <= 5; i++) await post('/auth/password/forgot', { email: `y${i}@exemplo.com` }, `10.2.0.${i}`);
+        for (let i = 1; i <= 5; i++) await post('/auth/password/forgot', { email: `y${i}@partyx.test` }, `10.2.0.${i}`);
         for (let i = 6; i <= 20; i++)
-          await post('/auth/password/forgot', { email: `y${i}@exemplo.com` }, `10.2.0.${i}`);
+          await post('/auth/password/forgot', { email: `y${i}@partyx.test` }, `10.2.0.${i}`);
         const lines = a.alerts();
         expect(lines).toHaveLength(2); // um de cadastro e um de recuperação, apesar de dezenas de recusas
         expect(lines.some(l => l.includes('"kind":"cadastro"') && l.includes('"limitPerHour":3'))).toBe(true);
         expect(lines.some(l => l.includes('"kind":"recuperacao"') && l.includes('"limitPerHour":5'))).toBe(true);
-        expect(lines.join('')).not.toMatch(/@exemplo\.com|marina|\d{11}/);
+        expect(lines.join('')).not.toMatch(/@partyx\.test|marina|\d{11}/);
       } finally {
         a.spy.mockRestore();
       }
@@ -924,7 +924,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       const html = await limited.request('/');
       expect(html.headers.get('content-security-policy') ?? '').not.toContain('cloudflare');
       expect((await signup(1)).status).toBe(201); // sem captchaToken
-      expect((await post('/auth/password/forgot', { email: 'ninguem@exemplo.com' }, '10.3.0.1')).status).toBe(202);
+      expect((await post('/auth/password/forgot', { email: 'ninguem@partyx.test' }, '10.3.0.1')).status).toBe(202);
     });
   });
 
@@ -937,7 +937,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       const res = await b.secured('PATCH', '/me', {
         name: 'Marina C. Souza',
         phone: '(55) 3333-4444',
-        email: 'outro@exemplo.com',
+        email: 'outro@partyx.test',
         cpf: CPF_B,
       });
       expect(res.status).toBe(200);

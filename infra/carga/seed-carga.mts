@@ -66,7 +66,7 @@ for (let i = 0; i < BUYERS; i++)
   await q(
     `insert into users (name, email, password_hash, role, is_active, must_change_password, phone, cpf)
      values ($1, $2, $3, 'cliente', true, false, '(11) 98765-4321', $4)`,
-    [`${REMOTE ? 'APRO ' : ''}Comprador Carga ${i} Fictício`, `carga${i}${tag}@exemplo.com`, hash, cpf(i)],
+    [`${REMOTE ? 'APRO ' : ''}Comprador Carga ${i} Fictício`, `carga${i}${tag}@partyx.test`, hash, cpf(i)],
   );
 
 writeFileSync(OUT, JSON.stringify({ url, eventId: event, slug, typeId: type, capacity: CAPACITY, buyers: BUYERS, tag }));

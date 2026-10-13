@@ -59,7 +59,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
     extra: { mustChange?: boolean; active?: boolean } = {},
   ) {
     const i = ++n;
-    const email = `${role}${i}@exemplo.com`;
+    const email = `${role}${i}@partyx.test`;
     const cpf = role === 'cliente' ? validCpf(i) : null;
     const { rows } = await sql(
       `insert into users (name, email, cpf, phone, password_hash, role, is_active, must_change_password)
@@ -98,7 +98,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
   const errorCode = async (res: Response) => ((await res.json()) as { erro: { codigo: string } }).erro.codigo;
   const newMember = (o: Record<string, unknown> = {}) => ({
     name: 'Carlos Portaria',
-    email: `equipe${++n}@exemplo.com`,
+    email: `equipe${++n}@partyx.test`,
     role: 'validador',
     ...o,
   });
@@ -217,7 +217,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
     it('ignora role e isActive enviados no cadastro e cria sempre cliente', async () => {
       const res = await browser().call('POST', '/auth/register', {
         name: 'Marina Costa',
-        email: 'marina@exemplo.com',
+        email: 'marina@partyx.test',
         cpf: validCpf(901),
         phone: '(55) 99812-4470',
         password: PASSWORD,
@@ -229,7 +229,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
         mustChangePassword: false,
       });
       expect(res.status).toBe(201);
-      const { rows } = await sql("select role from users where email = 'marina@exemplo.com'");
+      const { rows } = await sql("select role from users where email = 'marina@partyx.test'");
       expect(rows[0].role).toBe('cliente');
     });
 
@@ -420,7 +420,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
         ['PATCH', `/admin/team/${staff.id}`, { role: 'administrador' }],
         ['POST', `/admin/team/${staff.id}/activate`, undefined],
         ['POST', `/admin/team/${staff.id}/temporary-password`, undefined],
-        ['PATCH', `/admin/users/${staff.id}/identity`, { email: 'novo@exemplo.com', reason: 'teste de acesso' }],
+        ['PATCH', `/admin/users/${staff.id}/identity`, { email: 'novo@partyx.test', reason: 'teste de acesso' }],
       ];
       for (const [m, p, body] of attempts) expect((await staff.b.send(m, p, body ?? {})).status, `${m} ${p}`).toBe(403);
       expect((await sql('select role from users where id = $1', [staff.id])).rows[0].role).toBe('validador');
@@ -508,12 +508,12 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
       const a = await loggedIn('administrador');
       const client = await loggedIn('cliente');
       const res = await a.b.send('PATCH', `/admin/users/${client.id}/identity`, {
-        email: 'Correto@Exemplo.com',
+        email: 'Correto@PartyX.test',
         reason: 'Erro de digitação no cadastro',
       });
       expect(res.status).toBe(200);
       expect((await sql('select email from users where id = $1', [client.id])).rows[0].email).toBe(
-        'correto@exemplo.com',
+        'correto@partyx.test',
       );
       expect((await client.b.call('GET', '/auth/me')).status).toBe(401);
       const { rows } = await sql(
@@ -521,7 +521,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
       );
       expect(rows[0].reason).toBe('Erro de digitação no cadastro');
       expect(rows[0].before_json.email).toBe(client.email);
-      expect(rows[0].after_json.email).toBe('correto@exemplo.com');
+      expect(rows[0].after_json.email).toBe('correto@partyx.test');
     });
 
     it('exige motivo, CPF válido e não repetido, e não apaga o CPF do cliente', async () => {
@@ -530,7 +530,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
       const c2 = await seed('cliente');
       const cpf2 = (await sql('select cpf from users where id = $1', [c2.id])).rows[0].cpf as string;
       const call = (body: unknown) => a.b.send('PATCH', `/admin/users/${c1.id}/identity`, body);
-      expect((await call({ email: 'x@exemplo.com', reason: '' })).status).toBe(422);
+      expect((await call({ email: 'x@partyx.test', reason: '' })).status).toBe(422);
       expect((await call({ reason: 'motivo válido' })).status).toBe(422);
       expect((await call({ cpf: '12345678900', reason: 'motivo válido' })).status).toBe(422);
       expect((await call({ cpf: cpf2, reason: 'motivo válido' })).status).toBe(422);
@@ -541,7 +541,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
 
   describe('primeiro administrador (bootstrap)', () => {
     const deps = () => ({ db: createDrizzle(testDb.pool), hasher: argon2Hasher, clock });
-    const input = { name: 'Admin Inicial', email: 'Admin@Exemplo.com' };
+    const input = { name: 'Admin Inicial', email: 'Admin@PartyX.test' };
 
     it('cria com senha aleatória, exige troca e é idempotente', async () => {
       const first = await bootstrapFirstAdmin(deps(), input);
@@ -551,21 +551,21 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
       expect(first.temporaryPassword.length).toBeGreaterThanOrEqual(12);
 
       const row = (await sql('select role, must_change_password, email from users')).rows[0];
-      expect(row).toMatchObject({ role: 'administrador', must_change_password: true, email: 'admin@exemplo.com' });
+      expect(row).toMatchObject({ role: 'administrador', must_change_password: true, email: 'admin@partyx.test' });
 
       expect((await bootstrapFirstAdmin(deps(), input)).status).toBe('ja_existe');
-      expect((await bootstrapFirstAdmin(deps(), { ...input, email: 'outro@exemplo.com' })).status).toBe('ja_existe');
+      expect((await bootstrapFirstAdmin(deps(), { ...input, email: 'outro@partyx.test' })).status).toBe('ja_existe');
       expect((await sql('select count(*)::int as n from users')).rows[0].n).toBe(1);
 
       // O administrador criado consegue entrar com a senha gerada.
       const b = browser();
-      expect((await b.login('admin@exemplo.com', first.temporaryPassword)).status).toBe(200);
+      expect((await b.login('admin@partyx.test', first.temporaryPassword)).status).toBe(200);
     });
 
     it('duas execuções simultâneas criam um só administrador', async () => {
       const results = await Promise.all(
         Array.from({ length: 5 }, (_, i) =>
-          bootstrapFirstAdmin(deps(), { name: 'Admin Inicial', email: `admin${i}@exemplo.com` }),
+          bootstrapFirstAdmin(deps(), { name: 'Admin Inicial', email: `admin${i}@partyx.test` }),
         ),
       );
       expect(results.filter(r => r.status === 'criado')).toHaveLength(1);
@@ -581,7 +581,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
 
       const ok = await bootstrapFirstAdmin(deps(), { ...input, password: 'segredo-do-cofre-1' });
       expect(ok).toMatchObject({ status: 'criado', passwordGenerated: false });
-      expect((await browser().login('admin@exemplo.com', 'segredo-do-cofre-1')).status).toBe(200);
+      expect((await browser().login('admin@partyx.test', 'segredo-do-cofre-1')).status).toBe(200);
     });
 
     it('se o administrador existente está desativado, ainda assim não cria outro', async () => {

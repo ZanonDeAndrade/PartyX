@@ -228,7 +228,7 @@ export function LoginPage() {
               onChange={setEmail}
               autoComplete="email"
               inputMode="email"
-              placeholder="nome@exemplo.com"
+              placeholder="nome@example.com"
             />
             <PasswordField
               id="senha"
@@ -388,7 +388,7 @@ export function SignupPage() {
               error={errors.email}
               autoComplete="email"
               inputMode="email"
-              placeholder="nome@exemplo.com"
+              placeholder="nome@example.com"
             />
             <Field
               id="cpf"
@@ -610,7 +610,7 @@ export function ForgotPasswordPage() {
               onChange={setEmail}
               autoComplete="email"
               inputMode="email"
-              placeholder="nome@exemplo.com"
+              placeholder="nome@example.com"
             />
             {error ? (
               <p className="px-notice px-notice-err" role="alert">

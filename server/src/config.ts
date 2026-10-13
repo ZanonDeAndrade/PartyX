@@ -1,3 +1,4 @@
+import { invalidAllowlistItems, parseEmailAllowlist } from './mail/allowlist';
 import { createHmac } from 'node:crypto';
 import { z } from 'zod';
 import { parseQrKeys, type QrKeys } from './domain/ticketCode';
@@ -224,6 +225,11 @@ const schema = z
     EMAIL_FROM: z.string().min(3).optional(),
     /** Endereço de resposta. Vazio: usa PARTYX_SUPPORT_EMAIL, para a resposta do comprador chegar ao atendimento da PartyX. */
     EMAIL_REPLY_TO: z.string().min(3).optional(),
+    /**
+     * Só homologação: destinatários que podem receber e-mail de verdade (endereços exatos e `*@dominio`, separados por vírgula). Fora da
+     * lista, a mensagem fica no `email_log` como não enviada. Proibida em produção, onde todos recebem (`server/src/mail/allowlist.ts`).
+     */
+    EMAIL_ALLOWLIST: z.string().max(2000).optional(),
     /** Quantos proxies confiáveis existem na frente da API (Cloud Run direto: 1). Define qual IP do X-Forwarded-For vale. */
     TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
   })
@@ -328,6 +334,15 @@ const schema = z
         if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: 'obrigatória com TURNSTILE_ENABLED=true' });
       }
     }
+    if (env.EMAIL_ALLOWLIST !== undefined) {
+      if (env.APP_ENV === 'producao') {
+        ctx.addIssue({ code: 'custom', path: ['EMAIL_ALLOWLIST'], message: 'proibida em produção: lá todos os destinatários recebem' });
+      }
+      const bad = invalidAllowlistItems(env.EMAIL_ALLOWLIST);
+      if (bad.length > 0) {
+        ctx.addIssue({ code: 'custom', path: ['EMAIL_ALLOWLIST'], message: `item ${bad.join(', ')} inválido (use endereco@dominio ou *@dominio)` });
+      }
+    }
     if (env.SMTP_URL && !env.EMAIL_FROM) {
       ctx.addIssue({ code: 'custom', path: ['EMAIL_FROM'], message: 'obrigatório quando SMTP_URL está definido' });
     }
@@ -389,6 +404,7 @@ export type Config = Omit<
   | 'SIGNUP_OPEN'
   | 'MAINTENANCE_MODE'
   | 'PUBLIC_HOST_CHECK'
+  | 'EMAIL_ALLOWLIST'
 > & {
   /** Chaves de assinatura dos QR por versão, e a versão usada nos ingressos novos. */
   qr: { keys: QrKeys; currentVersion: number };
@@ -421,6 +437,8 @@ export type Config = Omit<
   maintenance: boolean;
   /** Barreira de Host ligada: sempre em produção; em homologação só com `PUBLIC_HOST_CHECK=true`. */
   publicHostCheck: boolean;
+  /** Destinatários que recebem e-mail fora de produção (`EMAIL_ALLOWLIST`). Nulo: sem restrição (sempre nulo em produção). */
+  emailAllowlist: string[] | null;
 };
 
 export interface PartyxPublicInfo {
@@ -494,6 +512,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     SIGNUP_OPEN,
     MAINTENANCE_MODE,
     PUBLIC_HOST_CHECK,
+    EMAIL_ALLOWLIST,
     ...rest
   } = raw;
   const salesOpen = SALES_OPEN ? SALES_OPEN === 'true' : raw.APP_ENV !== 'producao';
@@ -553,5 +572,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     signupOpen: SIGNUP_OPEN ? SIGNUP_OPEN === 'true' : raw.APP_ENV !== 'producao',
     maintenance: MAINTENANCE_MODE === 'true',
     publicHostCheck: raw.APP_ENV === 'producao' || PUBLIC_HOST_CHECK === 'true',
+    emailAllowlist: EMAIL_ALLOWLIST === undefined ? null : parseEmailAllowlist(EMAIL_ALLOWLIST),
   };
 }

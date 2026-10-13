@@ -27,7 +27,7 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
   type Role = 'cliente' | 'validador' | 'administrador';
   async function session(role: Role = 'administrador', name?: string) {
     const i = ++n;
-    const email = `${role}${i}@exemplo.com`;
+    const email = `${role}${i}@partyx.test`;
     await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5)', [
       name ?? `Pessoa ${role} ${i}`,
       email,
@@ -96,7 +96,7 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
     const userId = (
       await sql("insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,'cliente') returning id", [
         `Comprador ${i}`,
-        `comprador${i}@exemplo.com`,
+        `comprador${i}@partyx.test`,
         String(90000000000 + i),
         hash,
       ])

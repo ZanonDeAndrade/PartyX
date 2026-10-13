@@ -217,7 +217,7 @@ const jsonResponse = (status: number, body: unknown) =>
 
 describe('Mercado Pago: adaptador (HTTP)', () => {
   const clock = createFakeClock('2026-10-10T15:00:00Z');
-  const payer = { name: 'Maria Fictícia Souza', email: 'maria@exemplo.com', cpf: '12345678909' };
+  const payer = { name: 'Maria Fictícia Souza', email: 'maria@partyx.test', cpf: '12345678909' };
   const make = (responses: (Response | Error)[], liveMode = false) => {
     const f = fakeFetch(responses);
     const gateway = createMercadoPagoGateway({
@@ -277,7 +277,7 @@ describe('Mercado Pago: adaptador (HTTP)', () => {
   it('produção: o e-mail do pagador é o do comprador (no teste, o da documentação)', async () => {
     const { gateway, calls } = make([jsonResponse(201, fixture('order-cartao-aprovado.json'))], true);
     await gateway.createCard(card);
-    expect(calls[0]!.body.payer.email).toBe('maria@exemplo.com');
+    expect(calls[0]!.body.payer.email).toBe('maria@partyx.test');
   });
 
   it('cartão recusado (HTTP 402 com a order em data): vira cobrança recusada, sem erro', async () => {

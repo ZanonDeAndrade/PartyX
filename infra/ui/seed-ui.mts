@@ -24,10 +24,10 @@ const user = async (name: string, email: string, role: string, extra: { active?:
     )
   ).rows[0].id as string;
 
-await user('Carla Menezes Fictícia', 'admin@exemplo.com', 'administrador');
-await user('Rafael Lima Fictício', 'validador@exemplo.com', 'validador');
-await user('Otávio Portaria Fictício', 'validador2@exemplo.com', 'validador', { active: false });
-await user('Paulo Reis Fictício', 'primeiro@exemplo.com', 'validador', { temp: true });
+await user('Carla Menezes Fictícia', 'admin@partyx.test', 'administrador');
+await user('Rafael Lima Fictício', 'validador@partyx.test', 'validador');
+await user('Otávio Portaria Fictício', 'validador2@partyx.test', 'validador', { active: false });
+await user('Paulo Reis Fictício', 'primeiro@partyx.test', 'validador', { temp: true });
 
 for (const [name, code, active] of [
   ['Duda Martins Fictícia', 'DUDA', true],

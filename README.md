@@ -50,7 +50,7 @@ Senha de todas: `demo1234`.
 
 | Perfil | E-mail |
 | --- | --- |
-| Cliente | `marina.costa@exemplo.com` |
+| Cliente | `marina.costa@partyx.test` |
 | Administrador | `carla.menezes@partyx.exemplo` |
 | Validador | `rafael.lima@partyx.exemplo` |
 | Primeiro acesso | `paulo.reis@partyx.exemplo` (senha `temp1234`) |

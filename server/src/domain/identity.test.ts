@@ -33,7 +33,7 @@ describe('CPF', () => {
 
 describe('identidade', () => {
   it('normaliza e-mail para minúsculas sem espaços', () => {
-    expect(normalizeEmail('  Maria.Silva@Exemplo.COM ')).toBe('maria.silva@exemplo.com');
+    expect(normalizeEmail('  Maria.Silva@PartyX.TEST ')).toBe('maria.silva@partyx.test');
   });
 
   it('valida formato de e-mail', () => {

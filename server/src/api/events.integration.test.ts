@@ -35,7 +35,7 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
   /** Navegador simulado com sessão e CSRF. */
   async function session(role: 'administrador' | 'validador' | 'cliente' = 'administrador') {
     const i = ++n;
-    const email = `${role}${i}@exemplo.com`;
+    const email = `${role}${i}@partyx.test`;
     await sql(`insert into users (name, email, cpf, password_hash, role) values ($1,$2,$3,$4,$5)`, [
       `Pessoa ${i} Teste`,
       email,

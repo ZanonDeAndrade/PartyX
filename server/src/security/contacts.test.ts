@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
  * formulário e documentação (domínios reservados para exemplo, placeholder do gateway de teste).
  */
 const ROOTS = ['src/site', 'server/src', 'public', 'index.html', 'infra/producao/hosting-public'];
-const ALLOWED_EMAIL_DOMAINS = new Set(['exemplo.com', 'exemplo.test', 'example.com', 'testuser.com']);
+const ALLOWED_EMAIL_DOMAINS = new Set(['partyx.test', 'exemplo.test', 'example.com', 'testuser.com']);
 const ALLOWED_PHONES = new Set(['(11) 98765-4321', '+55 11 91234-5678']);
 
 function files(entry: string): string[] {

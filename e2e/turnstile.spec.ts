@@ -28,7 +28,7 @@ for (const [rota, botao] of [
       await r.continue();
     });
     await page.goto(`${S.passa}${rota}`);
-    if (rota === '/recuperar-senha') await page.getByLabel('E-mail').fill('ana@exemplo.com');
+    if (rota === '/recuperar-senha') await page.getByLabel('E-mail').fill('ana@partyx.test');
     const verificando = page.getByRole('button', { name: 'Verificando…' });
     await expect(verificando).toBeVisible();
     await expect(verificando).toBeDisabled();
@@ -40,7 +40,7 @@ for (const [rota, botao] of [
 test('recuperação: com o token, o envio é aceito pelo servidor (verificação real na Cloudflare, chave de teste)', async ({ page }) => {
   await skipIntro(page);
   await page.goto(`${S.passa}/recuperar-senha`);
-  await page.getByLabel('E-mail').fill('ninguem@exemplo.com');
+  await page.getByLabel('E-mail').fill('ninguem@partyx.test');
   await page.getByRole('button', { name: 'Enviar link', exact: true }).click();
   await expect(page.getByRole('heading').first()).not.toHaveText('Recuperar senha');
   await expect(page.getByRole('alert').filter({ hasText: /robô/ })).toHaveCount(0);
@@ -49,7 +49,7 @@ test('recuperação: com o token, o envio é aceito pelo servidor (verificação
 test('widget que bloqueia: mensagem clara, "Tentar de novo" e botão desabilitado', async ({ page }) => {
   await skipIntro(page);
   await page.goto(`${S.bloqueia}/recuperar-senha`);
-  await page.getByLabel('E-mail').fill('ana@exemplo.com');
+  await page.getByLabel('E-mail').fill('ana@partyx.test');
   await expect(page.getByRole('alert').filter({ hasText: FALHA })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('button', { name: 'Tentar de novo' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enviar link', exact: true })).toBeDisabled();
@@ -59,7 +59,7 @@ test('script da Cloudflare fora do ar: mensagem; "Tentar de novo" com a rede de 
   await skipIntro(page);
   await page.route(CF, r => r.abort());
   await page.goto(`${S.passa}/recuperar-senha`);
-  await page.getByLabel('E-mail').fill('ana@exemplo.com');
+  await page.getByLabel('E-mail').fill('ana@partyx.test');
   await expect(page.getByRole('alert').filter({ hasText: FALHA })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enviar link', exact: true })).toBeDisabled();
   await page.unroute(CF);

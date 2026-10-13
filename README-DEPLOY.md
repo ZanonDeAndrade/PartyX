@@ -88,8 +88,8 @@ export BACKUP_DONE=sim NO_FICTITIOUS_DATA=sim           # SÓ depois de cumprir 
 ./infra/producao/deploy.sh deploy                       # build + migração + Cloud Run + teste rápido (vendas FECHADAS)
 ./infra/producao/deploy.sh varredura                    # rotina diária 04:00 (precisa do serviço no ar); remove a varredura de 5 min, se existir
 ./infra/producao/deploy.sh hosting                      # publica o firebase.json
-NOTIFY_EMAIL=voce@exemplo.com ./infra/producao/deploy.sh alertas
-NOTIFY_EMAIL=voce@exemplo.com ./infra/producao/deploy.sh backup   # backup diário 03:00 (seção 10). Rode o job UMA vez logo depois (o alerta "backup ausente" dispara até o 1º backup)
+NOTIFY_EMAIL=voce@partyx.test ./infra/producao/deploy.sh alertas
+NOTIFY_EMAIL=voce@partyx.test ./infra/producao/deploy.sh backup   # backup diário 03:00 (seção 10). Rode o job UMA vez logo depois (o alerta "backup ausente" dispara até o 1º backup)
 ```
 
 Primeiro administrador: `npm run admin:bootstrap` (ver `docs/autenticacao.md`).

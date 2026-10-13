@@ -5,8 +5,8 @@ BASE = 'http://localhost:8099'; S = seed['slug']; EV = seed['eventId']
 PAGES = {
  'publico': [None, ['/', '/eventos', f'/eventos/{S}', '/criar-conta', '/entrar', '/recuperar-senha', '/termos-de-uso', '/privacidade', '/politica-de-cancelamento', '/pagina-que-nao-existe']],
  'cliente': [(fx['email'], 'festa2026Forte!'), [f'/checkout/{S}', '/meus-ingressos', '/minhas-compras', f"/pedido/{fx['orderId']}", f"/ingressos/{fx['ticketId']}", f"/ingressos/{fx['ticketId']}/tela-cheia"]],
- 'administrador': [('admin@exemplo.com', 'festa2026'), ['/admin', '/admin/pedidos', '/admin/eventos', f'/admin/eventos/{EV}', '/admin/relatorios/vendas', '/admin/relatorios/promoters', '/admin/relatorios/taxa-mensal']],
- 'validador': [('validador@exemplo.com', 'festa2026'), ['/portaria', f'/portaria/{EV}']],
+ 'administrador': [('admin@partyx.test', 'festa2026'), ['/admin', '/admin/pedidos', '/admin/eventos', f'/admin/eventos/{EV}', '/admin/relatorios/vendas', '/admin/relatorios/promoters', '/admin/relatorios/taxa-mensal']],
+ 'validador': [('validador@partyx.test', 'festa2026'), ['/portaria', f'/portaria/{EV}']],
 }
 PROFILES = {'desktop-1366': dict(viewport={'width': 1366, 'height': 768}), 'celular-360': dict(viewport={'width': 360, 'height': 740}, is_mobile=True, has_touch=True), 'tablet-768': dict(viewport={'width': 768, 'height': 1024}, has_touch=True)}
 results = []

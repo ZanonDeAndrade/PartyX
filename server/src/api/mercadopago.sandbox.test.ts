@@ -158,7 +158,7 @@ describe('Mercado Pago, ambiente de teste REAL: webhook, conciliação, estorno 
 
   async function person(role: 'cliente' | 'validador' | 'administrador') {
     const i = ++n;
-    const email = `sandbox${i}@exemplo.com`;
+    const email = `sandbox${i}@partyx.test`;
     // Primeiro nome APRO: no ambiente de teste o Mercado Pago aprova o Pix sozinho.
     await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5)', [
       role === 'cliente' ? `APRO Sandbox ${i}` : `Equipe ${i}`,

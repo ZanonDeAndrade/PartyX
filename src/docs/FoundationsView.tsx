@@ -757,7 +757,7 @@ export function FoundationsView({ vm }: { vm: ViewModel }) {
               <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <span style={{ fontSize: '14px', fontWeight: '600' }}>E-mail</span>
                 <input
-                  value="marina.costa@exemplo.com"
+                  value="marina.costa@partyx.test"
                   style={{
                     height: '48px',
                     border: '1px solid #D4D4DE',

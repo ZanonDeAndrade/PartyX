@@ -64,7 +64,7 @@ const cpf = n => {
 };
 const argon = require('@node-rs/argon2');
 const PASSWORD = `alerta-${randomUUID()}`;
-const email = `alerta.${RUN}@exemplo.com`;
+const email = `alerta.${RUN}@partyx.test`;
 await sql(
   `insert into users (name, email, password_hash, role, is_active, must_change_password, phone, cpf)
    values ($1, $2, $3, 'cliente', true, false, '(11) 98765-4321', $4)`,

@@ -22,12 +22,12 @@ ok('ingresso traz o conteúdo do QR', !!qr);
 const other = new Client(); await other.signup(2);
 ok('outro comprador não vê ingresso nem PDF alheio', (await other.get(`/api/tickets/${tk[0].id}`)).status === 404 && (await other.get(`/api/orders/${order.id}/tickets/pdf`)).status === 404);
 // portaria
-const val = new Client(); await val.login('validador@exemplo.com');
+const val = new Client(); await val.login('validador@partyx.test');
 const s1 = await val.post('/api/gate/scan', { eventId: seed.eventId, qr }); const s2 = await val.post('/api/gate/scan', { eventId: seed.eventId, qr });
 ok('portaria: verde e depois amarelo', s1.json.result === 'valido' && s2.json.result === 'ja_utilizado');
 // cancelamento pelo admin
 const qr2 = ((await buyer.get(`/api/tickets/${tk[1].id}`)).json); const q2 = (qr2.ticket ?? qr2).qrPayload ?? (qr2.ticket ?? qr2).qr;
-const adm = new Client(); await adm.login('admin@exemplo.com');
+const adm = new Client(); await adm.login('admin@partyx.test');
 const canc = await adm.post(`/api/admin/tickets/${tk[1].id}/cancel`, { reason: 'teste da rodada', confirm: true });
 ok('administrador cancela ingresso', canc.status === 200, canc.status);
 ok('portaria recusa o cancelado', (await val.post('/api/gate/scan', { eventId: seed.eventId, qr: q2 })).json.result === 'cancelado');

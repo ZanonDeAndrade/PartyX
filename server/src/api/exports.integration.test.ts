@@ -27,7 +27,7 @@ describe.skipIf(!ADMIN_URL)('exportações e contingência (integração)', () =
   type Role = 'cliente' | 'validador' | 'administrador';
   async function session(role: Role = 'administrador', name?: string) {
     const i = ++n;
-    const email = `${role}${i}@exemplo.com`;
+    const email = `${role}${i}@partyx.test`;
     const id = (
       await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5) returning id', [
         name ?? `Pessoa ${role} ${i}`,
@@ -98,7 +98,7 @@ describe.skipIf(!ADMIN_URL)('exportações e contingência (integração)', () =
   ) {
     const i = ++n;
     const name = o.buyer?.name ?? 'Marina Costa';
-    const email = o.buyer?.email ?? `comprador${i}@exemplo.com`;
+    const email = o.buyer?.email ?? `comprador${i}@partyx.test`;
     const userId = (
       await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5) returning id', [
         name,
@@ -279,7 +279,7 @@ describe.skipIf(!ADMIN_URL)('exportações e contingência (integração)', () =
   describe('CSV', () => {
     it('abre no Excel: BOM, ponto e vírgula, CRLF, acentos preservados, valores com vírgula decimal', async () => {
       const e = await event('Noite São João – Édição Ção');
-      await order(e, { buyer: { name: 'José d’Ávila Ñandú', email: 'jose@exemplo.com' } });
+      await order(e, { buyer: { name: 'José d’Ávila Ñandú', email: 'jose@partyx.test' } });
       const adm = await session();
       const bytes = Buffer.from(await (await adm.get('/admin/exports/orders.csv')).arrayBuffer());
       expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
@@ -297,9 +297,9 @@ describe.skipIf(!ADMIN_URL)('exportações e contingência (integração)', () =
 
     it('valores que começam com fórmula são neutralizados em todo campo de texto digitado pelo usuário', async () => {
       const e = await event('=HYPERLINK("http://x")');
-      await order(e, { buyer: { name: "=cmd|' /C calc'!A0", email: '+1@exemplo.com' } });
-      await order(e, { buyer: { name: '@SUM(1+1)', email: 'a@exemplo.com' } });
-      await order(e, { buyer: { name: '-2+3', email: 'b@exemplo.com' } });
+      await order(e, { buyer: { name: "=cmd|' /C calc'!A0", email: '+1@partyx.test' } });
+      await order(e, { buyer: { name: '@SUM(1+1)', email: 'a@partyx.test' } });
+      await order(e, { buyer: { name: '-2+3', email: 'b@partyx.test' } });
       const adm = await session();
       for (const path of [
         '/admin/exports/orders.csv',
@@ -406,9 +406,9 @@ describe.skipIf(!ADMIN_URL)('exportações e contingência (integração)', () =
 
     it('a busca digitada (CPF/e-mail) não vai para a auditoria; quem, o quê e quando vão', async () => {
       const e = await event();
-      await order(e, { buyer: { name: 'Marina', email: 'marina@exemplo.com', cpf: '52998224725' } });
+      await order(e, { buyer: { name: 'Marina', email: 'marina@partyx.test', cpf: '52998224725' } });
       const adm = await session();
-      await adm.get(`/admin/exports/orders.csv?eventId=${e.id}&q=marina@exemplo.com`);
+      await adm.get(`/admin/exports/orders.csv?eventId=${e.id}&q=marina@partyx.test`);
       await adm.get(`/admin/exports/events/${e.id}/contingency.pdf`);
       const log = (
         await sql(
@@ -456,7 +456,7 @@ describe.skipIf(!ADMIN_URL)('exportações e contingência (integração)', () =
       const e = await event('Festa Grande', 'publicado', { Pista: 5000, VIP: 5000 });
       const user = (
         await sql(
-          "insert into users (name,email,cpf,password_hash,role) values ('Volume','volume@exemplo.com','52998224725',$1,'cliente') returning id",
+          "insert into users (name,email,cpf,password_hash,role) values ('Volume','volume@partyx.test','52998224725',$1,'cliente') returning id",
           [hash],
         )
       ).rows[0].id as string;

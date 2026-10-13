@@ -14,7 +14,7 @@ URL=$(node -e "console.log(require('$SP/seed-ui.json').url)")
 cd "$SP/run"
 env DATABASE_URL="$URL" DATABASE_URL_DIRECT="$URL" APP_ENV=local PAYMENT_GATEWAY=mock PORT=8099 WEB_DIST_DIR="$DIST" \
   PUBLIC_BASE_URL=http://localhost:8099 TRUSTED_PROXY_HOPS=1 RESERVATION_MINUTES=60 \
-  PARTYX_SUPPORT_EMAIL=atendimento@exemplo.com PARTYX_SUPPORT_WHATSAPP="+55 11 90000-0000" \
+  PARTYX_SUPPORT_EMAIL=atendimento@partyx.test PARTYX_SUPPORT_WHATSAPP="+55 11 90000-0000" \
   node --import "$ROOT/node_modules/tsx/dist/loader.mjs" "$ROOT/server/src/index.ts" > "$SP/server.log" 2>&1 &
 echo $! > "$SP/server.pid"
 for _ in $(seq 1 60); do

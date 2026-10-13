@@ -35,7 +35,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
   type Role = 'cliente' | 'validador' | 'administrador';
   async function session(role: Role = 'administrador', name?: string) {
     const i = ++n;
-    const email = `${role}${i}@exemplo.com`;
+    const email = `${role}${i}@partyx.test`;
     const id = (
       await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5) returning id', [
         name ?? `Pessoa ${role} ${i}`,
@@ -113,7 +113,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
   ) {
     const i = ++n;
     const name = o.buyer?.name ?? 'Marina Costa';
-    const email = o.buyer?.email ?? `comprador${i}@exemplo.com`;
+    const email = o.buyer?.email ?? `comprador${i}@partyx.test`;
     const userId = (
       await sql('insert into users (name,email,cpf,password_hash,role) values ($1,$2,$3,$4,$5) returning id', [
         name,
@@ -389,13 +389,13 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
 
     it('cookie de sessão: HttpOnly, Secure, SameSite=Lax; o token não aparece no corpo', async () => {
       await sql(
-        "insert into users (name,email,cpf,password_hash,role) values ('A','a-ck@exemplo.com','52998224725',$1,'cliente')",
+        "insert into users (name,email,cpf,password_hash,role) values ('A','a-ck@partyx.test','52998224725',$1,'cliente')",
         [hash],
       );
       const res = await app.request('/api/auth/login', {
         method: 'POST',
         headers: { origin: 'http://localhost', 'content-type': 'application/json' },
-        body: JSON.stringify({ email: 'a-ck@exemplo.com', password: PASSWORD }),
+        body: JSON.stringify({ email: 'a-ck@partyx.test', password: PASSWORD }),
       });
       expect(res.status).toBe(200);
       const cookie = res.headers.get('set-cookie')!;
@@ -426,7 +426,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
     });
 
     it('corpo JSON acima de 1 MB é recusado (413) antes de ser processado', async () => {
-      const big = JSON.stringify({ email: 'x@exemplo.com', password: 'a'.repeat(1_100_000) });
+      const big = JSON.stringify({ email: 'x@partyx.test', password: 'a'.repeat(1_100_000) });
       const res = await app.request('/api/auth/login', {
         method: 'POST',
         headers: { origin: 'http://localhost', 'content-type': 'application/json' },
@@ -443,7 +443,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
         headers: { origin: 'http://localhost', 'content-type': 'application/json' },
         body: JSON.stringify({
           name: 'Intruso',
-          email: 'intruso@exemplo.com',
+          email: 'intruso@partyx.test',
           cpf: '39053344705',
           phone: '55998124470',
           password: 'festa2026',
@@ -455,7 +455,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
         }),
       });
       expect([201, 422]).toContain(res.status);
-      const r = await sql("select role from users where email = 'intruso@exemplo.com'");
+      const r = await sql("select role from users where email = 'intruso@partyx.test'");
       if (r.rows.length) expect(r.rows[0].role).toBe('cliente');
     });
 
@@ -544,10 +544,10 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
     async function subject(opts: { future?: boolean; pending?: boolean } = {}) {
       const e = await event();
       const o = await order(e, {
-        buyer: { name: 'Marina da Silva', email: 'marina.silva@exemplo.com', cpf: '52998224725' },
+        buyer: { name: 'Marina da Silva', email: 'marina.silva@partyx.test', cpf: '52998224725' },
       });
       if (opts.pending)
-        await order(e, { status: 'pendente', buyer: { name: 'Marina da Silva', email: 'outra@exemplo.com' } });
+        await order(e, { status: 'pendente', buyer: { name: 'Marina da Silva', email: 'outra@partyx.test' } });
       await sql(
         'insert into consents (user_id, terms_version, privacy_version, ip, user_agent) values ($1,$2,$3,$4,$5)',
         [o.userId, 'v1', 'v1', '203.0.113.5', 'Navegador X'],
@@ -557,7 +557,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
         [o.userId],
       );
       await sql(
-        "insert into login_attempts (email_normalized, ip, succeeded) values ('marina.silva@exemplo.com','203.0.113.5',true)",
+        "insert into login_attempts (email_normalized, ip, succeeded) values ('marina.silva@partyx.test','203.0.113.5',true)",
       );
       await sql(
         "insert into payment_events (signature_valid, order_id, type, payload_json) values (true,$1,'payment.updated',$2)",
@@ -566,7 +566,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
           JSON.stringify({
             status: 'approved',
             amount: 160,
-            payer: { email: 'marina.silva@exemplo.com', name: 'Marina' },
+            payer: { email: 'marina.silva@partyx.test', name: 'Marina' },
             cpf: '52998224725',
           }),
         ],
@@ -586,7 +586,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
       const client = await session('cliente');
       const staff = await session('validador');
       const routes: [string, string, unknown?][] = [
-        ['GET', '/admin/privacy/subjects?email=marina.silva@exemplo.com'],
+        ['GET', '/admin/privacy/subjects?email=marina.silva@partyx.test'],
         ['GET', `/admin/privacy/subjects/${o.userId}/export?protocolo=P-1`],
         ['POST', `/admin/privacy/subjects/${o.userId}/anonymize`, ack],
       ];
@@ -611,7 +611,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
       const adm = await session();
       const found = await json(await adm.get('/admin/privacy/subjects?cpf=529.982.247-25'));
       expect(found.subject.id).toBe(o.userId);
-      expect((await adm.get('/admin/privacy/subjects?email=nao-existe@exemplo.com')).status).toBe(404);
+      expect((await adm.get('/admin/privacy/subjects?email=nao-existe@partyx.test')).status).toBe(404);
       expect((await adm.get(`/admin/privacy/subjects/${o.userId}/export`)).status).toBe(422);
       const res = await adm.get(`/admin/privacy/subjects/${o.userId}/export?protocolo=PROTOCOLO-123`);
       expect(res.status).toBe(200);
@@ -621,7 +621,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
       const data = JSON.parse(text);
       expect(data.subject).toMatchObject({
         name: 'Marina da Silva',
-        email: 'marina.silva@exemplo.com',
+        email: 'marina.silva@partyx.test',
         cpf: '52998224725',
       });
       expect(data.orders).toHaveLength(1);
@@ -636,7 +636,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
       expect(log.map(r => r.action)).toEqual(['privacidade.consulta', 'privacidade.exportacao']);
       for (const r of log) {
         expect(r.actor_id).toBe(adm.id);
-        expect(JSON.stringify(r)).not.toMatch(/marina|52998224725|exemplo\.com/i);
+        expect(JSON.stringify(r)).not.toMatch(/marina|52998224725|partyx\.test/i);
       }
     });
 
@@ -676,7 +676,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
       ).toMatchObject({ ip: null, user_agent: null, terms_version: 'v1' });
       expect((await sql('select count(*)::int as n from sessions where user_id = $1', [o.userId])).rows[0].n).toBe(0);
       expect(
-        (await sql("select count(*)::int as n from login_attempts where email_normalized = 'marina.silva@exemplo.com'"))
+        (await sql("select count(*)::int as n from login_attempts where email_normalized = 'marina.silva@partyx.test'"))
           .rows[0].n,
       ).toBe(0);
       const payload = JSON.stringify(
@@ -699,7 +699,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
       const login = await app.request('/api/auth/login', {
         method: 'POST',
         headers: { origin: 'http://localhost', 'content-type': 'application/json' },
-        body: JSON.stringify({ email: 'marina.silva@exemplo.com', password: PASSWORD }),
+        body: JSON.stringify({ email: 'marina.silva@partyx.test', password: PASSWORD }),
       });
       expect(login.status).toBe(401);
 
@@ -709,7 +709,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
       ).rows;
       expect(audit).toHaveLength(1);
       expect(audit[0].actor_id).toBe(adm.id);
-      expect(JSON.stringify(audit[0].after_json)).not.toMatch(/marina|52998224725|exemplo/i);
+      expect(JSON.stringify(audit[0].after_json)).not.toMatch(/marina|52998224725|partyx\.test/i);
       expect(audit[0].after_json.protocolo).toBe('PROTOCOLO-123');
       expect((await adm.post(`/admin/privacy/subjects/${o.userId}/anonymize`, ack)).status).toBe(409);
     });
@@ -751,7 +751,7 @@ describe.skipIf(!ADMIN_URL)('segurança e LGPD (integração)', () => {
       const db = createDrizzle(testDb.pool);
       const u = (
         await sql(
-          "insert into users (name,email,cpf,password_hash,role) values ('R','r@exemplo.com','11144477735',$1,'cliente') returning id",
+          "insert into users (name,email,cpf,password_hash,role) values ('R','r@partyx.test','11144477735',$1,'cliente') returning id",
           [hash],
         )
       ).rows[0].id as string;
