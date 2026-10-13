@@ -272,6 +272,14 @@ conferir no log `gateway de pagamento: conta conferida` e a chegada do webhook. 
 **Voltar para teste** (homologação): as credenciais de teste do painel (Testes > Credenciais de teste) com
 `GATEWAY_ENVIRONMENT=sandbox`; produção nunca aceita `sandbox`.
 
+**Homologação com o Mercado Pago de TESTE** (13/10/2026): `bash scripts/setup-mp-credentials-homologacao.sh` copia as credenciais
+de teste do `.env.local` para o Secret Manager do `partyx-hml` (confere `test_user` na API, nada é impresso). Com os três segredos, o
+`infra/homologacao/deploy.sh` liga sozinho `PAYMENT_GATEWAY=mercadopago` e `GATEWAY_ENVIRONMENT=sandbox`, obtém o `MP_COLLECTOR_ID` da
+própria conta de teste e escala de 0 a 3 instâncias. O fictício continua disponível com `HML_GATEWAY=ficticio` (1 instância). No
+painel, o **modo de teste** do webhook aponta para `https://partyx-hml.web.app/api/webhooks/payments`, evento Order (conferência do
+responsável). A homologação também liga `PUBLIC_HOST_CHECK=true` (a barreira de Host da produção) e o teste rápido do deploy confere
+403 no `run.app` sem `X-Forwarded-Host` e 200 com ele.
+
 ## 9. Checklist final (manual)
 
 - [ ] Projeto, faturamento e Neon (seção 3). **Papéis do banco antes da 1ª migração** (`deploy.sh roles`).

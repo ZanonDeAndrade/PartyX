@@ -47,6 +47,12 @@ case "$HML_GATEWAY" in
   ficticio | none) ;;
   *) echo "HML_GATEWAY inválido: $HML_GATEWAY (mercadopago, ficticio ou none)" >&2; exit 1 ;;
 esac
+# --set-env-vars troca TODAS as variáveis do serviço: com o segredo smtp-url, o remetente precisa vir aqui (o servidor não sobe sem ele).
+# Na homologação: EMAIL_FROM='PartyX Homologação <ingressos@exemplo.com>'. Recusa antes do build, não depois de 5 minutos.
+if has_version smtp-url && [ -z "${EMAIL_FROM:-}" ]; then
+  echo "Recuso: o segredo smtp-url existe e EMAIL_FROM não foi informado (ex.: EMAIL_FROM='PartyX Homologação <ingressos@exemplo.com>')." >&2
+  exit 1
+fi
 # O fictício guarda estado na memória: UMA instância. Com o Mercado Pago, escala de 0 a 3 (sem custo parado).
 if [ "$HML_GATEWAY" = "ficticio" ]; then MIN_INSTANCES="${MIN_INSTANCES:-1}"; MAX_INSTANCES="${MAX_INSTANCES:-1}"; fi
 echo "== gateway de homologação: $HML_GATEWAY"
