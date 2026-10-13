@@ -1,0 +1,313 @@
+{
+    "metrics": {
+        "checks": {
+            "passes": 5008,
+            "fails": 0,
+            "value": 1
+        },
+        "http_reqs{etapa:compra_4_confirmacao}": {
+            "count": 360,
+            "rate": 2.343105556808779,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration": {
+            "med": 133.940369,
+            "p(90)": 384.12854880000003,
+            "p(95)": 455.0985916,
+            "p(99)": 1015.0944540400031,
+            "max": 2242.237793,
+            "avg": 211.38457596014376
+        },
+        "vus": {
+            "value": 1,
+            "min": 1,
+            "max": 71
+        },
+        "http_req_duration{etapa:compra_1_login}": {
+            "p(99)": 283.5387506100006,
+            "max": 401.694332,
+            "avg": 114.52406979487179,
+            "med": 130.311294,
+            "p(90)": 196.52072429999998,
+            "p(95)": 207.74390919999993,
+            "thresholds": {
+                "p(95)<5000": false
+            }
+        },
+        "http_req_duration{expected_response:true}": {
+            "max": 2242.237793,
+            "avg": 211.38457596014376,
+            "med": 133.940369,
+            "p(90)": 384.12854880000003,
+            "p(95)": 455.0985916,
+            "p(99)": 1015.0944540400031
+        },
+        "http_req_duration{etapa:evento_api}": {
+            "med": 318.590408,
+            "p(90)": 429.78317070000014,
+            "p(95)": 506.1659068499997,
+            "p(99)": 1018.3333039799984,
+            "max": 1539.213968,
+            "avg": 363.75863934384984,
+            "thresholds": {
+                "p(95)<1000": false
+            }
+        },
+        "dropped_iterations": {
+            "count": 1,
+            "rate": 0.006508626546691053
+        },
+        "compra_completa_ms": {
+            "max": 64920,
+            "avg": 63388.03333333333,
+            "med": 63257.5,
+            "p(90)": 63651.1,
+            "p(95)": 63757.95,
+            "p(99)": 64586.79,
+            "thresholds": {
+                "p(95)<300000": false
+            }
+        },
+        "compras_iniciadas": {
+            "count": 39,
+            "rate": 0.25383643532095107
+        },
+        "erros_inesperados": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "http_req_failed{etapa:evento_api}": {
+            "fails": 2504,
+            "passes": 0,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 5545,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_duration{etapa:compra_4_confirmacao}": {
+            "p(95)": 159.211908,
+            "p(99)": 193.75932565000042,
+            "max": 254.894048,
+            "avg": 104.35884840833334,
+            "med": 107.649611,
+            "p(90)": 140.70316630000002,
+            "thresholds": {
+                "p(95)<5000": false
+            }
+        },
+        "http_req_tls_handshaking": {
+            "p(95)": 0,
+            "p(99)": 62.946664920001304,
+            "max": 161.239472,
+            "avg": 1.0889648901713256,
+            "med": 0,
+            "p(90)": 0
+        },
+        "compras_recusadas_por_estoque": {
+            "count": 9,
+            "rate": 0.05857763892021947
+        },
+        "http_reqs": {
+            "count": 5545,
+            "rate": 36.09033420140189
+        },
+        "data_sent": {
+            "count": 332782,
+            "rate": 2165.953759460942
+        },
+        "iterations": {
+            "count": 2543,
+            "rate": 16.551437308235347
+        },
+        "http_reqs{etapa:compra_1_login}": {
+            "count": 78,
+            "rate": 0.5076728706419021,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "compras_concluidas": {
+            "count": 30,
+            "rate": 0.19525879640073157
+        },
+        "http_req_connecting": {
+            "max": 112.061621,
+            "avg": 0.42398482110009006,
+            "med": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "p(99)": 24.689486880000008
+        },
+        "http_req_blocked": {
+            "p(95)": 0.0011758,
+            "p(99)": 94.4388579200014,
+            "max": 312.918454,
+            "avg": 1.5941547044183928,
+            "med": 0.000534,
+            "p(90)": 0.0010456000000000003
+        },
+        "iteration_duration": {
+            "p(95)": 3361.7125481,
+            "p(99)": 63185.55739582,
+            "max": 64921.300466,
+            "avg": 3133.5787012681863,
+            "med": 2435.323962,
+            "p(90)": 3232.783421
+        },
+        "http_reqs{etapa:compra_5_meus_ingressos}": {
+            "rate": 0.19525879640073157,
+            "count": 30,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{etapa:compra_5_meus_ingressos}": {
+            "avg": 71.19784666666666,
+            "med": 51.355971999999994,
+            "p(90)": 103.2344719,
+            "p(95)": 112.99438099999995,
+            "p(99)": 283.3654031100002,
+            "max": 349.792699,
+            "thresholds": {
+                "p(95)<5000": false
+            }
+        },
+        "http_req_receiving": {
+            "p(99)": 14.669036600000014,
+            "max": 382.366808,
+            "avg": 0.991200081514881,
+            "med": 0.061382,
+            "p(90)": 1.6519520000000034,
+            "p(95)": 3.8400700000000003
+        },
+        "http_req_failed{etapa:evento_html}": {
+            "passes": 0,
+            "fails": 2504,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_duration{etapa:compra_2_pedido_reserva}": {
+            "p(90)": 159.4598132,
+            "p(95)": 172.72388290000004,
+            "p(99)": 204.68226019999994,
+            "max": 211.769625,
+            "avg": 115.84402151282055,
+            "med": 106.199221,
+            "thresholds": {
+                "p(95)<5000": false
+            }
+        },
+        "http_req_duration{etapa:compra_3_pix}": {
+            "avg": 1598.9789587999999,
+            "med": 1570.3064865000001,
+            "p(90)": 1720.1497787,
+            "p(95)": 1736.61158725,
+            "p(99)": 2095.8986249100003,
+            "max": 2242.237793,
+            "thresholds": {
+                "p(95)<5000": false
+            }
+        },
+        "http_reqs{etapa:compra_3_pix}": {
+            "rate": 0.19525879640073157,
+            "count": 30,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "data_received": {
+            "count": 12916415,
+            "rate": 84068.12155707851
+        },
+        "http_reqs{etapa:evento_api}": {
+            "count": 2504,
+            "rate": 16.297600872914394,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{etapa:evento_html}": {
+            "avg": 63.95789013897766,
+            "med": 32.897143,
+            "p(90)": 111.84579580000008,
+            "p(95)": 138.11292485,
+            "p(99)": 598.0236285299984,
+            "max": 989.62764,
+            "thresholds": {
+                "p(95)<1000": false
+            }
+        },
+        "http_req_sending": {
+            "avg": 0.06598502110009016,
+            "med": 0.058435,
+            "p(90)": 0.1024184,
+            "p(95)": 0.11635280000000002,
+            "p(99)": 0.19170944000000006,
+            "max": 0.878789
+        },
+        "vus_max": {
+            "min": 70,
+            "max": 71,
+            "value": 71
+        },
+        "http_reqs{etapa:compra_2_pedido_reserva}": {
+            "count": 39,
+            "rate": 0.25383643532095107,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_waiting": {
+            "med": 133.450717,
+            "p(90)": 383.87022140000005,
+            "p(95)": 454.842626,
+            "p(99)": 1014.9459715600032,
+            "max": 2242.087315,
+            "avg": 210.32739085752948
+        },
+        "http_reqs{etapa:evento_html}": {
+            "rate": 16.297600872914394,
+            "count": 2504,
+            "thresholds": {
+                "count>=0": false
+            }
+        }
+    },
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "página do evento 200": {
+                    "name": "página do evento 200",
+                    "path": "::página do evento 200",
+                    "id": "467a52e4ce5b2df482d1edf12a40e5f3",
+                    "passes": 2504,
+                    "fails": 0
+                },
+                "API do evento 200": {
+                    "id": "cd4fa316b352558ddaf41fc28a438cfe",
+                    "passes": 2504,
+                    "fails": 0,
+                    "name": "API do evento 200",
+                    "path": "::API do evento 200"
+                }
+            }
+    }
+}

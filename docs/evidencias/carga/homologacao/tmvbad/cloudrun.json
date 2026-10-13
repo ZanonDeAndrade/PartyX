@@ -1,0 +1,23 @@
+{
+ "janela": {
+  "inicio": "2026-10-13T22:47:13Z",
+  "fim": "2026-10-13T22:49:48Z"
+ },
+ "latenciaMs": {
+  "p50": 1355.8643507604866,
+  "p95": 1675.751490086336,
+  "p99": 2223.1464563197696
+ },
+ "memoria": {
+  "utilizacaoMaxP99": 0.34990000000000004,
+  "limiteMiB": 512,
+  "picoMiB": 179
+ },
+ "cpuUtilizacaoMaxP99": 0.2099,
+ "instanciasMax": 1,
+ "requisicoes": {
+  "2xx": 2647,
+  "3xx": 0,
+  "4xx": 5
+ }
+}
