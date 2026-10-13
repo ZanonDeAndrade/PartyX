@@ -24,7 +24,7 @@ const ORIGIN = HML ? `https://${PUBLIC_HOST}` : BASE;
 const TAG = __ENV.TAG || '';
 const CONFIRM_MAX_S = Number(__ENV.CONFIRM_MAX_S || 300);
 if (HML) {
-  if (!/^https:\/\/partyx-hml-[a-z0-9-]+\.run\.app$/.test(BASE || '')) fail(`recusado: BASE_URL precisa ser o run.app da homologação (recebido: ${BASE})`);
+  if (!/^https:\/\/partyx-hml-[a-z0-9.-]+\.run\.app$/.test(BASE || '')) fail(`recusado: BASE_URL precisa ser o run.app da homologação (recebido: ${BASE})`);
   if (VISIT_BASE !== 'https://partyx-hml.web.app' || PUBLIC_HOST !== 'partyx-hml.web.app') fail('recusado: VISIT_BASE e PUBLIC_HOST da homologação');
 } else if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(BASE || '')) fail(`recusado: BASE_URL precisa ser o servidor local (recebido: ${BASE})`);
 

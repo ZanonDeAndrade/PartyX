@@ -55,6 +55,7 @@ K6_STATUS=${PIPESTATUS[0]}
 set -e
 FIM=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 touch "$WORK/parar"; wait $SAMPLER 2>/dev/null || true
+[ -s "$WORK/k6-resumo.json" ] || { echo "FALHOU: o k6 não gerou resumo (status $K6_STATUS); nada foi medido. Veja $WORK/k6-saida.txt" >&2; exit 1; }
 
 # Estoque e emissão do evento da carga, conferidos no banco.
 node --input-type=module -e "

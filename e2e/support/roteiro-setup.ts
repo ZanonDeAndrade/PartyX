@@ -30,7 +30,7 @@ export const readState = (): RoteiroState => {
 /** Só a homologação: Hosting `partyx-hml.web.app` ou o run.app do serviço `partyx-hml`. Qualquer outra base é recusada. */
 function homologacaoBase(raw: string): string {
   const u = new URL(raw);
-  const ok = u.protocol === 'https:' && (u.host === 'partyx-hml.web.app' || /^partyx-hml-[a-z0-9-]+\.run\.app$/.test(u.host));
+  const ok = u.protocol === 'https:' && (u.host === 'partyx-hml.web.app' || /^partyx-hml-[a-z0-9.-]+\.run\.app$/.test(u.host));
   if (!ok || /prod/i.test(u.host)) throw new Error(`recusado: E2E_BASE_URL precisa ser a homologação (recebido ${u.host})`);
   return u.origin;
 }

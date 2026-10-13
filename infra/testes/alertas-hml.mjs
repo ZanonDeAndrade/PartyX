@@ -27,7 +27,7 @@ process.loadEnvFile(path.join(ROOT, '.env.local'));
 const { MP_ACCESS_TOKEN: TOKEN, MP_PUBLIC_KEY: PUBLIC_KEY, MP_WEBHOOK_SECRET: SECRET, E2E_DATABASE_URL: DB, RUN_URL, PUBLIC_HOST } = process.env;
 if (!TOKEN || !PUBLIC_KEY || !SECRET) throw new Error('credenciais de TESTE do Mercado Pago ausentes no .env.local');
 if (!DB || !RUN_URL || !PUBLIC_HOST) throw new Error('use infra/testes/alertas-hml.sh');
-if (!/^https:\/\/partyx-hml-[a-z0-9-]+\.run\.app$/.test(RUN_URL) || PUBLIC_HOST !== 'partyx-hml.web.app')
+if (!/^https:\/\/partyx-hml-[a-z0-9.-]+\.run\.app$/.test(RUN_URL) || PUBLIC_HOST !== 'partyx-hml.web.app')
   throw new Error('recusado: só a homologação');
 const ORIGIN = `https://${PUBLIC_HOST}`;
 const MP = 'https://api.mercadopago.com';
