@@ -202,3 +202,23 @@ Todos os deploys de homologação até hoje foram feitos com `infra/homologacao/
 6. Hash das migrações 0000 a 0002 diferente do arquivo atual.
 7. Conta padrão do Compute com papel Editor (padrão do Google; o serviço não a usa).
 8. Segredo órfão `qr-hmac-key-v1`.
+
+## Atualização em 13/10/2026 (depois da etapa 10)
+
+O texto acima é a fotografia de 12/10, antes das mudanças. O que mudou:
+
+| Item | Antes | Agora |
+|---|---|---|
+| Revisão | `partyx-hml-00009-jdx` (código de 06/10) | `partyx-hml-00012-tqz`, imagem `partyx-api:20261013-173327-e9e31e9` |
+| Gateway | fictício, 1 instância fixa | Mercado Pago de **teste** (`sandbox`), 0 a 3 instâncias |
+| Variáveis | montadas na linha de comando | `infra/homologacao/env.hml.yaml`, conferido por `infra/env-check.py` antes do build |
+| Barreira de Host | desligada | ligada (`PUBLIC_HOST_CHECK=true`): `run.app` sem `X-Forwarded-Host` responde 403 |
+| `NODE_OPTIONS` | ausente | `--max-old-space-size=320` |
+| Remetente | `ingressos@exemplo.com` | `ingressos@partyx-hml.web.app` (caixa de captura; entrega real em `email-homologacao-smtp-real.md`) |
+| Migrações no Neon | até a 0004 | até a 0008 (9 linhas); esquema idêntico ao criado pelos arquivos, conferido na restauração |
+| Segredos | sem os do gateway | mais `mp-access-token`, `mp-public-key`, `mp-webhook-secret` (teste) |
+| Scheduler | só o backup | mais `partyx-varredura-diaria` (04:00) |
+| Alertas | 13 políticas, 12 métricas | 16 políticas, 15 métricas (entraram `estorno_parcial`, `cobranca_duplicada`, `limite_global_atingido`) |
+
+Continua igual: deploy automático de `develop` inexistente (sem `develop`, sem WIF; o workflow foi corrigido no repositório, mas não ativado), segredo órfão `qr-hmac-key-v1`, conta padrão do Compute com papel Editor, PITR de 1 dia. Dados fictícios acumulados: `../registros/dados-ficticios-homologacao.md`.
+

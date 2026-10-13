@@ -24,5 +24,6 @@ As mensagens também ficam na caixa de captura Ethereal (`smtp-url`), que não e
 | 13/10 22:13 | `tmv9wk` | roteiro 11.2 | 9 | 2 | `outro-evento-e2e-tmv9wk`, `festival-roteiro-e2e-tmv9wk` | 8 | 7 | 11 | **21 de 21 aprovados** (endereços `@partyx.test`) |
 | 13/10 22:25 | `tmva9i` | carga | 60 | 0 | `carga-hml-tmva9i` (fora da vitrine) | 0 | 0 | 0 | só a semente; o k6 recusou a URL (erro na trava do script) e nenhuma carga rodou |
 | 13/10 22:47 | `tmvbad` | carga | 60 | 0 | `carga-hml-tmvbad` (fora da vitrine) | 30 pagos (mais 9 tentativas recusadas por estoque, sem pedido) | 60 | 30 | carga concluída: 0 erros, sem venda acima do estoque |
+| 13/10 23:00 | `tmvbwa` | disparo de alertas | 1 | 0 | `alertas-hml-tmvbwa` (fora da vitrine) | 2 pagos | 3 | 2 | sinais `estorno_parcial` e `cobranca_duplicada` emitidos; no Mercado Pago de teste ficaram um estorno parcial de R$ 40,00 e uma order em dobro de R$ 40,00 |
 
 Dados anteriores a esta etapa (01/10 a 06/10, gateway fictício): 12 usuários, 2 eventos, 9 pedidos e 10 ingressos (inventário, `../operacao/inventario-homologacao.md`). Também entram na limpeza.

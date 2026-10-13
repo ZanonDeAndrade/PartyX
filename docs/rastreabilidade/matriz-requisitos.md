@@ -118,6 +118,26 @@ Suíte `server/src/api/mercadopago.sandbox.test.ts` (`npm run test:sandbox`, for
 
 Correções desta etapa: (1) 409 `idempotency_key_already_used` deixou de ser "recusa" (abria tentativa nova e permitia segunda cobrança); (2) notificação de order desconhecida passa a vincular a cobrança órfã ao pedido, conferindo valor e conta antes; segunda cobrança vira alerta (D-83); (3) a rotina diária reconsulta pedidos pagos de eventos que ainda não passaram (estorno ou contestação sem webhook); (4) estorno parcial vira trilha e alerta (D-82). Comandos: `npm run lint`, `npm run typecheck`, `npm run test:db` e `npm run build` passaram; a suíte com banco tem 5 testes novos de integração para essas correções.
 
+## Homologação: infraestrutura, roteiro, carga, backup e alertas (etapa 10, 13/10/2026)
+
+Executado no projeto `partyx-hml`, com o Mercado Pago de **teste** e dados fictícios. Registro por rotina: `../operacao/registro-rotinas.md`; inventário: `../operacao/inventario-homologacao.md`; dados criados: `../registros/dados-ficticios-homologacao.md`.
+
+| Requisito ou critério | O que foi verificado em homologação | Resultado | Evidência |
+|---|---|---|---|
+| PDF 7.1, homologação com gateway sandbox | Revisão `partyx-hml-00012-tqz` com `PAYMENT_GATEWAY=mercadopago` e `GATEWAY_ENVIRONMENT=sandbox`; conta de teste conferida no deploy | atendido | inventário |
+| PDF 7.2, deploy automático de `develop` | Não existe `develop` nem WIF; publicação feita pelo `deploy.sh` local (o mesmo roteiro da CI) | **não atendido** (depende de autorização de push) | inventário |
+| PDF 7.2 e Anexo II, 2: backup diário com 7 dias ou mais | Diário às 03:00 desde 06/10, bucket privado, 35 dias; restauração real em banco isolado com 20 verificações, contagens e esquema idênticos; PITR comprovado | atendido em homologação; **ensaio em produção pendente** | `../operacao/runbooks/restauracao.md` |
+| PDF 7.2, monitoramento e alerta | Verificação de saúde a cada 5 min; 13 sinais por log com política e e-mail; `estorno_parcial` (D-82) e `cobranca_duplicada` (D-83) disparados pelo código real, incidentes abertos em 4 min | atendido; **recebimento do e-mail a confirmar pelo responsável** | `../evidencias/alertas/homologacao-tmvbwa.json` |
+| Roteiro 11.2, itens 1 a 20, e CA-32 (Brick a 360 px) | Pela interface, contra `https://partyx-hml.web.app`, rodada `tmv9wk` | 21 de 21 | `../evidencias/roteiro-11-2/homologacao-sandbox/` |
+| CA-01 e CA-04, e-mail | E-mails de cadastro, recuperação e compra enviados pelo SMTP da homologação e lidos na **caixa de captura** (Ethereal) | **não aprovado como entrega real**: a caixa de captura não entrega a ninguém; entrega e spam dependem de D-08 e D-09 | `../operacao/email-homologacao-smtp-real.md` |
+| CA-18, liberação sem ação manual | Pix aprovado pelo Mercado Pago de teste em 3 min 54 s e ingresso emitido pela verificação do Cloud Tasks, sem webhook (rodada `tmv8vl`); na carga, 30 compras confirmadas pela mesma via em cerca de 63 s | atendido pela conciliação; webhook real só na compra de baixo valor em produção | `../evidencias/carga/homologacao/tmvbad/resultado.md` |
+| CA-16 e PDF 11.3, estoque sob carga | 50 visitantes e 20 compras/min por 2 min, estoque de 60: 30 compras, 9 recusas, 0 erros, vendidos = emitidos = 60 | atendido em escala reduzida (escala do PDF só no local) | idem |
+| Seção 10, acesso direto ao serviço | Barreira de Host ligada também em homologação: `run.app` sem `X-Forwarded-Host` 403, pelo Hosting 200 | atendido | `server/src/api/security.integration.test.ts`, registro de rotinas |
+| CA-03 e abuso no cadastro (Turnstile) | Botão desabilitado com "Verificando…" até o token; falha ou 10 s sem token mostram mensagem e "Tentar de novo" | atendido | `src/site/humanGate.test.ts`, `e2e/turnstile.spec.ts` (6 casos) |
+| E-mail em homologação | `EMAIL_ALLOWLIST` (só fora de produção; produção recusa subir com ela); endereços fictícios em `@partyx.test` | implementado e testado; **não publicado nem ligado** (entra com o SMTP real) | `server/src/mail/allowlist.test.ts`, `server/src/api/mail.integration.test.ts` |
+
+Comandos da etapa (13/10/2026, último conjunto): `npm run lint`, `npm run typecheck`, `npm run test:db` (938 testes, nenhum pulado) e `npm run build` passaram; `npm run e2e:roteiro:ficticio` 20 de 20 (o do Brick é pulado com o fictício e não conta como aprovado) e `npm run e2e:turnstile` 6 de 6.
+
 ## Roteiro 11.2, responsividade e carga (12/10/2026)
 
 Playwright e k6 no **ambiente local** (PostgreSQL de teste descartável, dados fictícios). Nada rodou em homologação nem em produção, e nenhum aparelho real foi usado. Índice e o que é real ou simulado: `../evidencias/README.md`.
