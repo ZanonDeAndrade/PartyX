@@ -10,6 +10,7 @@ import {
   cpfFor,
   expectNoOverflow,
   formatCpf,
+  humanReady,
   PASSWORD_BUYER,
   PASSWORD_TEAM,
   prepareContext,
@@ -177,6 +178,7 @@ item(1, 'Cadastro com CPF válido, inválido e repetido', async () => {
     await page.getByLabel('Telefone com DDD').fill('11987654321');
     await page.locator('#senha').fill(buyers.ana.password);
     await page.locator('#aceite').check();
+    if (S.remote) await humanReady(page);
     await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
   };
   // Inválido: dígitos verificadores errados.
@@ -231,6 +233,7 @@ item(2, 'Login, logout e recuperação de senha', async () => {
   const asked = new Date();
   await page.goto(`${S.base}/recuperar-senha`);
   await page.getByLabel('E-mail').fill(buyers.ana.email);
+  if (S.remote) await humanReady(page);
   await page.getByRole('button', { name: 'Enviar link' }).click();
   await expect(page.getByRole('heading').first()).toBeVisible();
   const reset = S.remote

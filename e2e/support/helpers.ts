@@ -37,6 +37,17 @@ export async function prepareContext(ctx: BrowserContext) {
   });
 }
 
+/**
+ * Verificação humana (Turnstile) ligada, como na homologação: espera o widget devolver o token (campo oculto `cf-turnstile-response`)
+ * antes de enviar o formulário. Sem isso, o clique sai antes do token e o servidor recusa com 422. No local o Turnstile fica desligado.
+ */
+export async function humanReady(page: Page) {
+  const group = page.getByRole('group', { name: 'Verificação de que você não é um robô' });
+  await expect(group).toBeVisible({ timeout: 30_000 });
+  const field = group.locator('input[name="cf-turnstile-response"]');
+  await expect.poll(async () => ((await field.count()) ? await field.first().inputValue() : ''), { timeout: 30_000 }).not.toBe('');
+}
+
 /** Entra pela API (mesmo cookie do navegador). Para os itens em que o login não é o assunto. */
 export async function apiLogin(request: APIRequestContext, base: string, email: string, password: string) {
   const res = await request.post(`${base}/api/auth/login`, { data: { email, password }, headers: { origin: base } });
