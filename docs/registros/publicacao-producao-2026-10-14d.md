@@ -28,6 +28,8 @@ Sem mudança na Vercel (já aponta para o endereço principal do serviço), nas 
 
 ## Voltar atrás
 
+> Atualização de 14/10/2026 20:25 UTC: a `partyx-00012-vem` (texto longo) substituiu a `00010-ced`. A referência de retorno atual está em `publicacao-producao-2026-10-14e.md`.
+
 - **Referência de retorno a partir daqui: `partyx-00010-ced`.** Se esta revisão der problema antes da próxima publicação: `PROJECT=partyx-producao REVISAO=partyx-00008-gaz ./infra/producao/deploy.sh rollback`.
 - A `00008-gaz` funciona com o banco já migrado (a 0009 só acrescenta colunas e tabelas), mas não conhece as regras de menores nem os textos 1.1: volta aos Termos e Privacidade 1.0 e ao rodapé com os contatos antigos. Não é preciso reverter a migração para voltar.
 - Reverter a 0009 só com o banco sem provas de menor (a reversão recusa) e depois de voltar a revisão.

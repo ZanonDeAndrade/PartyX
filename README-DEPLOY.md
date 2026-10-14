@@ -432,3 +432,11 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Ordem que valeu para publicação com migração:** build, backup sob demanda conferido, `migrate`, `candidata`, `virar`, bateria por HTTPS no domínio. Vercel, rotinas e verificação de saúde não mudam quando só a revisão muda.
 
+## 17. Quinta publicação: texto longo e mensagens sem "ambiente" (14/10/2026)
+
+**Publicado:** revisão `partyx-00012-vem` (tag `release-2026-10-14e`, commit `a437388`), 100% desde 14/10 20:25 UTC, sem migração e com a mesma configuração. Texto longo digitado quebra a linha no site, nos PDFs e nos e-mails; frases ao público sem "ambiente". Registro: `docs/registros/publicacao-producao-2026-10-14e.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00012-vem`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00010-ced ./infra/producao/deploy.sh rollback`.
+
+**Sem migração:** a conferência do backup do dia (`infra/operacao/check-backup.sh`) basta antes da candidata; backup sob demanda só quando houver migração.
+
