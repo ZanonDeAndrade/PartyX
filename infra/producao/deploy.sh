@@ -463,12 +463,16 @@ cmd_evento_off() {
 }
 
 # --- Manutenção (G06): o site inteiro mostra a página de indisponibilidade com o contato da PartyX. Webhook e rotinas seguem no ar. ---
+# Depois da virada o tráfego fica PRESO à revisão virada (update-traffic --to-revisions): um `services update` cria a revisão nova com
+# 0%. Por isso cada troca rápida de variável leva o tráfego para a revisão recém-criada (--to-latest). Verificado em 14/10/2026.
 cmd_manutencao() {
   case "${1:-}" in
     on) g run services update "$SERVICE" --region="$REGION" --update-env-vars=MAINTENANCE_MODE=true --quiet
+        g run services update-traffic "$SERVICE" --region="$REGION" --to-latest --quiet
         echo "MANUTENÇÃO LIGADA: site, painel e portaria fechados (503). Webhook do gateway e rotinas internas continuam."
         echo "=> Para desligar: ./infra/producao/deploy.sh manutencao off" ;;
     off) g run services update "$SERVICE" --region="$REGION" --update-env-vars=MAINTENANCE_MODE=false --quiet
+         g run services update-traffic "$SERVICE" --region="$REGION" --to-latest --quiet
          echo "MANUTENÇÃO DESLIGADA." ;;
     *) echo "use: manutencao on|off" >&2; exit 1 ;;
   esac

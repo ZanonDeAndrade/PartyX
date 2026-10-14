@@ -1,8 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/", "destination": "https://candidata---partyx-7x4xxcu3eq-rj.a.run.app/" },
-    { "source": "/:path*", "destination": "https://candidata---partyx-7x4xxcu3eq-rj.a.run.app/:path*" }
+    { "source": "/", "destination": "https://partyx-391817439013.southamerica-east1.run.app/" },
+    { "source": "/:path*", "destination": "https://partyx-391817439013.southamerica-east1.run.app/:path*" }
   ],
   "headers": [
     {

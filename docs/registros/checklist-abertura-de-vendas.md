@@ -17,9 +17,9 @@ Preparado em 14/10/2026. **Nada aqui foi executado.** A publicação de 13/10 de
 
 | # | Item | Como se comprova | Feito em | Por quem |
 |---|---|---|---|---|
-| 2.1 | `partyx.com.br` e `www` ativos no Firebase, com HTTPS | API `customDomains`: `HOST_ACTIVE` e `CERT_ACTIVE` | | |
-| 2.2 | `PUBLIC_BASE_URL=https://partyx.com.br` publicado (candidata, teste rápido, virada) | Revisão nova; `run.app` direto 403 | | |
-| 2.3 | Rotina diária e verificação de saúde refeitas com o domínio | Execução manual 200; verificação apontando para `partyx.com.br` | | |
+| 2.1 | `partyx.com.br` e `www` ativos no Firebase, com HTTPS | API `customDomains`: `HOST_ACTIVE` e `CERT_ACTIVE` | Pendente no Firebase. Desde 14/10/2026 o domínio está no ar pela Vercel (ponte temporária, `docs/operacao/vercel.md`), com HTTPS | |
+| 2.2 | `PUBLIC_BASE_URL=https://partyx.com.br` publicado (candidata, teste rápido, virada) | Revisão nova; `run.app` direto 403 | 14/10/2026, revisão `partyx-00008-gaz` (`publicacao-producao-2026-10-14.md`) | Claude, com OK de Arthur |
+| 2.3 | Rotina diária e verificação de saúde refeitas com o domínio | Execução manual 200; verificação apontando para `partyx.com.br` | 14/10/2026: rotina diária e limpeza com 200; `partyx-saude-dominio` criada e a do `web.app` apagada | Claude, com OK de Arthur |
 | 2.4 | Domínio verificado no Resend; `smtp-url` de produção com chave só de envio; `EMAIL_FROM` de produção | `scripts/resend-chave-envio.sh producao` ok | | |
 | 2.5 | Entrega real de e-mail conferida, inclusive fora do spam | E-mail de teste recebido na caixa de entrada | | |
 | 2.6 | Chave de acesso total do Resend revogada | Painel do Resend | | |

@@ -14,7 +14,7 @@ visitante → `partyx.com.br` → Vercel (certificado Let's Encrypt, rewrite ext
 
 - **Na Vercel fica só a configuração de rewrite** (`infra/vercel/vercel.json`, projeto `partyx-dominio`). O back-end, o banco, as rotinas e os segredos continuam inteiros no Google Cloud.
 - CLI da Vercel fixada na versão **64.0.2** (a atual em 14/10/2026): sempre `npx vercel@64.0.2 ... --scope zanondeandrades-projects`, rodando dentro de `infra/vercel/`. A pasta `infra/vercel/.vercel/` (vínculo local com o projeto) fica fora do Git.
-- O destino do rewrite aponta primeiro para a candidata (`https://candidata---partyx-7x4xxcu3eq-rj.a.run.app`), para testar a cadeia antes da virada; na virada passa a ser o endereço principal do serviço (`https://partyx-391817439013.southamerica-east1.run.app`), com nova publicação na Vercel.
+- O destino do rewrite apontou primeiro para a candidata (`https://candidata---partyx-7x4xxcu3eq-rj.a.run.app`), para testar a cadeia antes da virada. **Desde 14/10/2026 (17:57 UTC) aponta para o endereço principal do serviço** (`https://partyx-391817439013.southamerica-east1.run.app`). Atenção: enquanto o destino era a candidata, publicar uma candidata já a colocava para o público pelo domínio (aconteceu em 14/10, das 17:56 até a virada, um minuto depois). Não volte o destino para a candidata com o domínio em uso.
 - Cache na Vercel só em `/assets/*` (arquivos com hash no nome, `immutable`); todo o resto vai sem cache (`x-vercel-enable-rewrite-caching: 0`).
 - `www.partyx.com.br` redireciona para a raiz com 308, configurado no projeto da Vercel.
 - O Firebase Hosting continua configurado (site, rewrites, domínios e o TXT `hosting-site=partyx-producao`), para a volta.
