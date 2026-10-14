@@ -77,3 +77,10 @@ Repetir sem `@$NS` para ver o que os resolvedores públicos já enxergam.
 - **Firebase:** no console (Hosting > domínios) ou pela API, o estado sai de "Needs setup" para "Pending", "Minting certificate" e **Connected**. O HTTPS é emitido sozinho depois que o TXT e o A (ou CNAME) estiverem visíveis: de minutos a poucas horas; a documentação fala em até 24 horas. Conferir com `curl -sI https://partyx.com.br/api/health`.
 - **Resend:** no painel, **Domains** > **Verify** em cada domínio; o estado vai de `not_started` a `verified` (costuma levar minutos; pode levar horas).
 - **Atenção à regra de Host:** enquanto `PUBLIC_BASE_URL` de produção for `https://partyx-producao.web.app`, o servidor responde **403** a quem chega por `partyx.com.br`, mesmo com o DNS e o certificado prontos. Isso inclui o webhook do Mercado Pago, se a URL do modo produtivo já estiver em `https://partyx.com.br/api/webhooks/payments`. A troca é o passo seguinte (`dominio-partyx.md`, item 6).
+
+## 5. Pendências
+
+- **DMARC para `p=quarantine`** (decisão do responsável em 14/10/2026): subir as linhas 13 e 14 de `p=none` para `p=quarantine` **depois** que os dois domínios estiverem verificados no Resend e os envios reais passarem com `spf=pass`, `dkim=pass` e `dmarc=pass`. Até lá o domínio fica sem proteção contra remetente forjado (a zona padrão do Registro.br tinha `p=reject`, `v=spf1 -all` e MX nulo, que saem quando a zona nova publicar).
+- Publicação da zona em modo avançado: em 14/10/2026 00:47 UTC os servidores do Registro.br ainda respondiam com a zona padrão (troca de modo: até 3 horas).
+- Relatórios do DMARC: trocar o endereço do Gmail por uma caixa do próprio domínio quando a PartyX tiver uma.
+
