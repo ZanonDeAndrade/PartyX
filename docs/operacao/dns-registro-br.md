@@ -16,6 +16,8 @@ Prazos, pela ajuda do Registro.br: a zona `.br` é publicada a cada 5 minutos; a
 
 Situação conferida em 14/10/2026 00:27 UTC: a delegação no `.br` já aponta para `a.auto.dns.br` e `b.auto.dns.br` e os resolvedores públicos respondem `NOERROR`. A zona tinha só os dois registros padrão do Registro.br para domínio sem e-mail, `TXT "v=spf1 -all"` e `MX 0 .`, ambos na raiz. **Os 4 registros do Firebase ainda não estavam publicados** (conferir se a zona foi salva).
 
+Atualização de 14/10/2026 02:30 UTC: com a zona em modo avançado, a delegação no `.br` passou para `a.sec.dns.br` e `b.sec.dns.br`, que já respondem os registros novos (A `199.36.158.100`, TXT `hosting-site=partyx-producao`, `www` e `hml` como CNAME). Os servidores `a.auto.dns.br` e `b.auto.dns.br` continuam respondendo a zona padrão antiga e não valem mais: conferir sempre em `a.sec.dns.br` ou num resolvedor público.
+
 ## 2. Tabela final (digitar exatamente assim)
 
 Nome no formato do editor do Registro.br: só o prefixo; **vazio** para a raiz (`partyx.com.br`). Valores sem aspas no campo; se o editor pedir, ele mesmo coloca.
@@ -58,7 +60,7 @@ Observações sobre a tabela:
 Direto nos servidores do Registro.br (sem esperar cache):
 
 ```bash
-NS=a.auto.dns.br
+NS=a.sec.dns.br
 dig +short A partyx.com.br @$NS                       # 199.36.158.100
 dig +short TXT partyx.com.br @$NS                     # "hosting-site=partyx-producao" e "v=spf1 -all"
 dig +short CNAME www.partyx.com.br @$NS               # partyx-producao.web.app.

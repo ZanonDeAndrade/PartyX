@@ -37,7 +37,7 @@ Os nomes dos botões podem variar um pouco no painel; se algum passo estiver dif
 Conferir depois da troca:
 
 ```bash
-dig +short NS partyx.com.br          # esperado: a.auto.dns.br. e b.auto.dns.br.
+dig +short NS partyx.com.br          # esperado: a.sec.dns.br. e b.sec.dns.br. (modo avançado; no modo simples eram a.auto e b.auto)
 dig +noall +comments SOA partyx.com.br | grep status     # esperado: NOERROR (hoje: SERVFAIL)
 dig +norecurse +short NS partyx.com.br @a.dns.br          # a delegação no .br já com os servidores novos
 ```
@@ -121,7 +121,7 @@ A variável do endereço público chama-se `PUBLIC_BASE_URL` (não existe `PUBLI
 
 | Passo | Comando | Esperado | Prazo usual |
 |---|---|---|---|
-| Delegação | `dig +short NS partyx.com.br` e `dig SOA partyx.com.br` | `a.auto.dns.br` e `b.auto.dns.br`, `NOERROR` | 30 min a 1 h |
+| Delegação | `dig +short NS partyx.com.br` e `dig SOA partyx.com.br` | `a.sec.dns.br` e `b.sec.dns.br`, `NOERROR` | 30 min a 1 h |
 | Hosting, verificação | `dig +short TXT partyx.com.br` | o TXT do console | minutos; até 24 h |
 | Hosting, apontamento | `dig +short A partyx.com.br` e `dig +short www.partyx.com.br` | IP do console | minutos; até 24 h |
 | Hosting, certificado | console: estado **Connected**; `curl -sI https://partyx.com.br/api/health` | 200 com certificado válido | minutos a horas; até 24 h |
