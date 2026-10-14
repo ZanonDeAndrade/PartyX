@@ -171,7 +171,7 @@ export async function startPayment(
 ): Promise<{ payment: PaymentView }> {
   const gateway = deps.gateway;
   if (!gateway) {
-    throw new AppError(503, 'pagamento_indisponivel', 'O pagamento ainda não está disponível neste ambiente.');
+    throw new AppError(503, 'pagamento_indisponivel', 'O pagamento ainda não está disponível. Tente de novo mais tarde.');
   }
   const now = deps.clock.now();
   await loadOwn(deps, userId, orderId);
@@ -418,7 +418,7 @@ export async function getPayment(deps: PaymentDeps, userId: string, orderId: str
   const { order } = await loadOwn(deps, userId, orderId);
   if (!order.gatewayPaymentId || !order.paymentMethod) return null;
   if (!deps.gateway)
-    throw new AppError(503, 'pagamento_indisponivel', 'O pagamento ainda não está disponível neste ambiente.');
+    throw new AppError(503, 'pagamento_indisponivel', 'O pagamento ainda não está disponível. Tente de novo mais tarde.');
   try {
     const snapshot = await deps.gateway.getPayment(order.gatewayPaymentId);
     if (snapshot.orderRef !== order.id) {

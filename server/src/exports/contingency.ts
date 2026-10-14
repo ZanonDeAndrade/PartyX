@@ -92,12 +92,18 @@ export function renderContingencyPdf(c: Contingency): Promise<Buffer> {
 
     const rows = (list: ContingencyTicket[], cancelled: boolean) => {
       for (const t of list) {
-        ensure(ROW);
+        // Nome e tipo longos quebram em linhas dentro da coluna e a linha da tabela cresce: nada sai cortado.
+        const holder = toLatin1(t.buyerMinor ? `${t.holderName} (MENOR)` : t.holderName);
+        const type = toLatin1(t.typeName);
+        doc.font('Helvetica').fontSize(9);
+        const textH = Math.max(
+          doc.heightOfString(holder, { width: COLS[2].w - 4 }),
+          doc.heightOfString(type, { width: COLS[4].w - 4 }),
+        );
+        const rowH = Math.max(ROW, Math.ceil(textH) + 6);
+        ensure(rowH);
         const y = doc.y;
-        doc
-          .font('Helvetica')
-          .fontSize(9)
-          .fillColor(cancelled ? '#555' : '#000');
+        doc.fillColor(cancelled ? '#555' : '#000');
         doc
           .rect(COLS[0].x + 4, y + 1, 9, 9)
           .lineWidth(0.7)
@@ -105,26 +111,16 @@ export function renderContingencyPdf(c: Contingency): Promise<Buffer> {
         if (t.status === 'utilizado') doc.text('já usou', COLS[0].x + 14, y + 2, { width: 12, lineBreak: false });
         doc.font('Courier-Bold').text(t.shortCode, COLS[1].x, y + 1, { width: COLS[1].w, lineBreak: false });
         doc.font('Helvetica');
-        doc.text(toLatin1(t.buyerMinor ? `${t.holderName} (MENOR)` : t.holderName), COLS[2].x, y + 1, {
-          width: COLS[2].w - 4,
-          height: 11,
-          ellipsis: true,
-          lineBreak: false,
-        });
+        doc.text(holder, COLS[2].x, y + 1, { width: COLS[2].w - 4 });
         doc.text(t.cpf ?? '', COLS[3].x, y + 1, { width: COLS[3].w, lineBreak: false });
-        doc.text(toLatin1(t.typeName), COLS[4].x, y + 1, {
-          width: COLS[4].w - 4,
-          height: 11,
-          ellipsis: true,
-          lineBreak: false,
-        });
+        doc.text(type, COLS[4].x, y + 1, { width: COLS[4].w - 4 });
         doc.text(`PX-${t.orderNumber}`, COLS[5].x, y + 1, { width: COLS[5].w, lineBreak: false });
         doc
-          .moveTo(M, y + ROW - 2)
-          .lineTo(M + 536, y + ROW - 2)
+          .moveTo(M, y + rowH - 2)
+          .lineTo(M + 536, y + rowH - 2)
           .lineWidth(0.2)
           .stroke('#999');
-        doc.y = y + ROW;
+        doc.y = y + rowH;
       }
     };
 
@@ -143,16 +139,19 @@ export function renderContingencyPdf(c: Contingency): Promise<Buffer> {
     const range = doc.bufferedPageRange();
     for (let i = range.start; i < range.start + range.count; i++) {
       doc.switchToPage(i);
+      // O rodapé fica abaixo da margem de baixo: sem zerá-la, o pdfkit levaria cada rodapé para uma página nova e em branco
+      // no fim do arquivo (defeito visto em 14/10/2026: lista de 3 páginas saía com 6).
+      doc.page.margins.bottom = 0;
+      // Sem o nome do evento: ele já está no cabeçalho de cada página e, longo, não caberia numa linha do rodapé.
       doc
         .font('Helvetica')
         .fontSize(8)
         .fillColor('#000')
-        .text(
-          `Página ${i + 1} de ${range.count} · ${toLatin1(c.event.name)} · CONFIDENCIAL: contém dados pessoais`,
-          M,
-          doc.page.height - M - 8,
-          { width: 523, align: 'center', lineBreak: false },
-        );
+        .text(`Página ${i + 1} de ${range.count} · CONFIDENCIAL: contém dados pessoais`, M, doc.page.height - M - 8, {
+          width: 523,
+          align: 'center',
+          lineBreak: false,
+        });
     }
     doc.end();
   });

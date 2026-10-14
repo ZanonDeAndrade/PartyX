@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import type { PartyxPublicInfo } from '../config';
 import { formatInEventZone } from '../domain/time';
 import type { LegalDocument } from '../legal/documents';
-import { toLatin1 } from '../tickets/pdf';
+import { fitFontSize, toLatin1 } from '../tickets/pdf';
 
 /**
  * Termo de Autorização e Responsabilidade para participação de menor (regras de menores, 14/10/2026). PDF de uma página no visual do
@@ -114,31 +114,34 @@ function draw(doc: PDFKit.PDFDocument, input: AuthorizationInput) {
       .text(title, M + 4, y);
     y = doc.y + 3;
   };
-  /** Linha de campos: cada um com o rótulo pequeno, o valor (quando há) e a linha de preencher embaixo. */
+  /**
+   * Linha de campos: cada um com o rótulo pequeno, o valor (quando há) e a linha de preencher embaixo. Valor longo (nome do evento,
+   * local, autorização judicial, nome do menor) quebra em linhas, com fonte um pouco menor depois de duas, e a linha cresce para
+   * caber: nada sai cortado.
+   */
   const fields = (cols: { label: string; value?: string | null; w: number }[], h = 30) => {
+    const sized = cols.map(col => {
+      const width = CW * col.w - 6;
+      if (!col.value) return { ...col, width, text: null, size: 9.6, valueH: 0 };
+      const text = toLatin1(col.value);
+      const size = fitFontSize(doc, text, 'Helvetica-Bold', [9.6, 8.4, 7.6], width, 2);
+      return { ...col, width, text, size, valueH: doc.heightOfString(text, { width }) };
+    });
+    const rowH = Math.max(h, 11 + Math.max(...sized.map(c => c.valueH)) + 6);
     let x = M;
-    for (const col of cols) {
-      const width = CW * col.w;
-      doc
-        .font('Helvetica')
-        .fontSize(7.6)
-        .fillColor(MUTED)
-        .text(toLatin1(col.label), x, y, { width: width - 6 });
-      if (col.value)
-        doc
-          .font('Helvetica-Bold')
-          .fontSize(9.6)
-          .fillColor(INK)
-          .text(toLatin1(col.value), x, y + 11, { width: width - 6, height: 13, ellipsis: true, lineBreak: false });
-      x += width;
+    for (const col of sized) {
+      doc.font('Helvetica').fontSize(7.6).fillColor(MUTED).text(toLatin1(col.label), x, y, { width: col.width });
+      if (col.text)
+        doc.font('Helvetica-Bold').fontSize(col.size).fillColor(INK).text(col.text, x, y + 11, { width: col.width });
+      x += CW * col.w;
     }
     doc
-      .moveTo(M, y + h - 2)
-      .lineTo(M + CW, y + h - 2)
+      .moveTo(M, y + rowH - 2)
+      .lineTo(M + CW, y + rowH - 2)
       .lineWidth(0.6)
       .strokeColor(RULE)
       .stroke();
-    y += h + 2;
+    y += rowH + 2;
   };
 
   section('1. Evento');

@@ -574,8 +574,8 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
       expect(pages.map(pg => /ingresso (\d) de 3/.exec(pg.replace(/\s+/g, ' '))?.[1])).toEqual(['1', '2', '3']);
     });
 
-    it('nome do evento com acentos, aspas e emoji não quebra o PDF (o que a fonte não desenha vira "?")', async () => {
-      expect(toLatin1('Festa "Açaí" — São João ✨🎉')).toBe('Festa "Açaí" — São João ??');
+    it('nome do evento com acentos, aspas e emoji não quebra o PDF (o emoji sai do texto impresso)', async () => {
+      expect(toLatin1('Festa "Açaí" — São João ✨🎉')).toBe('Festa "Açaí" — São João');
       const bytes = await renderTicketsPdf(
         [
           {
@@ -601,7 +601,7 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
         ],
         'Teste',
       );
-      expect(pdfPages(bytes)[0]).toContain('Festa Açaí ? do Zé');
+      expect(pdfPages(bytes)[0]).toContain('Festa Açaí do Zé');
     });
 
     it('o QR do PDF é lido de um PDF impresso pequeno: dimensão e zona de silêncio adequadas', async () => {

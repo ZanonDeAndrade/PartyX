@@ -46,7 +46,9 @@ Implementado em 01/10/2026 (Prompt 13): RF-38 a RF-43 e CA-20 a CA-22. Código e
 
 Evento, data, horário, local e endereço, classificação, tipo, nome do comprador, **código de identificação** e o **QR desenhado em vetor** (nítido na tela e na impressão, com a zona de silêncio de 4 módulos). Ingresso cancelado: marca CANCELADO e **sem QR**. Verificado rasterizando o PDF e decodificando a imagem como um leitor faria: o QR lido é exatamente o do ingresso, e o servidor o reconhece como válido. Também legível a 60 dpi.
 
-**Limite (D-43):** as fontes padrão do PDF cobrem Latin-1 (os acentos do português saem certos). Emoji e outros alfabetos viram "?". Suportar tudo exige embutir uma fonte Unicode.
+**Limite (D-43):** as fontes padrão do PDF cobrem Latin-1 (os acentos do português saem certos). Desde 14/10/2026 o emoji sai do texto impresso (antes virava "?"); outros alfabetos continuam virando "?". Suportar tudo exige embutir uma fonte Unicode.
+
+**Texto longo (14/10/2026):** nome do evento, local e endereço, tipo e comprador no limite (120, 120 + 200, 60 e 120 caracteres, mesmo sem espaço) quebram em linhas e nunca são cortados. A fonte diminui quando o texto passa de 2 ou 3 linhas, e o QR só encolhe se ainda faltar lugar, com mínimo de 200 pt. Texto comum sai igual ao de antes. O mesmo vale para o PDF da autorização de menor e para a lista de contingência.
 
 ## Telas (`src/site/ticketPages.tsx`)
 

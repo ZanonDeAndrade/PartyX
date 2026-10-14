@@ -251,7 +251,7 @@ export function PartyxContact({ lead = 'fale com a PartyX' }: { lead?: string })
       {whatsapp ? (
         <>
           WhatsApp{' '}
-          <a href={whatsappHref(whatsapp)} target="_blank" rel="noopener noreferrer">
+          <a href={whatsappHref(whatsapp)} target="_blank" rel="noopener noreferrer" className="px-nowrap">
             {whatsapp}
           </a>
         </>
@@ -287,7 +287,10 @@ export function Footer() {
             {p?.supportEmail ? <a href={`mailto:${p.supportEmail}`}>E-mail: {p.supportEmail}</a> : pending('E-mail')}
             {p?.supportWhatsapp ? (
               <a href={whatsappHref(p.supportWhatsapp)} target="_blank" rel="noopener noreferrer">
-                WhatsApp: {p.supportWhatsapp}
+                {/* Um só item do link (que é flex): "WhatsApp:" quebra antes do número, e o número fica inteiro. */}
+                <span>
+                  WhatsApp: <span className="px-nowrap">{p.supportWhatsapp}</span>
+                </span>
               </a>
             ) : (
               pending('WhatsApp')

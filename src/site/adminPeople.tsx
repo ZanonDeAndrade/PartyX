@@ -944,7 +944,7 @@ export function AdminTicketPage({ id }: { id: string }) {
             <div>
               <dt>Pedido</dt>
               <dd>
-                <Link to={`/admin/pedidos/${t.order.id}`}>PX-{t.order.number}</Link> ·{' '}
+                <Link to={`/admin/pedidos/${t.order.id}`} className="px-nowrap">PX-{t.order.number}</Link> ·{' '}
                 {ORDER_LABEL[t.order.status]?.[1] ?? t.order.status}
               </dd>
               <dd className="px-facts-sub">Pagamento aprovado em {when(t.order.paidAt)}</dd>

@@ -60,6 +60,12 @@ export function footerLines(ctx: MailContext): string[] {
   return lines;
 }
 
+/**
+ * Quebra de texto nos blocos com texto digitado (nome do evento, local, tipo, comprador, e-mail, link): palavra longa ou URL
+ * quebra em qualquer ponto em vez de alargar a tabela do e-mail. `word-break: break-word` cobre clientes sem `overflow-wrap`.
+ */
+const WRAP = 'word-break:break-word;overflow-wrap:anywhere;';
+
 interface Layout {
   preheader: string;
   title: string;
@@ -78,24 +84,24 @@ interface Layout {
  */
 function html(l: Layout, ctx: MailContext): string {
   const p = (t: string) =>
-    `<p style="margin:0 0 16px;font-family:${FONT};font-size:16px;line-height:1.55;color:${INK};">${escapeHtml(t)}</p>`;
+    `<p style="${WRAP}margin:0 0 16px;font-family:${FONT};font-size:16px;line-height:1.55;color:${INK};">${escapeHtml(t)}</p>`;
   const details = l.details?.length
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 24px;border-collapse:collapse;border-top:2px solid ${INK};">${l.details
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;margin:4px 0 24px;border-collapse:collapse;border-top:2px solid ${INK};">${l.details
         .map(
           d =>
-            `<tr><td valign="top" style="padding:11px 12px 11px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:13px;line-height:1.4;color:${MUTED};width:34%;">${escapeHtml(d.label)}</td><td valign="top" style="padding:11px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:15px;line-height:1.4;color:${INK};font-weight:700;">${escapeHtml(d.value)}</td></tr>`,
+            `<tr><td valign="top" style="${WRAP}padding:11px 12px 11px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:13px;line-height:1.4;color:${MUTED};width:34%;">${escapeHtml(d.label)}</td><td valign="top" style="${WRAP}padding:11px 0;border-bottom:1px solid ${LINE};font-family:${FONT};font-size:15px;line-height:1.4;color:${INK};font-weight:700;">${escapeHtml(d.value)}</td></tr>`,
         )
         .join('')}</table>`
     : '';
   const cta = l.cta
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;"><tr><td bgcolor="${VIOLET}" style="background:${VIOLET};border-radius:8px;"><a href="${escapeHtml(l.cta.url)}" style="display:inline-block;padding:15px 28px;font-family:${FONT};font-size:16px;font-weight:700;line-height:1;color:#FFFFFF;text-decoration:none;border-radius:8px;">${escapeHtml(l.cta.label)}</a></td></tr></table>
-       <p style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;color:${PURPLE};">${escapeHtml(l.cta.url)}</span></p>`
+       <p style="${WRAP}margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;color:${PURPLE};">${escapeHtml(l.cta.url)}</span></p>`
     : '';
   const link = l.link
-    ? `<p style="margin:0 0 16px;font-family:${FONT};font-size:15px;line-height:1.55;color:${INK};">${escapeHtml(l.link.lead)}<br><a href="${escapeHtml(l.link.url)}" style="color:${PURPLE};font-weight:700;">${escapeHtml(l.link.label)}</a></p>`
+    ? `<p style="${WRAP}margin:0 0 16px;font-family:${FONT};font-size:15px;line-height:1.55;color:${INK};">${escapeHtml(l.link.lead)}<br><a href="${escapeHtml(l.link.url)}" style="color:${PURPLE};font-weight:700;">${escapeHtml(l.link.label)}</a></p>`
     : '';
   const foot = l.footnote
-    ? `<p style="margin:0 0 8px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">${escapeHtml(l.footnote)}</p>`
+    ? `<p style="${WRAP}margin:0 0 8px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">${escapeHtml(l.footnote)}</p>`
     : '';
   const env = ctx.environmentLabel
     ? `<p style="margin:0 0 16px;font-family:${FONT};font-size:12px;color:#854D0E;background:#FEF3C7;padding:8px 12px;border-radius:6px;">E-mail de teste (${escapeHtml(ctx.environmentLabel)}). Identidade visual provisória.</p>`
@@ -105,15 +111,15 @@ function html(l: Layout, ctx: MailContext): string {
 <body style="margin:0;padding:0;background:#F7F7FA;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(l.preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F7FA;"><tr><td align="center" style="padding:24px 12px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid ${LINE};border-radius:12px;overflow:hidden;font-family:${FONT};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;max-width:560px;background:#FFFFFF;border:1px solid ${LINE};border-radius:12px;overflow:hidden;font-family:${FONT};">
 <tr><td bgcolor="${INK}" style="background:${INK};padding:18px 28px;"><img src="${escapeHtml(ctx.baseUrl + EMAIL_LOGO_PATH)}" width="58" height="32" alt="PartyX" style="display:block;width:58px;height:32px;border:0;outline:none;text-decoration:none;color:#FFFFFF;font-size:16px;line-height:32px;font-weight:900;font-family:${FONT};"></td></tr>
 <tr><td bgcolor="${VIOLET}" style="background:${VIOLET};height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
 <tr><td style="padding:32px 28px 28px;">
-${env}<h1 style="margin:0 0 18px;font-family:${FONT};font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-0.3px;color:${INK};">${escapeHtml(l.title)}</h1>
+${env}<h1 style="${WRAP}margin:0 0 18px;font-family:${FONT};font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-0.3px;color:${INK};">${escapeHtml(l.title)}</h1>
 ${l.paragraphs.map(p).join('\n')}
 ${details}${cta}${link}${foot}
 </td></tr>
-<tr><td style="padding:16px 28px 22px;border-top:1px solid ${LINE};background:#FAFAFC;"><p style="margin:0;font-family:${FONT};font-size:12px;line-height:1.5;color:${MUTED};">${footerLines(ctx).map(escapeHtml).join('<br>')}</p></td></tr>
+<tr><td style="padding:16px 28px 22px;border-top:1px solid ${LINE};background:#FAFAFC;"><p style="${WRAP}margin:0;font-family:${FONT};font-size:12px;line-height:1.5;color:${MUTED};">${footerLines(ctx).map(escapeHtml).join('<br>')}</p></td></tr>
 </table></td></tr></table></body></html>`;
 }
 

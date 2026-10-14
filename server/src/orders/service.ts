@@ -82,13 +82,13 @@ const invalid = (campo: string, mensagem: string, codigo = 'dados_invalidos') =>
 
 function assertSalesOpen(deps: OrdersDeps) {
   if (!deps.config.salesOpen) {
-    throw new AppError(503, 'vendas_fechadas', 'As vendas ainda não foram abertas neste ambiente.');
+    throw new AppError(503, 'vendas_fechadas', 'As vendas deste evento ainda não estão abertas.');
   }
   // Mesmo com SALES_OPEN=true, produção só vende com os textos legais e a aprovação visual do cliente (D-10, D-11).
   const blockers = salesBlockers(deps.config);
   if (blockers.length) {
     logger.warn('venda bloqueada por pendência do cliente', { blockers });
-    throw new AppError(503, 'vendas_fechadas', 'As vendas ainda não foram abertas neste ambiente.');
+    throw new AppError(503, 'vendas_fechadas', 'As vendas deste evento ainda não estão abertas.');
   }
 }
 

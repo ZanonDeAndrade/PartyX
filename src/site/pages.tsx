@@ -388,7 +388,7 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
                   <span>
                     {n} × {buyable.get(id)!.name}
                   </span>
-                  <span>{brl(n * buyable.get(id)!.priceCents)}</span>
+                  <span className="px-nowrap">{brl(n * buyable.get(id)!.priceCents)}</span>
                 </li>
               ))}
             </ul>
@@ -416,7 +416,7 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
             Continuar
           </button>
           {salesClosed ? (
-            <p className="px-notice px-notice-neu">As vendas ainda não foram abertas neste ambiente.</p>
+            <p className="px-notice px-notice-neu">As vendas deste evento ainda não estão abertas.</p>
           ) : null}
           <p className="px-fine">
             Escolher a quantidade ainda não reserva nada. A reserva começa quando você for para o pagamento.{' '}

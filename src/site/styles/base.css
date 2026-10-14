@@ -21,6 +21,36 @@ body.px-site {
   font-feature-settings: 'ss01' off;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* Texto digitado pelo admin ou pelo comprador (nome, descrição, local, tipo, e-mail, link, emojis) quebra em qualquer ponto
+     quando não cabe, em vez de esticar a coluna ou a página. Vale para o site inteiro, então texto novo já nasce protegido.
+     `break-word` antes: navegador sem `anywhere` (Safari anterior ao 15.4) fica com ele. */
+  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+/* Rótulos fixos da interface mantêm a palavra inteira quando a linha aperta (botão, aba, etiqueta, cabeçalho de tabela). */
+body.px-site :is(.px-btn, .px-badge, [role='tab'], th) {
+  overflow-wrap: normal;
+}
+/* Colunas de grade e de linha flexível que recebem texto digitado (evento, local, tipo, comprador, e-mail, promoter): podem
+   encolher abaixo da palavra mais longa, então quem quebra é o texto, não a página. O valor curto ao lado (`.px-nowrap`:
+   preço, data, código) fica de fora, para não ser espremido. Conferido com 300 caracteres sem espaço, URL e emojis em 360,
+   768 e 1280 px (14/10/2026). */
+body.px-site
+  :is(
+    .px-event,
+    .px-ck-grid,
+    .px-ck-buyer,
+    .px-tk-fields,
+    .px-ro-grid,
+    .px-hero-meta,
+    .px-hit,
+    .px-me-ticket-text > small,
+    .px-ck-review-lines > li,
+    .px-ck-lines > li,
+    .px-lines > li
+  )
+  > :not(.px-nowrap) {
+  min-width: 0;
 }
 body.px-site.px-dark {
   background: var(--px-ink);
@@ -150,6 +180,12 @@ body.px-dark .px-muted {
 }
 .px-break {
   overflow-wrap: anywhere;
+}
+/* Valor curto que não pode partir no meio (preço, data e hora, CPF mascarado, telefone, código): fica inteiro e não encolhe
+   ao lado de um texto digitado longo, que é quem quebra. */
+.px-nowrap,
+.px-mono:not(.px-break) {
+  white-space: nowrap;
 }
 .px-num {
   font-variant-numeric: tabular-nums;

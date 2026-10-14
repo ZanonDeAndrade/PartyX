@@ -95,12 +95,12 @@ function CheckoutShell({
                     <span>
                       {i.quantity} × {i.name}
                     </span>
-                    <span>{brl(i.subtotalCents)}</span>
+                    <span className="px-nowrap">{brl(i.subtotalCents)}</span>
                   </li>
                 ))}
                 {aside.coupon ? (
                   <li className="px-ck-promo">
-                    <span>Promoter</span>
+                    <span className="px-nowrap">Promoter</span>
                     <span>
                       <span className="px-mono">{aside.coupon.code}</span>, valor inalterado
                     </span>
@@ -109,7 +109,7 @@ function CheckoutShell({
               </ul>
               <p className="px-ck-total">
                 <b>Total</b>
-                <b>{brl(aside.totalCents)}</b>
+                <b className="px-nowrap">{brl(aside.totalCents)}</b>
               </p>
               <small className="px-fine">
                 Ingressos em nome de {buyer}. Pagamento processado pelo gateway na conta da PartyX.
@@ -349,7 +349,7 @@ export function CheckoutPage({ slug }: { slug: string }) {
         <div className="px-ck-mobbar">
           <div>
             <small>Total</small>
-            <b>{summary ? brl(summary.totalCents) : '...'}</b>
+            <b className="px-nowrap">{summary ? brl(summary.totalCents) : '...'}</b>
           </div>
           {goPay}
         </div>
@@ -379,7 +379,7 @@ export function CheckoutPage({ slug }: { slug: string }) {
                   </span>
                   <small>{brl(i.unitPriceCents)} cada</small>
                 </span>
-                <b>{brl(i.subtotalCents)}</b>
+                <b className="px-nowrap">{brl(i.subtotalCents)}</b>
               </li>
             ))}
           </ul>
@@ -644,7 +644,7 @@ function PixBox({ pix, total }: { pix: NonNullable<PaymentView['pix']>; total: n
       <div className="px-pix-qr">
         <div className="px-pix-qr-head">
           <span>Pagamento Pix</span>
-          <span>{brl(total)}</span>
+          <span className="px-nowrap">{brl(total)}</span>
         </div>
         <div className="px-pix-qr-box">
           {qr ? (

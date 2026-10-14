@@ -8,14 +8,23 @@ import type { TicketDetail } from './service';
  * evento, data, horário, local, tipo, nome do comprador, código de identificação e o QR Code (desenhado em vetor, nítido em
  * qualquer zoom e na impressão). **Sem CPF** (D-07). Ingresso cancelado sai com a marca CANCELADO e sem QR.
  *
- * Limite: as fontes padrão do PDF cobrem Latin-1 (acentos do português). Caracteres fora disso (emoji, outros alfabetos)
- * viram "?". Para suportá-los seria preciso embutir uma fonte Unicode (ver docs/ingressos.md).
+ * Limite: as fontes padrão do PDF cobrem Latin-1 (acentos do português). Emoji sai do texto impresso; outros alfabetos viram
+ * "?". Para desenhá-los seria preciso embutir uma fonte Unicode (ver docs/ingressos.md).
+ *
+ * Texto longo (nome do evento, local, tipo, comprador) nunca é cortado: quebra em linhas, inclusive palavra sem espaço, e a
+ * fonte diminui quando passa do espaço previsto. O QR só encolhe se ainda faltar lugar, com mínimo legível.
  */
 
-/** Troca por "?" o que a fonte padrão não desenha, para o PDF nunca sair com lixo. */
+/**
+ * Emoji com os seus modificadores (tom de pele, junção, variação, bandeira, tecla) e o espaço antes dele. © e ® são Latin-1 e
+ * ficam (a fonte desenha).
+ */
+const EMOJI = / ?(?:(?![©®])[\p{Extended_Pictographic}\p{Regional_Indicator}\u{1F3FB}-\u{1F3FF}‍︎️⃣])+/gu;
+
+/** Tira o emoji e troca por "?" o resto que a fonte padrão não desenha, para o PDF nunca sair com lixo. */
 export function toLatin1(text: string): string {
   const keep = new Set(['–', '—', '‘', '’', '“', '”', '•', '€', '…']);
-  return [...text.normalize('NFC')]
+  const out = [...text.normalize('NFC').replace(EMOJI, '')]
     .map(ch => {
       const code = ch.codePointAt(0)!;
       if ((code >= 0x20 && code <= 0xff) || keep.has(ch)) return ch;
@@ -23,6 +32,28 @@ export function toLatin1(text: string): string {
       return '?';
     })
     .join('');
+  // Texto só de emoji: sai "?" (como antes), não um campo vazio.
+  return out.trim() === '' && text.trim() !== '' ? '?' : out;
+}
+
+/**
+ * Maior tamanho da lista em que o texto cabe em `maxLines` linhas na largura dada. No menor tamanho, o texto quebra em quantas
+ * linhas precisar: nunca é cortado.
+ */
+export function fitFontSize(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  font: string,
+  sizes: readonly number[],
+  width: number,
+  maxLines: number,
+): number {
+  doc.font(font);
+  for (const size of sizes) {
+    doc.fontSize(size);
+    if (doc.heightOfString(text, { width }) <= maxLines * doc.currentLineHeight(true) + 0.5) return size;
+  }
+  return sizes[sizes.length - 1]!;
 }
 
 const PURPLE = '#5B21B6';
@@ -99,23 +130,19 @@ function page(
   drawDateBlock(doc, M, top, day, month);
   const tx = M + 82;
   const tw = W - tx - M;
-  doc
-    .fillColor(INK)
-    .font('Helvetica-Bold')
-    .fontSize(22)
-    .text(toLatin1(t.event.name), tx, top - 2, { width: tw });
+  // Tamanhos de sempre para texto comum; nome ou local longos (até 120 e 200 caracteres) descem de tamanho em vez de empurrar o QR.
+  const name = toLatin1(t.event.name);
+  const place = toLatin1(`${t.event.venue}, ${t.event.address}`);
+  const nameSize = fitFontSize(doc, name, 'Helvetica-Bold', [22, 18, 15], tw, 3);
+  const placeSize = fitFontSize(doc, place, 'Helvetica', [12, 10.5, 9], tw, 3);
+  doc.fillColor(INK).font('Helvetica-Bold').fontSize(nameSize).text(name, tx, top - 2, { width: tw });
   doc
     .moveDown(0.25)
     .font('Helvetica-Bold')
     .fontSize(12)
     .fillColor(PURPLE)
     .text(toLatin1(`${date}, às ${time}`), tx, undefined, { width: tw });
-  doc
-    .moveDown(0.15)
-    .font('Helvetica')
-    .fillColor(INK)
-    .fontSize(12)
-    .text(toLatin1(`${t.event.venue}, ${t.event.address}`), tx, undefined, { width: tw });
+  doc.moveDown(0.15).font('Helvetica').fillColor(INK).fontSize(placeSize).text(place, tx, undefined, { width: tw });
   doc
     .moveDown(0.15)
     .fillColor(MUTED)
@@ -129,21 +156,19 @@ function page(
     .lineTo(W - M, fields - 10)
     .lineWidth(0.6)
     .stroke(LINE);
+  const typeName = toLatin1(t.typeName);
+  const holder = toLatin1(t.holderName);
+  const holderW = W - 300 - M;
+  const typeSize = fitFontSize(doc, typeName, 'Helvetica-Bold', [15, 12.5, 11], 230, 2);
+  const holderSize = fitFontSize(doc, holder, 'Helvetica-Bold', [15, 12.5, 11], holderW, 2);
   doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Tipo', M, fields);
-  doc
-    .fillColor(INK)
-    .font('Helvetica-Bold')
-    .fontSize(15)
-    .text(toLatin1(t.typeName), M, fields + 13, { width: 230 });
+  doc.fillColor(INK).font('Helvetica-Bold').fontSize(typeSize).text(typeName, M, fields + 13, { width: 230 });
+  const typeEnd = doc.y;
   doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Comprador', 300, fields);
-  doc
-    .fillColor(INK)
-    .font('Helvetica-Bold')
-    .fontSize(15)
-    .text(toLatin1(t.holderName), 300, fields + 13, { width: W - 300 - M });
+  doc.fillColor(INK).font('Helvetica-Bold').fontSize(holderSize).text(holder, 300, fields + 13, { width: holderW });
 
-  // Picote: linha tracejada com meia-lua nas bordas, separando o canhoto do QR.
-  const cut = Math.max(doc.y, fields + 40) + 18;
+  // Picote: linha tracejada com meia-lua nas bordas, separando o canhoto do QR. Abaixo do mais alto dos dois campos.
+  const cut = Math.max(doc.y, typeEnd, fields + 40) + 18;
   doc.save();
   doc
     .moveTo(M, cut)
@@ -156,8 +181,10 @@ function page(
   doc.circle(W, cut, 10).lineWidth(1).stroke(LINE);
   doc.restore();
 
-  const qrSize = 300;
   const qrY = cut + 26;
+  // 300 pt de sempre; com o topo muito alto, o QR encolhe para o código e o rodapé caberem na página (mínimo de 200 pt, que
+  // continua lido no papel). Rodapé a 66 pt do fim, código (rótulo e texto) 54 pt abaixo do QR.
+  const qrSize = Math.max(200, Math.min(300, doc.page.height - 70 - 54 - qrY));
   if (t.status === 'cancelado' || !t.qrPayload) {
     doc
       .rect((W - qrSize) / 2, qrY, qrSize, qrSize)

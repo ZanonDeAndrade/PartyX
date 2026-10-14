@@ -136,7 +136,7 @@ export function SalesReportPage() {
                     <td>{l.eventName}</td>
                     <td>{l.typeName}</td>
                     <td>{l.tickets}</td>
-                    <td>{brl(l.cents)}</td>
+                    <td className="px-nowrap">{brl(l.cents)}</td>
                   </tr>
                 ))}
                 {r.byEvent.length > 1
@@ -146,7 +146,7 @@ export function SalesReportPage() {
                           Subtotal · {e.eventName}
                         </th>
                         <td>{e.tickets}</td>
-                        <td>{brl(e.cents)}</td>
+                        <td className="px-nowrap">{brl(e.cents)}</td>
                       </tr>
                     ))
                   : null}
@@ -157,7 +157,7 @@ export function SalesReportPage() {
                   <td>
                     <b>{r.totals.tickets}</b>
                   </td>
-                  <td>
+                  <td className="px-nowrap">
                     <b>{brl(r.totals.cents)}</b>
                   </td>
                 </tr>
@@ -276,8 +276,8 @@ export function PromoterReportPage() {
                     <td>
                       <Link to={`/admin/promoters/${p.id}`}>{p.name}</Link>
                       <br />
-                      <span className="px-muted px-mono">
-                        {p.code}
+                      <span className="px-muted">
+                        <span className="px-mono">{p.code}</span>
                         {p.isActive ? '' : ' · inativo'}
                       </span>
                     </td>
@@ -290,7 +290,7 @@ export function PromoterReportPage() {
                       </span>
                     </td>
                     <td>{metric === 'qtd' ? <b>{p.tickets}</b> : p.tickets}</td>
-                    <td>{metric === 'valor' ? <b>{brl(p.cents)}</b> : brl(p.cents)}</td>
+                    <td className="px-nowrap">{metric === 'valor' ? <b>{brl(p.cents)}</b> : brl(p.cents)}</td>
                     <td>{p.orders}</td>
                   </tr>
                 ))}
@@ -373,7 +373,7 @@ export function FeeReportPage() {
             </p>
             {r.reconciliation.anomalies.map(a => (
               <p key={a.orderId} className="px-notice px-notice-err" role="alert">
-                Pedido <Link to={`/admin/pedidos/${a.orderId}`}>PX-{a.number}</Link> ({a.status}) aprovado sem
+                Pedido <Link to={`/admin/pedidos/${a.orderId}`} className="px-nowrap">PX-{a.number}</Link> ({a.status}) aprovado sem
                 ingressos: {a.expectedUnits} unidade(s) previstas.
               </p>
             ))}
@@ -423,7 +423,7 @@ export function FeeReportPage() {
                   <tr key={e.eventId}>
                     <td>{e.eventName}</td>
                     <td>{e.units}</td>
-                    <td>{brl(e.feeCents)}</td>
+                    <td className="px-nowrap">{brl(e.feeCents)}</td>
                   </tr>
                 ))}
                 <tr className="px-total-row">
@@ -431,7 +431,7 @@ export function FeeReportPage() {
                   <td>
                     <b>{r.units}</b>
                   </td>
-                  <td>
+                  <td className="px-nowrap">
                     <b>{brl(r.feeCents)}</b>
                   </td>
                 </tr>
@@ -463,10 +463,10 @@ export function FeeReportPage() {
                     {r.exceptions.paidWithoutStock.map(o => (
                       <tr key={o.orderId}>
                         <td>
-                          <Link to={`/admin/pedidos/${o.orderId}`}>PX-{o.number}</Link>
+                          <Link to={`/admin/pedidos/${o.orderId}`} className="px-nowrap">PX-{o.number}</Link>
                         </td>
                         <td>{o.units}</td>
-                        <td>{brl(o.totalCents)}</td>
+                        <td className="px-nowrap">{brl(o.totalCents)}</td>
                         <td>{dateShort(o.paidAt)}</td>
                         <td>
                           <code>{o.gatewayRef ?? 'não informada'}</code>
@@ -479,7 +479,7 @@ export function FeeReportPage() {
                       <td>
                         <b>{r.exceptions.totals.units}</b>
                       </td>
-                      <td>
+                      <td className="px-nowrap">
                         <b>{brl(r.exceptions.totals.cents)}</b>
                       </td>
                       <td colSpan={3}>{r.exceptions.totals.open} em aberto</td>
@@ -530,10 +530,10 @@ export function FeeReportPage() {
                   <tr key={u.ticketId}>
                     <td className="px-mono">{u.shortCode}</td>
                     <td>
-                      <Link to={`/admin/pedidos/${u.orderId}`}>PX-{u.orderNumber}</Link>
+                      <Link to={`/admin/pedidos/${u.orderId}`} className="px-nowrap">PX-{u.orderNumber}</Link>
                     </td>
                     <td>{u.eventName}</td>
-                    <td>
+                    <td className="px-nowrap">
                       {dateShort(u.paidAt)} {timeOf(u.paidAt)}
                     </td>
                     <td>{u.current}</td>

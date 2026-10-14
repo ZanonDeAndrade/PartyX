@@ -97,6 +97,27 @@ describe('e-mails (RF-36, RF-67)', () => {
     expect(m.text).toContain('é preciso entrar na sua conta para ver os QR Codes');
   });
 
+  it('texto longo sem espaço (evento, local, tipo, comprador) quebra no HTML: blocos com quebra e tabelas de largura fixa', () => {
+    const long = (w: string, n: number) => w.repeat(Math.ceil(n / w.length)).slice(0, n);
+    const m = composeCompra(
+      {
+        ...purchase,
+        name: `Ana ${long('Testetesteteste', 115)}`,
+        eventName: long('FestaTesteteste', 120),
+        venue: long('ArenaCentraldeEventos', 120),
+        lines: [`2 × ${long('MeiaEntradaEstudante', 60)}`],
+      },
+      ctx,
+    );
+    // Todo bloco com texto (parágrafo, título, células dos detalhes, rodapé) tem a regra de quebra; o texto vai inteiro.
+    const blocks = m.html.match(/<(?:p|h1)\b[^>]*>|<td valign="top"[^>]*>/g) ?? [];
+    expect(blocks.length).toBeGreaterThan(5);
+    for (const b of blocks) expect(b).toContain('word-break:break-word;overflow-wrap:anywhere;');
+    expect(m.html.match(/table-layout:fixed/g)).toHaveLength(2);
+    expect(m.html).toContain(long('FestaTesteteste', 120));
+    expect(m.text).toContain(long('ArenaCentraldeEventos', 120));
+  });
+
   it('nunca leva QR, imagem, anexo nem código de ingresso: só o link seguro', () => {
     const m = composeCompra(purchase, ctx);
     // A única imagem permitida é a logo pública da marca (igual para todos, sem nada do pedido na URL).

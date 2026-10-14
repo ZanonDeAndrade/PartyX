@@ -740,12 +740,12 @@ export function AdminOrdersPage() {
                 {data.rows.map(o => (
                   <tr key={o.id}>
                     <td>
-                      <Link to={`/admin/pedidos/${o.id}`}>PX-{o.number}</Link>
+                      <Link to={`/admin/pedidos/${o.id}`} className="px-nowrap">PX-{o.number}</Link>
                     </td>
                     <td>
                       {o.buyer.name}
                       <br />
-                      <span className="px-muted">{o.buyer.cpf ?? ''}</span>
+                      <span className="px-muted px-nowrap">{o.buyer.cpf ?? ''}</span>
                     </td>
                     <td>{o.event.name}</td>
                     <td>
@@ -754,12 +754,12 @@ export function AdminOrdersPage() {
                         <span className="px-muted"> {o.paymentMethod === 'pix' ? 'Pix' : 'Cartão'}</span>
                       ) : null}
                     </td>
-                    <td>{brl(o.totalCents)}</td>
+                    <td className="px-nowrap">{brl(o.totalCents)}</td>
                     <td>
                       {o.tickets}
                       {o.cancelledTickets ? <span className="px-muted"> ({o.cancelledTickets} canc.)</span> : null}
                     </td>
-                    <td>
+                    <td className="px-nowrap">
                       {dateShort(o.createdAt)} {timeOf(o.createdAt)}
                     </td>
                   </tr>
@@ -932,7 +932,7 @@ export function AdminOrderPage({ id }: { id: string }) {
                 <span>
                   {i.quantity} × {i.name} ({brl(i.unitPriceCents)})
                 </span>
-                <b>{brl(i.subtotalCents)}</b>
+                <b className="px-nowrap">{brl(i.subtotalCents)}</b>
               </li>
             ))}
           </ul>
@@ -1097,7 +1097,7 @@ export function LiveEntriesPanel({ eventId }: { eventId: string }) {
               <tbody>
                 {data.recent.map((r, i) => (
                   <tr key={i}>
-                    <td>{timeOf(r.at)}</td>
+                    <td className="px-nowrap">{timeOf(r.at)}</td>
                     <td>
                       <b>{RESULT[r.result] ?? r.result}</b>
                       {r.method === 'manual' ? ' (manual)' : ''}
@@ -1197,9 +1197,9 @@ export function TicketsPanel({ eventId }: { eventId: string }) {
                       <br />
                       <span className="px-muted">{t.buyerEmail}</span>
                     </td>
-                    <td>{t.buyerCpf ?? 'Não informado'}</td>
+                    <td className="px-nowrap">{t.buyerCpf ?? 'Não informado'}</td>
                     <td>
-                      <Link to={`/admin/pedidos/${t.orderId}`}>PX-{t.orderNumber}</Link>
+                      <Link to={`/admin/pedidos/${t.orderId}`} className="px-nowrap">PX-{t.orderNumber}</Link>
                     </td>
                     <td>
                       <span className={`px-badge px-badge-${TICKET_TONE[t.status]}`}>{TICKET_LABEL[t.status]}</span>
@@ -1299,12 +1299,12 @@ export function BuyersPanel({ eventId }: { eventId: string }) {
                       <br />
                       <span className="px-muted">{b.email}</span>
                     </td>
-                    <td>{b.cpf ?? 'Não informado'}</td>
+                    <td className="px-nowrap">{b.cpf ?? 'Não informado'}</td>
                     <td>{b.orders}</td>
                     <td>{b.tickets}</td>
                     <td>{b.cancelled}</td>
                     <td>{b.entered}</td>
-                    <td>{brl(b.paidCents)}</td>
+                    <td className="px-nowrap">{brl(b.paidCents)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1453,7 +1453,7 @@ function ExceptionTable({
           {rows.map(c => (
             <tr key={c.orderId}>
               <td>
-                <Link to={`/admin/pedidos/${c.orderId}`}>PX-{c.number}</Link>
+                <Link to={`/admin/pedidos/${c.orderId}`} className="px-nowrap">PX-{c.number}</Link>
                 <br />
                 <span className="px-small px-muted">{c.event}</span>
               </td>
@@ -1462,8 +1462,8 @@ function ExceptionTable({
                 <br />
                 <span className="px-small px-muted">{c.buyerEmail}</span>
               </td>
-              <td>{brl(c.totalCents)}</td>
-              <td>{c.paidAt ? `${dateShort(c.paidAt)} ${timeOf(c.paidAt)}` : 'não informado'}</td>
+              <td className="px-nowrap">{brl(c.totalCents)}</td>
+              <td className="px-nowrap">{c.paidAt ? `${dateShort(c.paidAt)} ${timeOf(c.paidAt)}` : 'não informado'}</td>
               <td>
                 <code>{c.gatewayRef ?? 'não informada'}</code>
               </td>
@@ -1521,7 +1521,7 @@ function DuplicateChargeTable({
           {rows.map(c => (
             <tr key={`${c.orderId}:${c.duplicateRef}`}>
               <td>
-                <Link to={`/admin/pedidos/${c.orderId}`}>PX-{c.number}</Link>
+                <Link to={`/admin/pedidos/${c.orderId}`} className="px-nowrap">PX-{c.number}</Link>
                 <br />
                 <span className="px-small px-muted">{c.event}</span>
               </td>
@@ -1530,7 +1530,7 @@ function DuplicateChargeTable({
                 <br />
                 <span className="px-small px-muted">{c.buyerEmail}</span>
               </td>
-              <td>{brl(c.totalCents)}</td>
+              <td className="px-nowrap">{brl(c.totalCents)}</td>
               <td>
                 {dateShort(c.detectedAt)} {timeOf(c.detectedAt)}
               </td>
