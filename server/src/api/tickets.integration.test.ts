@@ -589,6 +589,7 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
               venue: 'Clube',
               address: 'Rua',
               ageRating: 'Livre',
+              allowsMinors: false,
             },
             typeName: 'Pista',
             holderName: 'José da Conceição',

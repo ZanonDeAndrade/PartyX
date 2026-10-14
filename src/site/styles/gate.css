@@ -458,3 +458,34 @@ body.px-dark .px-form .px-muted {
   outline: 4px solid #fff;
   outline-offset: 3px;
 }
+
+/* Conferir idade (pedido de comprador menor): três escolhas grandes; a tela não fecha sozinha. */
+.px-gate-minor-actions {
+  display: grid;
+  gap: var(--px-s-3);
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.px-gate-minor-actions .px-gate-next {
+  font-size: 1.35rem;
+}
+.px-gate-next-alt {
+  background: #fff;
+  color: var(--px-ink);
+  border: 3px solid var(--px-ink);
+}
+.px-gate-refuse {
+  min-height: 56px;
+  border: 0;
+  border-radius: var(--px-r-md);
+  background: transparent;
+  color: var(--px-ink);
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.px-gate-minor-actions button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}

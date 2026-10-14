@@ -28,7 +28,7 @@ Equipe da PartyX: administradores e validadores de portaria cadastrados pela Par
 
 A consulta aos eventos é livre. Para comprar ingressos, é necessário criar uma conta e estar logado.
 
-No cadastro, você informa nome completo, e-mail, CPF, telefone com DDD e uma senha. Os dados devem ser verdadeiros, completos e atualizados, e você é responsável por eles. Cada CPF pode ter apenas uma conta.
+No cadastro, você informa nome completo, data de nascimento, e-mail, CPF, telefone com DDD e uma senha. Os dados devem ser verdadeiros, completos e atualizados, e você é responsável por eles. Cada CPF pode ter apenas uma conta.
 
 O cadastro e a compra são permitidos somente a pessoas com 16 anos completos ou mais. Quem tiver entre 16 e 18 anos declara, ao aceitar estes Termos, que tem autorização dos pais ou responsáveis para criar a conta e comprar ingressos. A classificação etária de cada Evento continua valendo: em Eventos para maiores de 18 anos, menores de idade não entram, mesmo com ingresso.
 
@@ -75,6 +75,8 @@ Titularidade: todos os ingressos de um pedido são emitidos no nome do comprador
 Guarda do QR Code: o QR Code funciona como chave de entrada, e cada ingresso permite uma única entrada. Qualquer cópia, como captura de tela ou impressão, é aceita na leitura: entra quem apresentar primeiro, e as apresentações seguintes são recusadas como "já utilizado". Guarde seus ingressos com cuidado e não os divulgue. A PartyX não responde pelo uso do ingresso por pessoas a quem o comprador tenha dado acesso ao QR Code ou ao código, nem por perda ou vazamento causados pelo comprador.
 
 Validação: a entrada é validada pela equipe da PartyX, na portaria, pela leitura do QR Code ou por busca manual. A PartyX pode pedir documento de identificação com foto para conferir dados ou idade. Ingressos cancelados, estornados, contestados ou de outro Evento são recusados.
+
+Menores de 18 anos: em Eventos que permitem a entrada de menores, quem tiver 16 ou 17 anos na data do Evento precisa aceitar, na compra, o Termo de Ciência para Menores de Idade. Na portaria, o menor deve entregar o Termo de Autorização e Responsabilidade, disponível para download na Plataforma, preenchido e assinado pelo pai, pela mãe ou pelo responsável legal, junto com uma cópia do documento com foto do responsável, e apresentar o próprio documento original com foto. Com esses documentos, o menor pode entrar desacompanhado. Sem eles, a entrada é recusada. O termo fica retido na portaria. A mesma regra vale para acompanhantes de 16 ou 17 anos que usem ingressos comprados por outra pessoa. Menores de 16 anos não entram nos Eventos.
 
 Classificação etária e regras do Evento: a classificação etária aparece na página do Evento e no ingresso. A PartyX pode recusar a entrada de quem não atender à classificação etária ou à lei, ou de quem descumprir as regras de segurança, de conduta e do local informadas para o Evento. Nesses casos, aplica-se a Política de Cancelamento e Reembolso.
 

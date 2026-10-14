@@ -31,6 +31,10 @@ export interface EventDetail extends EventCard {
   attractions: string[];
   shareImageUrl: string | null;
   ticketTypes: TicketTypeView[];
+  /** Fim previsto, quando informado. */
+  endsAt?: string | null;
+  /** Entra quem terá 16 ou 17 anos na data do evento, com o Termo de Autorização (regras de menores). Falso: só 18+. */
+  allowsMinors?: boolean;
 }
 
 export interface SiteInfo {
@@ -166,8 +170,24 @@ export interface SessionUser {
   /** Já mascarado pelo servidor (***.***.***-00). */
   cpf?: string | null;
   phone?: string | null;
+  /** AAAA-MM-DD. Nula em conta antiga (o checkout pede) e na equipe. Só a PartyX corrige depois de informada. */
+  birthDate?: string | null;
   role: 'cliente' | 'validador' | 'administrador';
   mustChangePassword: boolean;
+}
+
+/** O que falta ao comprador para o evento escolhido, ou por que não pode comprar (calculado no servidor, na data do evento). */
+export interface BuyerCheck {
+  consentPending: boolean;
+  birthDateMissing: boolean;
+  age: number | null;
+  /** 16 ou 17 anos na data do evento: precisa aceitar o Termo de Ciência para Menores. */
+  minor: boolean;
+  minorTermVersion: string | null;
+  refusal: {
+    code: 'aceite_pendente' | 'data_nascimento_obrigatoria' | 'idade_minima' | 'evento_para_maiores';
+    message: string;
+  } | null;
 }
 
 export interface OrderLine {
@@ -179,11 +199,12 @@ export interface OrderLine {
 }
 
 export interface Summary {
-  event: { slug: string; name: string; startsAt: string; venue: string };
+  event: { slug: string; name: string; startsAt: string; venue: string; allowsMinors?: boolean };
   items: OrderLine[];
   totalCents: number;
   units: number;
   coupon: { code: string } | null;
+  buyer?: BuyerCheck | null;
 }
 
 export type OrderStatus =
@@ -193,7 +214,9 @@ export interface OrderView {
   id: string;
   number: number;
   status: OrderStatus;
-  event: { slug: string; name: string; startsAt: string; venue: string };
+  event: { slug: string; name: string; startsAt: string; venue: string; allowsMinors?: boolean };
+  /** Comprador com 16 ou 17 anos na data do evento. */
+  buyerMinor?: boolean;
   items: OrderLine[];
   totalCents: number;
   coupon: { code: string } | null;
@@ -244,7 +267,15 @@ export interface TicketSummary {
   id: string;
   orderId: string;
   orderNumber: number;
-  event: { slug: string; name: string; startsAt: string; venue: string; address: string; ageRating: string };
+  event: {
+    slug: string;
+    name: string;
+    startsAt: string;
+    venue: string;
+    address: string;
+    ageRating: string;
+    allowsMinors?: boolean;
+  };
   typeName: string;
   holderName: string;
   shortCode: string;
@@ -268,11 +299,13 @@ export interface OrderRow {
   ticketCount: number;
 }
 
-export type GateResultKind = 'valido' | 'ja_utilizado' | 'invalido' | 'cancelado' | 'outro_evento';
+/** `menor_confirmar`: ingresso de pedido de comprador menor; nada foi consumido, o validador confere a idade e confirma. */
+export type GateResultKind = 'valido' | 'ja_utilizado' | 'invalido' | 'cancelado' | 'outro_evento' | 'menor_confirmar';
+export type MinorCheck = 'autorizacao_recebida' | 'maior_de_idade';
 export interface GateOutcome {
   result: GateResultKind;
   message: string;
-  ticket: { id: string; shortCode: string; typeName: string; holderName: string } | null;
+  ticket: { id: string; shortCode: string; typeName: string; holderName: string; buyerMinor?: boolean } | null;
   firstEntry: { at: string; validatorName: string } | null;
   otherEvent: { name: string } | null;
   counter: { entered: number; total: number };
@@ -299,6 +332,8 @@ export interface GateHit {
   email: string;
   status: 'valido' | 'utilizado' | 'cancelado';
   usedAt: string | null;
+  /** Pedido de comprador menor: marca MENOR e a entrada pede a conferência da idade. */
+  buyerMinor?: boolean;
 }
 
 export interface Bucket {
@@ -484,6 +519,9 @@ export interface AdminEventRow {
   ageRating: string;
   bannerUrl: string | null;
   isFeatured: boolean;
+  endsAt: string | null;
+  allowsMinors: boolean;
+  judicialAuthorization: string | null;
   /** Quando foi encerrado (nulo se não encerrado, ou encerrado por versão anterior: vale `updatedAt`). */
   closedAt: string | null;
   createdAt: string;
@@ -625,6 +663,9 @@ export interface EventInputBody {
   attractions: string[];
   ageRating: string;
   isFeatured: boolean;
+  endsAt: string | null;
+  allowsMinors: boolean;
+  judicialAuthorization: string | null;
 }
 export interface TicketTypeBody {
   name: string;
@@ -778,9 +819,19 @@ export const api = {
   event: async (slug: string, signal?: AbortSignal) =>
     (await get<{ event: EventDetail }>(`/public/events/${encodeURIComponent(slug)}`, signal)).event,
 
-  me: (signal?: AbortSignal) => get<{ user: SessionUser; csrfToken: string }>('/auth/me', signal),
+  me: (signal?: AbortSignal) =>
+    get<{ user: SessionUser; csrfToken: string; pendingConsent?: boolean }>('/auth/me', signal),
   login: (email: string, password: string) =>
-    request<{ user: SessionUser }>('POST', '/auth/login', { email, password }),
+    request<{ user: SessionUser; pendingConsent?: boolean }>('POST', '/auth/login', { email, password }),
+  /** Conta antiga: informa a data de nascimento uma vez (depois, só a PartyX corrige). */
+  setBirthDate: (birthDate: string) => request<{ birthDate: string }>('POST', '/me/birth-date', { birthDate }),
+  /** Novo aceite dos Termos e da Privacidade vigentes. */
+  acceptTerms: (acceptedTermsVersion: string, acceptedPrivacyVersion: string) =>
+    request<{ pendingConsent: boolean }>('POST', '/me/consents', {
+      acceptedTermsVersion,
+      acceptedPrivacyVersion,
+      accept: true,
+    }),
   register: (body: Record<string, unknown>) => request<{ user: SessionUser }>('POST', '/auth/register', body),
   logout: () => request<void>('POST', '/auth/logout'),
   forgotPassword: (email: string, captchaToken?: string | null) =>
@@ -799,12 +850,19 @@ export const api = {
       items,
       couponCode: couponCode || null,
     }).then(r => r.summary),
-  createOrder: (eventSlug: string, items: CartItem[], couponCode: string | undefined, expectedTotalCents: number) =>
+  createOrder: (
+    eventSlug: string,
+    items: CartItem[],
+    couponCode: string | undefined,
+    expectedTotalCents: number,
+    minorTerm?: { accepted: boolean; version: string | null },
+  ) =>
     request<{ order: OrderView }>('POST', '/orders', {
       eventSlug,
       items,
       couponCode: couponCode || null,
       expectedTotalCents,
+      ...(minorTerm ? { minorTermAccepted: minorTerm.accepted, minorTermVersion: minorTerm.version } : {}),
     }).then(r => r.order),
   order: (id: string, signal?: AbortSignal) =>
     get<{ order: OrderView }>(`/orders/${encodeURIComponent(id)}`, signal).then(r => r.order),
@@ -830,7 +888,10 @@ export const api = {
   gateScan: (eventId: string, qr: string) => request<GateOutcome>('POST', '/gate/scan', { eventId, qr }),
   gateSearch: (eventId: string, q: string) =>
     request<{ kind: string; hits: GateHit[] }>('POST', '/gate/search', { eventId, q }),
-  gateAdmit: (eventId: string, ticketId: string) => request<GateOutcome>('POST', '/gate/admit', { eventId, ticketId }),
+  gateAdmit: (eventId: string, ticketId: string, confirm?: { method: 'camera' | 'manual'; minorCheck: MinorCheck }) =>
+    request<GateOutcome>('POST', '/gate/admit', { eventId, ticketId, ...confirm }),
+  gateMinorRefused: (eventId: string, ticketId: string) =>
+    request<{ recusado: boolean }>('POST', '/gate/minor-refused', { eventId, ticketId }),
   updateProfile: (name: string, phone: string) => request<{ user: SessionUser }>('PATCH', '/me', { name, phone }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ mensagem: string }>('POST', '/me/password', { currentPassword, newPassword }),
@@ -903,7 +964,7 @@ export const api = {
       ),
     buyer: (id: string, signal?: AbortSignal) => get<BuyerDetail>(`/admin/buyers/${encodeURIComponent(id)}`, signal),
     revealCpf: (id: string) => request<{ cpf: string }>('POST', `/admin/buyers/${encodeURIComponent(id)}/cpf`),
-    correctIdentity: (id: string, body: { email?: string; cpf?: string; reason: string }) =>
+    correctIdentity: (id: string, body: { email?: string; cpf?: string; birthDate?: string; reason: string }) =>
       request<{ mensagem: string }>('PATCH', `/admin/users/${encodeURIComponent(id)}/identity`, body),
     ticket: (id: string, signal?: AbortSignal) =>
       get<AdminTicketDetail>(`/admin/tickets/${encodeURIComponent(id)}`, signal),
@@ -963,7 +1024,14 @@ export const api = {
     get<{ payment: PaymentView | null }>(`/orders/${encodeURIComponent(id)}/payment`, signal).then(r => r.payment),
 };
 
-export type LegalKind = 'termos-de-uso' | 'privacidade' | 'cancelamento' | 'meia-entrada';
+export type LegalKind =
+  'termos-de-uso' | 'privacidade' | 'cancelamento' | 'meia-entrada' | 'termo-menor' | 'autorizacao-menor';
+
+/** Endereços dos PDFs da autorização de menor (o navegador baixa direto; o do pedido exige a sessão). */
+export const minorAuthorizationUrl = {
+  order: (orderId: string) => `/api/orders/${encodeURIComponent(orderId)}/autorizacao-menor.pdf`,
+  blank: (slug: string) => `/api/public/events/${encodeURIComponent(slug)}/autorizacao-menor.pdf`,
+};
 export interface LegalDocument {
   kind: LegalKind;
   title: string;

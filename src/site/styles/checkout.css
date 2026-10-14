@@ -703,3 +703,38 @@
   height: 420px;
   border-radius: var(--px-r-md);
 }
+
+/* Termo de Ciência para Menores no checkout: texto rolável, com a caixa de aceite logo abaixo. */
+.px-ck-term {
+  max-height: 260px;
+  overflow: auto;
+  margin: var(--px-s-3) 0;
+  padding: var(--px-s-3) var(--px-s-4);
+  border: 1px solid var(--px-line);
+  border-radius: var(--px-r-md);
+  background: var(--px-paper);
+  font-size: var(--px-t-sm);
+  line-height: 1.55;
+}
+.px-ck-term p {
+  margin: 0 0 var(--px-s-2);
+}
+.px-ck-term:focus-visible {
+  outline: 2px solid var(--px-violet);
+  outline-offset: 2px;
+}
+/* Pedido pago de evento com menores: aviso e o PDF da autorização. */
+.px-ck-minor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--px-s-2);
+  margin-top: var(--px-s-4);
+  padding-top: var(--px-s-4);
+  border-top: 1px solid var(--px-line);
+  text-align: left;
+}
+.px-ck-minor p {
+  margin: 0;
+  font-size: var(--px-t-sm);
+}

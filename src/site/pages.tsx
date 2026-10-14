@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, type EventCard, type EventDetail, type SiteInfo } from './api';
+import { api, minorAuthorizationUrl, type EventCard, type EventDetail, type SiteInfo } from './api';
 import { takeEmbedded } from './embedded';
 import { loadCart, saveCart } from './cart';
 import {
@@ -530,7 +530,10 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
               <div>
                 <dt>Quando</dt>
                 <dd>{capital(dateLong(event.startsAt))}</dd>
-                <dd className="px-facts-sub">Início às {timeOf(event.startsAt)}</dd>
+                <dd className="px-facts-sub">
+                  Início às {timeOf(event.startsAt)}
+                  {event.endsAt ? `, fim às ${timeOf(event.endsAt)}` : ''}
+                </dd>
               </div>
               <div>
                 <dt>Onde</dt>
@@ -540,8 +543,27 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
               <div>
                 <dt>Classificação</dt>
                 <dd>{event.ageRating}</dd>
+                <dd className="px-facts-sub">
+                  {event.allowsMinors
+                    ? 'A partir de 16 anos na data do evento. Com 16 ou 17, entrada com autorização do responsável.'
+                    : 'Só para quem tiver 18 anos ou mais na data do evento.'}
+                </dd>
               </div>
             </dl>
+            {event.allowsMinors && !preview ? (
+              <p className="px-event-minor">
+                Quem tiver 16 ou 17 anos entrega na portaria o Termo de Autorização e Responsabilidade preenchido e
+                assinado pelo responsável, com a cópia do documento dele, e apresenta o próprio documento com foto. Vale
+                também para acompanhantes.{' '}
+                <a href={minorAuthorizationUrl.blank(event.slug)} download className="px-textlink">
+                  Baixar o termo em branco (PDF)
+                </a>
+                {' · '}
+                <Link to="/termo-menor" className="px-textlink">
+                  Termo de ciência para menores
+                </Link>
+              </p>
+            ) : null}
             {preview ? null : (
               <div className="px-share-row">
                 <button type="button" className="px-btn px-btn-ghost" onClick={shareNow} aria-haspopup="dialog">

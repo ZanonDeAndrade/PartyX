@@ -558,3 +558,22 @@
   font-size: var(--px-t-sm);
   color: var(--px-text-3);
 }
+
+/* Autorização para menores (eventos que permitem 16 e 17 anos): aviso curto e o PDF de cada pedido. */
+.px-wallet-minor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--px-s-2);
+  margin: 0 0 var(--px-s-3);
+}
+.px-wallet-minor p {
+  margin: 0;
+  font-size: var(--px-t-sm);
+  color: var(--px-text-2);
+}
+.px-wallet-minor .px-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--px-s-2);
+}

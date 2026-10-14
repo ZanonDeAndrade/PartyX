@@ -610,6 +610,11 @@ interface EventForm {
   attractions: string;
   ageRating: string;
   isFeatured: boolean;
+  /** Fim previsto (vai na autorização de menores). */
+  endDate: string;
+  endTime: string;
+  allowsMinors: boolean;
+  judicialAuthorization: string;
 }
 const EMPTY_FORM: EventForm = {
   name: '',
@@ -621,9 +626,14 @@ const EMPTY_FORM: EventForm = {
   attractions: '',
   ageRating: '',
   isFeatured: false,
+  endDate: '',
+  endTime: '',
+  allowsMinors: false,
+  judicialAuthorization: '',
 };
 function formOf(e: AdminEvent): EventForm {
   const { date, time } = isoToZonedInputs(e.startsAt);
+  const end = e.endsAt ? isoToZonedInputs(e.endsAt) : { date: '', time: '' };
   return {
     name: e.name,
     date,
@@ -634,9 +644,13 @@ function formOf(e: AdminEvent): EventForm {
     attractions: e.attractions.join('\n'),
     ageRating: e.ageRating,
     isFeatured: e.isFeatured,
+    endDate: end.date,
+    endTime: end.time,
+    allowsMinors: e.allowsMinors,
+    judicialAuthorization: e.judicialAuthorization ?? '',
   };
 }
-const SERVER_FIELD: Record<string, string> = { startsAt: 'date', slug: 'name' };
+const SERVER_FIELD: Record<string, string> = { startsAt: 'date', slug: 'name', endsAt: 'endDate' };
 
 export function AdminEventFormPage({ id }: { id?: string }) {
   usePageTitle(id ? 'Editar evento · PartyX' : 'Novo evento · PartyX');
@@ -712,6 +726,18 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
     if (attractions.length > meta.limits.attractionsMax || attractions.some(a => a.length > meta.limits.attractionMax))
       e.attractions = `Até ${meta.limits.attractionsMax} atrações, com até ${meta.limits.attractionMax} caracteres cada.`;
     if (!form.ageRating) e.ageRating = 'Escolha a classificação etária.';
+    // Fim e regras de menores (as mesmas do servidor, que confere de novo).
+    const hasEnd = Boolean(form.endDate || form.endTime);
+    const endIso = form.endDate && form.endTime ? zonedInputsToIso(form.endDate, form.endTime) : null;
+    const startIso = form.date && form.time ? zonedInputsToIso(form.date, form.time) : null;
+    if (hasEnd && !endIso) e.endDate = 'Informe a data e o horário de fim.';
+    else if (endIso && startIso && endIso <= startIso) e.endDate = 'O fim precisa ser depois do início.';
+    if (form.allowsMinors) {
+      if (!endIso && !e.endDate) e.endDate = 'Informe o fim: ele vai na autorização de menores.';
+      if (!form.judicialAuthorization.trim())
+        e.judicialAuthorization = 'Informe o número da autorização judicial (portaria ou alvará).';
+      if (form.ageRating === '18 anos') e.allowsMinors = 'Evento com classificação 18 anos não permite menores.';
+    }
     return e;
   };
 
@@ -771,6 +797,9 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
       attractions: attractionsFromText(form.attractions),
       ageRating: form.ageRating,
       isFeatured: form.isFeatured,
+      endsAt: form.endDate && form.endTime ? zonedInputsToIso(form.endDate, form.endTime) : null,
+      allowsMinors: form.allowsMinors,
+      judicialAuthorization: form.judicialAuthorization.trim() || null,
     };
     let current: AdminEvent;
     try {
@@ -886,6 +915,29 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
           {...described('ev-time', errors.time)}
         />
       </FormField>
+      <FormField
+        id="ev-endDate"
+        label="Data do fim"
+        error={errors.endDate}
+        hint="Opcional, exceto se o evento permitir menores."
+      >
+        <input
+          id="ev-endDate"
+          type="date"
+          value={form.endDate}
+          onChange={e => set('endDate', e.target.value)}
+          {...described('ev-endDate', errors.endDate, true)}
+        />
+      </FormField>
+      <FormField id="ev-endTime" label="Horário do fim" error={errors.endTime}>
+        <input
+          id="ev-endTime"
+          type="time"
+          value={form.endTime}
+          onChange={e => set('endTime', e.target.value)}
+          {...described('ev-endTime', errors.endTime)}
+        />
+      </FormField>
       <FormField id="ev-venue" label="Local" error={errors.venue}>
         <input
           id="ev-venue"
@@ -951,6 +1003,46 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
           ))}
         </select>
       </FormField>
+      <fieldset className="px-field-wide px-fieldset">
+        <legend>Menores de idade</legend>
+        <div className="px-check">
+          <input
+            id="ev-allowsMinors"
+            type="checkbox"
+            checked={form.allowsMinors}
+            onChange={e => set('allowsMinors', e.target.checked)}
+            aria-invalid={errors.allowsMinors ? true : undefined}
+            aria-describedby={errors.allowsMinors ? 'ev-allowsMinors-erro' : 'ev-allowsMinors-ajuda'}
+          />
+          <label htmlFor="ev-allowsMinors">Permite menores de 16 e 17 anos</label>
+        </div>
+        <small id="ev-allowsMinors-ajuda" className="px-muted">
+          Marcado: quem tiver 16 ou 17 anos na data do evento compra com o Termo de Ciência e entra com o Termo de
+          Autorização assinado pelo responsável. Desmarcado: só quem tiver 18 anos ou mais na data do evento compra.
+        </small>
+        {errors.allowsMinors ? (
+          <small id="ev-allowsMinors-erro" className="px-error" role="alert">
+            {errors.allowsMinors}
+          </small>
+        ) : null}
+        {form.allowsMinors ? (
+          <FormField
+            id="ev-judicialAuthorization"
+            label="Autorização judicial (portaria ou alvará) nº"
+            error={errors.judicialAuthorization}
+            hint="Sai impressa na autorização de menores."
+          >
+            <input
+              id="ev-judicialAuthorization"
+              value={form.judicialAuthorization}
+              maxLength={120}
+              autoComplete="off"
+              onChange={e => set('judicialAuthorization', e.target.value)}
+              {...described('ev-judicialAuthorization', errors.judicialAuthorization, true)}
+            />
+          </FormField>
+        ) : null}
+      </fieldset>
       <div className="px-check px-field-wide">
         <input
           id="ev-isFeatured"
@@ -1268,6 +1360,22 @@ function EventInfoPanel({ event }: { event: AdminEvent }) {
           <dt>Classificação</dt>
           <dd>{event.ageRating}</dd>
         </div>
+        <div>
+          <dt>Menores de 16 e 17 anos</dt>
+          <dd>
+            {event.allowsMinors
+              ? `Permitidos, com autorização (${event.judicialAuthorization ?? 'sem número'})`
+              : 'Não: só 18 anos ou mais na data do evento'}
+          </dd>
+        </div>
+        {event.endsAt ? (
+          <div>
+            <dt>Fim</dt>
+            <dd>
+              {dateShort(event.endsAt)} às {timeOf(event.endsAt)}
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt>Destaque na página inicial</dt>
           <dd>{event.isFeatured ? 'Sim' : 'Não'}</dd>

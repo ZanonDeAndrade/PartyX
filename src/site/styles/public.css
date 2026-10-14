@@ -1434,3 +1434,14 @@ html[data-px-intro] .px-intro-static {
     scroll-behavior: smooth;
   }
 }
+
+/* Evento que permite menores de 16 e 17: a regra e o termo em branco para baixar. */
+.px-event-minor {
+  margin: var(--px-s-4) 0 0;
+  padding: var(--px-s-3) var(--px-s-4);
+  border-left: 3px solid var(--px-violet, #7c3aed);
+  background: rgba(124, 58, 237, 0.08);
+  border-radius: var(--px-r-md);
+  font-size: var(--px-t-sm);
+  line-height: 1.5;
+}

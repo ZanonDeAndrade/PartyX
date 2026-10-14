@@ -12,7 +12,7 @@ Encarregado de dados (DPO): Bernardo Peixoto Fortes Bittencourt, pelo e-mail bbi
 
 Coletamos apenas o necessário para a sua conta, suas compras e a sua entrada nos eventos.
 
-Cadastro: nome completo, e-mail, CPF, telefone com DDD e senha. A senha é guardada apenas em forma cifrada irreversível (hash), e ninguém consegue lê-la.
+Cadastro: nome completo, data de nascimento, e-mail, CPF, telefone com DDD e senha. A senha é guardada apenas em forma cifrada irreversível (hash), e ninguém consegue lê-la.
 
 Aceite dos documentos: versão dos Termos de Uso e desta Política que você aceitou, data e hora, endereço IP e navegador.
 
@@ -22,6 +22,8 @@ Dados enviados ao Mercado Pago: nome, e-mail e CPF do pagador, valor e número d
 
 Notificações de pagamento: o conteúdo das confirmações enviadas pelo Mercado Pago, que pode conter dados do pagador, nunca dados de cartão.
 
+Menores de idade: o aceite do Termo de Ciência para Menores de Idade, com versão, data e hora, e o Termo de Autorização e Responsabilidade em papel entregue na portaria, com os dados do menor e do responsável.
+
 Ingressos: nome do titular, códigos, situação, datas de emissão e de cancelamento e o motivo do cancelamento.
 
 Portaria: cada leitura de ingresso, com o resultado, a forma de validação (câmera ou busca manual), o horário e o validador.
@@ -30,11 +32,13 @@ Segurança: sessões de login (IP, navegador e datas), tentativas de login (e-ma
 
 Registros de acesso: endereço IP, navegador, página acessada, data e hora, guardados pelos provedores de infraestrutura.
 
-Não coletamos data de nascimento, endereço, gênero, foto, localização, biometria nem dados de cartão. Na portaria, a imagem da câmera é processada no aparelho da equipe e só o código lido vai ao servidor. A câmera do comprador nunca é usada.
+Não coletamos endereço, gênero, foto, localização, biometria nem dados de cartão. Na portaria, a imagem da câmera é processada no aparelho da equipe e só o código lido vai ao servidor. A câmera do comprador nunca é usada.
 
 # 3. Para que usamos e com qual base legal
 
 Criar e manter sua conta, vender e emitir ingressos, processar pagamentos, validar a entrada na portaria e prestar atendimento. Base legal: execução de contrato (LGPD, art. 7º, V).
+
+Verificar a idade pela data de nascimento, para aplicar a classificação etária dos Eventos e exigir o termo dos menores de idade, e guardar esse termo. Base legal: cumprimento de obrigação legal, pelo Estatuto da Criança e do Adolescente (LGPD, art. 7º, II), e execução de contrato (LGPD, art. 7º, V).
 
 Guardar os registros de pedidos e pagamentos exigidos pela legislação fiscal e contábil. Base legal: cumprimento de obrigação legal (LGPD, art. 7º, II).
 
@@ -92,6 +96,8 @@ Sessões, tentativas de login e códigos de recuperação de senha: 6 meses.
 
 Registros de acesso ao site: guardados pelos provedores de infraestrutura pelo prazo de retenção deles, hoje de 30 dias.
 
+Termo de Autorização e Responsabilidade em papel: 6 meses após o Evento, e depois destruído.
+
 Backups: cópias diárias cifradas, guardadas por 35 dias e depois apagadas.
 
 Medidas de segurança: conexão cifrada (HTTPS) em todo o site; senhas guardadas com hash Argon2id; limites de tentativas e bloqueios automáticos; permissões por função, conferidas no servidor; CPF mascarado nas telas e exportações da equipe; registros de operação sem dados sensíveis; trilha de auditoria que não pode ser alterada; backups diários cifrados; e QR Codes assinados digitalmente, impossíveis de adivinhar.
@@ -112,7 +118,7 @@ Você também pode apresentar reclamação à Autoridade Nacional de Proteção 
 
 # 8. Menores, incidentes, alterações e contato
 
-Menores de idade: o cadastro e a compra são permitidos somente a pessoas com 16 anos ou mais. Quem tiver entre 16 e 18 anos declara ter autorização dos pais ou responsáveis. Os dados de adolescentes são tratados no seu melhor interesse, como determina o art. 14 da LGPD. A PartyX não coleta intencionalmente dados de pessoas com menos de 16 anos; se identificarmos uma conta nessa situação, ela poderá ser encerrada.
+Menores de idade: o cadastro e a compra são permitidos somente a pessoas com 16 anos ou mais. Quem tiver 16 ou 17 anos declara ter autorização dos pais ou responsáveis e, para entrar nos Eventos, entrega o Termo de Autorização e Responsabilidade assinado pelo responsável. Os dados de adolescentes são tratados no seu melhor interesse, como determina o art. 14 da LGPD. A PartyX não coleta intencionalmente dados de pessoas com menos de 16 anos; se identificarmos uma conta nessa situação, ela poderá ser encerrada.
 
 Incidentes de segurança: se houver um incidente que possa trazer risco ou dano relevante a você, a PartyX comunicará a ANPD e as pessoas afetadas, como determina a LGPD.
 

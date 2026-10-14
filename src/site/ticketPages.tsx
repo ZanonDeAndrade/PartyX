@@ -1,6 +1,13 @@
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
-import { api, type OrderRow, type TicketDetail, type TicketSummary } from './api';
+import {
+  api,
+  minorAuthorizationUrl,
+  type OrderRow,
+  type OrderView,
+  type TicketDetail,
+  type TicketSummary,
+} from './api';
 import { DateStub, ErrorBox, Layout, usePageTitle } from './components';
 import { brl, dateParts, timeOf } from './format';
 import { IconBack, IconChevron, IconDownload, IconExpand, IconReceipt, IconTicket, IconUser } from './icons';
@@ -175,6 +182,7 @@ function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
           <small>{first.event.venue}</small>
         </div>
       </header>
+      {first.event.allowsMinors ? <MinorAuthorizationLinks items={items} /> : null}
       <ul id={listId} className="px-wallet-list">
         {shown.map((t, i) => (
           <m.li
@@ -209,6 +217,85 @@ function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
         </button>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Evento que permite menores de 16 e 17 anos: o Termo de Autorização e Responsabilidade de cada pedido (preenchido com os dados do
+ * comprador quando ele é menor; em branco para acompanhante). Quem tiver 16 ou 17 anos entrega o termo assinado na portaria.
+ */
+function MinorAuthorizationLinks({ items }: { items: TicketSummary[] }) {
+  const orders = [...new Map(items.map(t => [t.orderId, t.orderNumber])).entries()];
+  return (
+    <div className="px-wallet-minor">
+      <p>
+        Quem tiver 16 ou 17 anos na data do evento entra com o Termo de Autorização e Responsabilidade preenchido e
+        assinado pelo responsável, mais a cópia do documento dele.
+      </p>
+      {orders.map(([orderId, number]) => (
+        <a key={orderId} href={minorAuthorizationUrl.order(orderId)} download className="px-btn px-btn-sec">
+          <IconDownload size={18} />
+          {orders.length > 1 ? `Autorização para menores · pedido PX-${number}` : 'Autorização para menores (PDF)'}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Página do link do e-mail de compra: entra na conta (se preciso) e oferece o Termo de Autorização e Responsabilidade do pedido. O
+ * PDF sai do servidor só para o dono do pedido.
+ */
+export function MinorAuthorizationPage({ orderId }: { orderId: string }) {
+  usePageTitle('Autorização para menores · PartyX');
+  const ready = useLoggedIn(`/autorizacao-menor/pedido/${orderId}`);
+  const [state, retry] = useFetch<OrderView>(s => api.order(orderId, s), ready ? orderId : 'espera');
+  if (!ready)
+    return (
+      <Layout>
+        <div className="px-wrap" aria-busy="true" />
+      </Layout>
+    );
+  const order = state.status === 'ok' ? state.data : null;
+  return (
+    <MeShell narrow>
+      <h1 className="px-me-title">Termo de Autorização e Responsabilidade</h1>
+      {state.status === 'loading' ? <div aria-busy="true" className="px-me-skel" /> : null}
+      {state.status === 'error' ? (
+        state.code === 404 ? (
+          <div className="px-me-empty">
+            <b>Pedido não encontrado</b>
+            <Link to="/meus-ingressos" className="px-btn px-btn-pri">
+              Meus ingressos
+            </Link>
+          </div>
+        ) : (
+          <ErrorBox onRetry={retry} />
+        )
+      ) : null}
+      {order && !order.event.allowsMinors ? (
+        <p className="px-notice px-notice-neu" role="status">
+          O evento <b>{order.event.name}</b> é só para quem tiver 18 anos ou mais na data do evento: não há autorização
+          para menores.
+        </p>
+      ) : null}
+      {order?.event.allowsMinors ? (
+        <div className="px-wallet-minor">
+          <p>
+            Evento <b>{order.event.name}</b>, pedido PX-{order.number}.{' '}
+            {order.buyerMinor
+              ? 'O termo já sai com o seu nome e a sua data de nascimento.'
+              : 'Os dados do menor ficam em branco, para o acompanhante preencher.'}{' '}
+            O responsável legal preenche à mão e assina. Na portaria, o menor entrega o termo com a cópia do documento
+            com foto do responsável e apresenta o próprio documento original com foto.
+          </p>
+          <a href={minorAuthorizationUrl.order(order.id)} download className="px-btn px-btn-pri px-btn-lg">
+            <IconDownload size={20} />
+            Baixar o termo (PDF)
+          </a>
+        </div>
+      ) : null}
+    </MeShell>
   );
 }
 

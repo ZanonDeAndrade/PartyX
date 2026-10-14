@@ -112,7 +112,13 @@ export function HumanCheck({ onChange, resetKey = 0 }: { onChange: (s: HumanStat
   if (!siteKey) return null;
   return (
     <div className="px-human-wrap">
-      <div ref={box} key={attempt} className="px-human" role="group" aria-label="Verificação de que você não é um robô" />
+      <div
+        ref={box}
+        key={attempt}
+        className="px-human"
+        role="group"
+        aria-label="Verificação de que você não é um robô"
+      />
       {failed ? (
         <div className="px-human-fail">
           <p className="px-notice px-notice-err" role="alert">

@@ -5,6 +5,10 @@ interface SessionState {
   /** `loading` até a primeira resposta de /auth/me. */
   status: 'loading' | 'anon' | 'user';
   user: SessionUser | null;
+  /** Termos ou Privacidade com versão nova ainda não aceita (só comprador): o site mostra a tela do novo aceite. */
+  pendingConsent: boolean;
+  /** Aceita as versões vigentes (as que a tela mostrou) e relê a sessão. */
+  acceptTerms(termsVersion: string, privacyVersion: string): Promise<void>;
   login(email: string, password: string): Promise<SessionUser | null>;
   register(body: Record<string, unknown>): Promise<void>;
   logout(): Promise<void>;
@@ -15,6 +19,8 @@ interface SessionState {
 const Ctx = createContext<SessionState>({
   status: 'loading',
   user: null,
+  pendingConsent: false,
+  acceptTerms: async () => {},
   login: async () => null,
   register: async () => {},
   logout: async () => {},
@@ -27,17 +33,20 @@ export const useSession = () => useContext(Ctx);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionState['status']>('loading');
   const [user, setUser] = useState<SessionUser | null>(null);
+  const [pendingConsent, setPendingConsent] = useState(false);
 
   const refresh = useCallback(async (): Promise<SessionUser | null> => {
     try {
       const me = await api.me();
       setCsrfToken(me.csrfToken);
       setUser(me.user);
+      setPendingConsent(Boolean(me.pendingConsent));
       setStatus('user');
       return me.user;
     } catch (e) {
       setCsrfToken('');
       setUser(null);
+      setPendingConsent(false);
       // 401 é o caso normal de visitante. Falha de rede também cai aqui: a pessoa segue como visitante.
       setStatus('anon');
       if (!(e instanceof ApiError)) throw e;
@@ -69,6 +78,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => ({
       status,
       user,
+      pendingConsent,
+      async acceptTerms(termsVersion, privacyVersion) {
+        await api.acceptTerms(termsVersion, privacyVersion);
+        await refresh();
+      },
       async login(email, password) {
         await api.login(email, password);
         return refresh();
@@ -90,7 +104,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [status, user, refresh],
+    [status, user, pendingConsent, refresh],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -128,6 +128,8 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
       'GET /api/public/legal/:kind',
       'GET /api/public/events',
       'GET /api/public/events/:slug',
+      // Termo de Autorização EM BRANCO do evento (regras de menores): só dados do evento, sem dado pessoal.
+      'GET /api/public/events/:slug/autorizacao-menor.pdf',
       'GET /api/legal/versions',
       'POST /api/auth/register',
       'POST /api/auth/login',

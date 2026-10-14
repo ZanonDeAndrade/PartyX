@@ -403,6 +403,21 @@ a.px-adm-card-title:hover {
   font-weight: 700;
   padding: 0 var(--px-s-1);
 }
+/* Caixa "Menores de idade" no formulário do evento: mesmo quadro do banner. */
+.px-fieldset {
+  border: 1px solid var(--px-line);
+  border-radius: var(--px-r-md);
+  padding: var(--px-s-3) var(--px-s-4) var(--px-s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-3);
+  min-width: 0;
+  background: var(--px-paper);
+}
+.px-fieldset legend {
+  font-weight: 700;
+  padding: 0 var(--px-s-1);
+}
 .px-banner-edit input[type='file'] {
   min-height: var(--px-touch);
   padding: var(--px-s-2) 0;

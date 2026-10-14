@@ -261,7 +261,7 @@ export function SignupPage() {
   const { go } = useRouter();
   const session = useSession();
   const back = useReturnTo();
-  const [f, setF] = useState({ name: '', email: '', cpf: '', phone: '', password: '' });
+  const [f, setF] = useState({ name: '', email: '', cpf: '', phone: '', birthDate: '', password: '' });
   const [accept, setAccept] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [general, setGeneral] = useState('');
@@ -412,6 +412,17 @@ export function SignupPage() {
               placeholder="(11) 98765-4321"
               wide={false}
             />
+            <Field
+              id="nascimento"
+              label="Data de nascimento"
+              type="date"
+              value={f.birthDate}
+              onChange={set('birthDate')}
+              error={errors.birthDate}
+              autoComplete="bday"
+              hint="O cadastro é a partir de 16 anos. Para cada evento vale a idade na data dele."
+              wide={false}
+            />
             <PasswordField
               id="senha"
               label="Senha"
@@ -470,6 +481,92 @@ export function SignupPage() {
   );
 }
 
+/**
+ * Novo aceite (Termos ou Privacidade com versão nova): quem já tinha conta aceita as versões vigentes antes de continuar. A tela
+ * aparece no lugar de qualquer página da conta e do checkout; as páginas dos documentos continuam abertas para leitura.
+ */
+export function ConsentUpdatePage() {
+  usePageTitle('Novos Termos de Uso · PartyX');
+  const session = useSession();
+  const [legal, setLegal] = useState<LegalVersions | null>(null);
+  const [accept, setAccept] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    api
+      .legal()
+      .then(setLegal)
+      .catch(() => setError('Não foi possível carregar os documentos. Tente de novo.'));
+  }, []);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!legal || !accept) return;
+    setBusy(true);
+    setError('');
+    try {
+      await session.acceptTerms(legal.terms, legal.privacy);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Não foi possível registrar o aceite.');
+      // Versão mudou enquanto a tela estava aberta: recarrega as vigentes.
+      api
+        .legal()
+        .then(setLegal)
+        .catch(() => {});
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Layout>
+      <AuthCard wide>
+        <section className="px-authcard" aria-labelledby="auth-title">
+          <header>
+            <h1 id="auth-title">Atualizamos os documentos</h1>
+            <p>
+              Para continuar usando sua conta e comprar ingressos, leia e aceite as novas versões dos Termos de Uso e da
+              Política de Privacidade.
+            </p>
+          </header>
+          {error ? (
+            <p className="px-notice px-notice-err" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <form onSubmit={submit} className="px-form">
+            <div className="px-accept">
+              <div className="px-check">
+                <input
+                  id="novo-aceite"
+                  type="checkbox"
+                  checked={accept}
+                  onChange={e => setAccept(e.target.checked)}
+                  aria-describedby="novo-aceite-dica"
+                />
+                <label htmlFor="novo-aceite">
+                  Li e aceito os <Link to="/termos-de-uso">Termos de Uso</Link> e a{' '}
+                  <Link to="/privacidade">Política de Privacidade</Link>.
+                </label>
+              </div>
+              <small id="novo-aceite-dica" className="px-hint px-indent">
+                {legal
+                  ? `Termos de Uso, versão ${legal.terms}${legal.termsDate ? ` de ${calendarDate(legal.termsDate)}` : ''}; Política de Privacidade, versão ${legal.privacy}${legal.privacyDate ? ` de ${calendarDate(legal.privacyDate)}` : ''}. `
+                  : ''}
+                Registramos a versão, a data e o IP do aceite.
+              </small>
+            </div>
+            <button type="submit" className="px-btn px-btn-pri px-btn-lg" disabled={!legal || !accept || busy}>
+              {busy ? 'Registrando…' : 'Aceitar e continuar'}
+            </button>
+            <button type="button" className="px-btn" onClick={() => void session.logout()}>
+              Sair da conta
+            </button>
+          </form>
+        </section>
+      </AuthCard>
+    </Layout>
+  );
+}
+
 /** Páginas legais: o texto é do cliente e ainda não foi entregue (Prompt 19). Não há texto provisório com valor jurídico. */
 export function LegalPage({ kind }: { kind: LegalKind }) {
   const [state] = useFetch(signal => api.legalDocument(kind, signal), kind);
@@ -480,6 +577,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
     { to: '/privacidade', label: 'Política de Privacidade', kind: 'privacidade' },
     { to: '/politica-de-cancelamento', label: 'Cancelamento, troca e reembolso', kind: 'cancelamento' },
     { to: '/meia-entrada', label: 'Meia-entrada', kind: 'meia-entrada' },
+    { to: '/termo-menor', label: 'Termo para menores', kind: 'termo-menor' },
   ];
   return (
     <Layout>

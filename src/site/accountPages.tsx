@@ -189,9 +189,15 @@ export function MyAccountPage() {
                 <span className="px-ro">{user.cpf}</span>
               </div>
             ) : null}
+            {user.birthDate ? (
+              <div className="px-field">
+                <span className="px-ro-label">Data de nascimento</span>
+                <span className="px-ro">{user.birthDate.split('-').reverse().join('/')}</span>
+              </div>
+            ) : null}
           </div>
           <p className="px-hint">
-            E-mail e CPF não podem ser alterados por aqui. Para corrigir,{' '}
+            E-mail, CPF e data de nascimento não podem ser alterados por aqui. Para corrigir,{' '}
             <PartyxContact lead="fale com o atendimento da PartyX" />.
           </p>
           {general ? (

@@ -6,6 +6,8 @@ import {
   type CardTokenData,
   type CartItem,
   type DeclineReason,
+  type LegalDocument,
+  minorAuthorizationUrl,
   type OrderView,
   type PaymentOptions,
   type PaymentView,
@@ -235,6 +237,9 @@ export function CheckoutPage({ slug }: { slug: string }) {
   const [error, setError] = useState<{ message: string; coupon?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  // Regras de menores: caixa do Termo de Ciência (nunca pré-marcada) e o texto dele, quando a pessoa terá 16 ou 17 anos.
+  const [minorAccepted, setMinorAccepted] = useState(false);
+  const [minorTerm, setMinorTerm] = useState<LegalDocument | null>(null);
 
   const load = useCallback(
     async (code: string) => {
@@ -264,6 +269,17 @@ export function CheckoutPage({ slug }: { slug: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, load]);
 
+  const isMinor = Boolean(summary?.buyer?.minor);
+  useEffect(() => {
+    if (!isMinor || minorTerm) return;
+    const ctl = new AbortController();
+    api
+      .legalDocument('termo-menor', ctl.signal)
+      .then(setMinorTerm)
+      .catch(() => {});
+    return () => ctl.abort();
+  }, [isMinor, minorTerm]);
+
   if (!ready)
     return (
       <Layout>
@@ -292,11 +308,25 @@ export function CheckoutPage({ slug }: { slug: string }) {
     setError(null);
     try {
       // `expectedTotalCents` só avisa se o preço mudou; o servidor cobra o valor do banco.
-      const order = await api.createOrder(slug, items, applied, summary.totalCents);
+      const buyer = summary.buyer;
+      const order = await api.createOrder(
+        slug,
+        items,
+        applied,
+        summary.totalCents,
+        buyer?.minor ? { accepted: minorAccepted, version: buyer.minorTermVersion } : undefined,
+      );
       saveCart(null);
       go(`/pedido/${order.id}`);
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'preco_alterado') await load(applied);
+      const recheck = ['preco_alterado', 'data_nascimento_obrigatoria', 'aceite_pendente', 'versao_desatualizada'];
+      if (e instanceof ApiError && e.code && recheck.includes(e.code)) {
+        if (e.code === 'versao_desatualizada') {
+          setMinorTerm(null);
+          setMinorAccepted(false);
+        }
+        await load(applied);
+      }
       setError({ message: stockMessage(e) });
     } finally {
       setBusy(false);
@@ -304,8 +334,10 @@ export function CheckoutPage({ slug }: { slug: string }) {
   };
 
   const user = session.user;
+  const refusal = summary?.buyer?.refusal ?? null;
+  const blocked = Boolean(refusal) || (isMinor && !minorAccepted);
   const goPay = (
-    <button type="button" className="px-btn px-btn-pri px-btn-lg" disabled={!summary || busy} onClick={pay}>
+    <button type="button" className="px-btn px-btn-pri px-btn-lg" disabled={!summary || busy || blocked} onClick={pay}>
       {busy ? 'Reservando…' : 'Ir para o pagamento'}
     </button>
   );
@@ -379,6 +411,19 @@ export function CheckoutPage({ slug }: { slug: string }) {
         </p>
       </section>
 
+      {summary?.buyer ? (
+        <BuyerAgeSection
+          summary={summary}
+          minorTerm={minorTerm}
+          minorAccepted={minorAccepted}
+          onMinorAccepted={setMinorAccepted}
+          onBirthDateSaved={async () => {
+            await session.reload();
+            await load(applied);
+          }}
+        />
+      ) : null}
+
       <section aria-labelledby="promoter" className="px-ck-card">
         <h2 id="promoter">
           Código do promoter <small>(opcional)</small>
@@ -443,6 +488,123 @@ export function CheckoutPage({ slug }: { slug: string }) {
       </p>
       <div className="px-ck-desk-cta">{goPay}</div>
     </CheckoutShell>
+  );
+}
+
+/**
+ * Regras de menores no checkout, decididas pelo servidor na DATA DO EVENTO: conta antiga informa a data de nascimento; quem não pode
+ * comprar vê o motivo; quem terá 16 ou 17 anos lê e aceita o Termo de Ciência (caixa nunca pré-marcada) antes de continuar.
+ */
+function BuyerAgeSection({
+  summary,
+  minorTerm,
+  minorAccepted,
+  onMinorAccepted,
+  onBirthDateSaved,
+}: {
+  summary: Summary;
+  minorTerm: LegalDocument | null;
+  minorAccepted: boolean;
+  onMinorAccepted: (v: boolean) => void;
+  onBirthDateSaved: () => Promise<void>;
+}) {
+  const buyer = summary.buyer!;
+  const [birthDate, setBirthDate] = useState('');
+  const [birthError, setBirthError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const code = buyer.refusal?.code;
+
+  if (code === 'data_nascimento_obrigatoria') {
+    const save = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setSaving(true);
+      setBirthError('');
+      try {
+        await api.setBirthDate(birthDate);
+        await onBirthDateSaved();
+      } catch (err) {
+        setBirthError(
+          err instanceof ApiError
+            ? (err.fields.birthDate ?? err.message)
+            : 'Não foi possível salvar a data de nascimento.',
+        );
+      } finally {
+        setSaving(false);
+      }
+    };
+    return (
+      <section aria-labelledby="nascimento" className="px-ck-card">
+        <h2 id="nascimento">Data de nascimento</h2>
+        <p className="px-ck-text">
+          Para continuar, informe sua data de nascimento. Ela define as regras de idade de cada evento e, depois de
+          salva, só a PartyX pode corrigir.
+        </p>
+        <form className="px-coupon" onSubmit={save}>
+          <div className="px-field">
+            <label htmlFor="ck-nascimento">Data de nascimento</label>
+            <input
+              id="ck-nascimento"
+              type="date"
+              value={birthDate}
+              autoComplete="bday"
+              onChange={e => setBirthDate(e.target.value)}
+              aria-invalid={birthError ? true : undefined}
+              aria-describedby={birthError ? 'ck-nascimento-erro' : undefined}
+            />
+            {birthError ? (
+              <small id="ck-nascimento-erro" className="px-error" role="alert">
+                {birthError}
+              </small>
+            ) : null}
+          </div>
+          <button type="submit" className="px-btn" disabled={saving || !birthDate}>
+            {saving ? 'Salvando…' : 'Salvar e continuar'}
+          </button>
+        </form>
+      </section>
+    );
+  }
+  if (code === 'idade_minima' || code === 'evento_para_maiores' || code === 'aceite_pendente') {
+    return (
+      <p className="px-notice px-notice-err" role="alert">
+        <b>Não é possível continuar.</b> {buyer.refusal!.message}
+      </p>
+    );
+  }
+  if (!buyer.minor) return null;
+  return (
+    <section aria-labelledby="termo-menor" className="px-ck-card">
+      <h2 id="termo-menor">Termo de Ciência para Menores de Idade</h2>
+      <p className="px-ck-text">
+        Você terá {buyer.age} anos na data do evento. Para continuar, leia e aceite o termo. Depois da compra, baixe o
+        Termo de Autorização e Responsabilidade em Meus ingressos: ele é preenchido e assinado pelo seu responsável e
+        entregue na portaria.
+      </p>
+      <div className="px-ck-term" tabIndex={0} aria-label="Texto do Termo de Ciência para Menores de Idade">
+        {minorTerm ? (
+          minorTerm.blocks.map((b, i) => (b.type === 'heading' ? <h3 key={i}>{b.text}</h3> : <p key={i}>{b.text}</p>))
+        ) : (
+          <p aria-busy="true">Carregando o termo…</p>
+        )}
+      </div>
+      <div className="px-check">
+        <input
+          id="aceite-menor"
+          type="checkbox"
+          checked={minorAccepted}
+          disabled={!minorTerm}
+          onChange={e => onMinorAccepted(e.target.checked)}
+          aria-describedby="aceite-menor-dica"
+        />
+        <label htmlFor="aceite-menor">Li e aceito o Termo de Ciência para Menores de Idade.</label>
+      </div>
+      <small id="aceite-menor-dica" className="px-hint px-indent">
+        Versão {buyer.minorTermVersion}. Registramos a versão, a data, o IP e o pedido do aceite.{' '}
+        <a href={minorAuthorizationUrl.blank(summary.event.slug)} download className="px-textlink">
+          Ver o Termo de Autorização (PDF)
+        </a>
+      </small>
+    </section>
   );
 }
 
@@ -549,7 +711,8 @@ const DECLINE_TEXT: Record<DeclineReason, string> = {
   saldo_insuficiente: 'O cartão não tem limite ou saldo suficiente para esta compra.',
   nao_autorizado: 'O banco do cartão não autorizou o pagamento. Fale com o banco ou use outro cartão.',
   cartao_desabilitado: 'O cartão está desabilitado para compras pela internet. Fale com o banco ou use outro cartão.',
-  pagamento_duplicado: 'Já existe um pagamento igual e recente neste cartão. Se precisar pagar de novo, use outro cartão.',
+  pagamento_duplicado:
+    'Já existe um pagamento igual e recente neste cartão. Se precisar pagar de novo, use outro cartão.',
   seguranca: 'O pagamento foi recusado pela análise de segurança. Tente com outro cartão.',
   limite_de_tentativas: 'Este cartão atingiu o limite de tentativas. Use outro cartão.',
   autenticacao: 'A confirmação com o banco não foi concluída. Tente de novo.',
@@ -801,21 +964,21 @@ export function OrderPage({ id }: { id: string }) {
           )
             .filter(([k]) => k !== 'pix' || options?.pixAvailable !== false)
             .map(([k, label, text]) => (
-            <button
-              key={k}
-              type="button"
-              role="radio"
-              aria-checked={method === k}
-              className={`px-method${method === k ? ' px-method-on' : ''}`}
-              onClick={() => setMethod(k)}
-            >
-              <span className="px-radio" aria-hidden="true" />
-              <span>
-                <b>{label}</b>
-                <small>{text}</small>
-              </span>
-            </button>
-          ))}
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={method === k}
+                className={`px-method${method === k ? ' px-method-on' : ''}`}
+                onClick={() => setMethod(k)}
+              >
+                <span className="px-radio" aria-hidden="true" />
+                <span>
+                  <b>{label}</b>
+                  <small>{text}</small>
+                </span>
+              </button>
+            ))}
         </div>
         <p className="px-ck-note px-ck-note-box">
           O pagamento é processado pelo gateway na conta da PartyX. Ao continuar, seus ingressos ficam reservados pelo
@@ -928,6 +1091,18 @@ export function OrderPage({ id }: { id: string }) {
               Baixar ingressos (PDF)
             </a>
           </div>
+          {order.event.allowsMinors ? (
+            <div className="px-ck-minor">
+              <p>
+                {order.buyerMinor
+                  ? 'Você tem 16 ou 17 anos na data do evento. Na portaria, entregue o Termo de Autorização e Responsabilidade preenchido e assinado pelo seu responsável, com a cópia do documento dele, e apresente o seu documento original com foto.'
+                  : 'Acompanhante com 16 ou 17 anos na data do evento entra com o Termo de Autorização e Responsabilidade preenchido e assinado pelo responsável, com a cópia do documento dele.'}
+              </p>
+              <a className="px-btn px-btn-outline" href={minorAuthorizationUrl.order(id)} download>
+                Baixar o Termo de Autorização (PDF)
+              </a>
+            </div>
+          ) : null}
         </section>
       );
   } else if (order.status === 'expirado') {

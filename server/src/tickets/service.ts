@@ -12,6 +12,8 @@ export interface TicketEvent {
   venue: string;
   address: string;
   ageRating: string;
+  /** Evento que permite menores de 16 e 17 anos: a tela oferece a autorização do pedido. */
+  allowsMinors: boolean;
 }
 
 /** Item de lista: **sem** o código secreto e sem o conteúdo do QR (nunca aparecem em lista). */
@@ -49,6 +51,7 @@ const columns = {
   venue: events.venue,
   address: events.address,
   ageRating: events.ageRating,
+  allowsMinors: events.allowsMinors,
 };
 
 type Row = {
@@ -67,6 +70,7 @@ type Row = {
   venue: string;
   address: string;
   ageRating: string;
+  allowsMinors: boolean;
 };
 
 const summary = (r: Row): TicketSummary => ({
@@ -80,6 +84,7 @@ const summary = (r: Row): TicketSummary => ({
     venue: r.venue,
     address: r.address,
     ageRating: r.ageRating,
+    allowsMinors: r.allowsMinors,
   },
   typeName: r.typeName,
   holderName: r.holderName,

@@ -1,6 +1,6 @@
 import jsQR from 'jsqr';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, ApiError, type GateEvent, type GateHit, type GateOutcome } from './api';
+import { api, ApiError, type GateEvent, type GateHit, type GateOutcome, type MinorCheck } from './api';
 import { DateStub, ErrorBox, Layout, usePageTitle } from './components';
 import { dateParts, dateShort, timeOf } from './format';
 import { IconBack, IconCamera, IconKeyboard } from './icons';
@@ -156,20 +156,49 @@ const TONE: Record<GateOutcome['result'], { tone: 'ok' | 'warn' | 'err'; icon: s
   invalido: { tone: 'err', icon: '✕', title: 'Inválido' },
   cancelado: { tone: 'err', icon: '✕', title: 'Cancelado' },
   outro_evento: { tone: 'err', icon: '✕', title: 'Outro evento' },
+  menor_confirmar: { tone: 'warn', icon: '18', title: 'Conferir idade' },
 };
 
+/**
+ * Ingresso de pedido de comprador menor (regras de menores): nada foi consumido. O validador confere a idade de quem está na frente e
+ * escolhe; só então o servidor faz a entrada e grava a escolha na leitura. Recusar não consome o ingresso (a pessoa pode voltar).
+ */
+interface MinorActions {
+  busy: boolean;
+  onConfirm: (check: MinorCheck) => void;
+  onRefuse: () => void;
+}
+
 /** Resultado em tela cheia (RF-48): verde, amarelo ou vermelho, sempre também em texto e símbolo. */
-function ResultScreen({ outcome, eventName, onDone }: { outcome: GateOutcome; eventName: string; onDone: () => void }) {
+function ResultScreen({
+  outcome,
+  eventName,
+  onDone,
+  minor,
+}: {
+  outcome: GateOutcome;
+  eventName: string;
+  onDone: () => void;
+  minor?: MinorActions;
+}) {
   const t = TONE[outcome.result];
+  const asking = outcome.result === 'menor_confirmar';
   useEffect(() => {
-    beep(outcome.result);
+    beep(asking ? 'ja_utilizado' : outcome.result);
+    // Conferir idade espera a escolha do validador: não fecha sozinho nem com toque fora dos botões.
+    if (asking) return;
     // Verde segue sozinho; amarelo e vermelho esperam o toque (ou 8 s), para o validador ler com calma.
     const id = setTimeout(onDone, outcome.result === 'valido' ? 1800 : 8000);
     return () => clearTimeout(id);
-  }, [outcome, onDone]);
+  }, [outcome, onDone, asking]);
   // Aparece de imediato (sem transição de entrada). Só um pulso curto de cor, por baixo do conteúdo, que não atrasa nada.
   return (
-    <div className={`px-gate-result px-gate-r-${t.tone}`} role="alert" aria-live="assertive" onClick={onDone}>
+    <div
+      className={`px-gate-result px-gate-r-${t.tone}`}
+      role="alert"
+      aria-live="assertive"
+      onClick={asking ? undefined : onDone}
+    >
       <p className="px-gate-top">
         <span>{eventName}</span>
         <span>
@@ -200,17 +229,42 @@ function ResultScreen({ outcome, eventName, onDone }: { outcome: GateOutcome; ev
           </p>
         ) : null}
         {outcome.method === 'manual' ? <p className="px-gate-small">Entrada manual</p> : null}
+        {outcome.ticket?.buyerMinor && !asking ? <p className="px-gate-small">Pedido de comprador menor</p> : null}
       </div>
-      <button
-        type="button"
-        className="px-gate-next"
-        onClick={e => {
-          e.stopPropagation();
-          onDone();
-        }}
-      >
-        Próxima leitura
-      </button>
+      {asking && minor ? (
+        <div className="px-gate-minor-actions">
+          <button
+            type="button"
+            className="px-gate-next"
+            disabled={minor.busy}
+            onClick={() => minor.onConfirm('autorizacao_recebida')}
+          >
+            Menor: autorização recebida
+          </button>
+          <button
+            type="button"
+            className="px-gate-next px-gate-next-alt"
+            disabled={minor.busy}
+            onClick={() => minor.onConfirm('maior_de_idade')}
+          >
+            Tem 18 anos ou mais
+          </button>
+          <button type="button" className="px-gate-refuse" disabled={minor.busy} onClick={minor.onRefuse}>
+            Recusar: menor sem autorização
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="px-gate-next"
+          onClick={e => {
+            e.stopPropagation();
+            onDone();
+          }}
+        >
+          Próxima leitura
+        </button>
+      )}
     </div>
   );
 }
@@ -348,6 +402,44 @@ export function GatePage({ eventId }: { eventId: string }) {
     pausedRef.current = false;
   }, []);
 
+  // Conferência da idade num ingresso de pedido de comprador menor: confirma (entrada gravada com a escolha) ou recusa (trilha).
+  const [minorBusy, setMinorBusy] = useState(false);
+  const minorActions = (current: GateOutcome): MinorActions => ({
+    busy: minorBusy,
+    onConfirm: check => {
+      setMinorBusy(true);
+      api
+        .gateAdmit(eventId, current.ticket!.id, { method: current.method, minorCheck: check })
+        .then(res => {
+          setOutcome(res);
+          setCounter(res.counter);
+        })
+        .catch(e => {
+          setOutcome(null);
+          pausedRef.current = false;
+          setProblem(
+            e instanceof ApiError && e.status === 0
+              ? 'offline'
+              : e instanceof ApiError
+                ? e.message
+                : 'Não foi possível confirmar.',
+          );
+        })
+        .finally(() => setMinorBusy(false));
+    },
+    onRefuse: () => {
+      setMinorBusy(true);
+      api
+        .gateMinorRefused(eventId, current.ticket!.id)
+        .then(() => setProblem('Entrada recusada: menor sem a autorização. O ingresso continua válido.'))
+        .catch(e => setProblem(e instanceof ApiError ? e.message : 'Não foi possível registrar a recusa.'))
+        .finally(() => {
+          setMinorBusy(false);
+          done();
+        });
+    },
+  });
+
   if (access === 'negado') return <Denied />;
   if (access === 'espera')
     return (
@@ -451,7 +543,14 @@ export function GatePage({ eventId }: { eventId: string }) {
 
         {tab === 'busca' ? <ManualSearch eventId={eventId} onOutcome={setOutcome} /> : null}
       </div>
-      {outcome ? <ResultScreen outcome={outcome} eventName={event?.name ?? ''} onDone={done} /> : null}
+      {outcome ? (
+        <ResultScreen
+          outcome={outcome}
+          eventName={event?.name ?? ''}
+          onDone={done}
+          minor={outcome.result === 'menor_confirmar' ? minorActions(outcome) : undefined}
+        />
+      ) : null}
     </Layout>
   );
 }
@@ -530,6 +629,7 @@ function ManualSearch({ eventId, onOutcome }: { eventId: string; onOutcome: (o: 
           <li key={h.ticketId} className="px-hit">
             <div className="px-hit-text">
               <b>{h.holderName}</b>
+              {h.buyerMinor ? <span className="px-badge px-badge-warn">MENOR: conferir idade</span> : null}
               <span>{h.typeName}</span>
               <small>
                 <span className="px-mono">{h.shortCode}</span>

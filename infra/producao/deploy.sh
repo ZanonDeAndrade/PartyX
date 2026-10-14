@@ -221,7 +221,8 @@ load_env_file() {
   checked="$(python3 -I infra/env-check.py "$ENV_FILE" producao)" || exit 1
   eval "$checked"
   for v in PUBLIC_BASE_URL SALES_OPEN SIGNUP_OPEN PAYMENT_GATEWAY GATEWAY_ENVIRONMENT MP_COLLECTOR_ID TURNSTILE_ENABLED TURNSTILE_SITE_KEY \
-           VISUAL_APPROVED MAINTENANCE_MODE TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE EMAIL_FROM; do
+           VISUAL_APPROVED MAINTENANCE_MODE TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE EMAIL_FROM \
+           MINOR_TERM_VERSION MINOR_TERM_DATE MINOR_AUTHORIZATION_VERSION MINOR_AUTHORIZATION_DATE; do
     file_value="$(eval "printf %s \"\${ENVF_$v:-}\"")"
     if [ -n "${!v:-}" ] && [ "${!v}" != "$file_value" ]; then
       echo "Recuso: $v está no ambiente com valor diferente do $ENV_FILE. Mude o arquivo, não a linha de comando." >&2; exit 1
@@ -279,6 +280,15 @@ cmd_conferir() {
       legal_ok "$k" || { echo "Recuso: SIGNUP_OPEN=true sem $legal_dir/$k.txt $where (texto oficial da PartyX)." >&2; exit 1; }
     done
   fi
+  # Textos de menores: com versão no arquivo, o texto, a data e o par (termo e autorização) precisam vir juntos na tag.
+  if [ -n "${MINOR_TERM_VERSION:-}${MINOR_AUTHORIZATION_VERSION:-}" ]; then
+    for v in MINOR_TERM_VERSION MINOR_TERM_DATE MINOR_AUTHORIZATION_VERSION MINOR_AUTHORIZATION_DATE; do
+      [ -n "${!v:-}" ] || { echo "Recuso: textos de menores exigem $v no $ENV_FILE." >&2; exit 1; }
+    done
+    for k in termo-menor autorizacao-menor; do
+      legal_ok "$k" || { echo "Recuso: $legal_dir/$k.txt ausente $where (texto de menores)." >&2; exit 1; }
+    done
+  fi
   if [ "$SALES_OPEN" = "true" ]; then   # travas extras para ABRIR A VENDA (go-live)
     [ "$PAYMENT_GATEWAY" != "none" ] || { echo "Recuso: venda aberta sem gateway real." >&2; exit 1; }
     for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE GO_LIVE_CONFIRMED; do [ -n "${!v:-}" ] || { echo "Recuso: $v é obrigatório para abrir a venda." >&2; exit 1; }; done
@@ -317,7 +327,7 @@ cmd_build() {
         || { echo "Recuso: $f difere da tag $RELEASE ou não está nela. Faça commit e uma tag nova." >&2; exit 1; }
     done
   fi
-  for k in termos-de-uso privacidade cancelamento meia-entrada; do
+  for k in termos-de-uso privacidade cancelamento meia-entrada termo-menor autorizacao-menor; do
     [ ! -s "$tmp/conteudo-legal/$k.txt" ] || echo "   texto legal $k.txt (da tag): sha256 $(sha256sum < "$tmp/conteudo-legal/$k.txt" | cut -c1-16)"
   done
   echo "== build de $RELEASE -> $image (Cloud Build, manual: só roda quando você chama)"
@@ -369,7 +379,7 @@ sys.exit(0 if ok else 1)' "$host" || return 1
   echo "   ok   signupOpen=$SIGNUP_OPEN (textos exigidos publicados)"
   # Textos com versão no arquivo de variáveis: a API pública precisa mostrar o texto OFICIAL, com essa versão e essa data de vigência.
   local kind ver date
-  for kind in termos-de-uso:TERMS privacidade:PRIVACY cancelamento:CANCELLATION; do
+  for kind in termos-de-uso:TERMS privacidade:PRIVACY cancelamento:CANCELLATION termo-menor:MINOR_TERM autorizacao-menor:MINOR_AUTHORIZATION; do
     ver="$(eval "printf %s \"\${${kind#*:}_VERSION:-}\"")"; date="$(eval "printf %s \"\${${kind#*:}_DATE:-}\"")"
     [ -n "$ver" ] || continue
     curl -fsS -H "X-Forwarded-Host: $host" "$base/api/public/legal/${kind%%:*}" | python3 -I -c 'import json,sys; d=json.load(sys.stdin)["document"]; k,v,dt=sys.argv[1:4]

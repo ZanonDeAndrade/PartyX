@@ -614,7 +614,7 @@ export function AdminBuyerPage({ id }: { id: string }) {
           {!d.buyer.anonymized ? (
             <div className="px-adm-actions">
               <button type="button" className="px-btn" onClick={() => setCorrecting(true)}>
-                Corrigir e-mail ou CPF
+                Corrigir e-mail, CPF ou nascimento
               </button>
             </div>
           ) : null}
@@ -703,6 +703,7 @@ function IdentityDialog({
 }) {
   const [email, setEmail] = useState(buyer.email);
   const [cpf, setCpf] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'form' | 'confirm'>('form');
@@ -710,7 +711,7 @@ function IdentityDialog({
   const [formError, setFormError] = useState('');
   const emailChanged = email.trim().toLowerCase() !== buyer.email.toLowerCase();
   const cpfDigits = cpf.replace(/\D/g, '');
-  const dirty = emailChanged || cpfDigits !== '' || reason !== '';
+  const dirty = emailChanged || cpfDigits !== '' || birthDate !== '' || reason !== '';
   useLeaveGuard(dirty);
   const cancel = () => {
     if (dirty && !window.confirm('Descartar a correção?')) return;
@@ -719,7 +720,8 @@ function IdentityDialog({
   const check = (e: FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!emailChanged && !cpfDigits) errs.email = 'Altere o e-mail ou informe o CPF correto.';
+    if (!emailChanged && !cpfDigits && !birthDate)
+      errs.email = 'Altere o e-mail, ou informe o CPF ou a data de nascimento correta.';
     if (emailChanged && !isEmailLike(email)) errs.email = 'Informe um e-mail válido.';
     if (cpfDigits && !isCpfValid(cpfDigits)) errs.cpf = 'CPF inválido: confira os números.';
     if (reason.trim().length < 5) errs.reason = 'Informe o motivo (pelo menos 5 caracteres).';
@@ -733,6 +735,7 @@ function IdentityDialog({
       await api.admin.correctIdentity(buyer.id, {
         ...(emailChanged ? { email: email.trim() } : {}),
         ...(cpfDigits ? { cpf: cpfDigits } : {}),
+        ...(birthDate ? { birthDate } : {}),
         reason: reason.trim(),
       });
       toast('Dados corrigidos. O comprador precisa entrar de novo.');
@@ -766,6 +769,12 @@ function IdentityDialog({
               CPF passa a ser <b className="px-mono">{maskCpfInput(cpfDigits)}</b>
             </li>
           ) : null}
+          {birthDate ? (
+            <li>
+              Data de nascimento passa a ser <b>{birthDate.split('-').reverse().join('/')}</b>. O aviso de menor dos
+              pedidos de eventos futuros é refeito.
+            </li>
+          ) : null}
           <li>Motivo: {reason.trim()}</li>
         </ul>
         <p className="px-small">
@@ -786,7 +795,7 @@ function IdentityDialog({
         noValidate
       >
         <h2 id="id-title" className="px-h3">
-          Corrigir e-mail ou CPF
+          Corrigir e-mail, CPF ou data de nascimento
         </h2>
         <p className="px-small">
           Só o administrador corrige esses dados, para evitar fraude. O comprador não altera e-mail nem CPF pela própria
@@ -815,6 +824,19 @@ function IdentityDialog({
             value={cpf}
             onChange={e => setCpf(maskCpfInput(e.target.value))}
             {...described('id-cpf', errors.cpf)}
+          />
+        </FormField>
+        <FormField
+          id="id-birthDate"
+          label="Data de nascimento correta (deixe vazio para não mudar)"
+          error={errors.birthDate}
+        >
+          <input
+            id="id-birthDate"
+            type="date"
+            value={birthDate}
+            onChange={e => setBirthDate(e.target.value)}
+            {...described('id-birthDate', errors.birthDate)}
           />
         </FormField>
         <FormField id="id-reason" label="Motivo (fica na trilha de auditoria)" error={errors.reason}>
