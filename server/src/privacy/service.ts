@@ -7,6 +7,7 @@ import {
   emailLog,
   events,
   loginAttempts,
+  minorTermAcceptances,
   orderItems,
   orders,
   passwordResets,
@@ -127,6 +128,18 @@ export async function exportSubjectData(deps: PrivacyDeps, userId: string) {
         .where(inArray(tickets.orderId, orderIds))
     : [];
   const sessionRows = await deps.db.select().from(sessions).where(eq(sessions.userId, userId));
+  const minorRows = await deps.db
+    .select({
+      orderNumber: orders.number,
+      termVersion: minorTermAcceptances.termVersion,
+      ageAtEvent: minorTermAcceptances.ageAtEvent,
+      acceptedAt: minorTermAcceptances.acceptedAt,
+      ip: minorTermAcceptances.ip,
+      userAgent: minorTermAcceptances.userAgent,
+    })
+    .from(minorTermAcceptances)
+    .innerJoin(orders, eq(orders.id, minorTermAcceptances.orderId))
+    .where(eq(minorTermAcceptances.userId, userId));
   const mailRows = await deps.db
     .select({ template: emailLog.template, status: emailLog.status, sentAt: emailLog.sentAt })
     .from(emailLog)
@@ -138,6 +151,7 @@ export async function exportSubjectData(deps: PrivacyDeps, userId: string) {
       name: u.name,
       email: u.email,
       cpf: u.cpf,
+      birthDate: u.birthDate,
       phone: u.phone,
       role: u.role,
       active: u.isActive,
@@ -172,6 +186,14 @@ export async function exportSubjectData(deps: PrivacyDeps, userId: string) {
           status: t.status,
           usedAt: iso(t.usedAt),
         })),
+    })),
+    minorTermAcceptances: minorRows.map(m => ({
+      order: m.orderNumber,
+      termVersion: m.termVersion,
+      ageAtEvent: m.ageAtEvent,
+      acceptedAt: m.acceptedAt.toISOString(),
+      ip: m.ip,
+      userAgent: m.userAgent,
     })),
     emails: mailRows.map(m => ({ template: m.template, status: m.status, sentAt: iso(m.sentAt) })),
     sessions: sessionRows.map(s => ({
@@ -252,6 +274,7 @@ export async function anonymizeSubject(deps: PrivacyDeps, adminId: string, userI
         name: REMOVED_NAME,
         email: `removido-${userId}@removido.invalid`,
         cpf: null,
+        birthDate: null,
         phone: null,
         passwordHash: unusable,
         isActive: false,
@@ -275,6 +298,11 @@ export async function anonymizeSubject(deps: PrivacyDeps, adminId: string, userI
           .where(eq(paymentEvents.id, ev.id));
     }
     await tx.update(consents).set({ ip: null, userAgent: null }).where(eq(consents.userId, userId));
+    // Aceites do termo de menor ficam (prova, ligados ao pedido), sem o IP e o navegador.
+    await tx
+      .update(minorTermAcceptances)
+      .set({ ip: null, userAgent: null })
+      .where(eq(minorTermAcceptances.userId, userId));
     await tx.delete(sessions).where(eq(sessions.userId, userId));
     await tx.delete(passwordResets).where(eq(passwordResets.userId, userId));
     await tx.delete(loginAttempts).where(eq(loginAttempts.emailNormalized, oldEmail));

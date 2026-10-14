@@ -66,6 +66,8 @@ interface Layout {
   paragraphs: string[];
   details?: { label: string; value: string }[];
   cta?: { label: string; url: string };
+  /** Link secundário, depois do botão (ex.: a autorização de menor). Texto e endereço escapados como o resto. */
+  link?: { lead: string; label: string; url: string };
   footnote?: string;
 }
 
@@ -89,6 +91,9 @@ function html(l: Layout, ctx: MailContext): string {
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 20px;"><tr><td bgcolor="${VIOLET}" style="background:${VIOLET};border-radius:8px;"><a href="${escapeHtml(l.cta.url)}" style="display:inline-block;padding:15px 28px;font-family:${FONT};font-size:16px;font-weight:700;line-height:1;color:#FFFFFF;text-decoration:none;border-radius:8px;">${escapeHtml(l.cta.label)}</a></td></tr></table>
        <p style="margin:0 0 16px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;color:${PURPLE};">${escapeHtml(l.cta.url)}</span></p>`
     : '';
+  const link = l.link
+    ? `<p style="margin:0 0 16px;font-family:${FONT};font-size:15px;line-height:1.55;color:${INK};">${escapeHtml(l.link.lead)}<br><a href="${escapeHtml(l.link.url)}" style="color:${PURPLE};font-weight:700;">${escapeHtml(l.link.label)}</a></p>`
+    : '';
   const foot = l.footnote
     ? `<p style="margin:0 0 8px;font-family:${FONT};font-size:13px;line-height:1.5;color:${MUTED};">${escapeHtml(l.footnote)}</p>`
     : '';
@@ -106,7 +111,7 @@ function html(l: Layout, ctx: MailContext): string {
 <tr><td style="padding:32px 28px 28px;">
 ${env}<h1 style="margin:0 0 18px;font-family:${FONT};font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-0.3px;color:${INK};">${escapeHtml(l.title)}</h1>
 ${l.paragraphs.map(p).join('\n')}
-${details}${cta}${foot}
+${details}${cta}${link}${foot}
 </td></tr>
 <tr><td style="padding:16px 28px 22px;border-top:1px solid ${LINE};background:#FAFAFC;"><p style="margin:0;font-family:${FONT};font-size:12px;line-height:1.5;color:${MUTED};">${footerLines(ctx).map(escapeHtml).join('<br>')}</p></td></tr>
 </table></td></tr></table></body></html>`;
@@ -121,6 +126,7 @@ function text(l: Layout, ctx: MailContext): string {
   ];
   if (l.details?.length) lines.push(...l.details.map(d => `${d.label}: ${d.value}`), '');
   if (l.cta) lines.push(`${l.cta.label}:`, l.cta.url, '');
+  if (l.link) lines.push(l.link.lead, `${l.link.label}:`, l.link.url, '');
   if (l.footnote) lines.push(l.footnote, '');
   lines.push(...footerLines(ctx));
   return lines.join('\n');
@@ -169,6 +175,8 @@ export interface PurchaseData {
   units: string;
   paidAt: string;
   lines: string[];
+  /** Evento que permite menores de 16 e 17 anos: endereço da página que baixa a autorização do pedido (exige entrar na conta). */
+  minorAuthorizationUrl?: string | null;
 }
 
 /** E03. Sem QR e sem anexo: o botão leva a Meus ingressos, onde é preciso entrar na conta (RF-36). */
@@ -187,6 +195,15 @@ export function composeCompra(data: PurchaseData, ctx: MailContext): Composed {
       ...data.lines.map((line, i) => ({ label: i === 0 ? 'Ingressos' : '', value: line })),
     ],
     cta: { label: 'Acessar meus ingressos', url: `${ctx.baseUrl}/meus-ingressos` },
+    ...(data.minorAuthorizationUrl
+      ? {
+          link: {
+            lead: 'Este evento permite a entrada de quem tiver 16 ou 17 anos na data do evento, com o Termo de Autorização e Responsabilidade preenchido e assinado pelo responsável legal, entregue na portaria com a cópia do documento dele.',
+            label: 'Baixar o Termo de Autorização e Responsabilidade',
+            url: data.minorAuthorizationUrl,
+          },
+        }
+      : {}),
     footnote:
       'O botão abre Meus ingressos; é preciso entrar na sua conta para ver os QR Codes. Cancelamentos e reembolsos seguem a Política de Cancelamento da PartyX.',
   };

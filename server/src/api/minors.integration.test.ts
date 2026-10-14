@@ -659,4 +659,41 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       );
     });
   });
+
+  describe('LGPD com comprador menor', () => {
+    it('a cópia traz a data de nascimento e o aceite do termo; a anonimização apaga a data e o IP do aceite, e o aceite fica', async () => {
+      const ev = await event({ allowsMinors: true });
+      const p = await person('2009-06-01');
+      const order = (
+        await json(
+          await p.raw('POST', '/orders', {
+            eventSlug: ev.slug,
+            items: ev.items,
+            minorTermAccepted: true,
+            minorTermVersion: 'ficticio-0',
+          }),
+        )
+      ).order;
+      await sql("update orders set status = 'pago', paid_at = now(), payment_method = 'pix' where id = $1", [order.id]);
+      const admin = await person(null, { role: 'administrador' });
+
+      const copia = await json(await admin.raw('GET', `/admin/privacy/subjects/${p.id}/export?protocolo=PX-LGPD-1`));
+      expect(copia.subject.birthDate).toBe('2009-06-01');
+      expect(copia.minorTermAcceptances).toEqual([
+        expect.objectContaining({ order: order.number, termVersion: 'ficticio-0', ageAtEvent: 17, ip: '203.0.113.7' }),
+      ]);
+
+      const res = await admin.raw('POST', `/admin/privacy/subjects/${p.id}/anonymize`, {
+        reference: 'PX-LGPD-1',
+        reason: 'Pedido de exclusão do titular',
+        confirm: true,
+      });
+      expect(res.status).toBe(200);
+      expect((await sql('select birth_date from users where id = $1', [p.id])).rows[0].birth_date).toBeNull();
+      expect(await acceptances(p.id)).toEqual([
+        { order_id: order.id, term_version: 'ficticio-0', age_at_event: 17, ip: null },
+      ]);
+      expect((await orders(p.id))[0]!.buyer_minor).toBe(true); // o aviso da portaria continua (retrato da compra)
+    });
+  });
 });

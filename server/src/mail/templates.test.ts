@@ -44,6 +44,18 @@ describe('e-mails (RF-36, RF-67)', () => {
     expect(m.text).toMatch(/1 hora e só pode ser usado uma vez/);
   });
 
+  it('compra em evento que permite menores: link para baixar a autorização (página que exige login); sem ele, nada', () => {
+    const url = 'https://partyx.exemplo.test/autorizacao-menor/pedido/0b6f3b7e-1f1a-4c47-9a7b-1b2c3d4e5f60';
+    const m = composeCompra({ ...purchase, minorAuthorizationUrl: url }, ctx);
+    expect(m.text).toContain('Baixar o Termo de Autorização e Responsabilidade:');
+    expect(m.text).toContain(url);
+    expect(m.html).toContain(`href="${url}"`);
+    expect(m.text).toContain('16 ou 17 anos na data do evento');
+    const sem = composeCompra({ ...purchase, minorAuthorizationUrl: null }, ctx);
+    expect(sem.text).not.toContain('autorizacao-menor');
+    expect(sem.html).not.toContain('Termo de Autorização');
+  });
+
   it('compra: dados do pedido e do evento e link para Meus ingressos', () => {
     const m = composeCompra(purchase, ctx);
     expect(m.subject).toBe('Compra confirmada · Noite Neon Verão · Pedido PX-10184');
@@ -124,7 +136,14 @@ describe('e-mails (RF-36, RF-67)', () => {
       ctx,
     );
     expect(m.subject).toBe('Pagamento recebido sem ingresso disponível · Pedido PX-10190');
-    for (const piece of ['PX-10190', 'Marina "Costa"', 'marina@exemplo.test', 'R$ 180,00', 'mock_pay_123', '10/10/2026 às 12:11'])
+    for (const piece of [
+      'PX-10190',
+      'Marina "Costa"',
+      'marina@exemplo.test',
+      'R$ 180,00',
+      'mock_pay_123',
+      '10/10/2026 às 12:11',
+    ])
       expect(m.text).toContain(piece);
     expect(m.text).toContain('o estorno deve ser feito pela PartyX no painel do gateway');
     expect(m.text).toContain('A plataforma não estorna automaticamente');
@@ -190,7 +209,9 @@ describe('e-mails (RF-36, RF-67)', () => {
         'atendimento@exemplo.test',
       );
       expect(
-        replyToFor(loadConfig({ PARTYX_SUPPORT_EMAIL: 'atendimento@exemplo.test', EMAIL_REPLY_TO: 'sac@exemplo.test' })),
+        replyToFor(
+          loadConfig({ PARTYX_SUPPORT_EMAIL: 'atendimento@exemplo.test', EMAIL_REPLY_TO: 'sac@exemplo.test' }),
+        ),
       ).toBe('sac@exemplo.test');
     });
   });

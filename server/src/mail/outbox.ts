@@ -165,6 +165,7 @@ async function compose(
       startsAt: events.startsAt,
       eventName: events.name,
       venue: events.venue,
+      allowsMinors: events.allowsMinors,
       id: orders.id,
     })
     .from(orders)
@@ -191,6 +192,8 @@ async function compose(
     units: total === 1 ? '1 ingresso' : `${total} ingressos`,
     paidAt: formatEventDateTime(order.paidAt).replace(' ', ' às '),
     lines: units.map(u => `${u.n} × ${u.type}`),
+    // Página do site que exige entrar na conta e baixa a autorização do pedido (o e-mail nunca leva o PDF nem dado do menor).
+    minorAuthorizationUrl: order.allowsMinors ? `${ctx.baseUrl}/autorizacao-menor/pedido/${order.id}` : null,
   };
   const composed = composeCompra(data, ctx);
   return {
@@ -263,7 +266,10 @@ export async function processOutbox(
       // Homologação com entrega real: fora da lista, nada sai. Fica registrado, sem alerta e sem erro para quem usa a tela;
       // o administrador pode reabrir depois de a lista mudar. Em produção a lista é sempre nula.
       if (deps.config.APP_ENV !== 'producao' && !isRecipientAllowed(deps.config.emailAllowlist, composed.to)) {
-        await deps.db.update(emailLog).set({ status: 'falhou', lastError: NOT_ALLOWED_REASON }).where(eq(emailLog.id, row.id));
+        await deps.db
+          .update(emailLog)
+          .set({ status: 'falhou', lastError: NOT_ALLOWED_REASON })
+          .where(eq(emailLog.id, row.id));
         result.skipped++;
         continue;
       }
@@ -342,7 +348,10 @@ export type EmailTaskOutcome = 'enviado' | 'reagendado' | 'revisao_manual' | 'ja
  * `FOR UPDATE SKIP LOCKED` e só é pego quando vence). Falha de envio não é erro da tarefa: ela se reagenda (ou vai para revisão).
  * Só uma falha do nosso banco sobe, para o Cloud Tasks repetir.
  */
-export async function handleEmailTask(deps: OutboxDeps, input: { emailId: string }): Promise<{ outcome: EmailTaskOutcome }> {
+export async function handleEmailTask(
+  deps: OutboxDeps,
+  input: { emailId: string },
+): Promise<{ outcome: EmailTaskOutcome }> {
   const result = await processOutbox(deps, { emailId: input.emailId, limit: 1 });
   if (result.sent > 0) return { outcome: 'enviado' };
   if (result.failed > 0) return { outcome: 'revisao_manual' };
