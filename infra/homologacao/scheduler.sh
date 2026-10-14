@@ -26,14 +26,15 @@ HOST="$(python3 -I -c 'import sys,urllib.parse as u; print(u.urlsplit(sys.argv[1
 URL="https://${SERVICE}-$(gcloud projects describe "$PROJECT" --format='value(projectNumber)').${REGION}.run.app"
 TARGET="${URL}/api/internal/jobs/reconcile-payments"
 
+# Na criação o gcloud usa --headers; na atualização de um job existente, --update-headers (o --headers é recusado).
 if gcloud scheduler jobs describe "$JOB" --project="$PROJECT" --location="$REGION" >/dev/null 2>&1; then
-  VERB=update
+  VERB=update; HEADERS_FLAG=--update-headers
 else
-  VERB=create
+  VERB=create; HEADERS_FLAG=--headers
 fi
 gcloud scheduler jobs "$VERB" http "$JOB" --project="$PROJECT" --location="$REGION" \
   --schedule="$SCHEDULE" --time-zone="America/Sao_Paulo" \
-  --uri="$TARGET" --http-method=POST --headers="X-Forwarded-Host=$HOST" \
+  --uri="$TARGET" --http-method=POST "$HEADERS_FLAG=X-Forwarded-Host=$HOST" \
   --oidc-service-account-email="$SCHED_SA" --oidc-token-audience="$URL" \
   --attempt-deadline=120s --max-retry-attempts=1 --min-backoff=30s
 echo "Job $JOB ($VERB, $SCHEDULE) apontando para $TARGET"

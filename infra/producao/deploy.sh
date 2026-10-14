@@ -154,10 +154,12 @@ cmd_setup() {
 cmd_varredura() {
   load_env_file   # o X-Forwarded-Host da varredura sai do PUBLIC_BASE_URL do arquivo de variáveis
   local url host; url="$(run_url)"; host="$(public_host)"
-  local verb=create; exists g scheduler jobs describe "$SWEEP_JOB" --location="$REGION" && verb=update
+  # Na criação o gcloud usa --headers; na atualização de um job existente, --update-headers (o --headers é recusado).
+  local verb=create headers_flag=--headers
+  if exists g scheduler jobs describe "$SWEEP_JOB" --location="$REGION"; then verb=update; headers_flag=--update-headers; fi
   g scheduler jobs "$verb" http "$SWEEP_JOB" --location="$REGION" --schedule="0 4 * * *" --time-zone="America/Sao_Paulo" \
     --uri="$url/api/internal/jobs/reconcile-payments" --http-method=POST \
-    --headers="X-Forwarded-Host=$host" \
+    "$headers_flag=X-Forwarded-Host=$host" \
     --oidc-service-account-email="$(sa $SCHED_SA)" --oidc-token-audience="$url" --attempt-deadline=120s --max-retry-attempts=1
   echo "Rotina diária às 04:00 (America/Sao_Paulo) -> $url"
   # A varredura de 5 min de uma versão anterior (nunca executada) manteria o Neon acordado: se alguém a criou, sai.
