@@ -1,0 +1,5 @@
+# Só a configuração de rewrite vai para a Vercel. Todo o resto desta pasta fica local, inclusive o arquivo de variáveis que a
+# CLI cria no `vercel link` (token temporário) e o vínculo `.vercel/`.
+/*
+!/vercel.json
+!/public
