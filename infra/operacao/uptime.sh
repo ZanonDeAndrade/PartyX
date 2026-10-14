@@ -6,13 +6,16 @@
 # banco respondendo). O alerta abre quando a verificação falha em duas ou mais regiões por 10 minutos, para não avisar por falha de
 # uma região só. Custo: as verificações são gratuitas até 1 milhão por mês; a política conta como uma condição de alerta.
 # Observação: a verificação mantém o Cloud Run e o Neon acordados a cada 5 minutos (3 requisições leves).
+# Também valida o certificado: um certificado vencido ou trocado no intermediário (Vercel ou Firebase) dispara o alerta, assim
+# como uma pausa do projeto na Vercel (503 DEPLOYMENT_PAUSED, sem o texto "database":"ok").
+# Cada endereço tem a sua verificação (NAME) e a sua política, com o host no nome: dá para manter duas durante uma troca.
 set -euo pipefail
 : "${PROJECT:?informe PROJECT}"
 : "${PUBLIC_BASE_URL:?informe PUBLIC_BASE_URL}"
 : "${NOTIFY_EMAIL:?informe NOTIFY_EMAIL}"
 NAME="${NAME:-partyx-saude-publica}"
-POLICY="PartyX: saúde indisponível"
 HOST="$(python3 -I -c 'import sys,urllib.parse as u; x=u.urlsplit(sys.argv[1]); assert x.scheme=="https" and x.netloc; print(x.netloc)' "$PUBLIC_BASE_URL")"
+POLICY="${POLICY:-PartyX: saúde indisponível ($HOST)}"
 g() { gcloud --project="$PROJECT" "$@"; }
 
 CH="$(g alpha monitoring channels list --filter="labels.email_address=\"$NOTIFY_EMAIL\"" --format='value(name)' 2>/dev/null | head -1 || true)"
@@ -21,7 +24,7 @@ CH="$(g alpha monitoring channels list --filter="labels.email_address=\"$NOTIFY_
 CHECK="$(g monitoring uptime list-configs --filter="displayName=\"$NAME\"" --format='value(name)' 2>/dev/null | head -1 || true)"
 if [ -z "$CHECK" ]; then
   g monitoring uptime create "$NAME" --resource-type=uptime-url --resource-labels="host=$HOST,project_id=$PROJECT" \
-    --protocol=https --path=/api/health/ready --period=5 --timeout=10 \
+    --protocol=https --path=/api/health/ready --period=5 --timeout=10 --validate-ssl=true \
     --matcher-content='"database":"ok"' --matcher-type=contains-string \
     --regions=usa-virginia,europe,south-america >/dev/null
   CHECK="$(g monitoring uptime list-configs --filter="displayName=\"$NAME\"" --format='value(name)' | head -1)"
