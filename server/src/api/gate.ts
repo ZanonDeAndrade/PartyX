@@ -10,6 +10,8 @@ import {
   counterByType,
   counterOf,
   gateEvents,
+  MINOR_CHECKS,
+  refuseMinor,
   scan,
   searchTickets,
   type GateDeps,
@@ -84,8 +86,25 @@ export function gateRoutes(deps: AuthDeps) {
     const v = who(c);
     if (scanLimit.hit(v.id)) throw tooMany();
     await consumeGlobal(deps, 'portaria_leitura', deps.config.GATE_SCANS_PER_MINUTE);
-    const body = await parseJson(c, z.object({ eventId: uuid, ticketId: uuid }));
+    const body = await parseJson(
+      c,
+      z.object({
+        eventId: uuid,
+        ticketId: uuid,
+        // Confirmação depois da leitura pela câmera de ingresso de pedido de comprador menor (regras de menores).
+        method: z.enum(['camera', 'manual']).optional(),
+        minorCheck: z.enum(MINOR_CHECKS).optional(),
+      }),
+    );
     return c.json(await admitManually(gateDeps, v, body));
+  });
+
+  /** Menor sem a autorização ou sem os documentos: recusa registrada na trilha; o ingresso continua válido. */
+  app.post('/gate/minor-refused', async c => {
+    const v = who(c);
+    if (scanLimit.hit(v.id)) throw tooMany();
+    const body = await parseJson(c, z.object({ eventId: uuid, ticketId: uuid }));
+    return c.json(await refuseMinor(gateDeps, v, body));
   });
 
   return app;

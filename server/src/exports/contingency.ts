@@ -85,7 +85,7 @@ export function renderContingencyPdf(c: Contingency): Promise<Buffer> {
       .fontSize(9)
       .text(
         toLatin1(
-          'Como usar: com o sistema no ar, valide sempre pelo QR Code. Esta lista é só para conferir nome e código se a internet ou o sistema falhar, e não substitui a validação. Ela é um retrato da hora de geração: ingressos emitidos ou cancelados depois não constam. Marque cada entrada na caixa. Contém dados pessoais (CPF mascarado): guarde em local fechado, não fotografe nem compartilhe, e destrua (picote) depois do evento.',
+          'Como usar: com o sistema no ar, valide sempre pelo QR Code. Esta lista é só para conferir nome e código se a internet ou o sistema falhar, e não substitui a validação. Ela é um retrato da hora de geração: ingressos emitidos ou cancelados depois não constam. Marque cada entrada na caixa. Nome com (MENOR): pedido de comprador de 16 ou 17 anos; confira a idade de cada pessoa e recolha a autorização de quem for menor. Contém dados pessoais (CPF mascarado): guarde em local fechado, não fotografe nem compartilhe, e destrua (picote) depois do evento.',
         ),
         { width: 523 },
       );
@@ -105,7 +105,7 @@ export function renderContingencyPdf(c: Contingency): Promise<Buffer> {
         if (t.status === 'utilizado') doc.text('já usou', COLS[0].x + 14, y + 2, { width: 12, lineBreak: false });
         doc.font('Courier-Bold').text(t.shortCode, COLS[1].x, y + 1, { width: COLS[1].w, lineBreak: false });
         doc.font('Helvetica');
-        doc.text(toLatin1(t.holderName), COLS[2].x, y + 1, {
+        doc.text(toLatin1(t.buyerMinor ? `${t.holderName} (MENOR)` : t.holderName), COLS[2].x, y + 1, {
           width: COLS[2].w - 4,
           height: 11,
           ellipsis: true,

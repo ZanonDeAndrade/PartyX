@@ -11,6 +11,7 @@ import { createFakeClock } from '../providers/clock';
 import { MemoryEmailSender } from '../providers/email';
 import { argon2Hasher } from '../providers/passwordHasher';
 import { blankAuthorizationPdf } from '../minors/authorization';
+import { issueForOrder } from '../tickets/issuer';
 
 const ADMIN_URL = process.env.TEST_DATABASE_URL;
 const PASSWORD = 'festa2026';
@@ -48,7 +49,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
   /** Navegador simulado de alguém já cadastrado, com a data de nascimento indicada (`null` = conta antiga, sem data). */
   async function person(
     birthDate: string | null,
-    o: { role?: 'cliente' | 'administrador'; target?: ReturnType<typeof build>; consent?: string } = {},
+    o: { role?: 'cliente' | 'administrador' | 'validador'; target?: ReturnType<typeof build>; consent?: string } = {},
   ) {
     const i = ++n;
     const role = o.role ?? 'cliente';
@@ -539,6 +540,123 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
         status: 503,
         code: 'autorizacao_indisponivel',
       });
+    });
+  });
+
+  describe('portaria: pedido de comprador menor', () => {
+    /** Compra pela API (com o termo, se menor), aprova o pedido e emite os ingressos com o emissor de verdade. */
+    async function paidTickets(birthDate: string, ev: Awaited<ReturnType<typeof event>>, quantity = 2) {
+      const p = await person(birthDate);
+      const res = await p.raw('POST', '/orders', {
+        eventSlug: ev.slug,
+        items: [{ ticketTypeId: ev.items[0]!.ticketTypeId, quantity }],
+        minorTermAccepted: true,
+        minorTermVersion: 'ficticio-0',
+      });
+      expect(res.status).toBe(201);
+      const orderId = (await json(res)).order.id as string;
+      await sql("update orders set status = 'pago', paid_at = now(), payment_method = 'pix' where id = $1", [orderId]);
+      const items = (await sql('select id, ticket_type_id, quantity from order_items where order_id = $1', [orderId]))
+        .rows;
+      await createDrizzle(testDb.pool).transaction(tx =>
+        issueForOrder(tx, loadConfig({ APP_ENV: 'local' }).qr, {
+          id: orderId,
+          userId: p.id,
+          eventId: ev.id,
+          items: items.map(i => ({ orderItemId: i.id, ticketTypeId: i.ticket_type_id, quantity: i.quantity })),
+        }),
+      );
+      const tickets = (
+        await sql('select id, qr_payload, short_code from tickets where order_id = $1 order by unit_index', [orderId])
+      ).rows as { id: string; qr_payload: string; short_code: string }[];
+      return { buyer: p, orderId, tickets };
+    }
+    const checkinsOf = async (ticketId: string) =>
+      (
+        await sql('select result, method, minor_authorization_received as minor from checkins where ticket_id = $1', [
+          ticketId,
+        ])
+      ).rows;
+    const statusOf = async (ticketId: string) =>
+      (await sql('select status from tickets where id = $1', [ticketId])).rows[0].status as string;
+
+    it('a leitura pede a conferência da idade sem consumir; a confirmação libera e fica gravada na leitura', async () => {
+      const ev = await event({ allowsMinors: true });
+      const { tickets } = await paidTickets('2009-06-01', ev);
+      const [t1, t2] = tickets as [(typeof tickets)[0], (typeof tickets)[0]];
+      const v = await person(null, { role: 'validador' });
+
+      const lido = await json(await v.raw('POST', '/gate/scan', { eventId: ev.id, qr: t1.qr_payload }));
+      expect(lido).toMatchObject({
+        result: 'menor_confirmar',
+        message:
+          'Pedido de comprador menor: conferir a idade de cada pessoa; quem tiver 16 ou 17 anos entrega a autorização',
+        ticket: { id: t1.id, buyerMinor: true },
+      });
+      expect(await statusOf(t1.id)).toBe('valido');
+      expect(await checkinsOf(t1.id)).toEqual([]);
+
+      // Pessoa menor, com a autorização entregue.
+      const ok = await json(
+        await v.raw('POST', '/gate/admit', {
+          eventId: ev.id,
+          ticketId: t1.id,
+          method: 'camera',
+          minorCheck: 'autorizacao_recebida',
+        }),
+      );
+      expect(ok.result).toBe('valido');
+      expect(await checkinsOf(t1.id)).toEqual([{ result: 'valido', method: 'camera', minor: true }]);
+      // A mesma leitura de novo: já utilizado (não pede conferência de novo).
+      expect((await json(await v.raw('POST', '/gate/scan', { eventId: ev.id, qr: t1.qr_payload }))).result).toBe(
+        'ja_utilizado',
+      );
+
+      // Segundo ingresso: primeiro um menor sem autorização (recusa na trilha, ingresso segue válido); depois um adulto.
+      const recusa = await v.raw('POST', '/gate/minor-refused', { eventId: ev.id, ticketId: t2.id });
+      expect(recusa.status).toBe(200);
+      expect(await statusOf(t2.id)).toBe('valido');
+      const trail = (
+        await sql(
+          "select after_json::text as a from audit_log where action = 'portaria.menor_recusado' and entity_id = $1",
+          [t2.id],
+        )
+      ).rows;
+      expect(trail).toHaveLength(1);
+      const adulto = await json(
+        await v.raw('POST', '/gate/admit', { eventId: ev.id, ticketId: t2.id, minorCheck: 'maior_de_idade' }),
+      );
+      expect(adulto.result).toBe('valido');
+      expect(await checkinsOf(t2.id)).toEqual([{ result: 'valido', method: 'manual', minor: false }]);
+    });
+
+    it('a busca manual marca o pedido de menor, e a entrada pela busca também pede a conferência', async () => {
+      const ev = await event({ allowsMinors: true });
+      const { tickets } = await paidTickets('2010-01-15', ev, 1);
+      const v = await person(null, { role: 'validador' });
+      const busca = await json(await v.raw('POST', '/gate/search', { eventId: ev.id, q: tickets[0]!.short_code }));
+      expect(busca.hits[0]).toMatchObject({ ticketId: tickets[0]!.id, buyerMinor: true });
+      const semConferir = await json(await v.raw('POST', '/gate/admit', { eventId: ev.id, ticketId: tickets[0]!.id }));
+      expect(semConferir.result).toBe('menor_confirmar');
+      expect(await statusOf(tickets[0]!.id)).toBe('valido');
+    });
+
+    it('ingresso de comprador adulto entra direto, sem conferência; a confirmação de menor nele é recusada', async () => {
+      const ev = await event({ allowsMinors: true });
+      const { tickets } = await paidTickets('1990-01-01', ev, 2);
+      const v = await person(null, { role: 'validador' });
+      const direto = await json(await v.raw('POST', '/gate/scan', { eventId: ev.id, qr: tickets[0]!.qr_payload }));
+      expect(direto).toMatchObject({ result: 'valido', ticket: { buyerMinor: false } });
+      expect(await checkinsOf(tickets[0]!.id)).toEqual([{ result: 'valido', method: 'camera', minor: null }]);
+      const indevido = await v.raw('POST', '/gate/admit', {
+        eventId: ev.id,
+        ticketId: tickets[1]!.id,
+        minorCheck: 'autorizacao_recebida',
+      });
+      expect(indevido.status).toBe(422);
+      expect((await v.raw('POST', '/gate/minor-refused', { eventId: ev.id, ticketId: tickets[1]!.id })).status).toBe(
+        422,
+      );
     });
   });
 });

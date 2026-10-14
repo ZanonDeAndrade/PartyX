@@ -49,6 +49,14 @@ export interface Validator {
 }
 
 export type GateResult = 'valido' | 'ja_utilizado' | 'invalido' | 'cancelado' | 'outro_evento';
+/**
+ * `menor_confirmar` (regras de menores, 14/10/2026): ingresso válido de pedido de comprador menor. NÃO consome o ingresso nem vira
+ * leitura gravada: a tela pede ao validador que confira a idade de quem está na frente e confirme (`MinorCheck`).
+ */
+export type GateOutcomeResult = GateResult | 'menor_confirmar';
+/** O que o validador confirmou num ingresso de pedido de comprador menor: menor com a autorização entregue, ou pessoa de 18+. */
+export type MinorCheck = 'autorizacao_recebida' | 'maior_de_idade';
+export const MINOR_CHECKS = ['autorizacao_recebida', 'maior_de_idade'] as const;
 
 export interface Counter {
   entered: number;
@@ -56,10 +64,11 @@ export interface Counter {
 }
 
 export interface GateOutcome {
-  result: GateResult;
+  result: GateOutcomeResult;
   /** Texto curto para a tela cheia. */
   message: string;
-  ticket: { id: string; shortCode: string; typeName: string; holderName: string } | null;
+  /** `buyerMinor`: pedido de comprador com 16 ou 17 anos na data do evento (aviso de menor em todos os ingressos dele). */
+  ticket: { id: string; shortCode: string; typeName: string; holderName: string; buyerMinor: boolean } | null;
   /** Amarelo: quem entrou primeiro e quando (RF-48). */
   firstEntry: { at: string; validatorName: string } | null;
   /** Vermelho "outro evento" (RF-54): de qual evento é o ingresso. */
@@ -68,7 +77,9 @@ export interface GateOutcome {
   method: 'camera' | 'manual';
 }
 
-const MESSAGES: Record<GateResult, string> = {
+const MESSAGES: Record<GateOutcomeResult, string> = {
+  menor_confirmar:
+    'Pedido de comprador menor: conferir a idade de cada pessoa; quem tiver 16 ou 17 anos entrega a autorização',
   valido: 'Entrada liberada',
   ja_utilizado: 'Ingresso já utilizado',
   invalido: 'Ingresso inválido',
@@ -188,6 +199,7 @@ type TicketRow = {
   eventId: string;
   status: 'valido' | 'utilizado' | 'cancelado';
   usedAt: Date | null;
+  buyerMinor: boolean;
 };
 
 async function ticketById(db: Db, id: string): Promise<TicketRow | null> {
@@ -200,9 +212,11 @@ async function ticketById(db: Db, id: string): Promise<TicketRow | null> {
       eventId: tickets.eventId,
       status: tickets.status,
       usedAt: tickets.usedAt,
+      buyerMinor: orders.buyerMinor,
     })
     .from(tickets)
     .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+    .innerJoin(orders, eq(orders.id, tickets.orderId))
     .where(eq(tickets.id, id))
     .limit(1);
   return row ?? null;
@@ -232,7 +246,7 @@ async function record(
 async function outcome(
   deps: GateDeps,
   eventId: string,
-  result: GateResult,
+  result: GateOutcomeResult,
   method: 'camera' | 'manual',
   ticket: TicketRow | null,
   extra: { firstEntry?: GateOutcome['firstEntry']; otherEvent?: string | null } = {},
@@ -242,7 +256,13 @@ async function outcome(
     message: MESSAGES[result],
     ticket:
       ticket && result !== 'invalido'
-        ? { id: ticket.id, shortCode: ticket.shortCode, typeName: ticket.typeName, holderName: ticket.holderName }
+        ? {
+            id: ticket.id,
+            shortCode: ticket.shortCode,
+            typeName: ticket.typeName,
+            holderName: ticket.holderName,
+            buyerMinor: ticket.buyerMinor,
+          }
         : null,
     firstEntry: extra.firstEntry ?? null,
     otherEvent: extra.otherEvent ? { name: extra.otherEvent } : null,
@@ -263,8 +283,14 @@ async function admit(
   eventId: string,
   ticketId: string,
   method: 'camera' | 'manual',
+  minorCheck?: MinorCheck,
 ): Promise<GateOutcome> {
   const now = deps.clock.now();
+  const before = (await ticketById(deps.db, ticketId))!;
+  // Pedido de comprador menor (regras de menores): a entrada só acontece com a confirmação do validador, que conferiu a idade de quem
+  // está na frente. Sem ela, nada é consumido e a tela pede a conferência. Ingresso já usado ou cancelado segue o caminho normal.
+  if (before.buyerMinor && before.status === 'valido' && !minorCheck)
+    return outcome(deps, eventId, 'menor_confirmar', method, before);
   const won = await deps.db.transaction(async tx => {
     const rows = await tx
       .update(tickets)
@@ -272,9 +298,16 @@ async function admit(
       .where(and(eq(tickets.id, ticketId), eq(tickets.status, 'valido'), eq(tickets.eventId, eventId)))
       .returning({ id: tickets.id });
     if (rows.length === 0) return false;
-    await tx
-      .insert(checkins)
-      .values({ ticketId, eventId, validatorId: v.id, result: 'valido', method, createdAt: now });
+    await tx.insert(checkins).values({
+      ticketId,
+      eventId,
+      validatorId: v.id,
+      result: 'valido',
+      method,
+      // Gravado na leitura: true = menor com a autorização entregue; false = o validador conferiu 18 anos ou mais.
+      minorAuthorizationReceived: before.buyerMinor ? minorCheck === 'autorizacao_recebida' : null,
+      createdAt: now,
+    });
     return true;
   });
   const ticket = (await ticketById(deps.db, ticketId))!;
@@ -323,11 +356,14 @@ export async function scan(deps: GateDeps, v: Validator, input: { eventId: strin
   return admit(deps, v, input.eventId, ticket.id, 'camera');
 }
 
-/** Entrada manual de um ingresso encontrado na busca (RF-52). Registrada como `manual`. */
+/**
+ * Entrada de um ingresso já identificado: o encontrado na busca (RF-52, `manual`) ou a confirmação depois da leitura de um ingresso de
+ * pedido de comprador menor (`camera`, com `minorCheck`). A confirmação só é aceita em ingresso de pedido de comprador menor.
+ */
 export async function admitManually(
   deps: GateDeps,
   v: Validator,
-  input: { eventId: string; ticketId: string },
+  input: { eventId: string; ticketId: string; method?: 'camera' | 'manual'; minorCheck?: MinorCheck },
 ): Promise<GateOutcome> {
   await loadEvent(deps, input.eventId);
   const ticket = await ticketById(deps.db, input.ticketId);
@@ -338,11 +374,40 @@ export async function admitManually(
     await record(deps.db, v, input.eventId, 'outro_evento', 'manual', ticket.id, null, now);
     return outcome(deps, input.eventId, 'outro_evento', 'manual', ticket, { otherEvent: other?.name ?? null });
   }
+  const method = input.method ?? 'manual';
   if (ticket.status === 'cancelado') {
-    await record(deps.db, v, input.eventId, 'cancelado', 'manual', ticket.id, null, now);
-    return outcome(deps, input.eventId, 'cancelado', 'manual', ticket);
+    await record(deps.db, v, input.eventId, 'cancelado', method, ticket.id, null, now);
+    return outcome(deps, input.eventId, 'cancelado', method, ticket);
   }
-  return admit(deps, v, input.eventId, ticket.id, 'manual');
+  if (input.minorCheck && !ticket.buyerMinor)
+    throw new AppError(422, 'dados_invalidos', 'Este ingresso não é de pedido de comprador menor.');
+  return admit(deps, v, input.eventId, ticket.id, method, input.minorCheck);
+}
+
+/**
+ * Menor sem a autorização (ou sem os documentos): a entrada é recusada e o ingresso continua válido (a pessoa pode voltar com o papel).
+ * Fica na trilha de auditoria, sem dado pessoal: só o ingresso, o evento e quem recusou.
+ */
+export async function refuseMinor(deps: GateDeps, v: Validator, input: { eventId: string; ticketId: string }) {
+  await loadEvent(deps, input.eventId);
+  const ticket = await ticketById(deps.db, input.ticketId);
+  if (!ticket || ticket.eventId !== input.eventId)
+    throw new AppError(404, 'nao_encontrado', 'Ingresso não encontrado.');
+  if (!ticket.buyerMinor)
+    throw new AppError(422, 'dados_invalidos', 'Este ingresso não é de pedido de comprador menor.');
+  await deps.db.transaction(tx =>
+    writeAudit(tx, {
+      actorId: v.id,
+      action: 'portaria.menor_recusado',
+      entity: 'ticket',
+      entityId: ticket.id,
+      before: null,
+      after: { evento: input.eventId, codigo: ticket.shortCode },
+      reason: 'Menor sem a autorização ou sem os documentos',
+      at: deps.clock.now(),
+    }),
+  );
+  return { recusado: true };
 }
 
 // ---------- busca manual (RF-52) ----------
@@ -378,6 +443,8 @@ export interface SearchHit {
   email: string;
   status: 'valido' | 'utilizado' | 'cancelado';
   usedAt: string | null;
+  /** Pedido de comprador menor: a tela marca "MENOR" e a entrada pede a conferência da idade. */
+  buyerMinor: boolean;
 }
 
 /**
@@ -417,6 +484,7 @@ export async function searchTickets(
       email: users.email,
       status: tickets.status,
       usedAt: tickets.usedAt,
+      buyerMinor: orders.buyerMinor,
     })
     .from(tickets)
     .innerJoin(orders, eq(orders.id, tickets.orderId))
@@ -448,6 +516,7 @@ export async function searchTickets(
       email: maskEmail(r.email),
       status: r.status,
       usedAt: r.usedAt?.toISOString() ?? null,
+      buyerMinor: r.buyerMinor,
     })),
   };
 }

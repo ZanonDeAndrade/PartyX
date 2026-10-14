@@ -314,7 +314,10 @@ export async function exportPromoterOrders(
     [
       ['Total', '', '', int(r.totals.tickets), money(r.totals.cents)],
       ['Promoter', `${r.promoter.name} (${r.promoter.code})`],
-      ['Critério', 'Pedidos pagos com o código do promoter, pela data original da aprovação. Sem desconto e sem comissão.'],
+      [
+        'Critério',
+        'Pedidos pagos com o código do promoter, pela data original da aprovação. Sem desconto e sem comissão.',
+      ],
       ['Filtros aplicados', `Evento: ${evName}; Período de aprovação: ${period(f)}`],
       ['Gerado em', stamp(deps)],
     ],
@@ -368,6 +371,8 @@ export interface ContingencyTicket {
   orderNumber: number;
   status: 'valido' | 'utilizado' | 'cancelado';
   usedAt: string | null;
+  /** Pedido de comprador com 16 ou 17 anos na data do evento: conferir a idade e recolher a autorização de quem for menor. */
+  buyerMinor: boolean;
 }
 export interface Contingency {
   event: { id: string; name: string; startsAt: string; venue: string; address: string };
@@ -394,7 +399,7 @@ export async function loadContingency(deps: ExportDeps, eventId: string): Promis
   if ((count.rows[0]?.n ?? 0) > MAX_EXPORT_ROWS)
     throw new AppError(413, 'exportacao_grande', 'Evento grande demais para uma única lista.');
   const rows = await deps.db.execute<Record<string, unknown>>(sql`
-    select t.short_code, ty.name as type_name, t.holder_name, u.cpf, o.number, t.status::text as status, t.used_at
+    select t.short_code, ty.name as type_name, t.holder_name, u.cpf, o.number, t.status::text as status, t.used_at, o.buyer_minor
       from tickets t
       join ticket_types ty on ty.id = t.ticket_type_id
       join orders o on o.id = t.order_id
@@ -408,6 +413,7 @@ export async function loadContingency(deps: ExportDeps, eventId: string): Promis
     orderNumber: Number(r.number),
     status: r.status as ContingencyTicket['status'],
     usedAt: r.used_at ? new Date(r.used_at as string).toISOString() : null,
+    buyerMinor: r.buyer_minor === true,
   }));
   const byName = (a: ContingencyTicket, b: ContingencyTicket) =>
     fold(a.holderName).localeCompare(fold(b.holderName), 'pt-BR') || a.shortCode.localeCompare(b.shortCode);
@@ -443,6 +449,7 @@ export function contingencyCsv(c: Contingency): CsvExport {
       : t.status === 'utilizado'
         ? 'Já utilizado'
         : 'Válido',
+    t.buyerMinor ? 'MENOR: conferir a idade; 16 ou 17 anos entrega a autorização' : '',
     '',
   ];
   const csv = toCsv(
@@ -453,6 +460,7 @@ export function contingencyCsv(c: Contingency): CsvExport {
       'CPF (mascarado)',
       'Pedido',
       'Situação na hora da exportação',
+      'Pedido de comprador menor',
       'Entrou (marque aqui)',
     ],
     [...c.admit.map(row), ...c.cancelled.map(row)],
