@@ -9,6 +9,7 @@ import { events, orders, tickets } from '../db/schema';
 import { AppError } from '../domain/errors';
 import { renderTicketsPdf } from '../tickets/pdf';
 import { getMyOrderTickets, getMyTicket, listMyTickets } from '../tickets/service';
+import { orderAuthorizationPdf } from '../minors/authorization';
 
 const idParam = z.uuid();
 
@@ -53,7 +54,11 @@ export function ticketRoutes(deps: AuthDeps) {
 
   app.get('/tickets/:id/pdf', buyer, async c => {
     const t = await getMyTicket(deps.db, userId(c), id(c.req.param('id'), 'Ingresso'));
-    return pdf(c, await renderTicketsPdf([t], `Ingresso ${t.shortCode}`, await pdfLogo()), `ingresso-${t.shortCode}.pdf`);
+    return pdf(
+      c,
+      await renderTicketsPdf([t], `Ingresso ${t.shortCode}`, await pdfLogo()),
+      `ingresso-${t.shortCode}.pdf`,
+    );
   });
 
   app.get('/orders/:id/tickets', buyer, async c => {
@@ -69,6 +74,15 @@ export function ticketRoutes(deps: AuthDeps) {
       await renderTicketsPdf(list, `Pedido PX-${list[0]!.orderNumber}`, await pdfLogo()),
       `ingressos-pedido-${list[0]!.orderNumber}.pdf`,
     );
+  });
+
+  /**
+   * Termo de Autorização e Responsabilidade do pedido (regras de menores): com o nome e a data de nascimento do comprador quando ele
+   * tinha 16 ou 17 anos na data do evento; senão, em branco para um acompanhante. Só em evento que permite menores.
+   */
+  app.get('/orders/:id/autorizacao-menor.pdf', buyer, async c => {
+    const { bytes, slug } = await orderAuthorizationPdf(deps, userId(c), id(c.req.param('id'), 'Pedido'));
+    return pdf(c, bytes, `autorizacao-menor-${slug}.pdf`);
   });
 
   /** Histórico de compras: todos os pedidos do comprador, do mais novo ao mais antigo. */

@@ -1,3 +1,7 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app';
 import { loadConfig } from '../config';
@@ -6,9 +10,21 @@ import { createTestDatabase } from '../db/testing';
 import { createFakeClock } from '../providers/clock';
 import { MemoryEmailSender } from '../providers/email';
 import { argon2Hasher } from '../providers/passwordHasher';
+import { blankAuthorizationPdf } from '../minors/authorization';
 
 const ADMIN_URL = process.env.TEST_DATABASE_URL;
 const PASSWORD = 'festa2026';
+const HAS_POPPLER = spawnSync('pdftotext', ['-v']).status === 0 && spawnSync('pdfinfo', ['-v']).status === 0;
+
+/** Texto do PDF (sem quebras de coluna) e número de páginas. */
+function readPdf(bytes: ArrayBuffer) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'px-aut-'));
+  const file = path.join(dir, 'a.pdf');
+  writeFileSync(file, Buffer.from(bytes));
+  const text = spawnSync('pdftotext', ['-raw', file, '-'], { encoding: 'utf8' }).stdout.replace(/\s+/g, ' ');
+  const pages = Number(/Pages:\s+(\d+)/.exec(spawnSync('pdfinfo', [file], { encoding: 'utf8' }).stdout)?.[1]);
+  return { text, pages };
+}
 
 /**
  * Regras de menores (14/10/2026): data de nascimento no cadastro, idade na DATA DO EVENTO no checkout, termo de menor aceito e gravado
@@ -423,6 +439,106 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
         endsAt: '2026-12-13T08:00:00.000Z',
       });
       expect((await json(await app.request(`/api/public/events/${sem.slug}`))).event.allowsMinors).toBe(false);
+    });
+  });
+
+  describe.skipIf(!HAS_POPPLER)('autorização de menor em PDF', () => {
+    const legalDir = () => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'px-legal-'));
+      writeFileSync(
+        path.join(dir, 'autorizacao-menor.txt'),
+        '# Como usar\n\nPreencha à mão e assine.\n\n# Declarações do responsável\n\n1. Autorizo a participação.\n\n2. Assumo a responsabilidade.',
+      );
+      return dir;
+    };
+
+    it('comprador menor: sai com os dados do evento e o nome e a data de nascimento dele, em uma página', async () => {
+      const withText = build({ LEGAL_CONTENT_DIR: legalDir() });
+      const ev = await event({ allowsMinors: true });
+      const p = await person('2010-12-12', { target: withText });
+      const order = (
+        await json(
+          await p.raw('POST', '/orders', {
+            eventSlug: ev.slug,
+            items: ev.items,
+            minorTermAccepted: true,
+            minorTermVersion: 'ficticio-0',
+          }),
+        )
+      ).order;
+      const res = await p.raw('GET', `/orders/${order.id}/autorizacao-menor.pdf`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('application/pdf');
+      expect(res.headers.get('cache-control')).toContain('no-store');
+      const { text, pages } = readPdf(await res.arrayBuffer());
+      expect(pages).toBe(1);
+      for (const piece of [
+        'TERMO DE AUTORIZAÇÃO E RESPONSABILIDADE',
+        'Noite Neon',
+        '12/12/2026',
+        'das 22h às 5h',
+        'Arena, Rua 1',
+        'Portaria 12/2026',
+        '12/12/2010',
+        'Como usar: Preencha à mão e assine.',
+        '1. Autorizo a participação.',
+        '2. Assumo a responsabilidade.',
+        'Uso da portaria',
+        'Termo versão ficticio-0',
+      ])
+        expect(text, piece).toContain(piece);
+      const { rows } = await sql('select name from users where id = $1', [p.id]);
+      // O nome do comprador menor sai preenchido (comparado sem espaços: a extração do negrito às vezes junta palavras).
+      expect(text.replace(/\s/g, '')).toContain(rows[0].name.replace(/\s/g, ''));
+      expect(text).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/); // nenhum CPF impresso
+
+      // De outro comprador: não existe.
+      const outro = await person('1990-01-01', { target: withText });
+      expect((await outro.raw('GET', `/orders/${order.id}/autorizacao-menor.pdf`)).status).toBe(404);
+    });
+
+    it('comprador adulto em evento com menores: campos do menor em branco; evento sem menores: não há autorização', async () => {
+      const ev = await event({ allowsMinors: true });
+      const adulto = await person('1990-01-01');
+      const order = (await json(await adulto.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items }))).order;
+      const { text } = readPdf(
+        await (await adulto.raw('GET', `/orders/${order.id}/autorizacao-menor.pdf`)).arrayBuffer(),
+      );
+      expect(text).not.toContain('01/01/1990');
+      expect(text).toContain('AMBIENTE DE HOMOLOGAÇÃO'); // sem o arquivo de texto, fora de produção
+
+      const sem = await event();
+      const p = await person('1990-01-01');
+      const o2 = (await json(await p.raw('POST', '/orders', { eventSlug: sem.slug, items: sem.items }))).order;
+      const res = await p.raw('GET', `/orders/${o2.id}/autorizacao-menor.pdf`);
+      expect(res.status).toBe(404);
+      expect(await code(res)).toBe('evento_sem_menores');
+    });
+
+    it('página do evento: autorização em branco, sem login e sem dado pessoal; evento sem menores responde 404', async () => {
+      const ev = await event({ allowsMinors: true });
+      const res = await app.request(`/api/public/events/${ev.slug}/autorizacao-menor.pdf`);
+      expect(res.status).toBe(200);
+      const { text } = readPdf(await res.arrayBuffer());
+      expect(text).toContain('Portaria 12/2026');
+      expect(text).toContain('Nome completo');
+      const sem = await event();
+      expect((await app.request(`/api/public/events/${sem.slug}/autorizacao-menor.pdf`)).status).toBe(404);
+    });
+
+    it('produção sem o texto da autorização publicado: indisponível (503)', async () => {
+      const ev = await event({ allowsMinors: true });
+      const config = loadConfig({
+        APP_ENV: 'producao',
+        PUBLIC_BASE_URL: 'https://partyx.example.com',
+        DATABASE_URL: 'postgres://x',
+        SESSION_SECRET: 's'.repeat(40),
+        QR_HMAC_KEYS: `1:${'a'.repeat(43)}`,
+      });
+      await expect(blankAuthorizationPdf({ db: createDrizzle(testDb.pool), config }, ev.slug)).rejects.toMatchObject({
+        status: 503,
+        code: 'autorizacao_indisponivel',
+      });
     });
   });
 });
