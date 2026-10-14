@@ -95,3 +95,15 @@ Cada arquivo de teste cria um banco novo, aplica as migrações e o remove no fi
 - **Neon real**: não havia conta nem URL. Conexão pooled e direta, limites do plano, SSL e janela de restauração **não foram testados**. Rodar `npm run db:check` com as URLs do Neon.
 - **Backup**: nenhuma retenção foi assumida. A janela real do plano do Neon e o backup independente de 7 dias são do Prompt 25.
 - **Carga e concorrência**: as garantias de estoque (CA-16) exigem `SELECT ... FOR UPDATE` e testes paralelos. Entram no Prompt 09 e no Prompt 21. Este prompt entrega só a estrutura.
+
+## 0009: menores de idade (14/10/2026, D-85)
+
+| Onde | O quê | Regra no banco |
+|---|---|---|
+| `users.birth_date` | Data de nascimento (AAAA-MM-DD) | Anulável (contas antigas); não antes de 1900. O mínimo de 16 anos é da aplicação |
+| `events.ends_at`, `allows_minors`, `judicial_authorization` | Fim, "permite menores de 16 e 17" e o número da autorização judicial | Fim depois do início; permitir menores exige fim e autorização |
+| `orders.buyer_minor` | Comprador com 16 ou 17 anos na data do evento (retrato da compra) | Padrão `false`; refeito se a PartyX corrigir a data |
+| `minor_term_acceptances` | Aceite do Termo de Ciência: pedido, versão, idade, data, IP, navegador | Um por pedido; idade 16 ou 17; sem DELETE (prova) |
+| `checkins.minor_authorization_received` | Escolha do validador num pedido de comprador menor: `true` (menor com a autorização) ou `false` (18+) | Só em entrada válida |
+
+Reversão (`rollback/0009...down.sql`) recusa se já houver aceite de menor ou confirmação na portaria. No banco de **teste**, `users.birth_date` ganha o padrão 1990-01-01 só para as fixtures antigas (`db/testing.ts`); produção não tem padrão.

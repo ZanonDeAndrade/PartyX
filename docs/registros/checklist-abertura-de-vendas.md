@@ -13,6 +13,14 @@ Preparado em 14/10/2026. **Nada aqui foi executado.** A publicação de 13/10 de
 | 1.5 | Evento real cadastrado, com tipos, preços e capacidade conferidos pela PartyX | Tela do admin conferida pelo Bernardo | | |
 | 1.6 | Autorização escrita para abrir, com a data | Registro novo em `docs/registros/` | 14/10/2026, **só o cadastro** (vendas não): `autorizacao-cadastro-producao-2026-10-14.md`. Textos do cadastro prontos no mesmo dia; abertura depende da candidata e da virada | Bernardo (WhatsApp, 10:00) e Arthur, informado por Arthur |
 
+### Regras de menores (D-85, preparado em 14/10/2026)
+
+| # | Item | Como se comprova | Feito em | Por quem |
+|---|---|---|---|---|
+| 1.7 | Termos 1.1, Privacidade 1.1, Termo de Ciência 1.0 e texto da autorização 1.0 confirmados por escrito pela PartyX | Registro em `docs/registros/` | | |
+| 1.8 | Migração 0009 aplicada em produção, com backup do dia conferido | Job `migrate` e `check:migrations` | | |
+| 1.9 | Evento real que permite menores: autorização judicial informada e PDF conferido | Painel e PDF baixado | | |
+
 ## 2. Domínio e e-mail
 
 | # | Item | Como se comprova | Feito em | Por quem |

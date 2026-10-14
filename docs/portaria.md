@@ -107,3 +107,15 @@ Já cobertos antes: duas sessões no mesmo QR (20 rodadas), 10 aparelhos, câmer
 **Exportação de contingência com 30 ingressos fictícios:** CSV e PDF (4 páginas) trazem os 30 códigos; nenhum CPF inteiro; 2 downloads auditados.
 
 **Não executado (depende de pessoas e aparelhos):** ensaio com **dois aparelhos reais no local** e medição em **4G real** (CA-26 segue pendente); leitura sob a luz do evento; impressão em papel da lista. Roteiro sugerido: abrir `/portaria` em dois celulares (Chrome Android e Safari iPhone) em homologação com HTTPS, ler o mesmo QR nos dois ao mesmo tempo (esperado: um verde, um amarelo), ler QR cancelado e de outro evento, desligar os dados móveis e conferir o aviso, imprimir o PDF de contingência e anotar tempos.
+
+## Pedido de comprador menor (14/10/2026, D-85)
+
+Ingresso válido de pedido cujo comprador tinha 16 ou 17 anos na data do evento: a leitura (ou a entrada pela busca) responde **Conferir idade**, com o aviso "Pedido de comprador menor: conferir a idade de cada pessoa; quem tiver 16 ou 17 anos entrega a autorização", **sem consumir** o ingresso. O validador escolhe:
+
+| Escolha | O que acontece |
+|---|---|
+| Menor: autorização recebida | Entrada atômica; `checkins.minor_authorization_received = true` |
+| Tem 18 anos ou mais | Entrada atômica; `checkins.minor_authorization_received = false` |
+| Recusar: menor sem autorização | Trilha `portaria.menor_recusado`; o ingresso continua válido |
+
+Todos os ingressos do pedido levam o aviso (todos estão no nome do comprador). A busca marca "MENOR: conferir idade" e a lista de contingência traz "(MENOR)" ao lado do nome. Acompanhante menor com ingresso de comprador adulto não é detectado pelo sistema: vale a conferência de documentos da PartyX (Termos 1.1). A tela não fecha sozinha e mostra as três escolhas sem rolar a 360 px.

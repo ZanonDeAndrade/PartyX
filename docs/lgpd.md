@@ -58,3 +58,15 @@ Variáveis, em dias, **sem valor padrão** (vazio = não apaga): `RETENTION_LOGI
 ## Pendente do cliente
 
 A Política de Privacidade 1.0 (14/10/2026) trouxe bases legais, prazos de guarda, suboperadores, encarregado (Bernardo Peixoto Fortes Bittencourt), canal do titular (bbittencourt085@gmail.com) e prazo de resposta (15 dias). Falta: confirmação escrita da PartyX sobre o texto e quem na PartyX autoriza cada remoção.
+
+## Menores de idade (14/10/2026, D-85)
+
+| Dado | Onde | Para quê | Retenção |
+|---|---|---|---|
+| Data de nascimento | `users.birth_date` | Idade na data do evento, classificação etária, termo de menor | Como a conta; a anonimização apaga |
+| Aceite do Termo de Ciência (versão, idade, data, IP, navegador) | `minor_term_acceptances` | Prova do aceite, ligada ao pedido | Fica (prova); a anonimização apaga IP e navegador |
+| Comprador menor no pedido | `orders.buyer_minor` | Aviso na portaria | Fica com o pedido |
+| Confirmação da autorização na entrada | `checkins.minor_authorization_received` | Prova da conferência | Fica com a leitura |
+| Termo de Autorização em papel | Portaria (PartyX) | Controle de acesso | 6 meses após o evento e destruído (Política 1.1): procedimento da PartyX |
+
+A cópia dos dados do titular inclui a data de nascimento e os aceites de menor. O PDF da autorização não imprime CPF; o do pedido sai só para o dono; o em branco não tem dado pessoal.

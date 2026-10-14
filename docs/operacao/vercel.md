@@ -73,7 +73,7 @@ Enquanto o DNS aponta para a Vercel, o Firebase não recebe o tráfego e não em
 
 O domínio fica fora do ar até o Firebase emitir; o site volta pelo `https://partyx-producao.web.app`.
 
-1. Cloud Run, voltar para a revisão que espera o `web.app`: `PROJECT=partyx-producao REVISAO=partyx-00003-xeq ./infra/producao/deploy.sh rollback` (sempre com `REVISAO` explícita; sem ela o script escolhe a revisão mais nova que não está no ar).
+1. Cloud Run, voltar para a revisão que espera o `web.app` (só nesta emergência: ela responde 403 em `partyx.com.br`; o retorno normal de uma publicação é a `partyx-00008-gaz`, ver `README-DEPLOY.md`, seção 15): `PROJECT=partyx-producao REVISAO=partyx-00003-xeq ./infra/producao/deploy.sh rollback` (sempre com `REVISAO` explícita; sem ela o script escolhe a revisão mais nova que não está no ar).
 2. Rotina diária com o cabeçalho do `web.app`: `CLOUDSDK_CORE_PROJECT=partyx-producao gcloud scheduler jobs update http partyx-varredura-diaria --location=southamerica-east1 --update-headers=X-Forwarded-Host=partyx-producao.web.app`, e executar uma vez (`gcloud scheduler jobs run partyx-varredura-diaria --location=southamerica-east1`), esperando 200 no log.
 3. DNS como no passo 3 da volta planejada (o domínio aponta para o Firebase, ainda sem certificado).
 4. Avisar quem estiver usando o domínio que o endereço provisório é `https://partyx-producao.web.app`. O webhook do Mercado Pago está cadastrado no domínio: enquanto o domínio não tiver certificado, as notificações falham e a conciliação pelo Cloud Tasks e pela rotina diária confirma os pagamentos.

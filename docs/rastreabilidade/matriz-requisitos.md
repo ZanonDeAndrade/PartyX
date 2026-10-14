@@ -323,3 +323,15 @@ Playwright e k6 no **ambiente local** (PostgreSQL de teste descartável, dados f
 | 11 | Design, publicação e entregáveis | RF-65 a RF-68, Etapas 5 e 6 | CA-32, CA-33 |
 | 12 | Itens não incluídos | Seção 16 | — |
 
+## Regras de menores (14/10/2026, D-85)
+
+| Requisito | O que foi feito | Evidência | Pendência |
+|---|---|---|---|
+| Data de nascimento no cadastro, 16+ | Obrigatória; recusa abaixo de 16; só a PartyX corrige | `minors.integration.test.ts` (cadastro, correção), `age.test.ts` | Publicação |
+| Conta antiga sem data | Checkout pede a data antes de continuar (`/me/birth-date`, uma vez) | `minors.integration.test.ts` | Publicação |
+| Idade na data do evento | 15, 16, 17 e 18 anos, aniversário no dia, evento sem menores | `age.test.ts`, `minors.integration.test.ts` | Publicação |
+| Evento com menores | Permite menores exige fim, autorização judicial e classificação abaixo de 18 | `minors.integration.test.ts`, `schema.integration.test.ts` | Publicação |
+| Termo de Ciência gravado | `minor_term_acceptances` na transação do pedido | `minors.integration.test.ts` | Publicação |
+| Autorização em PDF | Visual do modelo, dados do evento e do menor, uma página, sem CPF | `authorizationPdf.test.ts`, `minors.integration.test.ts` | Publicação |
+| Portaria | Conferir idade sem consumir; confirmação gravada; recusa na trilha | `minors.integration.test.ts` (portaria) | Publicação |
+| Textos 1.1 e novo aceite | `conteudo-legal/`, `/me/consents`, checkout recusa até aceitar | `minors.integration.test.ts` (novo aceite), `documents.test.ts` | Vigência na publicação; confirmação escrita da PartyX |

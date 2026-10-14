@@ -35,6 +35,7 @@ Autorização: `autorizacao-cadastro-producao-2026-10-14.md` (Bernardo pelo What
   gcloud run services update partyx --region=southamerica-east1 --update-env-vars=SIGNUP_OPEN=false --quiet
   gcloud run services update-traffic partyx --region=southamerica-east1 --to-latest --quiet
   ```
+- **Referência de retorno a partir daqui: `partyx-00008-gaz`** (na próxima publicação: `PROJECT=partyx-producao REVISAO=partyx-00008-gaz ./infra/producao/deploy.sh rollback`).
 - **Rollback para a `partyx-00003-xeq`:** só como volta de emergência. Aquela revisão espera o `web.app` e responde 403 em `partyx.com.br`; exige também voltar o cabeçalho da rotina diária (`docs/operacao/vercel.md`, "Volta de emergência").
 - `deploy.sh manutencao on|off` foi corrigido nesta data: antes criava a revisão nova sem tráfego (a manutenção não entraria no ar com o tráfego preso).
 

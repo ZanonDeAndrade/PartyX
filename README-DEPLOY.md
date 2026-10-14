@@ -413,3 +413,14 @@ Os 5,5 s do primeiro acesso incluem o **boot do servidor**, que confere a marca 
 - No modo avançado do Registro.br os servidores são `a.sec.dns.br` e `b.sec.dns.br`; os `a.auto` e `b.auto` seguem respondendo a zona antiga.
 
 **Abertura de vendas:** só pelo `docs/registros/checklist-abertura-de-vendas.md`.
+
+## 15. Terceira publicação: cadastro aberto, vendas FECHADAS (14/10/2026)
+
+**Publicado:** revisão `partyx-00008-gaz` (tag `release-2026-10-14b`, commit `4009917`), 100% desde 14/10 17:56 UTC, com `SIGNUP_OPEN=true`, `SALES_OPEN=false`, Termos e Privacidade 1.0 e `PUBLIC_BASE_URL=https://partyx.com.br` (Vercel como ponte, apontando para o endereço principal do serviço). Registro: `docs/registros/publicacao-producao-2026-10-14.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00008-gaz`.** Na próxima publicação, se a nova revisão der problema: `PROJECT=partyx-producao REVISAO=partyx-00008-gaz ./infra/producao/deploy.sh rollback`. A `partyx-00003-xeq` **só serve para emergência e derruba o domínio** (espera o `partyx-producao.web.app` e responde 403 em `partyx.com.br`); ver `docs/operacao/vercel.md`, "Volta de emergência".
+
+**Tráfego preso à revisão:** depois de `virar`, um `gcloud run services update` cria revisão nova com 0%. Troca rápida de variável = `services update` + `services update-traffic --to-latest` (é o que `deploy.sh manutencao on|off` faz desde 14/10).
+
+**Próxima publicação (regras de menores, preparada no local em 14/10/2026):** migração `0009_menores_de_idade` (só expande; Cloud Run Job `migrate` antes da candidata, com backup do dia conferido), Termos e Privacidade 1.1 com vigência na data da publicação (atualizar `TERMS_DATE` e `PRIVACY_DATE` no `env.prod.yaml` se não for 14/10), Termo de Ciência e texto da autorização 1.0. Quem aceitou a 1.0 aceita a 1.1 no próximo login ou checkout.
+
