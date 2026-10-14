@@ -38,6 +38,11 @@ export const checkins = pgTable(
     method: checkinMethod('method').notNull(),
     /** Trecho do código apresentado, só para tentativas sem ingresso. Limitado a 64 caracteres. */
     codePresented: text('code_presented'),
+    /**
+     * Só em entrada (`valido`) de ingresso de pedido de comprador menor (0009): `true` = a pessoa era menor e o validador confirmou que
+     * recebeu a autorização; `false` = o validador conferiu que a pessoa tinha 18 anos ou mais. Nulo nos demais casos.
+     */
+    minorAuthorizationReceived: boolean('minor_authorization_received'),
     createdAt: createdAt(),
   },
   t => [
@@ -49,6 +54,10 @@ export const checkins = pgTable(
     index('checkins_validator_idx').on(t.validatorId, t.createdAt),
     check('checkins_ticket_required', sql`${t.result} not in ('valido', 'ja_utilizado') or ${t.ticketId} is not null`),
     check('checkins_code_presented_length', sql`${t.codePresented} is null or length(${t.codePresented}) <= 64`),
+    check(
+      'checkins_minor_authorization_on_entry',
+      sql`${t.minorAuthorizationReceived} is null or ${t.result} = 'valido'`,
+    ),
   ],
 );
 

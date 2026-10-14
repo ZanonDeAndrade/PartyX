@@ -114,7 +114,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
   });
 
   describe('migrações', () => {
-    it('criam as 14 tabelas da documentação e as 4 técnicas', async () => {
+    it('criam as 14 tabelas da documentação, as 4 técnicas e a de aceites de menor (0009)', async () => {
       const r = await q("select table_name from information_schema.tables where table_schema = 'public' order by 1");
       const tables = r.rows.map(x => x.table_name as string);
       const doc = [
@@ -135,16 +135,22 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       ];
       expect(tables).toEqual(expect.arrayContaining(doc));
       expect(tables).toEqual(
-        expect.arrayContaining(['sessions', 'login_attempts', 'global_limit_counters', 'job_leases']),
+        expect.arrayContaining([
+          'sessions',
+          'login_attempts',
+          'global_limit_counters',
+          'job_leases',
+          'minor_term_acceptances',
+        ]),
       );
-      expect(tables).toHaveLength(18);
+      expect(tables).toHaveLength(19);
     });
 
     it('podem rodar de novo sem erro nem duplicar o histórico', async () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(9);
+      expect(r.rows[0].n).toBe(10);
     });
   });
 
@@ -221,6 +227,72 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       await q("update events set name = 'Novo nome' where id = $1", [ev]);
       const after = (await q('select updated_at from events where id = $1', [ev])).rows[0].updated_at as Date;
       expect(after.getTime()).toBeGreaterThan(before.getTime());
+    });
+  });
+
+  describe('menores de idade (0009)', () => {
+    it('data de nascimento é opcional no banco (contas antigas), mas não antes de 1900', async () => {
+      const id = await user();
+      await q("update users set birth_date = '2009-05-10' where id = $1", [id]);
+      await violates(q("update users set birth_date = '1899-12-31' where id = $1", [id]), PG.check);
+    });
+
+    it('evento só permite menores com horário de fim e autorização judicial; o fim vem depois do início', async () => {
+      const ev = await event();
+      await violates(q('update events set allows_minors = true where id = $1', [ev]), PG.check);
+      await violates(
+        q("update events set allows_minors = true, ends_at = starts_at + interval '6 hours' where id = $1", [ev]),
+        PG.check,
+      );
+      await violates(
+        q(
+          "update events set allows_minors = true, ends_at = starts_at + interval '6 hours', judicial_authorization = '  ' where id = $1",
+          [ev],
+        ),
+        PG.check,
+      );
+      await q(
+        "update events set allows_minors = true, ends_at = starts_at + interval '6 hours', judicial_authorization = 'Portaria 12/2026' where id = $1",
+        [ev],
+      );
+      await violates(q('update events set ends_at = starts_at where id = $1', [ev]), PG.check);
+      const novo = await event();
+      expect((await q('select allows_minors from events where id = $1', [novo])).rows[0].allows_minors).toBe(false);
+    });
+
+    it('aceite do termo de menor: um por pedido, só 16 ou 17 anos e nunca apagado', async () => {
+      const ev = await event();
+      const buyer = await user();
+      const o = await order(buyer, ev);
+      const accept = (age: number) =>
+        q('insert into minor_term_acceptances (user_id, order_id, term_version, age_at_event) values ($1,$2,$3,$4)', [
+          buyer,
+          o.id,
+          '1.0',
+          age,
+        ]);
+      await violates(accept(15), PG.check);
+      await violates(accept(18), PG.check);
+      await accept(16);
+      await violates(accept(17), PG.unique);
+      await expect(q('delete from minor_term_acceptances where order_id = $1', [o.id])).rejects.toThrow();
+      expect((await q('select buyer_minor from orders where id = $1', [o.id])).rows[0].buyer_minor).toBe(false);
+    });
+
+    it('a confirmação da autorização de menor só existe numa entrada válida', async () => {
+      const sale = await paidSale();
+      const validator = await staff();
+      await violates(
+        q(
+          "insert into checkins (ticket_id,event_id,validator_id,result,method,minor_authorization_received) values ($1,$2,$3,'ja_utilizado','camera',true)",
+          [sale.ticket, sale.ev, validator],
+        ),
+        PG.check,
+      );
+      await q(
+        "insert into checkins (ticket_id,event_id,validator_id,result,method,minor_authorization_received) values ($1,$2,$3,'valido','camera',true)",
+        [sale.ticket, sale.ev, validator],
+      );
     });
   });
 
@@ -598,10 +670,52 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag6 = '0006_encerramento_do_evento';
       const tag7 = '0007_banner_responsivo';
       const tag8 = '0008_recusa_do_pagamento';
+      const tag9 = '0009_menores_de_idade';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag7)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag8)).rejects.toThrow(/não é a última/);
+
+      // 0009: recusa enquanto houver aceite do termo de menor (prova); sem prova, apaga a tabela e as colunas de menores.
+      const q9 = db.pool.query.bind(db.pool);
+      const u = (
+        await q9(
+          "insert into users (name,email,cpf,password_hash,role) values ('Ana Souza','ana9@partyx.test','52998224725','x','cliente') returning id",
+        )
+      ).rows[0].id;
+      const ev = (
+        await q9(
+          "insert into events (slug,name,starts_at,venue,address,description,age_rating) values ('ev-9','E',now()+interval '9 days','L','A','D','16 anos') returning id",
+        )
+      ).rows[0].id;
+      const o = (await q9('insert into orders (user_id,event_id,total_cents) values ($1,$2,100) returning id', [u, ev]))
+        .rows[0].id;
+      await q9(
+        "insert into minor_term_acceptances (user_id,order_id,term_version,age_at_event) values ($1,$2,'1.0',16)",
+        [u, o],
+      );
+      await expect(rollbackLastMigration(db.url, tag9)).rejects.toThrow(/termo de menor/);
+      await q9('alter table minor_term_acceptances disable trigger minor_term_acceptances_forbid_delete');
+      await q9('delete from minor_term_acceptances');
+      await q9('alter table minor_term_acceptances enable trigger minor_term_acceptances_forbid_delete');
+      await q9('alter table orders disable trigger orders_forbid_delete');
+      await q9('delete from orders');
+      await q9('alter table orders enable trigger orders_forbid_delete');
+      await q9('alter table events disable trigger events_forbid_delete');
+      await q9('delete from events');
+      await q9('alter table events enable trigger events_forbid_delete');
+      await q9('alter table users disable trigger users_forbid_delete');
+      await q9('delete from users');
+      await q9('alter table users enable trigger users_forbid_delete');
+      await rollbackLastMigration(db.url, tag9);
+      const minorColumns = (
+        await q9(
+          "select count(*)::int as n from information_schema.columns where (table_name, column_name) in (('users','birth_date'),('events','allows_minors'),('orders','buyer_minor'),('checkins','minor_authorization_received'))",
+        )
+      ).rows[0].n;
+      expect(minorColumns).toBe(0);
+      expect((await q9("select to_regclass('minor_term_acceptances') as t")).rows[0].t).toBeNull();
 
       // 0008: só as três colunas da recusa e da tentativa de cobrança em orders; reverter as apaga.
       const declineColumns = async () =>
@@ -653,8 +767,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe a 0007 e a 0008 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe a 0007, a 0008 e a 0009 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag9);
       await rollbackLastMigration(db.url, tag8);
       await rollbackLastMigration(db.url, tag7);
       await rollbackLastMigration(db.url, tag6);
@@ -724,7 +839,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       r = await db.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'");
-      expect(r.rows[0].n).toBe(18);
+      expect(r.rows[0].n).toBe(19); // 18 até a 0008 + minor_term_acceptances (0009)
     } finally {
       await db.drop();
     }

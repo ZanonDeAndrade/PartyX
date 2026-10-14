@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, inet, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, check, date, index, inet, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createdAt, instant, updatedAt } from './columns';
 import { userRole } from './enums';
 
@@ -14,6 +14,11 @@ export const users = pgTable(
     /** Só dígitos. Obrigatório para cliente; equipe pode não ter. */
     cpf: varchar('cpf', { length: 11 }),
     phone: text('phone'),
+    /**
+     * Data de nascimento (AAAA-MM-DD), obrigatória no cadastro desde a 0009 (regras de menores). Nula em contas anteriores: é pedida no
+     * próximo checkout. Depois de gravada, só a PartyX altera (como o CPF). A idade que vale é a da DATA DO EVENTO.
+     */
+    birthDate: date('birth_date', { mode: 'string' }),
     passwordHash: text('password_hash').notNull(),
     role: userRole('role').notNull(),
     isActive: boolean('is_active').notNull().default(true),
@@ -38,6 +43,8 @@ export const users = pgTable(
       'users_cliente_has_cpf',
       sql`${t.role} <> 'cliente' or ${t.cpf} is not null or ${t.anonymizedAt} is not null`,
     ),
+    // Só o piso: o teto (não pode ser futura, mínimo de 16 anos) depende do dia de hoje e fica na aplicação.
+    check('users_birth_date_range', sql`${t.birthDate} is null or ${t.birthDate} >= date '1900-01-01'`),
   ],
 );
 

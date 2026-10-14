@@ -23,6 +23,15 @@ export const events = pgTable(
     slug: text('slug').notNull(),
     name: text('name').notNull(),
     startsAt: instant('starts_at').notNull(),
+    /** Fim previsto (vai na autorização de menor). Obrigatório quando o evento permite menores. */
+    endsAt: instant('ends_at'),
+    /**
+     * Permite a entrada de quem terá 16 ou 17 anos na data do evento, com o termo de autorização (0009). Falso: quem tiver menos de 18
+     * na data do evento não compra.
+     */
+    allowsMinors: boolean('allows_minors').notNull().default(false),
+    /** Número da autorização judicial (portaria ou alvará) que permite menores. Obrigatório quando o evento permite menores. */
+    judicialAuthorization: text('judicial_authorization'),
     venue: text('venue').notNull(),
     address: text('address').notNull(),
     description: text('description').notNull(),
@@ -56,6 +65,11 @@ export const events = pgTable(
     index('events_status_starts_idx').on(t.status, t.startsAt),
     check('events_slug_format', sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check('events_name_not_blank', sql`length(btrim(${t.name})) > 0`),
+    check('events_ends_after_start', sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`),
+    check(
+      'events_minors_need_authorization',
+      sql`not ${t.allowsMinors} or (${t.endsAt} is not null and length(btrim(coalesce(${t.judicialAuthorization}, ''))) > 0)`,
+    ),
   ],
 );
 

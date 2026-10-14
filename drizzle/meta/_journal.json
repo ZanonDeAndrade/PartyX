@@ -64,6 +64,13 @@
       "when": 1791768473040,
       "tag": "0008_recusa_do_pagamento",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792001630894,
+      "tag": "0009_menores_de_idade",
+      "breakpoints": true
     }
   ]
 }

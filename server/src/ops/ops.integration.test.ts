@@ -170,7 +170,7 @@ describe.skipIf(!ADMIN_URL)('rotinas de operação (integração)', () => {
       const secrets = (await sql('select code, qr_payload from tickets')).rows as { code: string; qr_payload: string }[];
       const files = await buildClosureExport(db);
       expect(files.map(f => f.name)).toEqual([
-        'eventos.csv', 'tipos-de-ingresso.csv', 'promoters.csv', 'usuarios.csv', 'aceites.csv', 'pedidos.csv',
+        'eventos.csv', 'tipos-de-ingresso.csv', 'promoters.csv', 'usuarios.csv', 'aceites.csv', 'aceites-termo-de-menor.csv', 'pedidos.csv',
         'itens-dos-pedidos.csv', 'ingressos.csv', 'entradas-na-portaria.csv', 'trilha-de-auditoria.csv',
       ]);
       const all = files.map(f => f.content).join('\n');

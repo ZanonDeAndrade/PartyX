@@ -1,8 +1,10 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   foreignKey,
   index,
+  inet,
   integer,
   pgSequence,
   pgTable,
@@ -55,6 +57,11 @@ export const orders = pgTable(
      * cobrança (ex.: token de cartão inválido): a nova tentativa leva chave nova. Reenvio da mesma tentativa repete a chave.
      */
     paymentAttempt: smallint('payment_attempt').notNull().default(0),
+    /**
+     * O comprador tinha 16 ou 17 anos na data do evento quando fez o pedido (0009). Retrato da compra: vale mesmo depois de anonimizar
+     * a conta. A portaria mostra o aviso de menor em todos os ingressos do pedido. Recalculado se a PartyX corrigir a data de nascimento.
+     */
+    buyerMinor: boolean('buyer_minor').notNull().default(false),
     paidAt: instant('paid_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -191,5 +198,34 @@ export const tickets = pgTable(
     ),
     check('tickets_cancelled_has_time', sql`${t.status} <> 'cancelado' or ${t.cancelledAt} is not null`),
     check('tickets_valid_is_clean', sql`${t.status} <> 'valido' or (${t.usedAt} is null and ${t.cancelledAt} is null)`),
+  ],
+);
+
+/**
+ * Aceite do Termo de Ciência para Menores de Idade (0009): quem terá 16 ou 17 anos na data do evento aceita o termo no checkout, e o
+ * aceite fica ligado ao pedido, com a versão, a data, o IP e o navegador, como o aceite dos Termos. Um por pedido. Nunca apagado (é
+ * prova); a anonimização limpa só o IP e o navegador.
+ */
+export const minorTermAcceptances = pgTable(
+  'minor_term_acceptances',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id),
+    termVersion: text('term_version').notNull(),
+    /** Idade na data do evento, quando aceitou: 16 ou 17. */
+    ageAtEvent: smallint('age_at_event').notNull(),
+    acceptedAt: instant('accepted_at').notNull().defaultNow(),
+    ip: inet('ip'),
+    userAgent: text('user_agent'),
+  },
+  t => [
+    uniqueIndex('minor_term_acceptances_order_key').on(t.orderId),
+    index('minor_term_acceptances_user_idx').on(t.userId),
+    check('minor_term_acceptances_age', sql`${t.ageAtEvent} in (16, 17)`),
   ],
 );
