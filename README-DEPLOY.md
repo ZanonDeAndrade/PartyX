@@ -397,3 +397,19 @@ Resumo (detalhes, medidas e limites em **`docs/backup.md`**): `pg_dump` às **03
 | Direto no Cloud Run, sem o Hosting (3 medidas) | 0,24 a 0,25 s (a primeira, 0,50 s) |
 
 Os 5,5 s do primeiro acesso incluem o **boot do servidor**, que confere a marca de ambiente no banco e por isso também acorda o Neon. O Hosting soma cerca de 0,15 a 0,25 s por requisição. Para evitar o acesso frio em dia de evento: `./infra/producao/deploy.sh evento-on` (instância sempre quente).
+
+## 14. Segunda publicação de produção, ainda com as vendas FECHADAS (13 e 14/10/2026)
+
+**Publicado:** revisão `partyx-00003-xeq` (tag `release-2026-10-13`, commit `e9e31e9`), 100% do tráfego desde 14/10 00:49 UTC, com o Mercado Pago de produção e `SALES_OPEN=false` e `SIGNUP_OPEN=false`. Migrações 0005 a 0008 aplicadas, com backup restaurado antes e depois. Registro completo: `docs/registros/publicacao-producao-2026-10-13.md`.
+
+**Rollback:** `PROJECT=partyx-producao REVISAO=partyx-00002-bkn ./infra/producao/deploy.sh rollback`.
+
+**Roteiro usado (variáveis só de `infra/producao/env.prod.yaml`):** `conferir`, `build`, `candidata` (sem tráfego, com teste rápido), `virar`, `varredura`, `alertas` e `infra/operacao/uptime.sh`.
+
+**Lições desta publicação:**
+
+- Depois de toda virada que mude `PUBLIC_BASE_URL` ou ligue a barreira de Host, rodar `varredura` e executar o job uma vez: sem o `X-Forwarded-Host` a rotina diária recebe 403. Na atualização de um job o gcloud exige `--update-headers` (corrigido no commit `4960044`).
+- A verificação de saúde aponta para o endereço público; ao trocar para `partyx.com.br`, recriar com o endereço novo.
+- No modo avançado do Registro.br os servidores são `a.sec.dns.br` e `b.sec.dns.br`; os `a.auto` e `b.auto` seguem respondendo a zona antiga.
+
+**Abertura de vendas:** só pelo `docs/registros/checklist-abertura-de-vendas.md`.

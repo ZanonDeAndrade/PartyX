@@ -138,6 +138,18 @@ Executado no projeto `partyx-hml`, com o Mercado Pago de **teste** e dados fict�
 
 Comandos da etapa (13/10/2026, último conjunto): `npm run lint`, `npm run typecheck`, `npm run test:db` (938 testes, nenhum pulado) e `npm run build` passaram; `npm run e2e:roteiro:ficticio` 20 de 20 (o do Brick é pulado com o fictício e não conta como aprovado) e `npm run e2e:turnstile` 6 de 6.
 
+## Produção: publicação com vendas fechadas (13 e 14/10/2026)
+
+Executado no projeto `partyx-producao`. Registro: `../registros/publicacao-producao-2026-10-13.md`. Abertura: `../registros/checklist-abertura-de-vendas.md` (nada executado).
+
+| Requisito ou critério | O que foi verificado em produção | Resultado | Evidência |
+|---|---|---|---|
+| PDF 7.1, produção | Revisão `partyx-00003-xeq` com a tag `release-2026-10-13` (`e9e31e9`), Mercado Pago de produção e vendas e cadastro fechados; teste rápido 7 de 7 antes e depois da virada | publicado; **vendas não abertas** | registro da publicação |
+| PDF 7.2 e Anexo II, 2: backup | Backups antes e depois das migrações 0005 a 0008 restaurados em banco isolado (20 de 20, esquema idêntico) | atendido | idem |
+| PDF 7.2, monitoramento e alerta | 16 políticas ativas; verificação de saúde pelo endereço público a cada 5 min; alerta de teste por log sintético com incidente aberto em 4 min e e-mail confirmado pelo responsável | atendido (o disparo pelo código real foi provado em homologação) | idem |
+| Seção 10, acesso direto ao serviço | `run.app` direto responde 403, exceto as rotas de saúde; rotina diária com `X-Forwarded-Host` respondeu 200 | atendido | idem |
+| Domínio próprio e e-mail de produção | DNS publicado; Firebase ainda sem posse e certificado em 14/10 02:25 UTC; `smtp-url` e `EMAIL_FROM` pendentes | **pendente** | `../operacao/dns-registro-br.md` |
+
 ## Roteiro 11.2, responsividade e carga (12/10/2026)
 
 Playwright e k6 no **ambiente local** (PostgreSQL de teste descartável, dados fictícios). Nada rodou em homologação nem em produção, e nenhum aparelho real foi usado. Índice e o que é real ou simulado: `../evidencias/README.md`.
