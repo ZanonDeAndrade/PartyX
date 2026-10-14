@@ -47,11 +47,17 @@ const eventFields = {
   attractions: z.array(text).max(100),
   ageRating: z.enum(AGE_RATINGS),
   isFeatured: z.boolean(),
+  endsAt: instant.nullable(),
+  allowsMinors: z.boolean(),
+  judicialAuthorization: z.string().max(200).nullable(),
 };
 const createEventBody = z.object({
   ...eventFields,
   attractions: eventFields.attractions.optional(),
   isFeatured: eventFields.isFeatured.optional(),
+  endsAt: eventFields.endsAt.optional(),
+  allowsMinors: eventFields.allowsMinors.optional(),
+  judicialAuthorization: eventFields.judicialAuthorization.optional(),
   slug: text.optional(),
 });
 const updateEventBody = z.object(eventFields).partial();

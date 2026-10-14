@@ -45,6 +45,13 @@ export interface PublicEventDetail extends PublicEventCard {
   address: string;
   description: string;
   attractions: string[];
+  /** Fim previsto, quando informado. */
+  endsAt: string | null;
+  /**
+   * Regras de menores (14/10/2026): `true` = entra quem terá 16 ou 17 anos na data do evento, com o termo de autorização (a página
+   * oferece o PDF em branco para acompanhantes); `false` = só 18 anos ou mais na data do evento.
+   */
+  allowsMinors: boolean;
   /** Imagem 1200x630 para pré-visualização em redes sociais; nula se não houver banner. */
   shareImageUrl: string | null;
   ticketTypes: PublicTicketType[];
@@ -198,6 +205,8 @@ async function detail(deps: VitrineDeps, row: EventRow, preview: boolean): Promi
     address: row.address,
     description: row.description,
     attractions: row.attractions,
+    endsAt: row.endsAt?.toISOString() ?? null,
+    allowsMinors: row.allowsMinors,
     shareImageUrl: row.bannerUrl ? shareImageUrl(row.bannerUrl) : null,
     ticketTypes: types.map(t => {
       // Em evento encerrado nada está à venda, qualquer que seja o período do tipo.

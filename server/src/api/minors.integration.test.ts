@@ -366,4 +366,63 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       ).toBe(422);
     });
   });
+
+  describe('evento no painel', () => {
+    const body = (o: Record<string, unknown> = {}) => ({
+      name: 'Baile Teen',
+      startsAt: '2026-12-12T22:00:00-03:00',
+      venue: 'Arena',
+      address: 'Rua 1',
+      description: 'Teste',
+      ageRating: '16 anos',
+      ...o,
+    });
+    const fields = async (res: Response) =>
+      ((await json(res)).erro.detalhes as { campo: string }[]).map(d => d.campo).sort();
+
+    it('permitir menores exige fim, autorização judicial e classificação abaixo de 18; o fim vem depois do início', async () => {
+      const admin = await person(null, { role: 'administrador' });
+      const sem = await admin.raw('POST', '/admin/events', body({ allowsMinors: true }));
+      expect(sem.status).toBe(422);
+      expect(await fields(sem)).toEqual(['endsAt', 'judicialAuthorization']);
+      const dezoito = await admin.raw(
+        'POST',
+        '/admin/events',
+        body({
+          allowsMinors: true,
+          ageRating: '18 anos',
+          endsAt: '2026-12-13T05:00:00-03:00',
+          judicialAuthorization: 'Portaria 12/2026',
+        }),
+      );
+      expect(await fields(dezoito)).toEqual(['allowsMinors']);
+      const fimAntes = await admin.raw('POST', '/admin/events', body({ endsAt: '2026-12-12T21:00:00-03:00' }));
+      expect(await fields(fimAntes)).toEqual(['endsAt']);
+
+      const ok = await admin.raw(
+        'POST',
+        '/admin/events',
+        body({ allowsMinors: true, endsAt: '2026-12-13T05:00:00-03:00', judicialAuthorization: 'Portaria 12/2026' }),
+      );
+      expect(ok.status).toBe(201);
+      const created = (await json(ok)).event;
+      expect(created).toMatchObject({ allowsMinors: true, judicialAuthorization: 'Portaria 12/2026' });
+
+      // Edição parcial confere o estado final: tirar a autorização de um evento que permite menores é recusado.
+      const tirar = await admin.raw('PATCH', `/admin/events/${created.id}`, { judicialAuthorization: null });
+      expect(await fields(tirar)).toEqual(['judicialAuthorization']);
+      const naoPermite = await admin.raw('PATCH', `/admin/events/${created.id}`, { allowsMinors: false });
+      expect(naoPermite.status).toBe(200);
+    });
+
+    it('a página pública diz se o evento permite menores', async () => {
+      const com = await event({ allowsMinors: true });
+      const sem = await event();
+      expect((await json(await app.request(`/api/public/events/${com.slug}`))).event).toMatchObject({
+        allowsMinors: true,
+        endsAt: '2026-12-13T08:00:00.000Z',
+      });
+      expect((await json(await app.request(`/api/public/events/${sem.slug}`))).event.allowsMinors).toBe(false);
+    });
+  });
 });
