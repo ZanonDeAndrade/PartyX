@@ -78,6 +78,10 @@ O domínio fica fora do ar até o Firebase emitir; o site volta pelo `https://pa
 3. DNS como no passo 3 da volta planejada (o domínio aponta para o Firebase, ainda sem certificado).
 4. Avisar quem estiver usando o domínio que o endereço provisório é `https://partyx-producao.web.app`. O webhook do Mercado Pago está cadastrado no domínio: enquanto o domínio não tiver certificado, as notificações falham e a conciliação pelo Cloud Tasks e pela rotina diária confirma os pagamentos.
 
+## Pendência registrada: consultas automáticas com a aba escondida
+
+Registrada pelo responsável em 14/10/2026, para fazer depois: pausar as consultas a cada 4 s quando a aba estiver escondida (`document.visibilityState`), no contador da portaria (`src/site/gatePages.tsx`, hoje consulta mesmo escondida), no painel do admin (`src/site/adminPages.tsx`) e na espera do Pix (`src/site/checkoutPages.tsx`). Reduz os CDN Requests na Vercel e a carga no Cloud Run; voltar a consultar na hora em que a aba aparecer.
+
 ## Pendência registrada: cabeçalho secreto entre a Vercel e o Cloud Run
 
 Não implementado agora, por decisão do responsável (14/10/2026): a Vercel é temporária e a proteção fica no nível atual. Hoje, quem chama o `run.app` direto pode forjar o `X-Forwarded-Host` (passando pela barreira) e o `X-Forwarded-For` (contornando os limites por IP; os limites globais seguem valendo). A Vercel permite gravar um cabeçalho secreto em todo pedido repassado (`routes` com `transforms` do tipo `request.headers`, valor numa variável de ambiente sigilosa), e o servidor passaria a exigi-lo. Reavaliar quando a arquitetura definitiva do domínio for decidida; o Firebase Hosting não consegue enviar esse cabeçalho.
