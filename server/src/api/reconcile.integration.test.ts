@@ -237,6 +237,61 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
     });
   });
 
+  describe('atrás da Vercel: webhook com o corpo bruto intacto (docs/operacao/vercel.md)', () => {
+    const RUN = 'partyx-391817439013.southamerica-east1.run.app';
+    /** Cabeçalhos que o Cloud Run recebe quando a notificação passa pelo rewrite externo da Vercel. */
+    const vercel = (forwardedHost = 'partyx.com.br') => ({
+      host: RUN,
+      'x-forwarded-host': forwardedHost,
+      'x-forwarded-for': '54.88.218.97, 76.76.21.142',
+      'x-forwarded-proto': 'https',
+      'x-vercel-id': 'gru1::abcde-1760464800000-0123456789ab',
+    });
+    const proxied = () =>
+      build(mock, { env: { PUBLIC_BASE_URL: 'https://partyx.com.br', PUBLIC_HOST_CHECK: 'true', TRUSTED_PROXY_HOPS: '2' } });
+    /** Corpo com espaços, quebra de linha e acentos: a assinatura vale para estes bytes exatos, não para o JSON reescrito. */
+    const rawBody = (paymentId: string) =>
+      `{\n  "id": "evt_vercel_1",  "paymentId": "${paymentId}",\n  "type": "payment.updated", "nota": "notificação ✓"\n}`;
+
+    it('pelo domínio público, a assinatura sobre o corpo bruto confere e o pagamento é confirmado', async () => {
+      const e = await event();
+      const a = await user();
+      const p = await pay(a, e, [2]);
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      const body = rawBody(p.paymentId);
+      const res = await hook(p.paymentId, { body, headers: vercel() }, proxied());
+      expect([res.status, (await json(res)).status]).toEqual([200, 'processada']);
+      expect((await order(p.orderId)).status).toBe('pago');
+      expect(await ticketsOf(p.orderId)).toEqual(['valido', 'valido']);
+    });
+
+    it('o mesmo conteúdo com outros bytes (JSON reescrito) não passa: prova que a conferência usa o corpo recebido', async () => {
+      const e = await event();
+      const a = await user();
+      const p = await pay(a, e);
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      const body = rawBody(p.paymentId);
+      const res = await proxied().request('/api/webhooks/payments', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-mock-signature': mock.simulate.sign(body), ...vercel() },
+        body: JSON.stringify(JSON.parse(body)),
+      });
+      expect(res.status).toBe(401);
+      expect((await order(p.orderId)).status).toBe('pendente');
+    });
+
+    it('vindo por outro host (o endereço do projeto na Vercel), a barreira recusa antes de ler a notificação', async () => {
+      const e = await event();
+      const a = await user();
+      const p = await pay(a, e);
+      mock.simulate.setStatus(p.paymentId, 'aprovado');
+      const res = await hook(p.paymentId, { body: rawBody(p.paymentId), headers: vercel('partyx-ponte.vercel.app') }, proxied());
+      expect(res.status).toBe(403);
+      expect((await order(p.orderId)).status).toBe('pendente');
+      expect((await sql('select count(*)::int as n from payment_events')).rows[0].n).toBe(0);
+    });
+  });
+
   describe('repetição e concorrência (CA-P3)', () => {
     it('o mesmo evento duas vezes: a segunda é "duplicada" e nada se repete', async () => {
       const e = await event();

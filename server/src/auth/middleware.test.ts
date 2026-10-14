@@ -13,6 +13,12 @@ describe('clientIp', () => {
     expect(clientIp('177.86.10.20, 192.178.11.130', 2)).toBe('177.86.10.20');
   });
 
+  it('com dois saltos extrai o cliente atrás da Vercel (ela regrava o cabeçalho; o Cloud Run acrescenta o IP dela)', () => {
+    // A Vercel substitui o X-Forwarded-For pelo IP do visitante e descarta o que ele enviou; o Google acrescenta o da Vercel.
+    expect(clientIp('177.86.10.20, 76.76.21.142', 2)).toBe('177.86.10.20');
+    expect(clientIp('2804:14c:5b8:8e00::1, 76.76.21.142', 2)).toBe('2804:14c:5b8:8e00::1');
+  });
+
   it('sem proxy confiável ou sem cabeçalho, não confia em nada', () => {
     expect(clientIp('1.1.1.1', 0)).toBeNull();
     expect(clientIp(undefined, 1)).toBeNull();

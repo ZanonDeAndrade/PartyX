@@ -149,6 +149,7 @@ Executado no projeto `partyx-producao`. Registro: `../registros/publicacao-produ
 | PDF 7.2, monitoramento e alerta | 16 políticas ativas; verificação de saúde pelo endereço público a cada 5 min; alerta de teste por log sintético com incidente aberto em 4 min e e-mail confirmado pelo responsável | atendido (o disparo pelo código real foi provado em homologação) | idem |
 | Seção 10, acesso direto ao serviço | `run.app` direto responde 403, exceto as rotas de saúde; rotina diária com `X-Forwarded-Host` respondeu 200 | atendido | idem |
 | Domínio próprio e e-mail de produção | DNS publicado; Firebase ainda sem posse e certificado em 14/10 02:25 UTC; `smtp-url` e `EMAIL_FROM` pendentes | **pendente** | `../operacao/dns-registro-br.md` |
+| Seção 10, acesso direto, atrás da Vercel (ponte temporária do domínio, 14/10/2026) | Barreira de Host com a cadeia da Vercel: `partyx.com.br` aceito; endereço `*.vercel.app`, `www`, `web.app` (depois da troca), lista e porta recusados com 403; IP do visitante com `TRUSTED_PROXY_HOPS=2` na cadeia regravada pela Vercel; webhook com o corpo bruto intacto atrás da Vercel; `/api/health/origem` com IP mascarado; teste rápido do `deploy.sh` confere a cadeia | implementado e testado localmente; **não publicado** | `server/src/api/proxy.test.ts`, `server/src/api/reconcile.integration.test.ts`, `server/src/security/ip.test.ts`, `../operacao/vercel.md` |
 
 ## Roteiro 11.2, responsividade e carga (12/10/2026)
 
