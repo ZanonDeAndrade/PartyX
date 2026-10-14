@@ -3,7 +3,8 @@
 # NÃO FOI EXECUTADO. Idempotente onde dá. Uso: ./infra/producao/deploy.sh <comando>
 #
 #   setup        cria o projeto (opcional), APIs, contas de serviço, fila, buckets, segredos e orçamento
-#   varredura    cria a rotina diária das 04:00 (Cloud Scheduler) e remove a varredura de 5 min, se existir; rode depois do 1º deploy
+#   varredura    cria a rotina diária das 04:00 e a limpeza de retenção das 04:05 (Cloud Scheduler) e remove a varredura de 5 min,
+#                se existir; rode depois do 1º deploy e depois de mudar o PUBLIC_BASE_URL
 #   roles        cria os papéis partyx_app (aplicação) e partyx_backup (só leitura) NO NEON e grava as URLs nos segredos. ANTES da 1ª migração
 #   backup       backup diário: imagem, job, agendamento às 03:00 e alertas (infra/backup/setup.sh). Depois de `roles` e do `setup`
 #   migrate      roda as migrações (Cloud Run Job com a conexão direta do Neon)
@@ -37,7 +38,7 @@
 #   PARTYX_SUPPORT_EMAIL  PARTYX_SUPPORT_WHATSAPP   contato de atendimento DA PARTYX para o comprador (nunca o da contratada)
 #   PARTYX_LEGAL_NAME  PARTYX_CNPJ  PARTYX_ADDRESS  PARTYX_SUPPORT_HOURS   dados públicos DA PARTYX (rodapé, e-mails, manutenção)
 #   TERMS_DATE  PRIVACY_DATE  CANCELLATION_DATE   vigência (AAAA-MM-DD) das versões; textos em conteudo-legal/ (fora do Git)
-#   SIGNUP_OPEN=false   cadastro de compradores; `true` só com os três textos publicados (arquivo, versão e data)
+#   SIGNUP_OPEN=false   cadastro de compradores; `true` só com Termos e Privacidade publicados (arquivo, versão e data; D-84)
 #   MAINTENANCE_MODE=false   página de manutenção (G06); para ligar sem novo build: comando `manutencao on|off`
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -54,6 +55,7 @@ QUEUE="partyx-conciliacao"
 REPO="partyx"
 JOB="partyx-migrate"
 SWEEP_JOB="partyx-varredura-diaria"
+PURGE_JOB="partyx-limpeza-retencao"   # limpeza diária dos dados técnicos pelos prazos RETENTION_* (D-62)
 OLD_PENDING_JOB="partyx-varredura-pendentes"   # varredura de 5 min de uma versão anterior deste script: removida (D-78)
 BANNERS="${PROJECT}-banners"
 BACKUPS="${PROJECT}-backups"
@@ -150,7 +152,8 @@ cmd_setup() {
 # UMA agenda fixa no Cloud Scheduler: a rotina diária, de madrugada, rede de segurança para e-mails pendentes, pagamentos de até 3 dias
 # (inclusive pedidos cujas tarefas no Cloud Tasks falharam) e ingressos que faltarem. A conciliação "a cada poucos minutos" e a da
 # aprovação tardia são tarefas POR PEDIDO no Cloud Tasks (1, 2, 4, 8 min, fim da reserva, e 15 min, 30 min, 1 h, 3 h, 8 h, 24 h), sem cron:
-# sem pedido em aberto, nada roda e o Neon dorme (D-78). Com o backup das 03:00, são 2 jobs no Scheduler. Rodar depois do 1º deploy.
+# sem pedido em aberto, nada roda e o Neon dorme (D-78). Mais a limpeza de retenção das 04:05 (D-62) e o backup das 03:00: 3 jobs no
+# Scheduler. Rodar depois do 1º deploy.
 cmd_varredura() {
   load_env_file   # o X-Forwarded-Host da varredura sai do PUBLIC_BASE_URL do arquivo de variáveis
   local url host; url="$(run_url)"; host="$(public_host)"
@@ -162,6 +165,15 @@ cmd_varredura() {
     "$headers_flag=X-Forwarded-Host=$host" \
     --oidc-service-account-email="$(sa $SCHED_SA)" --oidc-token-audience="$url" --attempt-deadline=120s --max-retry-attempts=1
   echo "Rotina diária às 04:00 (America/Sao_Paulo) -> $url"
+  # Limpeza de retenção (D-62): sessões encerradas, tentativas de login e códigos de recuperação mais velhos que os prazos RETENTION_* do
+  # arquivo de variáveis. Às 04:05, logo depois da varredura, para aproveitar o banco já acordado (o Neon escala a zero).
+  verb=create; headers_flag=--headers
+  if exists g scheduler jobs describe "$PURGE_JOB" --location="$REGION"; then verb=update; headers_flag=--update-headers; fi
+  g scheduler jobs "$verb" http "$PURGE_JOB" --location="$REGION" --schedule="5 4 * * *" --time-zone="America/Sao_Paulo" \
+    --uri="$url/api/internal/jobs/purge-retention" --http-method=POST \
+    "$headers_flag=X-Forwarded-Host=$host" \
+    --oidc-service-account-email="$(sa $SCHED_SA)" --oidc-token-audience="$url" --attempt-deadline=120s --max-retry-attempts=1
+  echo "Limpeza de retenção às 04:05 (America/Sao_Paulo) -> $url"
   # A varredura de 5 min de uma versão anterior (nunca executada) manteria o Neon acordado: se alguém a criou, sai.
   if exists g scheduler jobs describe "$OLD_PENDING_JOB" --location="$REGION"; then
     g scheduler jobs delete "$OLD_PENDING_JOB" --location="$REGION" --quiet
@@ -252,19 +264,23 @@ cmd_conferir() {
   direct="$(g secrets versions access latest --secret=database-url-direct 2>/dev/null || true)"; pooled="$(g secrets versions access latest --secret=database-url 2>/dev/null || true)"
   { [ -n "$direct" ] && [ -n "$pooled" ]; } || { echo "Recuso: database-url e database-url-direct precisam ter valor (rode 'roles')." >&2; exit 1; }
   DATABASE_URL_DIRECT="$direct" DATABASE_URL_POOLED="$pooled" npm run -s db:env -- check producao || { echo "Recuso: o banco apontado NÃO é o de produção." >&2; exit 1; }
-  # Textos legais (D-11): vão na imagem a partir de conteudo-legal/ (fora do Git). Cadastro aberto exige os três publicados.
+  # Textos legais (D-11): vão na imagem a partir de conteudo-legal/ (fora do Git). Cadastro aberto exige Termos e Privacidade publicados;
+  # a Política de Cancelamento é exigida só para abrir a venda (D-84).
   local legal_dir="conteudo-legal" k v
   if [ "$SIGNUP_OPEN" = "true" ]; then
-    for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE; do
+    for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE; do
       [ -n "${!v:-}" ] || { echo "Recuso: SIGNUP_OPEN=true exige $v no $ENV_FILE (texto legal fornecido pela PartyX)." >&2; exit 1; }
     done
-    for k in termos-de-uso privacidade cancelamento; do
+    for k in termos-de-uso privacidade; do
       [ -s "$legal_dir/$k.txt" ] || { echo "Recuso: SIGNUP_OPEN=true sem $legal_dir/$k.txt (texto oficial da PartyX)." >&2; exit 1; }
     done
   fi
   if [ "$SALES_OPEN" = "true" ]; then   # travas extras para ABRIR A VENDA (go-live)
     [ "$PAYMENT_GATEWAY" != "none" ] || { echo "Recuso: venda aberta sem gateway real." >&2; exit 1; }
-    for v in TERMS_VERSION PRIVACY_VERSION CANCELLATION_VERSION GO_LIVE_CONFIRMED; do [ -n "${!v:-}" ] || { echo "Recuso: $v é obrigatório para abrir a venda." >&2; exit 1; }; done
+    for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE GO_LIVE_CONFIRMED; do [ -n "${!v:-}" ] || { echo "Recuso: $v é obrigatório para abrir a venda." >&2; exit 1; }; done
+    for k in termos-de-uso privacidade cancelamento; do
+      [ -s "$legal_dir/$k.txt" ] || { echo "Recuso: SALES_OPEN=true sem $legal_dir/$k.txt (texto oficial da PartyX)." >&2; exit 1; }
+    done
     [ "$GO_LIVE_CONFIRMED" = "sim-aceite-e-autorizacao-registrados" ] || { echo "Recuso: registre aceite/autorização e use GO_LIVE_CONFIRMED=sim-aceite-e-autorizacao-registrados." >&2; exit 1; }
     [ "$VISUAL_APPROVED" = "true" ] || { echo "Recuso: identidade visual sem aprovação escrita (CA-33)." >&2; exit 1; }
   fi
@@ -337,6 +353,10 @@ sys.exit(0 if ok else 1)' "$host" || return 1
     "$base/api/webhooks/payments?data.id=ORD000&type=order" || return 1
   curl -fsS -H "X-Forwarded-Host: $host" "$base/api/public/site" | grep -q "\"salesOpen\":$SALES_OPEN" || { echo "   FALHOU: salesOpen difere do arquivo" >&2; return 1; }
   echo "   ok   salesOpen=$SALES_OPEN"
+  # Cadastro: `ready` do /api/legal/versions só é verdadeiro com SIGNUP_OPEN=true E os textos exigidos publicados na imagem.
+  curl -fsS -H "X-Forwarded-Host: $host" "$base/api/legal/versions" | grep -q "\"ready\":$SIGNUP_OPEN" \
+    || { echo "   FALHOU: cadastro (ready do /api/legal/versions) difere de SIGNUP_OPEN=$SIGNUP_OPEN" >&2; return 1; }
+  echo "   ok   signupOpen=$SIGNUP_OPEN (textos exigidos publicados)"
   curl -fsSI "$base/api/health" | tr -d '\r' | grep -qi '^cache-control: private, no-store' || { echo "   FALHOU: /api sem Cache-Control private, no-store" >&2; return 1; }
 }
 

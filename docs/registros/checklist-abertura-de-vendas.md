@@ -6,12 +6,12 @@ Preparado em 14/10/2026. **Nada aqui foi executado.** A publicação de 13/10 de
 
 | # | Item | Como se comprova | Feito em | Por quem |
 |---|---|---|---|---|
-| 1.1 | Termos de Uso, Política de Privacidade e Política de Cancelamento fornecidos (D-11) | Arquivos em `conteudo-legal/`, com versão e data de cada um | | |
-| 1.2 | Dados da PartyX para o rodapé e os e-mails (razão social, CNPJ, contato) | Variáveis `PARTYX_*` e `EMAIL_REPLY_TO` preenchidas | | |
+| 1.1 | Termos de Uso, Política de Privacidade e Política de Cancelamento fornecidos (D-11) | Arquivos em `conteudo-legal/`, com versão e data de cada um | 14/10/2026, **só Termos 1.0 e Privacidade 1.0** (bastam para o cadastro, D-84). Falta a Política de Cancelamento, exigida para vender | Arthur (responsável) |
+| 1.2 | Dados da PartyX para o rodapé e os e-mails (razão social, CNPJ, contato) | Variáveis `PARTYX_*` e `EMAIL_REPLY_TO` preenchidas | 14/10/2026: `PARTYX_*` no `env.prod.yaml`; `EMAIL_REPLY_TO` vazio de propósito (cai no e-mail de atendimento) | Arthur (responsável) |
 | 1.3 | Identidade visual aprovada por escrito (CA-33) | Registro em `aprovacao-visual.md` | | |
 | 1.4 | Gateway de produção confirmado por escrito (D-01) | Registro em `decisoes-pendentes.md` | | |
 | 1.5 | Evento real cadastrado, com tipos, preços e capacidade conferidos pela PartyX | Tela do admin conferida pelo Bernardo | | |
-| 1.6 | Autorização escrita para abrir, com a data | Registro novo em `docs/registros/` | | |
+| 1.6 | Autorização escrita para abrir, com a data | Registro novo em `docs/registros/` | 14/10/2026, **só o cadastro** (vendas não): `autorizacao-cadastro-producao-2026-10-14.md`. Textos do cadastro prontos no mesmo dia; abertura depende da candidata e da virada | Bernardo (WhatsApp, 10:00) e Arthur, informado por Arthur |
 
 ## 2. Domínio e e-mail
 

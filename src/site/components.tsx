@@ -306,6 +306,9 @@ export function Footer() {
           <Link to="/privacidade">Política de Privacidade</Link>
           <Link to="/politica-de-cancelamento">Cancelamento, troca e reembolso</Link>
         </nav>
+        <p className="px-footer-credit">
+          Desenvolvido por Zanon de Andrade Softwares - <span className="px-nowrap">CNPJ 57.971.378/0001-50</span>
+        </p>
       </div>
     </footer>
   );

@@ -24,6 +24,11 @@ export const LEGAL_TITLES: Record<LegalKind, string> = {
 
 /** Obrigatórios para vender de verdade. A meia-entrada só se aplica se o cliente oferecer esse tipo de ingresso (D-06). */
 const REQUIRED: LegalKind[] = ['termos-de-uso', 'privacidade', 'cancelamento'];
+/**
+ * Obrigatórios para abrir o cadastro: os dois que a pessoa aceita no cadastro (RF-03). A Política de Cancelamento é exigida só para
+ * vender (`salesBlockers`), por decisão do responsável em 14/10/2026 (D-84).
+ */
+const SIGNUP_REQUIRED: LegalKind[] = ['termos-de-uso', 'privacidade'];
 const MAX_BYTES = 200_000;
 
 export interface LegalDocument {
@@ -123,15 +128,16 @@ export function salesBlockers(config: LegalConfig & Pick<Config, 'visualApproved
 }
 
 /**
- * O que impede o cadastro de compradores (RF-03, D-11). Vale em qualquer ambiente o `SIGNUP_OPEN=false`. Em produção, além da flag
- * (fechada por padrão), cada um dos três textos precisa estar **publicado**: arquivo oficial, versão e data de vigência. Sem isso não há
- * o que aceitar, e o cadastro real continua bloqueado. Fora de produção, a falta do texto só gera o aviso de homologação.
+ * O que impede o cadastro de compradores (RF-03, D-11, D-84). Vale em qualquer ambiente o `SIGNUP_OPEN=false`. Em produção, além da flag
+ * (fechada por padrão), os Termos de Uso e a Política de Privacidade precisam estar **publicados**: arquivo oficial, versão e data de
+ * vigência. Sem isso não há o que aceitar, e o cadastro real continua bloqueado. A Política de Cancelamento não entra aqui: é exigida só
+ * para vender. Fora de produção, a falta do texto só gera o aviso de homologação.
  */
 export function signupBlockers(config: LegalConfig & Pick<Config, 'signupOpen'>): string[] {
   const out: string[] = [];
   if (!config.signupOpen) out.push('cadastro fechado por configuração (SIGNUP_OPEN)');
   if (config.APP_ENV !== 'producao') return out;
-  for (const kind of REQUIRED) {
+  for (const kind of SIGNUP_REQUIRED) {
     if (!hasFile(config, kind)) out.push(`texto legal ausente: ${LEGAL_TITLES[kind]}`);
     if (!versionOf(config, kind)) out.push(`versão não informada: ${LEGAL_TITLES[kind]}`);
     if (!dateOf(config, kind)) out.push(`data de vigência não informada: ${LEGAL_TITLES[kind]}`);

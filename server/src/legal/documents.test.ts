@@ -169,7 +169,7 @@ describe('textos legais (RF-68)', () => {
     });
   });
 
-  describe('cadastro (RF-03, D-11): bloqueado em produção sem os textos oficiais publicados', () => {
+  describe('cadastro (RF-03, D-11, D-84): bloqueado em produção sem os Termos e a Privacidade publicados', () => {
     const published = { TERMS_VERSION: 'v1', PRIVACY_VERSION: 'v1', CANCELLATION_VERSION: 'v1', ...DATES };
 
     it('produção: fechado por padrão, mesmo com tudo publicado; abre só com SIGNUP_OPEN=true', () => {
@@ -178,18 +178,38 @@ describe('textos legais (RF-68)', () => {
       expect(signupBlockers(prod({ ...all, SIGNUP_OPEN: 'true' }))).toEqual([]);
     });
 
-    it('produção com a flag ligada: cada texto, versão e data que falta é um bloqueio', () => {
-      expect(signupBlockers(prod({ SIGNUP_OPEN: 'true' }))).toHaveLength(9);
+    it('produção com a flag ligada: cada texto, versão e data dos Termos e da Privacidade que falta é um bloqueio', () => {
+      expect(signupBlockers(prod({ SIGNUP_OPEN: 'true' }))).toHaveLength(6);
       const semTexto = prod({
         ...published,
         SIGNUP_OPEN: 'true',
-        LEGAL_CONTENT_DIR: dirWith({ ...FULL, cancelamento: '' }),
+        LEGAL_CONTENT_DIR: dirWith({ ...FULL, privacidade: '' }),
       });
-      expect(signupBlockers(semTexto)).toEqual(['texto legal ausente: Política de Cancelamento']);
+      expect(signupBlockers(semTexto)).toEqual(['texto legal ausente: Política de Privacidade']);
       const { PRIVACY_DATE: _p, ...semData } = published;
       expect(signupBlockers(prod({ ...semData, SIGNUP_OPEN: 'true', LEGAL_CONTENT_DIR: dirWith(FULL) }))).toEqual([
         'data de vigência não informada: Política de Privacidade',
       ]);
+    });
+
+    it('sem a Política de Cancelamento: o cadastro abre, a venda continua bloqueada por ela', () => {
+      const semCancelamento = prod({
+        SIGNUP_OPEN: 'true',
+        SALES_OPEN: 'true',
+        VISUAL_APPROVED: 'true',
+        TERMS_VERSION: 'v1',
+        PRIVACY_VERSION: 'v1',
+        TERMS_DATE: '2026-10-14',
+        PRIVACY_DATE: '2026-10-14',
+        LEGAL_CONTENT_DIR: dirWith({ 'termos-de-uso': FULL['termos-de-uso'], privacidade: FULL.privacidade }),
+      });
+      expect(signupBlockers(semCancelamento)).toEqual([]);
+      expect(salesBlockers(semCancelamento)).toEqual([
+        'texto legal ausente: Política de Cancelamento',
+        'versão da Política de Cancelamento não informada',
+        'data de vigência não informada: Política de Cancelamento',
+      ]);
+      expect(legalDocument(semCancelamento, 'cancelamento')).toMatchObject({ status: 'pendente', blocks: [] });
     });
 
     it('fora de produção: aberto e marcado como provisório sem o texto oficial; SIGNUP_OPEN=false fecha', () => {

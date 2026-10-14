@@ -65,7 +65,8 @@ const schema = z
     CANCELLATION_DATE: isoDate.optional(),
     /**
      * Abre o cadastro de compradores. Padrão: aberto fora de produção, **fechado em produção**. Mesmo com `true`, produção só cadastra com os
-     * três textos oficiais publicados (arquivo, versão e data): ver `signupBlockers` em `legal/documents.ts`.
+     * Termos de Uso e a Política de Privacidade publicados (arquivo, versão e data); a de Cancelamento é exigida só para vender (D-84). Ver
+     * `signupBlockers` em `legal/documents.ts`.
      */
     SIGNUP_OPEN: z.enum(['true', 'false']).optional(),
     /**

@@ -42,7 +42,9 @@ Não há tela: é procedimento operacional. Não há prazo legal embutido: a Par
 
 ## Retenção configurável (D-62)
 
-Variáveis, em dias, **sem valor padrão** (vazio = não apaga): `RETENTION_LOGIN_ATTEMPTS_DAYS`, `RETENTION_SESSIONS_DAYS` (só sessões já encerradas), `RETENTION_PASSWORD_RESETS_DAYS`. A rotina `POST /internal/jobs/purge-retention` (autenticada como as demais) aplica. **Falta criar o agendamento no Cloud Scheduler** (pendente de infraestrutura). Pedidos, ingressos, pagamentos e auditoria não são apagados por rotina: o prazo é decisão da PartyX com a contabilidade.
+Variáveis, em dias, **sem valor padrão** (vazio = não apaga): `RETENTION_LOGIN_ATTEMPTS_DAYS`, `RETENTION_SESSIONS_DAYS` (só sessões já encerradas), `RETENTION_PASSWORD_RESETS_DAYS`. A rotina `POST /internal/jobs/purge-retention` (autenticada como as demais) aplica. Pedidos, ingressos, pagamentos e auditoria não são apagados por rotina: o prazo é decisão da PartyX com a contabilidade.
+
+**Produção, desde 14/10/2026 (decisão do responsável, igual à Política de Privacidade 1.0):** as três com 180 dias (6 meses) no `infra/producao/env.prod.yaml`. O agendamento é a rotina `partyx-limpeza-retencao` do Cloud Scheduler, todo dia às 04:05 (America/Sao_Paulo), criada pelo `deploy.sh varredura` junto com a rotina diária. Os logs de acesso do Google ficam com a retenção padrão de 30 dias, também por decisão do responsável.
 
 ## Incidente de segurança
 
@@ -55,4 +57,4 @@ Variáveis, em dias, **sem valor padrão** (vazio = não apaga): `RETENTION_LOGI
 
 ## Pendente do cliente
 
-Base legal de cada finalidade, prazos de retenção (D-62), textos de privacidade (D-11), lista de suboperadores, encarregado (DPO) e canal do titular, prazo de resposta aos pedidos e quem na PartyX autoriza cada remoção.
+A Política de Privacidade 1.0 (14/10/2026) trouxe bases legais, prazos de guarda, suboperadores, encarregado (Bernardo Peixoto Fortes Bittencourt), canal do titular (bbittencourt085@gmail.com) e prazo de resposta (15 dias). Falta: confirmação escrita da PartyX sobre o texto e quem na PartyX autoriza cada remoção.

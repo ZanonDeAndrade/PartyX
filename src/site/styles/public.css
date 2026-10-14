@@ -272,6 +272,18 @@ body.px-dark .px-footer {
   color: var(--px-on-ink) !important;
   overflow-wrap: anywhere;
 }
+/* Crédito da contratada: última linha, em toda a largura, abaixo das colunas. */
+.px-footer-credit {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: var(--px-s-5);
+  border-top: 1px solid var(--px-ink-line);
+  color: var(--px-on-ink-3);
+  font-size: var(--px-t-sm);
+}
+.px-footer-credit .px-nowrap {
+  white-space: nowrap;
+}
 
 /* ---------- manutenção (G06) ---------- */
 .px-maint {

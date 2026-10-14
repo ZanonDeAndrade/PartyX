@@ -35,10 +35,19 @@ describe('infra/env-check.py', () => {
     expect(check(hml, 'homologacao', ['EMAIL_FROM']).status).toBe(0);
   });
 
-  it('arquivo de produção do repositório: venda e cadastro FECHADOS, sem protótipo, sem lista de e-mail, gateway de produção', () => {
+  it('arquivo de produção do repositório: venda FECHADA, cadastro aberto com os textos, sem protótipo, sem lista de e-mail', () => {
+    // Cadastro aberto por autorização de 14/10/2026 (docs/registros/autorizacao-cadastro-producao-2026-10-14.md), com Termos e
+    // Privacidade 1.0 publicados (D-84). A venda continua fechada.
     for (const [name, value] of [
       ['SALES_OPEN', 'false'],
-      ['SIGNUP_OPEN', 'false'],
+      ['SIGNUP_OPEN', 'true'],
+      ['TERMS_VERSION', '1.0'],
+      ['TERMS_DATE', '2026-10-14'],
+      ['PRIVACY_VERSION', '1.0'],
+      ['PRIVACY_DATE', '2026-10-14'],
+      ['RETENTION_SESSIONS_DAYS', '180'],
+      ['RETENTION_LOGIN_ATTEMPTS_DAYS', '180'],
+      ['RETENTION_PASSWORD_RESETS_DAYS', '180'],
       ['PAYMENT_GATEWAY', 'mercadopago'],
       ['GATEWAY_ENVIRONMENT', 'producao'],
       ['RESERVATION_MINUTES', '30'],
@@ -53,7 +62,12 @@ describe('infra/env-check.py', () => {
     expect(ok.err).toBe('');
     expect(ok.status).toBe(0);
     expect(ok.out).toContain("ENVF_SALES_OPEN=false");
-    expect(ok.out).toContain("ENVF_SIGNUP_OPEN=false");
+    expect(ok.out).toContain("ENVF_SIGNUP_OPEN=true");
+  });
+
+  it('o prazo de retenção dos códigos de recuperação passa; uma senha de verdade no arquivo continua recusada', () => {
+    expect(check(set(withAccount, 'RETENTION_PASSWORD_RESETS_DAYS', '180'), 'producao').status).toBe(0);
+    expect(check(set(withAccount, 'SMTP_PASSWORD', 'abc'), 'producao').err).toContain('parece segredo');
   });
 
   it('produção sem o id da conta do Mercado Pago é recusada (o arquivo do repositório fica assim até o bloco de segredos)', () => {

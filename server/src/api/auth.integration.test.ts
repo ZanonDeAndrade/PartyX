@@ -293,6 +293,24 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       expect(old.status).toBe(409);
     });
 
+    it('em produção sem a Política de Cancelamento (D-84): Termos e Privacidade publicados bastam para cadastrar', async () => {
+      const { CANCELLATION_VERSION: _v, CANCELLATION_DATE: _d, ...semCancelamento } = prodBase();
+      const cfg = config({
+        ...semCancelamento,
+        SIGNUP_OPEN: 'true',
+        LEGAL_CONTENT_DIR: legalDir({ 'termos-de-uso': 'Termos.', privacidade: 'Privacidade.' }),
+      });
+      const b = browser(() => build({ cfg }));
+      expect(await (await b.call('GET', '/legal/versions')).json()).toMatchObject({ ready: true, provisional: false });
+      const res = await b.call(
+        'POST',
+        '/auth/register',
+        person({ acceptedTermsVersion: '2026-10', acceptedPrivacyVersion: '2026-10' }),
+      );
+      expect(res.status).toBe(201);
+      expect((await sql('select count(*)::int as n from consents')).rows[0].n).toBe(1);
+    });
+
     it('informa as versões em vigor e marca as fictícias como provisórias', async () => {
       const res = await browser().call('GET', '/legal/versions');
       expect(await res.json()).toEqual({

@@ -13,9 +13,10 @@ import shlex
 import sys
 
 LINE = re.compile(r'^([A-Z][A-Z0-9_]*): "([^"]*)"\s*(#.*)?$')
-# Segredos ficam no Secret Manager. As chaves públicas de verdade (TURNSTILE_SITE_KEY) são a exceção.
+# Segredos ficam no Secret Manager. As exceções são nomes conhecidos que não guardam segredo: a chave pública do Turnstile e o prazo,
+# em dias, de retenção dos códigos de recuperação de senha (o "PASSWORD" do nome é o assunto, não o valor).
 SECRET_LIKE = re.compile(r'(SECRET|TOKEN|PASSWORD|PASS|DATABASE_URL|SMTP_URL|QR_HMAC_KEYS|PRIVATE|CREDENTIAL|_KEY$|_KEYS$)')
-PUBLIC_OK = {'TURNSTILE_SITE_KEY'}
+PUBLIC_OK = {'TURNSTILE_SITE_KEY', 'RETENTION_PASSWORD_RESETS_DAYS'}
 REQUIRED = [
     'NODE_ENV', 'NODE_OPTIONS', 'APP_ENV', 'DB_POOL_MAX', 'TRUSTED_PROXY_HOPS', 'PUBLIC_BASE_URL', 'BANNER_BUCKET',
     'JOBS_AUDIENCE', 'JOBS_CALLER_EMAIL', 'TASKS_QUEUE', 'TASKS_INVOKER_EMAIL', 'TURNSTILE_ENABLED', 'PAYMENT_GATEWAY',
