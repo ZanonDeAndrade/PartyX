@@ -1,0 +1,113 @@
+# 1. Quem somos e aceitação
+
+Estes Termos de Uso regulam o uso do site partyx.com.br ("Plataforma"), por meio do qual a PartyX vende ingressos para os eventos que ela mesma organiza.
+
+A Plataforma pertence a 58.471.403 BERNARDO PEIXOTO FORTES BITTENCOURT, empresário individual inscrito no CNPJ sob o nº 58.471.403/0001-07, que atua sob a marca PartyX, com endereço na Rua Celestino Cavalheiro, 1200, São Gabriel/RS ("PartyX"). A PartyX é a vendedora dos ingressos e a organizadora dos eventos.
+
+O sistema é hospedado e mantido pela Zanon de Andrade Softwares, CNPJ 57.971.378/0001-50, que presta serviço de tecnologia à PartyX. Ela não vende ingressos, não recebe pagamentos e não presta atendimento ao comprador.
+
+Ao criar uma conta, você declara que leu e aceita estes Termos e a Política de Privacidade. Se não concordar, não crie conta nem compre ingressos. Cada compra também segue a Política de Cancelamento e Reembolso e as regras informadas na página de cada evento.
+
+# 2. Definições
+
+Plataforma: o site partyx.com.br, com a vitrine de eventos, a área do cliente e o ingresso digital.
+
+Usuário ou comprador: a pessoa que cria uma conta na Plataforma.
+
+Evento: a festa ou atividade organizada pela PartyX e divulgada na Plataforma.
+
+Ingresso: o direito de acesso a um Evento, emitido em formato digital com QR Code e código individual.
+
+Tipo de ingresso ou lote: cada categoria de ingresso, com preço, quantidade e período de venda próprios.
+
+Pedido: a solicitação de compra de um ou mais ingressos.
+
+Equipe da PartyX: administradores e validadores de portaria cadastrados pela PartyX.
+
+# 3. Cadastro e conta
+
+A consulta aos eventos é livre. Para comprar ingressos, é necessário criar uma conta e estar logado.
+
+No cadastro, você informa nome completo, e-mail, CPF, telefone com DDD e uma senha. Os dados devem ser verdadeiros, completos e atualizados, e você é responsável por eles. Cada CPF pode ter apenas uma conta.
+
+O cadastro e a compra são permitidos somente a pessoas com 16 anos completos ou mais. Quem tiver entre 16 e 18 anos declara, ao aceitar estes Termos, que tem autorização dos pais ou responsáveis para criar a conta e comprar ingressos. A classificação etária de cada Evento continua valendo: em Eventos para maiores de 18 anos, menores de idade não entram, mesmo com ingresso.
+
+Você é responsável por manter a senha em sigilo e por todas as atividades feitas na sua conta. A senha deve ter no mínimo 8 caracteres, com letras e números. Se suspeitar de uso indevido, troque a senha e avise a PartyX pelos canais de atendimento.
+
+Na área do cliente, você pode alterar nome, telefone e senha. A alteração de e-mail ou CPF só é feita pela PartyX, mediante solicitação e conferência.
+
+Por segurança, a Plataforma pode bloquear o acesso por um tempo após várias tentativas de login com senha errada, e limitar cadastros e tentativas vindos de uma mesma rede. A sessão de login expira após um período sem uso.
+
+A PartyX pode suspender ou encerrar contas com dados falsos, uso fraudulento ou violação destes Termos, sem prejuízo das medidas legais cabíveis.
+
+Para excluir sua conta, faça o pedido à PartyX pelos canais de atendimento, conforme a Política de Privacidade.
+
+# 4. Compra de ingressos
+
+Preço: você paga apenas o valor dos ingressos mostrado na tela de compra. Não há taxa de conveniência nem taxa de serviço.
+
+Meia-entrada: os ingressos vendidos na Plataforma são de valor integral. A Plataforma não oferece venda de meia-entrada.
+
+Limite por pedido: cada pedido pode ter até o número de ingressos informado na tela de compra, hoje 6 ingressos, somando todos os tipos.
+
+Disponibilidade: os ingressos são vendidos por tipo ou lote, enquanto houver quantidade disponível. A PartyX pode abrir, alterar ou encerrar lotes e encerrar as vendas de um Evento a qualquer momento. Essas mudanças não afetam ingressos já pagos.
+
+Código de divulgação: o campo de código de promoter é opcional. Ele só identifica quem indicou a compra e não dá desconto. Um código inválido não impede a compra.
+
+Reserva: ao iniciar o pagamento, os ingressos ficam reservados pelo tempo informado na tela, hoje 30 minutos. Se o pagamento não for confirmado nesse prazo, o pedido expira e os ingressos voltam à venda. Cada comprador pode ter um pedido aguardando pagamento por Evento. Iniciar outro pedido libera a reserva anterior.
+
+Pagamento: o pagamento é processado pelo Mercado Pago, na conta da PartyX, por Pix ou por cartão de crédito ou débito, somente à vista. Não há parcelamento nem outras formas de pagamento. A forma escolhida fica ligada ao pedido; para trocá-la, é preciso fazer um novo pedido.
+
+Dados do cartão: são digitados diretamente nos campos do Mercado Pago. A PartyX não recebe nem guarda número, validade ou código de segurança do cartão. O uso do Mercado Pago também segue os termos e a política de privacidade dele.
+
+Confirmação: a compra só é concluída quando o Mercado Pago confirma o pagamento à PartyX. Telas ou comprovantes exibidos no navegador não substituem essa confirmação. Pagamento recusado não gera ingresso e libera a reserva.
+
+Pagamento confirmado depois de vencida a reserva: os ingressos são emitidos se ainda houver disponibilidade. Se não houver, nenhum ingresso é emitido e a PartyX devolve o valor integral pelo Mercado Pago.
+
+Cobrança em duplicidade: se o mesmo pedido for cobrado mais de uma vez, a cobrança a mais não gera ingresso e é estornada pela PartyX.
+
+# 5. Ingresso digital e acesso ao evento
+
+Cada ingresso comprado gera um ingresso digital individual, com QR Code exclusivo e um código curto no formato PX-XXXX-XXXX. Os ingressos ficam em "Meus ingressos", na área logada, e podem ser exibidos em tela cheia ou baixados em PDF. O e-mail de confirmação traz apenas um link para essa área.
+
+Titularidade: todos os ingressos de um pedido são emitidos no nome do comprador. Não há transferência de titularidade nem troca de nome. O comprador pode adquirir ingressos para acompanhantes, dentro do limite por pedido, e responde pelo repasse e pelo uso desses ingressos.
+
+Guarda do QR Code: o QR Code funciona como chave de entrada, e cada ingresso permite uma única entrada. Qualquer cópia, como captura de tela ou impressão, é aceita na leitura: entra quem apresentar primeiro, e as apresentações seguintes são recusadas como "já utilizado". Guarde seus ingressos com cuidado e não os divulgue. A PartyX não responde pelo uso do ingresso por pessoas a quem o comprador tenha dado acesso ao QR Code ou ao código, nem por perda ou vazamento causados pelo comprador.
+
+Validação: a entrada é validada pela equipe da PartyX, na portaria, pela leitura do QR Code ou por busca manual. A PartyX pode pedir documento de identificação com foto para conferir dados ou idade. Ingressos cancelados, estornados, contestados ou de outro Evento são recusados.
+
+Classificação etária e regras do Evento: a classificação etária aparece na página do Evento e no ingresso. A PartyX pode recusar a entrada de quem não atender à classificação etária ou à lei, ou de quem descumprir as regras de segurança, de conduta e do local informadas para o Evento. Nesses casos, aplica-se a Política de Cancelamento e Reembolso.
+
+Programação: atrações, horários e local são de responsabilidade da PartyX e podem mudar. As mudanças são informadas na página do Evento.
+
+# 6. Cancelamento e reembolso
+
+As regras de desistência, cancelamento e reembolso, inclusive para Evento adiado ou cancelado, constam da Política de Cancelamento e Reembolso. Ela será publicada na Plataforma antes do início das vendas e passará a fazer parte destes Termos.
+
+Em qualquer caso, o reembolso, quando devido, é feito pela PartyX, pelo Mercado Pago, no mesmo meio de pagamento usado na compra.
+
+Ingresso cancelado ou estornado deixa de valer para entrada. Ingresso já utilizado não pode ser cancelado.
+
+Se o pagamento for estornado por inteiro, os ingressos do pedido são cancelados automaticamente. Se a compra for contestada junto à operadora do cartão, os ingressos do pedido também são cancelados.
+
+Nada nestes Termos limita os direitos garantidos pelo Código de Defesa do Consumidor.
+
+# 7. Responsabilidades e condutas
+
+É proibido informar dados falsos ou usar dados de outra pessoa sem autorização; tentar burlar limites, reservas, estoque, pagamentos ou a validação de ingressos; falsificar ou adulterar ingressos, QR Codes ou códigos; acessar áreas restritas, testar falhas de segurança, usar robôs ou automações, ou sobrecarregar a Plataforma; e usar a Plataforma para qualquer fim ilícito.
+
+Disponibilidade: a Plataforma pode ser acessada a qualquer hora, mas pode ficar indisponível por manutenção, falhas de terceiros, como provedores de internet, hospedagem ou pagamento, ou por motivo de força maior. Durante manutenções, o site mostra uma página com o contato da PartyX.
+
+Limitação de responsabilidade: ressalvados os direitos do consumidor previstos em lei, a PartyX não responde por danos causados por uso indevido da conta pelo próprio usuário, por falhas no aparelho ou na conexão do usuário, nem por serviços de terceiros fora do seu controle.
+
+Propriedade intelectual: marcas, logotipos, textos, imagens e demais conteúdos da Plataforma pertencem à PartyX ou a quem a autorizou a usá-los, e não podem ser usados sem autorização.
+
+Comunicações: a PartyX envia apenas e-mails ligados à sua conta e às suas compras, como criação de conta, recuperação de senha e confirmação de compra. Não há envio de publicidade.
+
+# 8. Disposições finais
+
+Alterações: a PartyX pode atualizar estes Termos. A versão vigente, com número e data de vigência, fica sempre publicada na Plataforma. Alterações não afetam compras já concluídas.
+
+Atendimento: dúvidas, pedidos e reclamações devem ser enviados à PartyX pelo e-mail bbittencourt085@gmail.com ou pelo WhatsApp (55) 99939-4600. As mensagens são respondidas em horário comercial, de segunda a sexta-feira.
+
+Lei e foro: estes Termos seguem as leis brasileiras, em especial o Código de Defesa do Consumidor. Eventuais conflitos serão resolvidos no foro do domicílio do consumidor.

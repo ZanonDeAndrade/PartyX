@@ -1,0 +1,121 @@
+# 1. Quem cuida dos seus dados
+
+Esta Política explica como a PartyX trata os dados pessoais de quem usa o site partyx.com.br ("Plataforma"), conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018, "LGPD").
+
+Controladora: 58.471.403 BERNARDO PEIXOTO FORTES BITTENCOURT, empresário individual, CNPJ 58.471.403/0001-07, que atua sob a marca PartyX, com endereço na Rua Celestino Cavalheiro, 1200, São Gabriel/RS ("PartyX"). A PartyX vende os ingressos, organiza os eventos e decide como e por que os dados são usados.
+
+Operadora: Zanon de Andrade Softwares, CNPJ 57.971.378/0001-50, que hospeda e mantém o sistema. Ela trata os dados apenas para prestar esse serviço à PartyX, conforme as instruções da PartyX, e não os usa para fins próprios.
+
+Encarregado de dados (DPO): Bernardo Peixoto Fortes Bittencourt, pelo e-mail bbittencourt085@gmail.com.
+
+# 2. Dados que coletamos
+
+Coletamos apenas o necessário para a sua conta, suas compras e a sua entrada nos eventos.
+
+Cadastro: nome completo, e-mail, CPF, telefone com DDD e senha. A senha é guardada apenas em forma cifrada irreversível (hash), e ninguém consegue lê-la.
+
+Aceite dos documentos: versão dos Termos de Uso e desta Política que você aceitou, data e hora, endereço IP e navegador.
+
+Compras: pedidos, tipos e quantidades de ingressos, valores, forma de pagamento, código de promoter informado, situação do pedido, datas e o motivo de recusa informado pelo Mercado Pago.
+
+Dados enviados ao Mercado Pago: nome, e-mail e CPF do pagador, valor e número do pedido. Os dados do cartão são digitados diretamente nos campos do Mercado Pago e não chegam à PartyX.
+
+Notificações de pagamento: o conteúdo das confirmações enviadas pelo Mercado Pago, que pode conter dados do pagador, nunca dados de cartão.
+
+Ingressos: nome do titular, códigos, situação, datas de emissão e de cancelamento e o motivo do cancelamento.
+
+Portaria: cada leitura de ingresso, com o resultado, a forma de validação (câmera ou busca manual), o horário e o validador.
+
+Segurança: sessões de login (IP, navegador e datas), tentativas de login (e-mail e IP) e códigos de recuperação de senha, guardados apenas em forma cifrada.
+
+Registros de acesso: endereço IP, navegador, página acessada, data e hora, guardados pelos provedores de infraestrutura.
+
+Não coletamos data de nascimento, endereço, gênero, foto, localização, biometria nem dados de cartão. Na portaria, a imagem da câmera é processada no aparelho da equipe e só o código lido vai ao servidor. A câmera do comprador nunca é usada.
+
+# 3. Para que usamos e com qual base legal
+
+Criar e manter sua conta, vender e emitir ingressos, processar pagamentos, validar a entrada na portaria e prestar atendimento. Base legal: execução de contrato (LGPD, art. 7º, V).
+
+Guardar os registros de pedidos e pagamentos exigidos pela legislação fiscal e contábil. Base legal: cumprimento de obrigação legal (LGPD, art. 7º, II).
+
+Guardar a prova do seu aceite e os registros de compra, cancelamento e estorno para eventual defesa em processos. Base legal: exercício regular de direitos (LGPD, art. 7º, VI).
+
+Proteger sua conta e a Plataforma, prevenir fraudes, bloquear tentativas repetidas e limitar acessos abusivos. Base legal: legítimo interesse (LGPD, art. 7º, IX), sempre no limite do necessário.
+
+Enviar e-mails ligados à sua conta e às suas compras, como criação de conta, recuperação de senha e confirmação de compra. Base legal: execução de contrato (LGPD, art. 7º, V).
+
+Não usamos seus dados para publicidade, marketing, perfis de comportamento ou decisões automatizadas, e não vendemos dados a ninguém.
+
+# 4. Com quem compartilhamos
+
+Seus dados só são compartilhados com quem precisa deles para a Plataforma funcionar.
+
+Mercado Pago: processa os pagamentos por Pix e cartão e faz análise antifraude. Recebe nome, e-mail e CPF do pagador, valor e número do pedido. Na tela de pagamento com cartão, o script do Mercado Pago pode coletar dados do aparelho para prevenção de fraude. Para esses dados, o Mercado Pago segue a própria política de privacidade.
+
+Google Cloud: servidores, filas, backups, imagens dos eventos e registros de operação, em São Paulo.
+
+Neon: banco de dados, hospedado em São Paulo.
+
+Provedores de entrega do site, hoje Vercel e Firebase Hosting (Google): recebem todo o tráfego do site para entregá-lo com conexão segura.
+
+Resend, com envio pela Amazon: envio dos e-mails da conta e das compras.
+
+Zanon de Andrade Softwares: hospeda e mantém o sistema, como operadora.
+
+Dentro da PartyX, os dados são acessados apenas pela equipe autorizada, com permissões por função. Nas telas da equipe, nas planilhas e na lista impressa de contingência da portaria, o CPF aparece mascarado.
+
+Os dados também podem ser fornecidos a autoridades públicas quando houver obrigação legal ou ordem judicial.
+
+Transferência internacional: Vercel, Resend e Neon são empresas sediadas nos Estados Unidos, e parte do tráfego ou do tratamento pode ocorrer fora do Brasil. Essas transferências seguem o art. 33 da LGPD e a regulamentação da ANPD, com cláusulas contratuais que garantem nível adequado de proteção.
+
+# 5. Cookies e armazenamento no navegador
+
+A Plataforma usa um único cookie, chamado __session, que mantém o seu login. Ele é essencial para o funcionamento do site, não serve para rastreamento e não pode ser lido por outros sites.
+
+O navegador também guarda, só enquanto a aba estiver aberta, o carrinho de compra e um aviso de sessão expirada. Esses dados somem quando a aba é fechada.
+
+Não usamos Google Analytics, pixels de anúncio nem ferramentas de marketing. Por isso não há aviso de cookies.
+
+Alguns conteúdos vêm de terceiros: o script do Mercado Pago, apenas na tela de pagamento com cartão; as imagens dos eventos, servidas pelo Google Cloud; e o link do WhatsApp, quando você clica nele.
+
+# 6. Por quanto tempo guardamos e como protegemos
+
+Guardamos os dados apenas pelo tempo necessário para cada finalidade.
+
+Conta: enquanto ela estiver ativa ou até você pedir a exclusão.
+
+Pedidos, pagamentos e ingressos: 5 anos, pelo prazo exigido pela legislação fiscal e contábil.
+
+Prova do aceite e registros de cancelamento e estorno: 5 anos após a última compra, para eventual defesa de direitos.
+
+Sessões, tentativas de login e códigos de recuperação de senha: 6 meses.
+
+Registros de acesso ao site: guardados pelos provedores de infraestrutura pelo prazo de retenção deles, hoje de 30 dias.
+
+Backups: cópias diárias cifradas, guardadas por 35 dias e depois apagadas.
+
+Medidas de segurança: conexão cifrada (HTTPS) em todo o site; senhas guardadas com hash Argon2id; limites de tentativas e bloqueios automáticos; permissões por função, conferidas no servidor; CPF mascarado nas telas e exportações da equipe; registros de operação sem dados sensíveis; trilha de auditoria que não pode ser alterada; backups diários cifrados; e QR Codes assinados digitalmente, impossíveis de adivinhar.
+
+Nenhum sistema é totalmente imune a incidentes. Por isso, também pedimos que você proteja sua senha e seus ingressos.
+
+# 7. Seus direitos e como exercê-los
+
+Pela LGPD (art. 18), você pode pedir à PartyX, a qualquer momento: confirmação de que tratamos seus dados e acesso a eles; correção de dados incompletos, incorretos ou desatualizados; anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desacordo com a lei; portabilidade dos seus dados; informação sobre com quem compartilhamos seus dados; oposição a tratamentos baseados em legítimo interesse, quando cabível; e exclusão da sua conta.
+
+Como pedir: envie o pedido para bbittencourt085@gmail.com. Para proteger você, a PartyX confirma a sua identidade antes de atender. A resposta é dada em até 15 dias.
+
+Cópia dos dados: você recebe um arquivo com seu cadastro, aceites, pedidos, ingressos, e-mails enviados e sessões.
+
+Exclusão da conta: seus dados de identificação são apagados ou anonimizados, incluindo nome, e-mail, CPF, telefone, senha, IP e navegador. Por obrigação legal e para defesa de direitos, continuam guardados, sem identificá-lo, os pedidos, os valores, os ingressos, as entradas e as datas dos aceites. Ingressos válidos para eventos futuros continuam valendo. A exclusão não pode ser feita enquanto houver pedido aguardando pagamento. Cópias de segurança são apagadas no ciclo normal de 35 dias, e os registros do próprio Mercado Pago seguem a política dele.
+
+Você também pode apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD).
+
+# 8. Menores, incidentes, alterações e contato
+
+Menores de idade: o cadastro e a compra são permitidos somente a pessoas com 16 anos ou mais. Quem tiver entre 16 e 18 anos declara ter autorização dos pais ou responsáveis. Os dados de adolescentes são tratados no seu melhor interesse, como determina o art. 14 da LGPD. A PartyX não coleta intencionalmente dados de pessoas com menos de 16 anos; se identificarmos uma conta nessa situação, ela poderá ser encerrada.
+
+Incidentes de segurança: se houver um incidente que possa trazer risco ou dano relevante a você, a PartyX comunicará a ANPD e as pessoas afetadas, como determina a LGPD.
+
+Alterações: esta Política pode ser atualizada. A versão vigente, com número e data de vigência, fica sempre publicada na Plataforma.
+
+Contato: dúvidas sobre esta Política ou sobre seus dados podem ser enviadas ao encarregado, pelo e-mail bbittencourt085@gmail.com, ou pelo WhatsApp (55) 99939-4600. As mensagens são respondidas em horário comercial, de segunda a sexta-feira.

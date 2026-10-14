@@ -37,7 +37,7 @@
 #   RECONCILE_LATE_OFFSETS_SECONDS=900,1800,3600,10800,28800,86400  RECONCILE_LOCK_SECONDS=120   (padrões do código; só passe para mudar)
 #   PARTYX_SUPPORT_EMAIL  PARTYX_SUPPORT_WHATSAPP   contato de atendimento DA PARTYX para o comprador (nunca o da contratada)
 #   PARTYX_LEGAL_NAME  PARTYX_CNPJ  PARTYX_ADDRESS  PARTYX_SUPPORT_HOURS   dados públicos DA PARTYX (rodapé, e-mails, manutenção)
-#   TERMS_DATE  PRIVACY_DATE  CANCELLATION_DATE   vigência (AAAA-MM-DD) das versões; textos em conteudo-legal/ (fora do Git)
+#   TERMS_DATE  PRIVACY_DATE  CANCELLATION_DATE   vigência (AAAA-MM-DD) das versões; textos em conteudo-legal/ (no Git, vão pela tag)
 #   SIGNUP_OPEN=false   cadastro de compradores; `true` só com Termos e Privacidade publicados (arquivo, versão e data; D-84)
 #   MAINTENANCE_MODE=false   página de manutenção (G06); para ligar sem novo build: comando `manutencao on|off`
 set -euo pipefail
@@ -264,22 +264,26 @@ cmd_conferir() {
   direct="$(g secrets versions access latest --secret=database-url-direct 2>/dev/null || true)"; pooled="$(g secrets versions access latest --secret=database-url 2>/dev/null || true)"
   { [ -n "$direct" ] && [ -n "$pooled" ]; } || { echo "Recuso: database-url e database-url-direct precisam ter valor (rode 'roles')." >&2; exit 1; }
   DATABASE_URL_DIRECT="$direct" DATABASE_URL_POOLED="$pooled" npm run -s db:env -- check producao || { echo "Recuso: o banco apontado NÃO é o de produção." >&2; exit 1; }
-  # Textos legais (D-11): vão na imagem a partir de conteudo-legal/ (fora do Git). Cadastro aberto exige Termos e Privacidade publicados;
-  # a Política de Cancelamento é exigida só para abrir a venda (D-84).
+  # Textos legais (D-11): vão na imagem a partir de conteudo-legal/ DA TAG (com RELEASE; sem ela, a pasta de trabalho). Cadastro aberto
+  # exige Termos e Privacidade publicados; a Política de Cancelamento é exigida só para abrir a venda (D-84).
   local legal_dir="conteudo-legal" k v
+  legal_ok() { # documento: existe e não está vazio na tag (ou na pasta, sem RELEASE)
+    if [ -n "${RELEASE:-}" ]; then [ -n "$(git show "refs/tags/$RELEASE:$legal_dir/$1.txt" 2>/dev/null | head -c 1)" ]; else [ -s "$legal_dir/$1.txt" ]; fi
+  }
+  local where="${RELEASE:+na tag $RELEASE}"; where="${where:-na pasta de trabalho}"
   if [ "$SIGNUP_OPEN" = "true" ]; then
     for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE; do
       [ -n "${!v:-}" ] || { echo "Recuso: SIGNUP_OPEN=true exige $v no $ENV_FILE (texto legal fornecido pela PartyX)." >&2; exit 1; }
     done
     for k in termos-de-uso privacidade; do
-      [ -s "$legal_dir/$k.txt" ] || { echo "Recuso: SIGNUP_OPEN=true sem $legal_dir/$k.txt (texto oficial da PartyX)." >&2; exit 1; }
+      legal_ok "$k" || { echo "Recuso: SIGNUP_OPEN=true sem $legal_dir/$k.txt $where (texto oficial da PartyX)." >&2; exit 1; }
     done
   fi
   if [ "$SALES_OPEN" = "true" ]; then   # travas extras para ABRIR A VENDA (go-live)
     [ "$PAYMENT_GATEWAY" != "none" ] || { echo "Recuso: venda aberta sem gateway real." >&2; exit 1; }
     for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE GO_LIVE_CONFIRMED; do [ -n "${!v:-}" ] || { echo "Recuso: $v é obrigatório para abrir a venda." >&2; exit 1; }; done
     for k in termos-de-uso privacidade cancelamento; do
-      [ -s "$legal_dir/$k.txt" ] || { echo "Recuso: SALES_OPEN=true sem $legal_dir/$k.txt (texto oficial da PartyX)." >&2; exit 1; }
+      legal_ok "$k" || { echo "Recuso: SALES_OPEN=true sem $legal_dir/$k.txt $where (texto oficial da PartyX)." >&2; exit 1; }
     done
     [ "$GO_LIVE_CONFIRMED" = "sim-aceite-e-autorizacao-registrados" ] || { echo "Recuso: registre aceite/autorização e use GO_LIVE_CONFIRMED=sim-aceite-e-autorizacao-registrados." >&2; exit 1; }
     [ "$VISUAL_APPROVED" = "true" ] || { echo "Recuso: identidade visual sem aprovação escrita (CA-33)." >&2; exit 1; }
@@ -303,13 +307,19 @@ cmd_build() {
   local image tmp k; image="$(release_image)"
   BUILD_TMP="$(mktemp -d)"; tmp="$BUILD_TMP"; trap 'rm -rf "${BUILD_TMP:-}"' EXIT
   git archive --format=tar "refs/tags/$RELEASE" | tar -x -C "$tmp"
-  # Textos legais ficam fora do Git: entram no contexto do build quando existirem (sem eles, a imagem leva a pasta vazia).
+  # Textos legais: versionados no Git desde 14/10/2026, entram na imagem PELA TAG (o git archive acima), nunca da pasta de trabalho.
+  # Um arquivo da pasta local diferente do da tag, ou fora dela, é recusado: ninguém publica achando que levou um texto que não foi.
   if [ -d conteudo-legal ]; then
-    cp -r conteudo-legal "$tmp/conteudo-legal"
-    for k in termos-de-uso privacidade cancelamento meia-entrada; do
-      [ ! -s "conteudo-legal/$k.txt" ] || echo "   texto legal $k.txt: sha256 $(sha256sum "conteudo-legal/$k.txt" | cut -c1-16)"
+    for f in conteudo-legal/*; do
+      [ -f "$f" ] || continue
+      { git cat-file -e "refs/tags/$RELEASE:$f" 2>/dev/null \
+        && [ "$(git show "refs/tags/$RELEASE:$f" | sha256sum)" = "$(sha256sum < "$f")" ]; } \
+        || { echo "Recuso: $f difere da tag $RELEASE ou não está nela. Faça commit e uma tag nova." >&2; exit 1; }
     done
   fi
+  for k in termos-de-uso privacidade cancelamento meia-entrada; do
+    [ ! -s "$tmp/conteudo-legal/$k.txt" ] || echo "   texto legal $k.txt (da tag): sha256 $(sha256sum < "$tmp/conteudo-legal/$k.txt" | cut -c1-16)"
+  done
   echo "== build de $RELEASE -> $image (Cloud Build, manual: só roda quando você chama)"
   g builds submit "$tmp" --region="$REGION" --tag="$image" --quiet
   # O Cloud Build guarda o código enviado num bucket próprio (criado no 1º build); limpa depois de 7 dias para não acumular custo.
@@ -357,6 +367,16 @@ sys.exit(0 if ok else 1)' "$host" || return 1
   curl -fsS -H "X-Forwarded-Host: $host" "$base/api/legal/versions" | grep -q "\"ready\":$SIGNUP_OPEN" \
     || { echo "   FALHOU: cadastro (ready do /api/legal/versions) difere de SIGNUP_OPEN=$SIGNUP_OPEN" >&2; return 1; }
   echo "   ok   signupOpen=$SIGNUP_OPEN (textos exigidos publicados)"
+  # Textos com versão no arquivo de variáveis: a API pública precisa mostrar o texto OFICIAL, com essa versão e essa data de vigência.
+  local kind ver date
+  for kind in termos-de-uso:TERMS privacidade:PRIVACY cancelamento:CANCELLATION; do
+    ver="$(eval "printf %s \"\${${kind#*:}_VERSION:-}\"")"; date="$(eval "printf %s \"\${${kind#*:}_DATE:-}\"")"
+    [ -n "$ver" ] || continue
+    curl -fsS -H "X-Forwarded-Host: $host" "$base/api/public/legal/${kind%%:*}" | python3 -I -c 'import json,sys; d=json.load(sys.stdin)["document"]; k,v,dt=sys.argv[1:4]
+ok = d.get("status")=="oficial" and d.get("version")==v and d.get("effectiveDate")==dt and len(d.get("blocks") or [])>0
+print("   ok   %s: oficial, versão %s, vigência %s, %d blocos" % (k, d.get("version"), d.get("effectiveDate"), len(d.get("blocks") or [])) if ok else "   FALHOU %s: %s, versão %s, vigência %s" % (k, d.get("status"), d.get("version"), d.get("effectiveDate")), file=sys.stdout if ok else sys.stderr)
+sys.exit(0 if ok else 1)' "${kind%%:*}" "$ver" "$date" || return 1
+  done
   curl -fsSI "$base/api/health" | tr -d '\r' | grep -qi '^cache-control: private, no-store' || { echo "   FALHOU: /api sem Cache-Control private, no-store" >&2; return 1; }
 }
 

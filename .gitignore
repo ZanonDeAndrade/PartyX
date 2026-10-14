@@ -32,8 +32,8 @@ dist-ssr
 dist-server
 .data
 
-# Textos legais da PartyX: entram na imagem pelo build, não no Git (D-61, docs/visual-e-legal.md)
-/conteudo-legal/
+# Textos legais da PartyX (conteudo-legal/): versionados no Git desde 14/10/2026 (textos públicos, decisão do responsável). A imagem os
+# leva da tag publicada, nunca da pasta de trabalho (infra/producao/deploy.sh build).
 
 # Testes ponta a ponta: banco, servidor e resultados de cada rodada (as evidências vão para docs/evidencias)
 /e2e/.run/

@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-# Textos legais da PartyX (docs/visual-e-legal.md): pasta `conteudo-legal/` FORA do Git, enviada no contexto do build. Ausente, vira
+# Textos legais da PartyX (docs/visual-e-legal.md): pasta `conteudo-legal/`, versionada no Git e vinda da tag publicada. Ausente, vira
 # pasta vazia e o site mostra "documento pendente" (em produção o cadastro e a venda ficam bloqueados).
 RUN mkdir -p conteudo-legal && APP_ENV="$APP_ENV" ENABLE_PROTOTYPE="$ENABLE_PROTOTYPE" npm run build
 
