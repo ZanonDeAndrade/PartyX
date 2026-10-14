@@ -182,7 +182,6 @@ function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
           <small>{first.event.venue}</small>
         </div>
       </header>
-      {first.event.allowsMinors ? <MinorAuthorizationLinks items={items} /> : null}
       <ul id={listId} className="px-wallet-list">
         {shown.map((t, i) => (
           <m.li
@@ -216,6 +215,7 @@ function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
           {open ? 'Mostrar só o primeiro' : `Mostrar os ${items.length} ingressos`}
         </button>
       ) : null}
+      {first.event.allowsMinors ? <MinorAuthorizationLinks items={items} /> : null}
     </section>
   );
 }

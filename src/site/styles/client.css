@@ -565,7 +565,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--px-s-2);
-  margin: 0 0 var(--px-s-3);
+  margin: var(--px-s-4) 0 0;
 }
 .px-wallet-minor p {
   margin: 0;

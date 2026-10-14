@@ -194,7 +194,7 @@ function ResultScreen({
   // Aparece de imediato (sem transição de entrada). Só um pulso curto de cor, por baixo do conteúdo, que não atrasa nada.
   return (
     <div
-      className={`px-gate-result px-gate-r-${t.tone}`}
+      className={`px-gate-result px-gate-r-${t.tone}${asking ? ' px-gate-asking' : ''}`}
       role="alert"
       aria-live="assertive"
       onClick={asking ? undefined : onDone}

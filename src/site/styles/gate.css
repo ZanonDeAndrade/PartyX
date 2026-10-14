@@ -489,3 +489,10 @@ body.px-dark .px-form .px-muted {
   opacity: 0.6;
   cursor: progress;
 }
+/* Conferir idade: sem o ícone grande, para as três escolhas caberem na tela do celular sem rolar. */
+.px-gate-asking .px-gate-icon {
+  display: none;
+}
+.px-gate-asking .px-gate-msg-main {
+  font-size: var(--px-t-lg);
+}
