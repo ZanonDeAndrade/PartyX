@@ -261,8 +261,9 @@ export function PartyxContact({ lead = 'fale com a PartyX' }: { lead?: string })
 }
 
 /**
- * Rodapé com os dados e contatos públicos da PartyX vindos da configuração (D-16). Fora de produção, o que faltar aparece como
- * "a fornecer pela PartyX"; em produção, o item ausente é omitido, sem texto inventado.
+ * Rodapé com os dados e contatos públicos da PartyX vindos da configuração (D-16). Desde 14/10/2026 (pedido do responsável) a
+ * identificação é só o logo e o CNPJ: sem razão social e sem endereço (a razão social segue nos Termos, na Privacidade, nos e-mails e
+ * na autorização de menor). Fora de produção, o que faltar aparece como "a fornecer pela PartyX"; em produção, é omitido.
  */
 export function Footer() {
   const site = useSiteInfo();
@@ -278,9 +279,7 @@ export function Footer() {
           <span className="px-logo px-logo-sm">
             <img src={LOGO} width={58} height={32} alt="PartyX" loading="lazy" decoding="async" />
           </span>
-          {p?.legalName ? <span>{p.legalName}</span> : pending('Razão social')}
           {p?.cnpj ? <span>CNPJ {p.cnpj}</span> : pending('CNPJ')}
-          {p?.address ? <span className="px-footer-dim">{p.address}</span> : null}
         </div>
         {hasContact || testing ? (
           <div className="px-footer-col px-footer-contact">

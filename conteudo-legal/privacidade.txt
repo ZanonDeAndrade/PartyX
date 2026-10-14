@@ -2,11 +2,11 @@
 
 Esta Política explica como a PartyX trata os dados pessoais de quem usa o site partyx.com.br ("Plataforma"), conforme a Lei Geral de Proteção de Dados (Lei 13.709/2018, "LGPD").
 
-Controladora: 58.471.403 BERNARDO PEIXOTO FORTES BITTENCOURT, empresário individual, CNPJ 58.471.403/0001-07, que atua sob a marca PartyX, com endereço na Rua Celestino Cavalheiro, 1200, São Gabriel/RS ("PartyX"). A PartyX vende os ingressos, organiza os eventos e decide como e por que os dados são usados.
+Controladora: 58.471.403 BERNARDO PEIXOTO FORTES BITTENCOURT, empresário individual, CNPJ 58.471.403/0001-07, que atua sob a marca PartyX ("PartyX"). A PartyX vende os ingressos, organiza os eventos e decide como e por que os dados são usados.
 
 Operadora: Zanon de Andrade Softwares, CNPJ 57.971.378/0001-50, que hospeda e mantém o sistema. Ela trata os dados apenas para prestar esse serviço à PartyX, conforme as instruções da PartyX, e não os usa para fins próprios.
 
-Encarregado de dados (DPO): Bernardo Peixoto Fortes Bittencourt, pelo e-mail bbittencourt085@gmail.com.
+Encarregado de dados (DPO): Bernardo Peixoto Fortes Bittencourt, pelo e-mail partyx992@gmail.com.
 
 # 2. Dados que coletamos
 
@@ -108,7 +108,7 @@ Nenhum sistema é totalmente imune a incidentes. Por isso, também pedimos que v
 
 Pela LGPD (art. 18), você pode pedir à PartyX, a qualquer momento: confirmação de que tratamos seus dados e acesso a eles; correção de dados incompletos, incorretos ou desatualizados; anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desacordo com a lei; portabilidade dos seus dados; informação sobre com quem compartilhamos seus dados; oposição a tratamentos baseados em legítimo interesse, quando cabível; e exclusão da sua conta.
 
-Como pedir: envie o pedido para bbittencourt085@gmail.com. Para proteger você, a PartyX confirma a sua identidade antes de atender. A resposta é dada em até 15 dias.
+Como pedir: envie o pedido para partyx992@gmail.com. Para proteger você, a PartyX confirma a sua identidade antes de atender. A resposta é dada em até 15 dias.
 
 Cópia dos dados: você recebe um arquivo com seu cadastro, aceites, pedidos, ingressos, e-mails enviados e sessões.
 
@@ -124,4 +124,4 @@ Incidentes de segurança: se houver um incidente que possa trazer risco ou dano 
 
 Alterações: esta Política pode ser atualizada. A versão vigente, com número e data de vigência, fica sempre publicada na Plataforma.
 
-Contato: dúvidas sobre esta Política ou sobre seus dados podem ser enviadas ao encarregado, pelo e-mail bbittencourt085@gmail.com, ou pelo WhatsApp (55) 99939-4600. As mensagens são respondidas em horário comercial, de segunda a sexta-feira.
+Contato: dúvidas sobre esta Política ou sobre seus dados podem ser enviadas ao encarregado, pelo e-mail partyx992@gmail.com, ou pelo WhatsApp +55 55 99156-6900. As mensagens são respondidas em horário comercial, de segunda a sexta-feira.

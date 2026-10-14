@@ -30,10 +30,9 @@ describe('Termo de Autorização e Responsabilidade (PDF)', () => {
       MINOR_AUTHORIZATION_DATE: '2026-10-14',
       PARTYX_LEGAL_NAME: '58.471.403 BERNARDO PEIXOTO FORTES BITTENCOURT',
       PARTYX_CNPJ: '58.471.403/0001-07',
-      PARTYX_ADDRESS: 'Rua Celestino Cavalheiro, 1200, São Gabriel/RS',
       PARTYX_SUPPORT_EMAIL: 'atendimento@partyx.test',
-      PARTYX_SUPPORT_WHATSAPP: '+55 (55) 99939-4600',
-      PARTYX_SUPPORT_HOURS: 'Horário comercial, de segunda a sexta-feira',
+      PARTYX_SUPPORT_WHATSAPP: '+55 55 99156-6900',
+      PARTYX_SUPPORT_HOURS: 'de segunda a sexta-feira, em horário comercial',
     });
     const document = legalDocument(config, 'autorizacao-menor');
     expect(document.status).toBe('oficial');
@@ -64,10 +63,13 @@ describe('Termo de Autorização e Responsabilidade (PDF)', () => {
       '20/05/2010',
       'CNPJ 58.471.403/0001-07',
       'Termo versão 1.0, vigente desde 14/10/2026.',
+      'WhatsApp +55 55 99156-6900',
+      'de segunda a sexta-feira, em horário comercial',
       'Uso da portaria',
     ])
       expect(text, piece).toContain(piece);
     expect(text).not.toContain('14 anos'); // a idade do texto aprovado é 16 (o modelo antigo dizia 14)
     expect(text).not.toMatch(/exonero/i); // a cláusula de exoneração do modelo antigo foi retirada
+    expect(text).not.toContain('Celestino'); // sem endereço publicado, o cabeçalho não leva endereço
   });
 });

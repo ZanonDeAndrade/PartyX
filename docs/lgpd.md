@@ -57,7 +57,7 @@ Variáveis, em dias, **sem valor padrão** (vazio = não apaga): `RETENTION_LOGI
 
 ## Pendente do cliente
 
-A Política de Privacidade 1.0 (14/10/2026) trouxe bases legais, prazos de guarda, suboperadores, encarregado (Bernardo Peixoto Fortes Bittencourt), canal do titular (bbittencourt085@gmail.com) e prazo de resposta (15 dias). Falta: confirmação escrita da PartyX sobre o texto e quem na PartyX autoriza cada remoção.
+A Política de Privacidade 1.0 (14/10/2026) trouxe bases legais, prazos de guarda, suboperadores, encarregado (Bernardo Peixoto Fortes Bittencourt), canal do titular (partyx992@gmail.com desde a 1.1; antes, o e-mail pessoal do Bernardo) e prazo de resposta (15 dias). Falta: confirmação escrita da PartyX sobre o texto e quem na PartyX autoriza cada remoção.
 
 ## Menores de idade (14/10/2026, D-85)
 

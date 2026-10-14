@@ -17,7 +17,7 @@ Preparado em 14/10/2026. **Nada aqui foi executado.** A publicação de 13/10 de
 
 | # | Item | Como se comprova | Feito em | Por quem |
 |---|---|---|---|---|
-| 1.7 | Termos 1.1, Privacidade 1.1, Termo de Ciência 1.0 e texto da autorização 1.0 confirmados por escrito pela PartyX | Registro em `docs/registros/` | | |
+| 1.7 | Termos 1.1, Privacidade 1.1, Termo de Ciência 1.0 e texto da autorização 1.0 confirmados por escrito pela PartyX | Registro em `docs/registros/` | 14/10/2026, aprovação do Bernardo informada por Arthur (`aprovacao-menores-e-contatos-2026-10-14.md`); prova fora do repositório | Bernardo, informado por Arthur |
 | 1.8 | Migração 0009 aplicada em produção, com backup do dia conferido | Job `migrate` e `check:migrations` | | |
 | 1.9 | Evento real que permite menores: autorização judicial informada e PDF conferido | Painel e PDF baixado | | |
 

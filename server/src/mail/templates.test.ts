@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { maintenancePage } from '../ops/maintenance';
 import { loadConfig } from '../config';
 import { replyToFor } from './outbox';
 import {
@@ -26,6 +27,26 @@ const purchase: PurchaseData = {
 };
 
 describe('e-mails (RF-36, RF-67)', () => {
+  it('contatos de produção revistos em 14/10/2026: sem endereço, sem "a fornecer", WhatsApp com DDI e horário sem repetir', () => {
+    const partyx = {
+      legalName: '58.471.403 BERNARDO PEIXOTO FORTES BITTENCOURT',
+      cnpj: '58.471.403/0001-07',
+      address: null,
+      supportEmail: 'partyx992@gmail.com',
+      supportWhatsapp: '+55 55 99156-6900',
+      supportHours: 'de segunda a sexta-feira, em horário comercial',
+    };
+    const lines = footerLines({ baseUrl: 'https://partyx.com.br', environmentLabel: null, partyx });
+    expect(lines).toEqual([
+      'PartyX · 58.471.403 BERNARDO PEIXOTO FORTES BITTENCOURT · CNPJ 58.471.403/0001-07',
+      'Atendimento da PartyX: e-mail partyx992@gmail.com · WhatsApp +55 55 99156-6900 (de segunda a sexta-feira, em horário comercial)',
+    ]);
+    const page = maintenancePage({ APP_ENV: 'producao', partyx });
+    expect(page).toContain('href="https://wa.me/5555991566900"');
+    expect(page).toContain('Horário de atendimento: de segunda a sexta-feira, em horário comercial.');
+    expect(page).not.toMatch(/a fornecer|Celestino/);
+  });
+
   it('cadastro: texto do design, botão para os eventos, sem exigir confirmação', () => {
     const m = composeCadastro({ name: 'Marina' }, ctx);
     expect(m.subject).toBe('Sua conta PartyX foi criada');
