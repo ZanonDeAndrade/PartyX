@@ -1,5 +1,7 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
-import { auditLog, users } from '../db/schema';
+import { and, asc, eq, gt, inArray } from 'drizzle-orm';
+import { auditLog, events, orders, users } from '../db/schema';
+import { ageOnEvent, ADULT_AGE, isCalendarDate } from '../domain/age';
+import { dateKeyInEventZone } from '../domain/time';
 import { maskCpf, isValidCpf, onlyDigits } from '../domain/cpf';
 import { AppError } from '../domain/errors';
 import {
@@ -333,6 +335,8 @@ export async function issueTemporaryPassword(deps: AuthDeps, actor: Actor, id: s
 export interface IdentityInput {
   email?: string;
   cpf?: string;
+  /** AAAA-MM-DD. Só a PartyX corrige a data de nascimento depois de gravada (regras de menores, 14/10/2026). */
+  birthDate?: string;
   reason: string;
 }
 
@@ -343,10 +347,19 @@ export interface IdentityInput {
 export async function correctIdentity(deps: AuthDeps, actor: Actor, id: string, input: IdentityInput) {
   const reason = input.reason.trim();
   if (reason.length < 5) throw invalid([{ campo: 'reason', mensagem: 'Informe o motivo da correção.' }]);
-  if (input.email === undefined && input.cpf === undefined) {
-    throw invalid([{ campo: 'email', mensagem: 'Informe o e-mail ou o CPF a corrigir.' }]);
+  if (input.email === undefined && input.cpf === undefined && input.birthDate === undefined) {
+    throw invalid([{ campo: 'email', mensagem: 'Informe o e-mail, o CPF ou a data de nascimento a corrigir.' }]);
   }
   const data = checkMember({ email: input.email, cpf: input.cpf }, false);
+  const now = deps.clock.now();
+  const birthDate = input.birthDate?.trim();
+  // Correção: data real, não futura e a partir de 1900. Sem o piso de 16 anos do cadastro: corrigir para a data verdadeira vale mesmo
+  // que ela mostre alguém mais novo (os ingressos ficam como estão e a portaria passa a ver o aviso de menor).
+  if (
+    birthDate !== undefined &&
+    (!isCalendarDate(birthDate) || birthDate < '1900-01-01' || birthDate > dateKeyInEventZone(now))
+  )
+    throw invalid([{ campo: 'birthDate', mensagem: 'Informe uma data de nascimento válida.' }]);
   try {
     await deps.db.transaction(async tx => {
       await lockActiveAdmins(tx, actor);
@@ -359,7 +372,8 @@ export async function correctIdentity(deps: AuthDeps, actor: Actor, id: string, 
         .set({
           ...(data.email !== undefined ? { email: data.email } : {}),
           ...(data.cpf !== undefined ? { cpf: data.cpf } : {}),
-          updatedAt: deps.clock.now(),
+          ...(birthDate !== undefined ? { birthDate } : {}),
+          updatedAt: now,
         })
         .where(eq(users.id, id))
         .returning({
@@ -371,7 +385,28 @@ export async function correctIdentity(deps: AuthDeps, actor: Actor, id: string, 
           phone: users.phone,
           isActive: users.isActive,
         });
-      await audit(tx, deps, actor, 'usuario.identidade', id, snapshot(before), snapshot(after!), reason);
+      let ordersRecomputed = 0;
+      if (birthDate !== undefined) {
+        // O aviso de menor da portaria vem do retrato do pedido: refeito para os eventos que ainda não começaram.
+        const future = await tx
+          .select({ id: orders.id, startsAt: events.startsAt })
+          .from(orders)
+          .innerJoin(events, eq(events.id, orders.eventId))
+          .where(and(eq(orders.userId, id), gt(events.startsAt, now)));
+        for (const o of future) {
+          await tx
+            .update(orders)
+            .set({ buyerMinor: ageOnEvent(birthDate, o.startsAt) < ADULT_AGE })
+            .where(eq(orders.id, o.id));
+        }
+        ordersRecomputed = future.length;
+      }
+      // A data de nascimento não vai para a trilha (dado pessoal): só o registro de que foi corrigida.
+      const after2 =
+        birthDate !== undefined
+          ? { ...snapshot(after!), birthDateCorrected: true, ordersRecomputed }
+          : snapshot(after!);
+      await audit(tx, deps, actor, 'usuario.identidade', id, snapshot(before), after2, reason);
     });
   } catch (error) {
     return conflict(error);

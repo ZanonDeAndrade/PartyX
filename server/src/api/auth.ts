@@ -11,8 +11,10 @@ import {
   requestPasswordReset,
   resetPassword,
   resetTokenState,
+  setOwnBirthDate,
   updateProfile,
 } from '../auth/service';
+import { acceptCurrentTerms, consentPending } from '../auth/consent';
 import { SESSION_COOKIE } from '../auth/sessions';
 import { assertGlobalOpen, consumeGlobal, recordGlobal } from '../auth/globalLimits';
 import type { AuthDeps, AuthState, AuthVariables } from '../auth/types';
@@ -40,6 +42,7 @@ function publicUser(user: AuthState['user']) {
     email: user.email,
     cpf: user.cpf ? maskCpf(user.cpf) : null,
     phone: user.phone,
+    birthDate: user.birthDate,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
   };
@@ -53,6 +56,7 @@ const registerBody = z.object({
   email: text,
   cpf: text,
   phone: text,
+  birthDate: z.string().max(20),
   password: z.string().max(200),
   acceptedTermsVersion: text,
   acceptedPrivacyVersion: text,
@@ -65,6 +69,8 @@ const forgotBody = z.object({ email: text, captchaToken: captcha });
 const tokenBody = z.object({ token: z.string().min(10).max(200) });
 const resetBody = z.object({ token: z.string().min(10).max(200), password: z.string().max(200) });
 const profileBody = z.object({ name: text, phone: text });
+const birthDateBody = z.object({ birthDate: z.string().max(20) });
+const consentBody = z.object({ acceptedTermsVersion: text, acceptedPrivacyVersion: text, accept: z.boolean() });
 const changePasswordBody = z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) });
 
 export function authRoutes(deps: AuthDeps) {
@@ -148,7 +154,7 @@ export function authRoutes(deps: AuthDeps) {
     const body = await parseJson(c, loginBody);
     const { user, session } = await login(deps, body, c.get('meta'));
     startSession(c, session);
-    return c.json({ user: publicUser(user) });
+    return c.json({ user: publicUser(user), pendingConsent: await consentPending(deps.db, deps.config, user) });
   });
 
   app.post('/auth/logout', async c => {
@@ -159,10 +165,15 @@ export function authRoutes(deps: AuthDeps) {
   });
 
   /** Usuário atual e o token CSRF da sessão, que a interface envia em `X-CSRF-Token`. */
-  app.get('/auth/me', c => {
+  app.get('/auth/me', async c => {
     const auth = c.get('auth');
     if (!auth) throw new AppError(401, 'nao_autenticado', 'Entre na sua conta para continuar.');
-    return c.json({ user: publicUser(auth.user), csrfToken: auth.csrfToken });
+    return c.json({
+      user: publicUser(auth.user),
+      csrfToken: auth.csrfToken,
+      // Termos ou Privacidade com versão nova ainda não aceita: a interface mostra a tela do novo aceite.
+      pendingConsent: await consentPending(deps.db, deps.config, auth.user),
+    });
   });
 
   // Recuperação: a resposta é a mesma exista o e-mail ou não.
@@ -201,6 +212,20 @@ export function authRoutes(deps: AuthDeps) {
     const body = await parseJson(c, profileBody);
     const updated = await updateProfile(deps, auth.user.id, body);
     return c.json({ user: publicUser({ ...auth.user, ...updated }) });
+  });
+
+  /** Conta anterior às regras de menores: informa a data de nascimento uma vez (depois, só a PartyX corrige). */
+  app.post('/me/birth-date', requireUser, async c => {
+    const auth = c.get('auth')!;
+    const { birthDate } = await parseJson(c, birthDateBody);
+    return c.json(await setOwnBirthDate(deps, auth.user.id, birthDate));
+  });
+
+  /** Novo aceite dos Termos e da Privacidade vigentes (quem aceitou uma versão anterior). */
+  app.post('/me/consents', requireUser, async c => {
+    const auth = c.get('auth')!;
+    await acceptCurrentTerms(deps, auth.user, await parseJson(c, consentBody), c.get('meta'));
+    return c.json({ pendingConsent: false });
   });
 
   app.post('/me/password', requireUser, async c => {

@@ -12,7 +12,16 @@ export async function createTestDatabase(adminUrl: string, options: { migrate?: 
 
   const url = new URL(adminUrl);
   url.pathname = `/${name}`;
-  if (options.migrate !== false) await runMigrations(url.toString());
+  if (options.migrate !== false) {
+    await runMigrations(url.toString());
+    // SÓ NO BANCO DE TESTE: quem é cadastrado direto no SQL (fixtures antigas) nasce adulto, para o checkout não pedir a data de
+    // nascimento em todo teste (regra de 14/10/2026). Produção não tem valor padrão: o cadastro exige a data e conta antiga fica nula.
+    // Os testes de menores e de "conta antiga sem data" informam a data, ou `null`, explicitamente.
+    const setup = new pg.Client({ connectionString: url.toString() });
+    await setup.connect();
+    await setup.query(`alter table users alter column birth_date set default date '1990-01-01'`);
+    await setup.end();
+  }
 
   const pool = new pg.Pool({ connectionString: url.toString(), max: 4 });
   return {

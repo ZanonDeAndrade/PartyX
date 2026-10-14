@@ -15,6 +15,8 @@ const checkoutBody = z.object({
   items: z.array(z.object({ ticketTypeId: z.uuid(), quantity: z.number() })).max(20),
   couponCode: z.string().max(40).nullable().optional(),
   expectedTotalCents: z.number().int().optional(),
+  minorTermAccepted: z.boolean().optional(),
+  minorTermVersion: z.string().max(40).nullable().optional(),
 });
 const paymentBody = z.discriminatedUnion('method', [
   z.object({ method: z.literal('pix') }),
@@ -56,12 +58,12 @@ export function checkoutRoutes(deps: AuthDeps) {
 
   app.post('/checkout/quote', buyer, async c => {
     if (quoteLimiter.hit(userId(c))) throw tooMany();
-    return c.json({ summary: await quote(ordersDeps, await parseJson(c, checkoutBody)) });
+    return c.json({ summary: await quote(ordersDeps, await parseJson(c, checkoutBody), userId(c)) });
   });
 
   app.post('/orders', buyer, async c => {
     if (createLimiter.hit(userId(c))) throw tooMany();
-    const order = await createOrder(ordersDeps, userId(c), await parseJson(c, checkoutBody));
+    const order = await createOrder(ordersDeps, userId(c), await parseJson(c, checkoutBody), c.get('meta'));
     c.header('Cache-Control', 'no-store');
     return c.json({ order }, 201);
   });
@@ -88,7 +90,13 @@ export function checkoutRoutes(deps: AuthDeps) {
               clock: deps.clock,
               gateway,
               issueTickets: deps.issueTickets,
-              mail: { db: deps.db, clock: deps.clock, mailer: deps.mailer, config: deps.config, taskQueue: deps.taskQueue },
+              mail: {
+                db: deps.db,
+                clock: deps.clock,
+                mailer: deps.mailer,
+                config: deps.config,
+                taskQueue: deps.taskQueue,
+              },
             },
             gatewayPaymentId,
           );
@@ -97,7 +105,9 @@ export function checkoutRoutes(deps: AuthDeps) {
   });
 
   /** Como montar a tela de pagamento: componente de cartão (chave PÚBLICA do gateway) e se o Pix está disponível (D-03). */
-  app.get('/payments/options', buyer, c => c.json({ options: paymentOptions(gateway, deps.config.RESERVATION_MINUTES) }));
+  app.get('/payments/options', buyer, c =>
+    c.json({ options: paymentOptions(gateway, deps.config.RESERVATION_MINUTES) }),
+  );
   const payLimiter = createMemoryLimiter({ max: 20, windowMs: 600_000, now });
 
   /** Escolhe a forma de pagamento e cria a cobrança. Valor e prazo vêm do pedido; o corpo só diz Pix ou cartão. */

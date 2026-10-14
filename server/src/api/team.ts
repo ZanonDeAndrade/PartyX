@@ -33,7 +33,12 @@ const updateBody = z.object({
   cpf: text.nullable().optional(),
   role: role.optional(),
 });
-const identityBody = z.object({ email: text.optional(), cpf: text.optional(), reason: text });
+const identityBody = z.object({
+  email: text.optional(),
+  cpf: text.optional(),
+  birthDate: z.string().max(20).optional(),
+  reason: text,
+});
 
 const view = (m: TeamMember) => ({
   id: m.id,

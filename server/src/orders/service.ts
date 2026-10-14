@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import type { Tx } from '../db/audit';
-import { events, orderItems, orders, promoters, reservations, ticketTypes } from '../db/schema';
+import { events, minorTermAcceptances, orderItems, orders, promoters, reservations, ticketTypes } from '../db/schema';
 import {
   checkShape,
   planOrder,
@@ -20,6 +20,8 @@ import type { Clock } from '../providers/clock';
 import { salesBlockers } from '../legal/documents';
 import { logger } from '../logger';
 import type { TaskQueue } from '../payments/taskQueue';
+import type { RequestMeta } from '../auth/types';
+import { assertBuyerMayPurchase, checkBuyer, type BuyerCheck } from './buyer';
 
 export interface OrdersDeps {
   db: Db;
@@ -35,6 +37,8 @@ export interface OrdersDeps {
     | 'legal'
     | 'legalContentDir'
     | 'cancellationVersion'
+    | 'minorTermVersion'
+    | 'minorAuthorizationVersion'
     | 'legalDates'
     | 'visualApproved'
     | 'reconcile'
@@ -48,6 +52,9 @@ export interface CheckoutInput {
   couponCode?: string | null;
   /** Total que o navegador mostrou. Só serve para avisar que o preço mudou; nunca é usado para cobrar. */
   expectedTotalCents?: number;
+  /** Caixa do Termo de Ciência para Menores marcada pela pessoa (16 ou 17 anos na data do evento), e a versão que ela leu. */
+  minorTermAccepted?: boolean;
+  minorTermVersion?: string | null;
 }
 
 const FAILURE_TEXT: Record<ItemFailure['reason'], string> = {
@@ -156,18 +163,20 @@ function forPlan(rows: (typeof ticketTypes.$inferSelect)[]): Map<string, TypeFor
 }
 
 export interface Summary {
-  event: { slug: string; name: string; startsAt: string; venue: string };
+  event: { slug: string; name: string; startsAt: string; venue: string; allowsMinors: boolean };
   items: PlannedLine[];
   totalCents: number;
   units: number;
   coupon: { code: string } | null;
+  /** O que o comprador ainda precisa (novo aceite, data de nascimento, termo de menor) ou por que não pode comprar. Com `userId`. */
+  buyer: BuyerCheck | null;
 }
 
 /**
  * Resumo antes do pagamento (RF-32): recalcula tudo no servidor e confere o estoque **sem reservar**.
  * É informação; quem garante o estoque é `createOrder`, dentro da transação com bloqueio.
  */
-export async function quote(deps: OrdersDeps, input: CheckoutInput): Promise<Summary> {
+export async function quote(deps: OrdersDeps, input: CheckoutInput, userId?: string): Promise<Summary> {
   shapeOrThrow(deps, input.items);
   const now = deps.clock.now();
   const event = await loadEvent(deps.db, input.eventSlug);
@@ -187,11 +196,18 @@ export async function quote(deps: OrdersDeps, input: CheckoutInput): Promise<Sum
   await resolveCoupon(deps.db, input.couponCode);
   const code = normalizeCouponCode(input.couponCode ?? '');
   return {
-    event: { slug: event.slug, name: event.name, startsAt: event.startsAt.toISOString(), venue: event.venue },
+    event: {
+      slug: event.slug,
+      name: event.name,
+      startsAt: event.startsAt.toISOString(),
+      venue: event.venue,
+      allowsMinors: event.allowsMinors,
+    },
     items: plan.lines,
     totalCents: plan.totalCents,
     units: plan.units,
     coupon: code ? { code } : null,
+    buyer: userId ? await checkBuyer(deps.db, deps.config, userId, event) : null,
   };
 }
 
@@ -199,7 +215,9 @@ export interface OrderView {
   id: string;
   number: number;
   status: typeof orders.$inferSelect.status;
-  event: { slug: string; name: string; startsAt: string; venue: string };
+  event: { slug: string; name: string; startsAt: string; venue: string; allowsMinors: boolean };
+  /** Comprador com 16 ou 17 anos na data do evento: a tela oferece a autorização preenchida com os dados dele. */
+  buyerMinor: boolean;
   items: PlannedLine[];
   totalCents: number;
   coupon: { code: string } | null;
@@ -223,7 +241,14 @@ async function view(
   support: SupportContact | null = null,
 ): Promise<OrderView> {
   const [order] = await db
-    .select({ o: orders, eventSlug: events.slug, eventName: events.name, eventStartsAt: events.startsAt, eventVenue: events.venue })
+    .select({
+      o: orders,
+      eventSlug: events.slug,
+      eventName: events.name,
+      eventStartsAt: events.startsAt,
+      eventVenue: events.venue,
+      eventAllowsMinors: events.allowsMinors,
+    })
     .from(orders)
     .innerJoin(events, eq(events.id, orders.eventId))
     .where(eq(orders.id, orderId))
@@ -263,7 +288,9 @@ async function view(
       name: order.eventName,
       startsAt: order.eventStartsAt.toISOString(),
       venue: order.eventVenue,
+      allowsMinors: order.eventAllowsMinors,
     },
+    buyerMinor: order.o.buyerMinor,
     items: items.map(i => ({ ...i, subtotalCents: i.quantity * i.unitPriceCents })),
     totalCents: order.o.totalCents,
     coupon,
@@ -336,7 +363,12 @@ async function release(tx: Tx, orderId: string, now: Date) {
  * (5) conta vendidos mais reservas válidas **com a linha trancada**; (6) grava pedido, itens e reservas.
  * Não há chamada externa dentro da transação.
  */
-export async function createOrder(deps: OrdersDeps, userId: string, input: CheckoutInput): Promise<OrderView> {
+export async function createOrder(
+  deps: OrdersDeps,
+  userId: string,
+  input: CheckoutInput,
+  meta: RequestMeta = { ip: null, userAgent: null },
+): Promise<OrderView> {
   assertSalesOpen(deps);
   shapeOrThrow(deps, input.items);
   const promoterId = await resolveCoupon(deps.db, input.couponCode);
@@ -346,6 +378,10 @@ export async function createOrder(deps: OrdersDeps, userId: string, input: Check
   const orderId = await deps.db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`order-user:${userId}`}, 0))`);
     const event = await loadEvent(tx, input.eventSlug);
+    // Regras do comprador (novo aceite, data de nascimento, idade na data do evento, termo de menor) ANTES de mexer em qualquer
+    // pedido ou reserva: uma recusa aqui não solta a reserva de um pedido anterior.
+    const buyer = await checkBuyer(tx, deps.config, userId, event);
+    assertBuyerMayPurchase(buyer, deps.config, input);
 
     // **Ordem das travas: pedidos antes dos tipos**, a mesma da confirmação do pagamento (`applyApproval`). Trancar os tipos
     // primeiro e o pedido anterior depois cruzava com uma aprovação que tranca o pedido e depois os tipos: impasse no banco
@@ -409,10 +445,23 @@ export async function createOrder(deps: OrdersDeps, userId: string, input: Check
         promoterId,
         totalCents: plan.totalCents,
         status: 'pendente',
+        buyerMinor: buyer.minor,
         createdAt: now,
         updatedAt: now,
       })
       .returning({ id: orders.id });
+    if (buyer.minor) {
+      // Aceite do termo de menor na mesma transação do pedido: existe se, e somente se, o pedido existe.
+      await tx.insert(minorTermAcceptances).values({
+        userId,
+        orderId: order!.id,
+        termVersion: buyer.minorTermVersion!,
+        ageAtEvent: buyer.age!,
+        acceptedAt: now,
+        ip: meta.ip,
+        userAgent: meta.userAgent?.slice(0, 255) ?? null,
+      });
+    }
     for (const line of plan.lines) {
       await tx.insert(orderItems).values({
         orderId: order!.id,

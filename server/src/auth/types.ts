@@ -35,6 +35,8 @@ export interface AuthUser {
   email: string;
   cpf: string | null;
   phone: string | null;
+  /** AAAA-MM-DD. Nula em contas anteriores à 0009 (pedida no próximo checkout) e na equipe. */
+  birthDate: string | null;
   role: Role;
   isActive: boolean;
   mustChangePassword: boolean;

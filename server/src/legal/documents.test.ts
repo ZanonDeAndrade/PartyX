@@ -10,6 +10,7 @@ import { createOrder } from '../orders/service';
 import {
   isLegalKind,
   legalDocument,
+  minorDocsBlockers,
   parseBlocks,
   salesBlockers,
   signupBlockers,
@@ -40,10 +41,17 @@ const FULL = {
 };
 
 describe('textos legais (RF-68)', () => {
-  it('só aceita os quatro documentos conhecidos: nenhum caminho de arquivo passa', () => {
+  it('só aceita os documentos conhecidos: nenhum caminho de arquivo passa', () => {
     for (const bad of ['..', '../etc/passwd', 'termos-de-uso.txt', 'TERMOS-DE-USO', '', '%2e%2e'])
       expect([bad, isLegalKind(bad)]).toEqual([bad, false]);
-    for (const ok of ['termos-de-uso', 'privacidade', 'cancelamento', 'meia-entrada'])
+    for (const ok of [
+      'termos-de-uso',
+      'privacidade',
+      'cancelamento',
+      'meia-entrada',
+      'termo-menor',
+      'autorizacao-menor',
+    ])
       expect(isLegalKind(ok)).toBe(true);
   });
 
@@ -226,6 +234,48 @@ describe('textos legais (RF-68)', () => {
         'cadastro fechado por configuração (SIGNUP_OPEN)',
       ]);
       expect(signupTextsProvisional(prod())).toBe(false);
+    });
+  });
+
+  describe('textos de menores (0009)', () => {
+    const MINOR = { 'termo-menor': 'Termo de ciência.', 'autorizacao-menor': '# Como usar\n\nPreencha.' };
+
+    it('produção: compra de menor e autorização só com os dois textos publicados (arquivo, versão e data)', () => {
+      expect(minorDocsBlockers(prod())).toEqual([
+        'texto legal ausente: Termo de Ciência para Menores de Idade',
+        'texto legal ausente: Termo de Autorização e Responsabilidade',
+      ]);
+      const semData = prod({
+        LEGAL_CONTENT_DIR: dirWith({ ...FULL, ...MINOR }),
+        MINOR_TERM_VERSION: '1.0',
+        MINOR_AUTHORIZATION_VERSION: '1.0',
+        MINOR_TERM_DATE: '2026-10-14',
+      });
+      expect(minorDocsBlockers(semData)).toEqual([
+        'data de vigência não informada: Termo de Autorização e Responsabilidade',
+      ]);
+      const pronto = prod({
+        LEGAL_CONTENT_DIR: dirWith({ ...FULL, ...MINOR }),
+        MINOR_TERM_VERSION: '1.0',
+        MINOR_AUTHORIZATION_VERSION: '1.0',
+        MINOR_TERM_DATE: '2026-10-14',
+        MINOR_AUTHORIZATION_DATE: '2026-10-14',
+      });
+      expect(minorDocsBlockers(pronto)).toEqual([]);
+      expect(legalDocument(pronto, 'termo-menor')).toMatchObject({
+        status: 'oficial',
+        version: '1.0',
+        effectiveDate: '2026-10-14',
+      });
+    });
+
+    it('fora de produção: sem arquivo não bloqueia (versão fictícia); com arquivo, vale o texto', () => {
+      expect(minorDocsBlockers(loadConfig({}))).toEqual([]);
+      expect(legalDocument(loadConfig({}), 'termo-menor').status).toBe('homologacao');
+      expect(legalDocument(loadConfig({ LEGAL_CONTENT_DIR: dirWith(MINOR) }), 'autorizacao-menor')).toMatchObject({
+        status: 'oficial',
+        version: 'ficticio-0',
+      });
     });
   });
 });

@@ -393,7 +393,11 @@ describe('loadConfig', () => {
         terms: '2026-10-01',
         privacy: null,
         cancellation: '2024-02-29',
+        minorTerm: null,
+        minorAuthorization: null,
       });
+      expect(loadConfig({ MINOR_TERM_DATE: '2026-10-14' }).legalDates.minorTerm).toBe('2026-10-14');
+      expect(() => loadConfig({ MINOR_AUTHORIZATION_DATE: '2026-02-30' })).toThrow(/MINOR_AUTHORIZATION_DATE/);
       for (const bad of ['01/10/2026', '2026-13-01', '2026-02-30', '2025-02-29', '2026-10-1'])
         expect(() => loadConfig({ PRIVACY_DATE: bad }), bad).toThrow(/PRIVACY_DATE/);
     });

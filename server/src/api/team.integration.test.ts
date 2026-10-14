@@ -220,6 +220,7 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
         email: 'marina@partyx.test',
         cpf: validCpf(901),
         phone: '(55) 99812-4470',
+        birthDate: '1995-03-20',
         password: PASSWORD,
         acceptedTermsVersion: 'ficticio-0',
         acceptedPrivacyVersion: 'ficticio-0',

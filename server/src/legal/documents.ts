@@ -12,7 +12,14 @@ import type { Config } from '../config';
  * - Arquivo ausente fora de produção: aviso identificado como **homologação**, sem texto jurídico algum.
  * - Arquivo ausente em produção: **pendente**; cadastro e vendas ficam bloqueados (ver `salesBlockers`).
  */
-export const LEGAL_KINDS = ['termos-de-uso', 'privacidade', 'cancelamento', 'meia-entrada'] as const;
+export const LEGAL_KINDS = [
+  'termos-de-uso',
+  'privacidade',
+  'cancelamento',
+  'meia-entrada',
+  'termo-menor',
+  'autorizacao-menor',
+] as const;
 export type LegalKind = (typeof LEGAL_KINDS)[number];
 
 export const LEGAL_TITLES: Record<LegalKind, string> = {
@@ -20,6 +27,8 @@ export const LEGAL_TITLES: Record<LegalKind, string> = {
   privacidade: 'Política de Privacidade',
   cancelamento: 'Política de Cancelamento',
   'meia-entrada': 'Regras de meia-entrada',
+  'termo-menor': 'Termo de Ciência para Menores de Idade',
+  'autorizacao-menor': 'Termo de Autorização e Responsabilidade',
 };
 
 /** Obrigatórios para vender de verdade. A meia-entrada só se aplica se o cliente oferecer esse tipo de ingresso (D-06). */
@@ -42,7 +51,16 @@ export interface LegalDocument {
   blocks: { type: 'heading' | 'paragraph'; text: string }[];
 }
 
-type LegalConfig = Pick<Config, 'APP_ENV' | 'legal' | 'legalContentDir' | 'cancellationVersion' | 'legalDates'>;
+type LegalConfig = Pick<
+  Config,
+  | 'APP_ENV'
+  | 'legal'
+  | 'legalContentDir'
+  | 'cancellationVersion'
+  | 'minorTermVersion'
+  | 'minorAuthorizationVersion'
+  | 'legalDates'
+>;
 
 export const isLegalKind = (v: string): v is LegalKind => (LEGAL_KINDS as readonly string[]).includes(v);
 
@@ -51,6 +69,9 @@ function versionOf(config: LegalConfig, kind: LegalKind): string | null {
   if (kind === 'privacidade') return config.legal.privacy || null;
   if (kind === 'cancelamento')
     return config.cancellationVersion ?? (config.APP_ENV === 'producao' ? null : 'ficticio-0');
+  if (kind === 'termo-menor') return config.minorTermVersion ?? (config.APP_ENV === 'producao' ? null : 'ficticio-0');
+  if (kind === 'autorizacao-menor')
+    return config.minorAuthorizationVersion ?? (config.APP_ENV === 'producao' ? null : 'ficticio-0');
   return null;
 }
 
@@ -58,6 +79,8 @@ function dateOf(config: LegalConfig, kind: LegalKind): string | null {
   if (kind === 'termos-de-uso') return config.legalDates.terms;
   if (kind === 'privacidade') return config.legalDates.privacy;
   if (kind === 'cancelamento') return config.legalDates.cancellation;
+  if (kind === 'termo-menor') return config.legalDates.minorTerm;
+  if (kind === 'autorizacao-menor') return config.legalDates.minorAuthorization;
   return null;
 }
 
@@ -150,3 +173,25 @@ export function signupTextsProvisional(config: LegalConfig): boolean {
   if (config.APP_ENV === 'producao') return false;
   return (['termos-de-uso', 'privacidade'] as const).some(kind => !hasFile(config, kind));
 }
+
+/**
+ * Textos de menores (0009) publicados: o termo aceito no checkout e o texto da autorização em PDF. Em produção exige arquivo, versão e
+ * data de cada um; fora de produção, só o arquivo (sem ele, a compra de menor mostra o aviso de homologação no lugar do termo).
+ * Vazio = pode vender a menor e gerar a autorização.
+ */
+export function minorDocsBlockers(config: LegalConfig): string[] {
+  const out: string[] = [];
+  for (const kind of ['termo-menor', 'autorizacao-menor'] as const) {
+    if (!hasFile(config, kind)) {
+      if (config.APP_ENV === 'producao') out.push(`texto legal ausente: ${LEGAL_TITLES[kind]}`);
+      continue;
+    }
+    if (!versionOf(config, kind)) out.push(`versão não informada: ${LEGAL_TITLES[kind]}`);
+    if (config.APP_ENV === 'producao' && !dateOf(config, kind))
+      out.push(`data de vigência não informada: ${LEGAL_TITLES[kind]}`);
+  }
+  return out;
+}
+
+/** Versão vigente de um texto (a mesma que a página mostra), ou `null`. */
+export const legalVersion = (config: LegalConfig, kind: LegalKind): string | null => versionOf(config, kind);

@@ -65,6 +65,7 @@ export async function loadSession(deps: AuthDeps, token: string): Promise<AuthSt
         email: users.email,
         cpf: users.cpf,
         phone: users.phone,
+        birthDate: users.birthDate,
         role: users.role,
         isActive: users.isActive,
         mustChangePassword: users.mustChangePassword,

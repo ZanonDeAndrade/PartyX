@@ -11,6 +11,8 @@ import {
   normalizePhone,
 } from '../domain/identity';
 import { hashToken, passwordProblem } from '../domain/password';
+import { birthDateProblem } from '../domain/age';
+import { dateKeyInEventZone } from '../domain/time';
 import { enqueueEmail, processSoon } from '../mail/outbox';
 import { signupBlockers } from '../legal/documents';
 import { logger } from '../logger';
@@ -43,6 +45,8 @@ export interface RegisterInput {
   email: string;
   cpf: string;
   phone: string;
+  /** AAAA-MM-DD. Obrigatória desde 14/10/2026 (regras de menores): recusa quem tem menos de 16 anos hoje. */
+  birthDate: string;
   password: string;
   acceptedTermsVersion: string;
   acceptedPrivacyVersion: string;
@@ -82,6 +86,9 @@ export async function register(deps: AuthDeps, input: RegisterInput, meta: Reque
   if (cpf.length < 11) errors.push({ campo: 'cpf', mensagem: 'Informe os 11 dígitos do CPF.' });
   else if (!isValidCpf(cpf)) errors.push({ campo: 'cpf', mensagem: 'CPF inválido. Confira os números digitados.' });
   if (!isPhoneValid(phone)) errors.push({ campo: 'phone', mensagem: 'Informe o telefone com DDD.' });
+  const birthDate = (input.birthDate ?? '').trim();
+  const birthProblem = birthDateProblem(birthDate, dateKeyInEventZone(deps.clock.now()));
+  if (birthProblem) errors.push({ campo: 'birthDate', mensagem: birthProblem });
   const pwProblem = passwordProblem(input.password);
   if (pwProblem) errors.push({ campo: 'password', mensagem: pwProblem });
   if (errors.length) throw invalid(errors);
@@ -107,13 +114,14 @@ export async function register(deps: AuthDeps, input: RegisterInput, meta: Reque
     user = await deps.db.transaction(async tx => {
       const [created] = await tx
         .insert(users)
-        .values({ name, email, cpf, phone, passwordHash, role: 'cliente', createdAt: now, updatedAt: now })
+        .values({ name, email, cpf, phone, birthDate, passwordHash, role: 'cliente', createdAt: now, updatedAt: now })
         .returning({
           id: users.id,
           name: users.name,
           email: users.email,
           cpf: users.cpf,
           phone: users.phone,
+          birthDate: users.birthDate,
           role: users.role,
           isActive: users.isActive,
           mustChangePassword: users.mustChangePassword,
@@ -197,6 +205,7 @@ export async function login(deps: AuthDeps, input: { email: string; password: st
     email: row.email,
     cpf: row.cpf,
     phone: row.phone,
+    birthDate: row.birthDate,
     role: row.role,
     isActive: row.isActive,
     mustChangePassword: row.mustChangePassword,
@@ -343,4 +352,28 @@ export async function changePassword(
     .where(eq(users.id, auth.userId));
   // Mantém só a sessão atual: os outros aparelhos precisam entrar de novo.
   await revokeUserSessions(deps, auth.userId, auth.sessionId);
+}
+
+// ---------- data de nascimento de conta antiga (regras de menores, 14/10/2026) ----------
+
+/**
+ * Conta criada antes da 0009 informa a data de nascimento uma única vez (o checkout pede antes de continuar). Depois de gravada, só a
+ * PartyX altera (`correctIdentity`), como o CPF. A gravação é condicional (`birth_date is null`): duas abas não sobrescrevem.
+ */
+export async function setOwnBirthDate(deps: AuthDeps, userId: string, rawBirthDate: string) {
+  const birthDate = rawBirthDate.trim();
+  const problem = birthDateProblem(birthDate, dateKeyInEventZone(deps.clock.now()));
+  if (problem) throw invalid([{ campo: 'birthDate', mensagem: problem }]);
+  const rows = await deps.db
+    .update(users)
+    .set({ birthDate, updatedAt: deps.clock.now() })
+    .where(and(eq(users.id, userId), isNull(users.birthDate)))
+    .returning({ id: users.id });
+  if (rows.length === 0)
+    throw new AppError(
+      409,
+      'data_nascimento_ja_informada',
+      'A data de nascimento já foi informada. Para corrigir, fale com a PartyX.',
+    );
+  return { birthDate };
 }

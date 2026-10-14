@@ -84,6 +84,7 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       email: `marina${i}@partyx.test`,
       cpf: CPF_A,
       phone: '(55) 99812-4470',
+      birthDate: '1995-03-20',
       password: 'festa2026',
       acceptedTermsVersion: 'ficticio-0',
       acceptedPrivacyVersion: 'ficticio-0',

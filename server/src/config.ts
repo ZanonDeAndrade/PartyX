@@ -21,7 +21,10 @@ export function parseOffsets(
 const isoDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'use AAAA-MM-DD')
-  .refine(v => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().startsWith(v), 'data inválida');
+  .refine(
+    v => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().startsWith(v),
+    'data inválida',
+  );
 /** Texto público de uma linha (rodapé, e-mails, página de manutenção): sem quebra de linha nem sinais de marcação. */
 const publicLine = (max: number) =>
   z
@@ -63,6 +66,15 @@ const schema = z
     TERMS_DATE: isoDate.optional(),
     PRIVACY_DATE: isoDate.optional(),
     CANCELLATION_DATE: isoDate.optional(),
+    /**
+     * Textos de menores (0009): o Termo de Ciência para Menores de Idade, aceito no checkout por quem terá 16 ou 17 anos na data do evento,
+     * e o texto do Termo de Autorização e Responsabilidade (PDF). Em produção, sem arquivo, versão e data, a compra de menor e o PDF ficam
+     * indisponíveis.
+     */
+    MINOR_TERM_VERSION: z.string().min(1).optional(),
+    MINOR_TERM_DATE: isoDate.optional(),
+    MINOR_AUTHORIZATION_VERSION: z.string().min(1).optional(),
+    MINOR_AUTHORIZATION_DATE: isoDate.optional(),
     /**
      * Abre o cadastro de compradores. Padrão: aberto fora de produção, **fechado em produção**. Mesmo com `true`, produção só cadastra com os
      * Termos de Uso e a Política de Privacidade publicados (arquivo, versão e data); a de Cancelamento é exigida só para vender (D-84). Ver
@@ -115,7 +127,10 @@ const schema = z
     /** Mercado Pago: assinatura secreta das notificações (Webhooks > Configurar notificações). SEGREDO. */
     MP_WEBHOOK_SECRET: z.string().min(16).max(200).optional(),
     /** Mercado Pago: id da conta da PartyX (`collector_id`). Todo pagamento precisa ter este recebedor para ser aprovado. */
-    MP_COLLECTOR_ID: z.string().regex(/^\d{1,20}$/, 'só dígitos').optional(),
+    MP_COLLECTOR_ID: z
+      .string()
+      .regex(/^\d{1,20}$/, 'só dígitos')
+      .optional(),
 
     /** Endereço do serviço, usado como `audience` do token OIDC que o Cloud Scheduler envia às rotinas internas. Sem ele, as rotinas respondem 503. */
     JOBS_AUDIENCE: z.url().optional(),
@@ -209,10 +224,7 @@ const schema = z
      * Fornecidos pela PartyX. Sem eles, fora de produção aparece "a fornecer"; em produção o item é omitido. Nunca dados da contratada.
      */
     PARTYX_LEGAL_NAME: publicLine(160).optional(),
-    PARTYX_CNPJ: z
-      .string()
-      .refine(isValidCnpj, 'CNPJ inválido (dígitos verificadores)')
-      .optional(),
+    PARTYX_CNPJ: z.string().refine(isValidCnpj, 'CNPJ inválido (dígitos verificadores)').optional(),
     PARTYX_ADDRESS: publicLine(240).optional(),
     /** Horário de atendimento ao comprador como a PartyX informar (ex.: "Segunda a sexta, das 10h às 18h"). */
     PARTYX_SUPPORT_HOURS: publicLine(120).optional(),
@@ -242,7 +254,11 @@ const schema = z
       ctx.addIssue({ code: 'custom', path: ['PUBLIC_BASE_URL'], message: 'obrigatória com PUBLIC_HOST_CHECK=true' });
     }
     if (env.APP_ENV === 'producao' && env.PUBLIC_HOST_CHECK === 'false') {
-      ctx.addIssue({ code: 'custom', path: ['PUBLIC_HOST_CHECK'], message: 'a barreira de Host não pode ser desligada em produção' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['PUBLIC_HOST_CHECK'],
+        message: 'a barreira de Host não pode ser desligada em produção',
+      });
     }
     if (env.APP_ENV === 'producao' && env.ENABLE_PROTOTYPE === 'true') {
       ctx.addIssue({ code: 'custom', path: ['ENABLE_PROTOTYPE'], message: 'proibido em produção' });
@@ -316,7 +332,8 @@ const schema = z
     }
     if (env.PAYMENT_GATEWAY === 'mercadopago') {
       for (const key of ['MP_ACCESS_TOKEN', 'MP_PUBLIC_KEY', 'MP_WEBHOOK_SECRET', 'MP_COLLECTOR_ID'] as const) {
-        if (!env[key]) ctx.addIssue({ code: 'custom', path: [key], message: 'obrigatória com PAYMENT_GATEWAY=mercadopago' });
+        if (!env[key])
+          ctx.addIssue({ code: 'custom', path: [key], message: 'obrigatória com PAYMENT_GATEWAY=mercadopago' });
       }
       // Credencial de produção cobra de verdade: nunca no computador de desenvolvimento.
       if (env.APP_ENV === 'local' && env.GATEWAY_ENVIRONMENT === 'producao') {
@@ -327,7 +344,11 @@ const schema = z
         });
       }
       if (env.GATEWAY_ENVIRONMENT === 'producao' && env.MP_ACCESS_TOKEN?.startsWith('TEST-')) {
-        ctx.addIssue({ code: 'custom', path: ['MP_ACCESS_TOKEN'], message: 'credencial de teste com GATEWAY_ENVIRONMENT=producao' });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['MP_ACCESS_TOKEN'],
+          message: 'credencial de teste com GATEWAY_ENVIRONMENT=producao',
+        });
       }
     }
     if (env.TURNSTILE_ENABLED === 'true') {
@@ -337,11 +358,19 @@ const schema = z
     }
     if (env.EMAIL_ALLOWLIST !== undefined) {
       if (env.APP_ENV === 'producao') {
-        ctx.addIssue({ code: 'custom', path: ['EMAIL_ALLOWLIST'], message: 'proibida em produção: lá todos os destinatários recebem' });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['EMAIL_ALLOWLIST'],
+          message: 'proibida em produção: lá todos os destinatários recebem',
+        });
       }
       const bad = invalidAllowlistItems(env.EMAIL_ALLOWLIST);
       if (bad.length > 0) {
-        ctx.addIssue({ code: 'custom', path: ['EMAIL_ALLOWLIST'], message: `item ${bad.join(', ')} inválido (use endereco@dominio ou *@dominio)` });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['EMAIL_ALLOWLIST'],
+          message: `item ${bad.join(', ')} inválido (use endereco@dominio ou *@dominio)`,
+        });
       }
     }
     if (env.SMTP_URL && !env.EMAIL_FROM) {
@@ -402,6 +431,10 @@ export type Config = Omit<
   | 'TERMS_DATE'
   | 'PRIVACY_DATE'
   | 'CANCELLATION_DATE'
+  | 'MINOR_TERM_VERSION'
+  | 'MINOR_TERM_DATE'
+  | 'MINOR_AUTHORIZATION_VERSION'
+  | 'MINOR_AUTHORIZATION_DATE'
   | 'SIGNUP_OPEN'
   | 'MAINTENANCE_MODE'
   | 'PUBLIC_HOST_CHECK'
@@ -420,6 +453,9 @@ export type Config = Omit<
   legal: LegalVersions;
   legalContentDir: string | undefined;
   cancellationVersion: string | undefined;
+  /** Versões do termo de menor e do texto da autorização de menor, quando informadas (0009). */
+  minorTermVersion: string | undefined;
+  minorAuthorizationVersion: string | undefined;
   /** O cliente aprovou a identidade visual por escrito (CA-33). */
   visualApproved: boolean;
   /** Prazos de retenção dos dados técnicos, em dias. Indefinido = não apagar. */
@@ -431,7 +467,13 @@ export type Config = Omit<
   /** Dados e contatos públicos da PartyX (rodapé, e-mails, manutenção). Cada campo nulo enquanto a PartyX não informar. */
   partyx: PartyxPublicInfo;
   /** Data de vigência (AAAA-MM-DD) de cada texto legal, quando informada. */
-  legalDates: { terms: string | null; privacy: string | null; cancellation: string | null };
+  legalDates: {
+    terms: string | null;
+    privacy: string | null;
+    cancellation: string | null;
+    minorTerm: string | null;
+    minorAuthorization: string | null;
+  };
   /** O cadastro de compradores está aberto por configuração (produção ainda exige os textos: `signupBlockers`). */
   signupOpen: boolean;
   /** Página de manutenção ligada (G06). */
@@ -510,6 +552,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     TERMS_DATE,
     PRIVACY_DATE,
     CANCELLATION_DATE,
+    MINOR_TERM_VERSION,
+    MINOR_TERM_DATE,
+    MINOR_AUTHORIZATION_VERSION,
+    MINOR_AUTHORIZATION_DATE,
     SIGNUP_OPEN,
     MAINTENANCE_MODE,
     PUBLIC_HOST_CHECK,
@@ -540,6 +586,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     legal,
     legalContentDir: LEGAL_CONTENT_DIR,
     cancellationVersion: CANCELLATION_VERSION,
+    minorTermVersion: MINOR_TERM_VERSION,
+    minorAuthorizationVersion: MINOR_AUTHORIZATION_VERSION,
     visualApproved: VISUAL_APPROVED === 'true',
     mockGatewayInHomologacao: raw.APP_ENV === 'homologacao' && HOMOLOGACAO_GATEWAY_FICTICIO === 'true',
     turnstileEnabled,
@@ -569,7 +617,13 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       supportWhatsapp: PARTYX_SUPPORT_WHATSAPP ?? null,
       supportHours: PARTYX_SUPPORT_HOURS ?? null,
     },
-    legalDates: { terms: TERMS_DATE ?? null, privacy: PRIVACY_DATE ?? null, cancellation: CANCELLATION_DATE ?? null },
+    legalDates: {
+      terms: TERMS_DATE ?? null,
+      privacy: PRIVACY_DATE ?? null,
+      cancellation: CANCELLATION_DATE ?? null,
+      minorTerm: MINOR_TERM_DATE ?? null,
+      minorAuthorization: MINOR_AUTHORIZATION_DATE ?? null,
+    },
     signupOpen: SIGNUP_OPEN ? SIGNUP_OPEN === 'true' : raw.APP_ENV !== 'producao',
     maintenance: MAINTENANCE_MODE === 'true',
     publicHostCheck: raw.APP_ENV === 'producao' || PUBLIC_HOST_CHECK === 'true',

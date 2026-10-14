@@ -96,6 +96,7 @@ async function register(b: Buyer) {
     email: b.email,
     cpf: b.cpf,
     phone: '(11) 98765-4321',
+    birthDate: '1995-03-20', // adulto: o roteiro compra para eventos sem menores
     password: b.password,
     acceptedTermsVersion: lv.terms,
     acceptedPrivacyVersion: lv.privacy,

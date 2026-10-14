@@ -646,6 +646,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
           email: 'marina@partyx.test',
           cpf: '52998224725',
           phone: '55998124470',
+          birthDate: '1995-03-20',
           password: PASSWORD,
           acceptedTermsVersion: 'ficticio-0',
           acceptedPrivacyVersion: 'ficticio-0',
