@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Hono } from 'hono';
 import { clientIp } from '../auth/middleware';
 import type { Config } from '../config';
@@ -47,6 +48,8 @@ export function healthRoutes({ config, clock, pingDatabase }: HealthDeps) {
    */
   app.get('/health/origem', c => {
     const forwardedFor = c.req.header('x-forwarded-for');
+    const url = new URL(c.req.url);
+    const signature = c.req.header('x-signature');
     const origin = {
       host: c.req.header('x-forwarded-host') ?? c.req.header('host') ?? null,
       intermediario: intermediary(c.req.raw.headers),
@@ -54,8 +57,21 @@ export function healthRoutes({ config, clock, pingDatabase }: HealthDeps) {
       itensNoEncaminhamento: (forwardedFor ?? '').split(',').filter(s => s.trim()).length,
       protocolo: c.req.header('x-forwarded-proto') ?? null,
     };
-    logger.info('origem do pedido', origin);
-    return c.json(origin);
+    // A assinatura do webhook do Mercado Pago depende do `data.id` da URL e do `x-request-id`: a resposta (só para quem
+    // perguntou) mostra se chegaram como foram enviados. A assinatura sai como resumo, nunca o valor; no log, só os nomes.
+    const received = {
+      consulta: url.search.slice(0, 300),
+      cabecalhos: {
+        'x-request-id': c.req.header('x-request-id')?.slice(0, 100) ?? null,
+        'x-signature': signature ? `sha256:${createHash('sha256').update(signature).digest('hex').slice(0, 16)}` : null,
+      },
+    };
+    logger.info('origem do pedido', {
+      ...origin,
+      parametros: [...url.searchParams.keys()].slice(0, 20),
+      cabecalhosPresentes: Object.entries(received.cabecalhos).flatMap(([k, v]) => (v ? [k] : [])),
+    });
+    return c.json({ ...origin, ...received });
   });
 
   return app;

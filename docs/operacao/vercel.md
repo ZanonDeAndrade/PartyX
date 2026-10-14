@@ -7,6 +7,8 @@ Decidido pelo responsável em 14/10/2026. Motivo: o certificado do Firebase Host
 visitante → `partyx.com.br` → Vercel (certificado Let's Encrypt, rewrite externo) → Cloud Run `partyx` (southamerica-east1) → Neon
 
 - **Na Vercel fica só a configuração de rewrite** (`infra/vercel/vercel.json`). O back-end, o banco, as rotinas e os segredos continuam inteiros no Google Cloud.
+- CLI da Vercel fixada na versão **64.0.2** (a atual em 14/10/2026): sempre `npx vercel@64.0.2 ...`, rodando dentro de `infra/vercel/`. A pasta `infra/vercel/.vercel/` (vínculo local com o projeto) fica fora do Git.
+- O destino do rewrite aponta primeiro para a candidata (`https://candidata---partyx-7x4xxcu3eq-rj.a.run.app`), para testar a cadeia antes da virada; na virada passa a ser o endereço principal do serviço (`https://partyx-391817439013.southamerica-east1.run.app`), com nova publicação na Vercel.
 - Cache na Vercel só em `/assets/*` (arquivos com hash no nome, `immutable`); todo o resto vai sem cache.
 - `www.partyx.com.br` redireciona para a raiz com 308, configurado no projeto da Vercel.
 - O Firebase Hosting continua configurado (site, rewrites, domínios e o TXT `hosting-site=partyx-producao`), para a volta.
@@ -33,7 +35,7 @@ Confirmar a data exata de fim no painel da Vercel (Settings > Billing) assim que
 | `X-Forwarded-For` | `visitante, IP da Vercel` (a Vercel regrava com o IP do visitante; o Google acrescenta o dela) | IP do visitante com `TRUSTED_PROXY_HOPS=2`, o mesmo valor medido atrás do Firebase |
 | `X-Vercel-Id` | identificador do pedido na Vercel | só diagnóstico (`/api/health/origem`) |
 
-Conferência: `GET https://partyx.com.br/api/health/origem` devolve o host recebido, o intermediário (`vercel` ou `firebase`), o IP do visitante mascarado (`177.86.x.x`) e grava a mesma linha no log ("origem do pedido"). Direto no `run.app`, sem o domínio, responde 403. O teste rápido do `deploy.sh` confere essa cadeia.
+Conferência: `GET https://partyx.com.br/api/health/origem` devolve o host recebido, o intermediário (`vercel` ou `firebase`), o IP do visitante mascarado (`177.86.x.x`), a query string e o `x-request-id` como chegaram e um resumo SHA-256 do `x-signature` (a assinatura do webhook do Mercado Pago depende do `data.id` da URL e do `x-request-id`). No log ("origem do pedido") vão o IP mascarado e só os nomes dos parâmetros e cabeçalhos. Direto no `run.app`, sem o domínio, responde 403. O teste rápido do `deploy.sh` confere essa cadeia.
 
 ## Pendência registrada: cabeçalho secreto entre a Vercel e o Cloud Run
 

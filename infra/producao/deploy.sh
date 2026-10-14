@@ -321,11 +321,14 @@ smoke() { # base
   # Cadeia da Vercel (ponte temporária, docs/operacao/vercel.md): o visitante vem no X-Forwarded-For e o Google acrescenta
   # quem chamou; com TRUSTED_PROXY_HOPS=2 o servidor precisa devolver o visitante (203.0.113.10), mascarado.
   local origem
+  # A assinatura do webhook do Mercado Pago depende do data.id da URL e do x-request-id: os dois precisam chegar intactos.
   origem="$(curl -fsS -H "X-Forwarded-Host: $host" -H 'X-Forwarded-For: 203.0.113.10' -H 'X-Vercel-Id: teste-de-publicacao' \
-    "$base/api/health/origem")" || { echo "   FALHOU: /api/health/origem" >&2; return 1; }
+    -H 'X-Request-Id: teste-de-publicacao' "$base/api/health/origem?data.id=ORD000&type=order")" \
+    || { echo "   FALHOU: /api/health/origem" >&2; return 1; }
   printf '%s' "$origem" | python3 -I -c 'import json,sys; d=json.load(sys.stdin); h=sys.argv[1]
-ok = d.get("host")==h and d.get("intermediario")=="vercel" and d.get("ip")=="203.0.x.x"
-print("   ok   origem pela cadeia da Vercel (host %s, IP %s)" % (d.get("host"), d.get("ip")) if ok else "   FALHOU origem: %s" % d, file=sys.stdout if ok else sys.stderr)
+ok = d.get("host")==h and d.get("intermediario")=="vercel" and d.get("ip")=="203.0.x.x" \
+  and d.get("consulta")=="?data.id=ORD000&type=order" and (d.get("cabecalhos") or {}).get("x-request-id")=="teste-de-publicacao"
+print("   ok   origem pela cadeia da Vercel (host %s, IP %s, query e x-request-id intactos)" % (d.get("host"), d.get("ip")) if ok else "   FALHOU origem: %s" % d, file=sys.stdout if ok else sys.stderr)
 sys.exit(0 if ok else 1)' "$host" || return 1
   check "origem direto no run.app, sem o domínio" 403 "$base/api/health/origem" || return 1
   check "run.app sem o cabeçalho do domínio" 403 "$base/" || return 1

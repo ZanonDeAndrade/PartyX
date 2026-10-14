@@ -44,9 +44,30 @@ describe('atrás da Vercel (rewrite externo para o Cloud Run)', () => {
       ip: '177.86.x.x',
       itensNoEncaminhamento: 2,
       protocolo: 'https',
+      consulta: '',
+      cabecalhos: { 'x-request-id': null, 'x-signature': null },
     });
     expect(body).not.toContain(VISITANTE);
     expect(body).not.toContain(VERCEL);
+  });
+
+  it('mostra a query string e os cabeçalhos da assinatura do Mercado Pago como chegaram (a assinatura só como resumo)', async () => {
+    const signature = 'ts=1760464800,v1=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    const lines: string[] = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation(chunk => (lines.push(String(chunk)), true));
+    const res = await prod().request(`https://${RUN}/api/health/origem?data.id=123456789&type=payment&teste=1`, {
+      headers: viaVercel('partyx.com.br', { 'x-request-id': 'bb56a2f1-6aae-46ac-982e-9dcd3581d08e', 'x-signature': signature }),
+    });
+    const body = (await res.json()) as { consulta: string; cabecalhos: Record<string, string | null> };
+    expect(body.consulta).toBe('?data.id=123456789&type=payment&teste=1');
+    expect(body.cabecalhos['x-request-id']).toBe('bb56a2f1-6aae-46ac-982e-9dcd3581d08e');
+    expect(body.cabecalhos['x-signature']).toMatch(/^sha256:[0-9a-f]{16}$/);
+    expect(JSON.stringify(body)).not.toContain('v1=');
+    const line = JSON.parse(lines.find(l => l.includes('origem do pedido'))!);
+    expect(line.parametros).toEqual(['data.id', 'type', 'teste']);
+    expect(line.cabecalhosPresentes).toEqual(['x-request-id', 'x-signature']);
+    expect(lines.join('')).not.toContain('123456789&');
+    expect(lines.join('')).not.toContain('v1=');
   });
 
   it('grava a origem no log com o IP mascarado, nunca o completo', async () => {

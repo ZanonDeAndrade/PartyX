@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/:path*", "destination": "https://candidata---partyx-7x4xxcu3eq-rj.a.run.app/:path*" }
+  ],
+  "headers": [
+    {
+      "source": "/:path((?!assets/).*)",
+      "headers": [{ "key": "x-vercel-enable-rewrite-caching", "value": "0" }]
+    }
+  ]
+}

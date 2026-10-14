@@ -45,3 +45,6 @@ docs/evidencias/**/*.jpg
 docs/evidencias/**/*.jpeg
 docs/evidencias/**/*.png
 docs/evidencias/**/*.pdf
+
+# Vínculo local da CLI da Vercel (ids do projeto e do time; não é segredo, mas é da máquina)
+infra/vercel/.vercel/
