@@ -150,7 +150,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(10);
+      expect(r.rows[0].n).toBe(11);
     });
   });
 
@@ -237,24 +237,10 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       await violates(q("update users set birth_date = '1899-12-31' where id = $1", [id]), PG.check);
     });
 
-    it('evento só permite menores com horário de fim e autorização judicial; o fim vem depois do início', async () => {
+    it('evento só permite menores com horário de fim (sem autorização judicial desde a 0010); o fim vem depois do início', async () => {
       const ev = await event();
       await violates(q('update events set allows_minors = true where id = $1', [ev]), PG.check);
-      await violates(
-        q("update events set allows_minors = true, ends_at = starts_at + interval '6 hours' where id = $1", [ev]),
-        PG.check,
-      );
-      await violates(
-        q(
-          "update events set allows_minors = true, ends_at = starts_at + interval '6 hours', judicial_authorization = '  ' where id = $1",
-          [ev],
-        ),
-        PG.check,
-      );
-      await q(
-        "update events set allows_minors = true, ends_at = starts_at + interval '6 hours', judicial_authorization = 'Portaria 12/2026' where id = $1",
-        [ev],
-      );
+      await q("update events set allows_minors = true, ends_at = starts_at + interval '6 hours' where id = $1", [ev]);
       await violates(q('update events set ends_at = starts_at where id = $1', [ev]), PG.check);
       const novo = await event();
       expect((await q('select allows_minors from events where id = $1', [novo])).rows[0].allows_minors).toBe(false);
@@ -671,11 +657,28 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag7 = '0007_banner_responsivo';
       const tag8 = '0008_recusa_do_pagamento';
       const tag9 = '0009_menores_de_idade';
+      const tag10 = '0010_sem_autorizacao_judicial';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag7)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag8)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag9)).rejects.toThrow(/não é a última/);
+
+      // 0010: recusa enquanto houver evento com menores sem o número (a regra antiga não aceitaria); sem ele, volta a exigir.
+      const q10 = db.pool.query.bind(db.pool);
+      await q10(
+        "insert into events (slug,name,starts_at,ends_at,venue,address,description,age_rating,allows_minors) values ('ev-10','E',now()+interval '9 days',now()+interval '10 days','L','A','D','16 anos',true)",
+      );
+      await expect(rollbackLastMigration(db.url, tag10)).rejects.toThrow(/sem número de autorização judicial/);
+      await q10("update events set judicial_authorization = 'Portaria 1/2026' where slug = 'ev-10'");
+      await rollbackLastMigration(db.url, tag10);
+      await expect(q10("update events set judicial_authorization = null where slug = 'ev-10'")).rejects.toMatchObject({
+        code: '23514',
+      });
+      await q10('alter table events disable trigger events_forbid_delete');
+      await q10("delete from events where slug = 'ev-10'");
+      await q10('alter table events enable trigger events_forbid_delete');
 
       // 0009: recusa enquanto houver aceite do termo de menor (prova); sem prova, apaga a tabela e as colunas de menores.
       const q9 = db.pool.query.bind(db.pool);
@@ -767,8 +770,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe a 0007, a 0008 e a 0009 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0010 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag10);
       await rollbackLastMigration(db.url, tag9);
       await rollbackLastMigration(db.url, tag8);
       await rollbackLastMigration(db.url, tag7);

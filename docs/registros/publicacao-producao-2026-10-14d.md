@@ -5,7 +5,7 @@ Autorização: aprovação do Bernardo informada por Arthur (`aprovacao-menores-
 | Campo | Registro |
 |---|---|
 | Versão | tag `release-2026-10-14d`, commit `247534b` |
-| Migração | `0009_menores_de_idade` (só expande: colunas novas anuláveis ou com padrão e tabela nova; reversão em `drizzle/0009_menores_de_idade.down.sql`, recusa se já houver prova de menor) |
+| Migração | `0009_menores_de_idade` (só expande: colunas novas anuláveis ou com padrão e tabela nova; reversão em `drizzle/rollback/0009_menores_de_idade.down.sql`, recusa se já houver prova de menor) |
 | Imagem | `southamerica-east1-docker.pkg.dev/partyx-producao/partyx/partyx-api:release-2026-10-14d-247534b` (Cloud Build `74be3114`), digest `sha256:de3f7bfd7b08...` |
 | Textos legais na imagem | Da tag, iguais à pasta `conteudo-legal/`: `termos-de-uso.txt` 1.1 (sha256 `a5cd126eabe6a468`), `privacidade.txt` 1.1 (`ee71d314ecf37d8b`), `termo-menor.txt` 1.0 (`a4623176794f6224`), `autorizacao-menor.txt` 1.0 (`7ca0fe8bc9b25f03`), todos com vigência 2026-10-14 |
 | Revisão no ar | `partyx-00010-ced`, 100% |

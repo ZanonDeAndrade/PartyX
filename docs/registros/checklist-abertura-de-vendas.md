@@ -19,7 +19,7 @@ Preparado em 14/10/2026. **Nada aqui foi executado.** A publicação de 13/10 de
 |---|---|---|---|---|
 | 1.7 | Termos 1.1, Privacidade 1.1, Termo de Ciência 1.0 e texto da autorização 1.0 confirmados por escrito pela PartyX | Registro em `docs/registros/` | 14/10/2026, aprovação do Bernardo informada por Arthur (`aprovacao-menores-e-contatos-2026-10-14.md`); prova fora do repositório | Bernardo, informado por Arthur |
 | 1.8 | Migração 0009 aplicada em produção, com backup do dia conferido | Job `migrate` e `check:migrations` | 14/10/2026 19:03 UTC: backup `partyx-backup-gmhk6` conferido, `partyx-migrate-67cxn` ok; revisão `partyx-00010-ced` no ar às 19:05 (`publicacao-producao-2026-10-14d.md`) | Arthur (pedido), Claude (execução) |
-| 1.9 | Evento real que permite menores: autorização judicial informada e PDF conferido | Painel e PDF baixado | | |
+| 1.9 | Evento real que permite menores: horário de fim informado e PDF da autorização conferido (sem autorização judicial desde 14/10/2026) | Painel e PDF baixado | | |
 
 ## 2. Domínio e e-mail
 

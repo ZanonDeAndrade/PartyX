@@ -101,7 +101,7 @@ Cada arquivo de teste cria um banco novo, aplica as migrações e o remove no fi
 | Onde | O quê | Regra no banco |
 |---|---|---|
 | `users.birth_date` | Data de nascimento (AAAA-MM-DD) | Anulável (contas antigas); não antes de 1900. O mínimo de 16 anos é da aplicação |
-| `events.ends_at`, `allows_minors`, `judicial_authorization` | Fim, "permite menores de 16 e 17" e o número da autorização judicial | Fim depois do início; permitir menores exige fim e autorização |
+| `events.ends_at`, `allows_minors`, `judicial_authorization` | Fim, "permite menores de 16 e 17" e o número da autorização judicial (**sem uso desde a 0010**, 14/10/2026: a coluna ficou só para não apagar dado) | Fim depois do início; permitir menores exige fim (`events_minors_need_end`; até a 0009, também a autorização) |
 | `orders.buyer_minor` | Comprador com 16 ou 17 anos na data do evento (retrato da compra) | Padrão `false`; refeito se a PartyX corrigir a data |
 | `minor_term_acceptances` | Aceite do Termo de Ciência: pedido, versão, idade, data, IP, navegador | Um por pedido; idade 16 ou 17; sem DELETE (prova) |
 | `checkins.minor_authorization_received` | Escolha do validador num pedido de comprador menor: `true` (menor com a autorização) ou `false` (18+) | Só em entrada válida |

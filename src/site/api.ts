@@ -521,7 +521,6 @@ export interface AdminEventRow {
   isFeatured: boolean;
   endsAt: string | null;
   allowsMinors: boolean;
-  judicialAuthorization: string | null;
   /** Quando foi encerrado (nulo se não encerrado, ou encerrado por versão anterior: vale `updatedAt`). */
   closedAt: string | null;
   createdAt: string;
@@ -665,7 +664,6 @@ export interface EventInputBody {
   isFeatured: boolean;
   endsAt: string | null;
   allowsMinors: boolean;
-  judicialAuthorization: string | null;
 }
 export interface TicketTypeBody {
   name: string;

@@ -71,6 +71,13 @@
       "when": 1792001630894,
       "tag": "0009_menores_de_idade",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792012419059,
+      "tag": "0010_sem_autorizacao_judicial",
+      "breakpoints": true
     }
   ]
 }

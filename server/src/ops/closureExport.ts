@@ -31,7 +31,6 @@ export const CLOSURE_SPECS: Spec[] = [
       c('age_rating', 'Classificação'),
       c('allows_minors::text', 'Permite menores de 16 e 17'),
       c('ends_at::text', 'Fim'),
-      c('judicial_authorization', 'Autorização judicial'),
       c('status::text', 'Situação'),
       c('created_at::text', 'Criado em'),
     ],

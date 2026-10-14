@@ -62,7 +62,6 @@ const eventSnapshot = (e: EventRow) => ({
   ageRating: e.ageRating,
   endsAt: e.endsAt?.toISOString() ?? null,
   allowsMinors: e.allowsMinors,
-  judicialAuthorization: e.judicialAuthorization,
   bannerUrl: e.bannerUrl,
   status: e.status,
   isFeatured: e.isFeatured,
@@ -82,19 +81,17 @@ export interface EventInput {
   endsAt?: Date | null;
   /** Permite quem terá 16 ou 17 anos na data do evento, com o termo de autorização (regras de menores, 14/10/2026). */
   allowsMinors?: boolean;
-  /** Número da autorização judicial (portaria ou alvará). Obrigatório quando o evento permite menores. */
-  judicialAuthorization?: string | null;
 }
 
 /**
  * Regras de menores do evento, conferidas no estado FINAL (o que já está gravado mais o que mudou): fim depois do início, e quem permite
- * menores precisa de horário de fim, autorização judicial e classificação abaixo de 18 anos. O banco confere as duas primeiras de novo.
+ * menores precisa de horário de fim e classificação abaixo de 18 anos. O banco confere as duas primeiras de novo. A autorização judicial
+ * saiu do sistema em 14/10/2026 (D-85 revista).
  */
 function checkMinorRules(final: {
   startsAt: Date;
   endsAt: Date | null;
   allowsMinors: boolean;
-  judicialAuthorization: string | null;
   ageRating: string;
 }) {
   const errors: FieldError[] = [];
@@ -103,11 +100,6 @@ function checkMinorRules(final: {
   if (final.allowsMinors) {
     if (!final.endsAt)
       errors.push({ campo: 'endsAt', mensagem: 'Informe o horário de fim: ele vai na autorização de menores.' });
-    if (!final.judicialAuthorization)
-      errors.push({
-        campo: 'judicialAuthorization',
-        mensagem: 'Informe o número da autorização judicial (portaria ou alvará).',
-      });
     if (final.ageRating === '18 anos')
       errors.push({ campo: 'allowsMinors', mensagem: 'Evento com classificação 18 anos não permite menores.' });
   }
@@ -152,11 +144,6 @@ function checkEvent(input: Partial<EventInput>, required: boolean) {
     else out.endsAt = input.endsAt;
   }
   if (input.allowsMinors !== undefined) out.allowsMinors = input.allowsMinors;
-  if (input.judicialAuthorization !== undefined) {
-    const value = input.judicialAuthorization === null ? '' : normalizeName(input.judicialAuthorization);
-    if (value.length > 120) errors.push({ campo: 'judicialAuthorization', mensagem: 'Use no máximo 120 caracteres.' });
-    else out.judicialAuthorization = value || null;
-  }
   if (errors.length) throw invalid(errors);
   return out;
 }
@@ -167,7 +154,6 @@ export async function createEvent(deps: EventsDeps, actor: Actor, input: EventIn
     startsAt: data.startsAt!,
     endsAt: data.endsAt ?? null,
     allowsMinors: data.allowsMinors ?? false,
-    judicialAuthorization: data.judicialAuthorization ?? null,
     ageRating: data.ageRating!,
   });
   const now = deps.clock.now();
@@ -195,7 +181,6 @@ export async function createEvent(deps: EventsDeps, actor: Actor, input: EventIn
             isFeatured: data.isFeatured ?? false,
             endsAt: data.endsAt ?? null,
             allowsMinors: data.allowsMinors ?? false,
-            judicialAuthorization: data.judicialAuthorization ?? null,
             createdAt: now,
             updatedAt: now,
           })
@@ -241,8 +226,6 @@ export async function updateEvent(deps: EventsDeps, actor: Actor, id: string, in
       startsAt: data.startsAt ?? before.startsAt,
       endsAt: data.endsAt !== undefined ? data.endsAt : before.endsAt,
       allowsMinors: data.allowsMinors ?? before.allowsMinors,
-      judicialAuthorization:
-        data.judicialAuthorization !== undefined ? data.judicialAuthorization : before.judicialAuthorization,
       ageRating: data.ageRating ?? before.ageRating,
     });
     const [after] = await tx

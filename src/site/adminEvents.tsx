@@ -614,7 +614,6 @@ interface EventForm {
   endDate: string;
   endTime: string;
   allowsMinors: boolean;
-  judicialAuthorization: string;
 }
 const EMPTY_FORM: EventForm = {
   name: '',
@@ -629,7 +628,6 @@ const EMPTY_FORM: EventForm = {
   endDate: '',
   endTime: '',
   allowsMinors: false,
-  judicialAuthorization: '',
 };
 function formOf(e: AdminEvent): EventForm {
   const { date, time } = isoToZonedInputs(e.startsAt);
@@ -647,7 +645,6 @@ function formOf(e: AdminEvent): EventForm {
     endDate: end.date,
     endTime: end.time,
     allowsMinors: e.allowsMinors,
-    judicialAuthorization: e.judicialAuthorization ?? '',
   };
 }
 const SERVER_FIELD: Record<string, string> = { startsAt: 'date', slug: 'name', endsAt: 'endDate' };
@@ -734,8 +731,6 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
     else if (endIso && startIso && endIso <= startIso) e.endDate = 'O fim precisa ser depois do início.';
     if (form.allowsMinors) {
       if (!endIso && !e.endDate) e.endDate = 'Informe o fim: ele vai na autorização de menores.';
-      if (!form.judicialAuthorization.trim())
-        e.judicialAuthorization = 'Informe o número da autorização judicial (portaria ou alvará).';
       if (form.ageRating === '18 anos') e.allowsMinors = 'Evento com classificação 18 anos não permite menores.';
     }
     return e;
@@ -799,7 +794,6 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
       isFeatured: form.isFeatured,
       endsAt: form.endDate && form.endTime ? zonedInputsToIso(form.endDate, form.endTime) : null,
       allowsMinors: form.allowsMinors,
-      judicialAuthorization: form.judicialAuthorization.trim() || null,
     };
     let current: AdminEvent;
     try {
@@ -1024,23 +1018,6 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
           <small id="ev-allowsMinors-erro" className="px-error" role="alert">
             {errors.allowsMinors}
           </small>
-        ) : null}
-        {form.allowsMinors ? (
-          <FormField
-            id="ev-judicialAuthorization"
-            label="Autorização judicial (portaria ou alvará) nº"
-            error={errors.judicialAuthorization}
-            hint="Sai impressa na autorização de menores."
-          >
-            <input
-              id="ev-judicialAuthorization"
-              value={form.judicialAuthorization}
-              maxLength={120}
-              autoComplete="off"
-              onChange={e => set('judicialAuthorization', e.target.value)}
-              {...described('ev-judicialAuthorization', errors.judicialAuthorization, true)}
-            />
-          </FormField>
         ) : null}
       </fieldset>
       <div className="px-check px-field-wide">
@@ -1364,7 +1341,7 @@ function EventInfoPanel({ event }: { event: AdminEvent }) {
           <dt>Menores de 16 e 17 anos</dt>
           <dd>
             {event.allowsMinors
-              ? `Permitidos, com autorização (${event.judicialAuthorization ?? 'sem número'})`
+              ? 'Permitidos, com o Termo de Autorização do responsável'
               : 'Não: só 18 anos ou mais na data do evento'}
           </dd>
         </div>

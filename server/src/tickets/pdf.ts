@@ -19,7 +19,7 @@ import type { TicketDetail } from './service';
  * Emoji com os seus modificadores (tom de pele, junção, variação, bandeira, tecla) e o espaço antes dele. © e ® são Latin-1 e
  * ficam (a fonte desenha).
  */
-const EMOJI = / ?(?:(?![©®])[\p{Extended_Pictographic}\p{Regional_Indicator}\u{1F3FB}-\u{1F3FF}‍︎️⃣])+/gu;
+const EMOJI = / ?(?:(?![\u00A9\u00AE])[\p{Extended_Pictographic}\p{Regional_Indicator}\u{1F3FB}-\u{1F3FF}]|\u200D|\uFE0E|\uFE0F|\u20E3)+/gu;
 
 /** Tira o emoji e troca por "?" o resto que a fonte padrão não desenha, para o PDF nunca sair com lixo. */
 export function toLatin1(text: string): string {

@@ -93,14 +93,9 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
     const slug = `evento-${++n}`;
     const id = (
       await sql(
-        `insert into events (slug,name,starts_at,ends_at,venue,address,description,age_rating,status,allows_minors,judicial_authorization)
-         values ($1,'Noite Neon','2026-12-12T22:00:00-03:00','2026-12-13T05:00:00-03:00','Arena','Rua 1','desc',$2,'publicado',$3,$4) returning id`,
-        [
-          slug,
-          o.allowsMinors ? '16 anos' : '18 anos',
-          o.allowsMinors ?? false,
-          o.allowsMinors ? 'Portaria 12/2026' : null,
-        ],
+        `insert into events (slug,name,starts_at,ends_at,venue,address,description,age_rating,status,allows_minors)
+         values ($1,'Noite Neon','2026-12-12T22:00:00-03:00','2026-12-13T05:00:00-03:00','Arena','Rua 1','desc',$2,'publicado',$3) returning id`,
+        [slug, o.allowsMinors ? '16 anos' : '18 anos', o.allowsMinors ?? false],
       )
     ).rows[0].id as string;
     const type = (
@@ -397,25 +392,21 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
     const fields = async (res: Response) =>
       ((await json(res)).erro.detalhes as { campo: string }[]).map(d => d.campo).sort();
 
-    it('permitir menores exige fim, autorização judicial e classificação abaixo de 18; o fim vem depois do início', async () => {
+    it('permitir menores exige fim e classificação abaixo de 18 (sem autorização judicial desde 14/10/2026); o fim vem depois do início', async () => {
       const admin = await person(null, { role: 'administrador' });
       const sem = await admin.raw('POST', '/admin/events', body({ allowsMinors: true }));
       expect(sem.status).toBe(422);
-      expect(await fields(sem)).toEqual(['endsAt', 'judicialAuthorization']);
+      expect(await fields(sem)).toEqual(['endsAt']);
       const dezoito = await admin.raw(
         'POST',
         '/admin/events',
-        body({
-          allowsMinors: true,
-          ageRating: '18 anos',
-          endsAt: '2026-12-13T05:00:00-03:00',
-          judicialAuthorization: 'Portaria 12/2026',
-        }),
+        body({ allowsMinors: true, ageRating: '18 anos', endsAt: '2026-12-13T05:00:00-03:00' }),
       );
       expect(await fields(dezoito)).toEqual(['allowsMinors']);
       const fimAntes = await admin.raw('POST', '/admin/events', body({ endsAt: '2026-12-12T21:00:00-03:00' }));
       expect(await fields(fimAntes)).toEqual(['endsAt']);
 
+      // Cliente antigo (página em cache) que ainda mande o número: o campo é ignorado, nada é gravado nem devolvido.
       const ok = await admin.raw(
         'POST',
         '/admin/events',
@@ -423,11 +414,13 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       );
       expect(ok.status).toBe(201);
       const created = (await json(ok)).event;
-      expect(created).toMatchObject({ allowsMinors: true, judicialAuthorization: 'Portaria 12/2026' });
+      expect(created).toMatchObject({ allowsMinors: true });
+      expect(created.judicialAuthorization ?? null).toBeNull();
+      expect((await sql('select judicial_authorization from events where id = $1', [created.id])).rows[0].judicial_authorization).toBeNull();
 
-      // Edição parcial confere o estado final: tirar a autorização de um evento que permite menores é recusado.
-      const tirar = await admin.raw('PATCH', `/admin/events/${created.id}`, { judicialAuthorization: null });
-      expect(await fields(tirar)).toEqual(['judicialAuthorization']);
+      // Edição parcial confere o estado final: tirar o fim de um evento que permite menores é recusado.
+      const semFim = await admin.raw('PATCH', `/admin/events/${created.id}`, { endsAt: null });
+      expect(await fields(semFim)).toEqual(['endsAt']);
       const naoPermite = await admin.raw('PATCH', `/admin/events/${created.id}`, { allowsMinors: false });
       expect(naoPermite.status).toBe(200);
     });
@@ -479,7 +472,6 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
         '12/12/2026',
         'das 22h às 5h',
         'Arena, Rua 1',
-        'Portaria 12/2026',
         '12/12/2010',
         'Como usar: Preencha à mão e assine.',
         '1. Autorizo a participação.',
@@ -521,7 +513,8 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       const res = await app.request(`/api/public/events/${ev.slug}/autorizacao-menor.pdf`);
       expect(res.status).toBe(200);
       const { text } = readPdf(await res.arrayBuffer());
-      expect(text).toContain('Portaria 12/2026');
+      expect(text).toContain('Noite Neon');
+      expect(text).not.toMatch(/judicial|alvará/i); // a autorização judicial saiu do sistema em 14/10/2026
       expect(text).toContain('Nome completo');
       const sem = await event();
       expect((await app.request(`/api/public/events/${sem.slug}/autorizacao-menor.pdf`)).status).toBe(404);

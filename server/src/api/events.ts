@@ -49,7 +49,6 @@ const eventFields = {
   isFeatured: z.boolean(),
   endsAt: instant.nullable(),
   allowsMinors: z.boolean(),
-  judicialAuthorization: z.string().max(200).nullable(),
 };
 const createEventBody = z.object({
   ...eventFields,
@@ -57,7 +56,6 @@ const createEventBody = z.object({
   isFeatured: eventFields.isFeatured.optional(),
   endsAt: eventFields.endsAt.optional(),
   allowsMinors: eventFields.allowsMinors.optional(),
-  judicialAuthorization: eventFields.judicialAuthorization.optional(),
   slug: text.optional(),
 });
 const updateEventBody = z.object(eventFields).partial();

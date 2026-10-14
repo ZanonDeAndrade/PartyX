@@ -22,6 +22,16 @@
 
 O texto do modelo anexo já traz A (16 anos), B (assinatura à mão, com local e data), C (bloco do menor), D (autorização judicial), E (título "Termo de Autorização e Responsabilidade"), F (cópia do documento do responsável) e G (horário do evento). O gerador segue o leiaute do anexo, sem logo, e lê o texto do arquivo versionado.
 
+## Revisão de 14/10/2026 (noite): sem autorização judicial e novo cabeçalho do termo
+
+Pedido do responsável (Arthur), com o modelo revisto `docs/ui/autorizacao-menor-modelo-2026-10-14.pdf`:
+
+- **A autorização judicial saiu do sistema todo** (escolha do responsável entre "só do PDF" e "sistema todo"): o campo "Autorização judicial (portaria ou alvará) nº" sai do termo, do formulário do evento no painel, da validação do servidor e da exportação de fechamento. Evento que permite menores passa a exigir só o horário de fim (e classificação abaixo de 18). Migração `drizzle/0010_sem_autorizacao_judicial.sql`: troca a regra `events_minors_need_authorization` por `events_minors_need_end`; a coluna `events.judicial_authorization` fica, sem uso, para não apagar dado e para a reversão ser simples (a reversão recusa se já houver evento com menores sem o número).
+- **Cabeçalho do termo:** logo da PartyX à esquerda (o mesmo desenho do site, em `public/brand/partyx-logo-print-dark.png`, 652 x 360, versão escura do arquivo de impressão) e "CNPJ 58.471.403/0001-07" à direita, com uma linha fina embaixo. Sem o nome empresarial e sem endereço no termo (continuam nos Termos, na Privacidade e nos e-mails).
+- **Rodapé:** "Atendimento PartyX: e-mail · WhatsApp · horário", montado das variáveis `PARTYX_SUPPORT_*`. Abaixo, discreta, a versão do texto ("Termo versão 1.0, vigente desde 14/10/2026."): o modelo não a trazia; o responsável escolheu mantê-la, porque o papel fica retido na portaria e a versão mostra qual texto foi assinado.
+- **Uma página sempre**, inclusive com nome do evento, local e nome do menor no limite (teste em `server/src/minors/authorizationPdf.test.ts`).
+- Premissa a confirmar com a PartyX: a dispensa da autorização judicial é decisão de negócio e jurídica da PartyX; aqui ela foi aplicada a pedido do responsável da contratada.
+
 ## Onde está
 
 Migração `drizzle/0009_menores_de_idade.sql` (com reversão que recusa se houver prova); `server/src/domain/age.ts`; `server/src/orders/buyer.ts`; `server/src/auth/consent.ts`; `server/src/minors/`; portaria em `server/src/gate/service.ts`; telas em `src/site/`. Testes: `server/src/domain/age.test.ts`, `server/src/api/minors.integration.test.ts`, `server/src/minors/authorizationPdf.test.ts` e os de esquema e operação.

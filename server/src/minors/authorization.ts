@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import type { Config } from '../config';
 import type { Db } from '../db/client';
@@ -17,6 +19,7 @@ type AuthorizationConfig = Pick<
   | 'minorAuthorizationVersion'
   | 'legalDates'
   | 'partyx'
+  | 'WEB_DIST_DIR'
 >;
 export interface AuthorizationDeps {
   db: Db;
@@ -27,33 +30,32 @@ type EventRow = typeof events.$inferSelect;
 
 function assertAvailable(deps: AuthorizationDeps, event: EventRow | undefined) {
   if (!event || event.status === 'rascunho') throw new AppError(404, 'nao_encontrado', 'Evento não encontrado.');
-  if (!event.allowsMinors || !event.endsAt || !event.judicialAuthorization)
+  if (!event.allowsMinors || !event.endsAt)
     throw new AppError(404, 'evento_sem_menores', 'Este evento não permite a entrada de menores de 18 anos.');
   const blockers = minorDocsBlockers(deps.config);
   if (blockers.length) {
     logger.warn('autorização de menor indisponível', { blockers });
     throw new AppError(503, 'autorizacao_indisponivel', 'A autorização para menores está indisponível no momento.');
   }
-  return event as EventRow & { endsAt: Date; judicialAuthorization: string };
+  return event as EventRow & { endsAt: Date };
 }
 
-const render = (
+// Logo escuro do cabeçalho: vem do build do front-end (public/brand). Lido uma vez; sem o arquivo (API sem build), o nome sai em texto.
+let logo: Promise<Buffer | undefined> | undefined;
+const pdfLogo = (deps: AuthorizationDeps) =>
+  (logo ??= readFile(path.resolve(deps.config.WEB_DIST_DIR, 'brand/partyx-logo-print-dark.png')).catch(() => undefined));
+
+const render = async (
   deps: AuthorizationDeps,
-  event: EventRow & { endsAt: Date; judicialAuthorization: string },
+  event: EventRow & { endsAt: Date },
   minor: { name: string; birthDate: string } | null,
 ) =>
   renderAuthorizationPdf({
-    event: {
-      name: event.name,
-      startsAt: event.startsAt,
-      endsAt: event.endsAt,
-      venue: event.venue,
-      address: event.address,
-      judicialAuthorization: event.judicialAuthorization,
-    },
+    event: { name: event.name, startsAt: event.startsAt, endsAt: event.endsAt, venue: event.venue, address: event.address },
     minor,
     partyx: deps.config.partyx,
     document: legalDocument(deps.config, 'autorizacao-menor'),
+    logo: await pdfLogo(deps),
   });
 
 /**

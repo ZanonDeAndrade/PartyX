@@ -33,15 +33,14 @@ await user('Admin Teste', 'admin@partyx.test', null, 'administrador');
 
 const ev = (
   await q(
-    `insert into events (slug,name,starts_at,ends_at,venue,address,description,attractions,age_rating,status,allows_minors,judicial_authorization,is_featured)
-     values ('texto-longo',$1,'2026-12-12T23:30:00-03:00','2026-12-13T05:00:00-03:00',$2,$3,$4,$5,'16 anos','publicado',true,$6,true) returning id`,
+    `insert into events (slug,name,starts_at,ends_at,venue,address,description,attractions,age_rating,status,allows_minors,is_featured)
+     values ('texto-longo',$1,'2026-12-12T23:30:00-03:00','2026-12-13T05:00:00-03:00',$2,$3,$4,$5,'16 anos','publicado',true,true) returning id`,
     [
       `${LONG('FestaTesteteste', 114)} 🎉`,
       LONG('ArenaCentraldeEventos', 120),
       URL_LONGA,
       DESC,
       [`DJ ${LONG('Testetesteteste', 76)}`, 'Banda Neon 🎸🎤', URL_LONGA.slice(0, 80)],
-      LONG('Portaria12/2026doJuizado', 120),
     ],
   )
 ).rows[0].id as string;

@@ -30,7 +30,10 @@ export const events = pgTable(
      * na data do evento não compra.
      */
     allowsMinors: boolean('allows_minors').notNull().default(false),
-    /** Número da autorização judicial (portaria ou alvará) que permite menores. Obrigatório quando o evento permite menores. */
+    /**
+     * SEM USO desde 14/10/2026 (D-85 revista: a autorização judicial saiu do sistema). A 0010 tirou a exigência; a coluna ficou para
+     * não apagar dado já gravado e para a reversão ser simples. Nada lê nem grava esta coluna.
+     */
     judicialAuthorization: text('judicial_authorization'),
     venue: text('venue').notNull(),
     address: text('address').notNull(),
@@ -66,10 +69,8 @@ export const events = pgTable(
     check('events_slug_format', sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check('events_name_not_blank', sql`length(btrim(${t.name})) > 0`),
     check('events_ends_after_start', sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`),
-    check(
-      'events_minors_need_authorization',
-      sql`not ${t.allowsMinors} or (${t.endsAt} is not null and length(btrim(coalesce(${t.judicialAuthorization}, ''))) > 0)`,
-    ),
+    // Quem permite menores precisa do horário de fim (vai na autorização). Desde a 0010, sem exigir a autorização judicial.
+    check('events_minors_need_end', sql`not ${t.allowsMinors} or ${t.endsAt} is not null`),
   ],
 );
 
