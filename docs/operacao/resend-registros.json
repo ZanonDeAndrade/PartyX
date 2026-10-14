@@ -1,0 +1,91 @@
+{
+ "origem": "API do Resend (GET /domains/{id})",
+ "dominios": [
+  {
+   "name": "hml.partyx.com.br",
+   "region": "sa-east-1",
+   "status": "not_started",
+   "records": [
+    {
+     "record": "DKIM",
+     "type": "TXT",
+     "name": "resend._domainkey.hml",
+     "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQChfLoZyqAsBtJ5duir2ikkQD2tpuW9GokcnKsl2e7Vs/nJXVJao0zBqJUOCjRh6/WQnlKpWhWv4A/q1yYE3N3qb2ictLYeBGW26aUPVEY9QKaaNlF2NC/PqaCkwcNC3rzHnfFpQpTkftJvrZyY9RdNXtFYcdMeCaRMVbopzv6ZuwIDAQAB",
+     "priority": null,
+     "ttl": "Auto",
+     "status": "not_started"
+    },
+    {
+     "record": "SPF",
+     "type": "MX",
+     "name": "send.hml",
+     "value": "feedback-smtp.sa-east-1.amazonses.com",
+     "priority": 10,
+     "ttl": "Auto",
+     "status": "not_started"
+    },
+    {
+     "record": "SPF",
+     "type": "TXT",
+     "name": "send.hml",
+     "value": "v=spf1 include:amazonses.com ~all",
+     "priority": null,
+     "ttl": "Auto",
+     "status": "not_started"
+    },
+    {
+     "record": "SPF",
+     "type": "CNAME",
+     "name": "rsend.hml",
+     "value": "send.forge.rmta.net",
+     "priority": null,
+     "ttl": "Auto",
+     "status": "not_started"
+    }
+   ]
+  },
+  {
+   "name": "partyx.com.br",
+   "region": "sa-east-1",
+   "status": "not_started",
+   "records": [
+    {
+     "record": "DKIM",
+     "type": "TXT",
+     "name": "resend._domainkey",
+     "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqFvQnDDxNDEJOzg4SLv5mhpx+aVf0ZzXPlHzaqsrOeCITnrvBj5Bx2Ow281UgidGZko2seEvy3bbeFPN6YV1g1aqoXqRkNczBI66pLZWO4m/SrCw6RFcXb1IhWEB2u5sGsRzy4CxWKChymllOLk0MDS9Dg8btGfw1VfIFNcoQ2wIDAQAB",
+     "priority": null,
+     "ttl": "Auto",
+     "status": "not_started"
+    },
+    {
+     "record": "SPF",
+     "type": "MX",
+     "name": "send",
+     "value": "feedback-smtp.sa-east-1.amazonses.com",
+     "priority": 10,
+     "ttl": "Auto",
+     "status": "not_started"
+    },
+    {
+     "record": "SPF",
+     "type": "TXT",
+     "name": "send",
+     "value": "v=spf1 include:amazonses.com ~all",
+     "priority": null,
+     "ttl": "Auto",
+     "status": "not_started"
+    },
+    {
+     "record": "SPF",
+     "type": "CNAME",
+     "name": "rsend",
+     "value": "send.forge.rmta.net",
+     "priority": null,
+     "ttl": "Auto",
+     "status": "not_started"
+    }
+   ]
+  }
+ ]
+}
