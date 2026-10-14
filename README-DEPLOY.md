@@ -422,5 +422,13 @@ Os 5,5 s do primeiro acesso incluem o **boot do servidor**, que confere a marca 
 
 **Tráfego preso à revisão:** depois de `virar`, um `gcloud run services update` cria revisão nova com 0%. Troca rápida de variável = `services update` + `services update-traffic --to-latest` (é o que `deploy.sh manutencao on|off` faz desde 14/10).
 
-**Próxima publicação (regras de menores, preparada no local em 14/10/2026):** migração `0009_menores_de_idade` (só expande; Cloud Run Job `migrate` antes da candidata, com backup do dia conferido), Termos e Privacidade 1.1 com vigência na data da publicação (atualizar `TERMS_DATE` e `PRIVACY_DATE` no `env.prod.yaml` se não for 14/10), Termo de Ciência e texto da autorização 1.0. Quem aceitou a 1.0 aceita a 1.1 no próximo login ou checkout.
+A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a seção 16.
+
+## 16. Quarta publicação: regras de menores, textos 1.1 e contatos novos (14/10/2026)
+
+**Publicado:** revisão `partyx-00010-ced` (tag `release-2026-10-14d`, commit `247534b`), 100% desde 14/10 19:05 UTC, depois do backup sob demanda (`partyx-backup-gmhk6`, conferido) e da migração `0009_menores_de_idade` (`partyx-migrate-67cxn`). Continua com cadastro aberto e venda fechada. Termos e Privacidade 1.1, Termo de Ciência e texto da autorização 1.0, todos com vigência 2026-10-14; rodapé só com CNPJ e os contatos novos, sem endereço (`PARTYX_ADDRESS` saiu do `env.prod.yaml`). Registro: `docs/registros/publicacao-producao-2026-10-14d.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00010-ced`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00008-gaz ./infra/producao/deploy.sh rollback`. A `00008-gaz` funciona com o banco já migrado (a 0009 só acrescenta), mas volta aos textos 1.0 e aos contatos antigos; não é preciso reverter a migração.
+
+**Ordem que valeu para publicação com migração:** build, backup sob demanda conferido, `migrate`, `candidata`, `virar`, bateria por HTTPS no domínio. Vercel, rotinas e verificação de saúde não mudam quando só a revisão muda.
 

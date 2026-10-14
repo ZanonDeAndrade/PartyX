@@ -29,6 +29,8 @@ Autorização: `autorizacao-cadastro-producao-2026-10-14.md` (Bernardo pelo What
 
 ## Voltar atrás ou fechar o cadastro
 
+> Atualização de 14/10/2026 19:05 UTC: a `partyx-00010-ced` (regras de menores e textos 1.1) substituiu a `00008-gaz`. A referência de retorno atual está em `publicacao-producao-2026-10-14d.md`.
+
 - **Fechar só o cadastro (rápido, cerca de 1 minuto):** o tráfego está preso à revisão virada, então são dois comandos. Depois, ponha `SIGNUP_OPEN: "false"` no `env.prod.yaml`, senão a próxima publicação reabre.
   ```
   export CLOUDSDK_CORE_PROJECT=partyx-producao
