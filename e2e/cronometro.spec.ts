@@ -25,23 +25,24 @@ interface EventSetup {
   endsIn?: string | null;
   status?: 'publicado' | 'encerrado';
   enabled?: boolean;
-  phrase?: string | null;
   name?: string;
+  /** Cor de destaque do evento (#RRGGBB); nula: o roxo da PartyX. */
+  accent?: string | null;
 }
 /** Evento publicado (ou encerrado), criado ou regravado pelo endereço. Devolve o id. */
 async function event(slug: string, o: EventSetup): Promise<string> {
   const { rows } = await db.query(
     `insert into events (slug, name, starts_at, ends_at, venue, address, description, age_rating, status, closed_at,
-                         countdown_enabled, countdown_phrase)
+                         countdown_enabled, accent_color)
      values ($1, $2, now() + $3::interval, case when $4::text is null then null else now() + $4::interval end, 'Clube Comercial',
              'Rua do Acampamento, 500', 'Evento de teste, dados fictícios.', '18 anos', $5::event_status,
              case when $5::text = 'encerrado' then now() end,
              $6, $7)
      on conflict (slug) do update set name = excluded.name, starts_at = excluded.starts_at, ends_at = excluded.ends_at,
        status = excluded.status, closed_at = excluded.closed_at, countdown_enabled = excluded.countdown_enabled,
-       countdown_phrase = excluded.countdown_phrase
+       accent_color = excluded.accent_color
      returning id`,
-    [slug, o.name ?? 'Baile Teen de Verão', o.startsIn, o.endsIn ?? null, o.status ?? 'publicado', o.enabled ?? true, o.phrase ?? null],
+    [slug, o.name ?? 'Baile Teen de Verão', o.startsIn, o.endsIn ?? null, o.status ?? 'publicado', o.enabled ?? true, o.accent ?? null],
   );
   return rows[0].id as string;
 }
@@ -85,13 +86,16 @@ async function shownSeconds(page: Page) {
   return ((d! * 24 + h!) * 60 + m!) * 60 + s!;
 }
 
-test('antes do início: frase padrão acima do nome e quatro blocos numa linha a 360 px, com a contagem do servidor', async ({
+test('antes do início: só a data e o nome, sem frase acima, e quatro blocos numa linha a 360 px, com a contagem do servidor', async ({
   browser,
 }) => {
   await event('cronometro-antes', { startsIn: '3 days 14 hours 27 minutes 40 seconds', endsIn: '3 days 20 hours' });
   const page = await open(browser, 'cronometro-antes');
   await expect(page.locator('[data-countdown="antes"]')).toBeVisible();
-  await expect(page.locator('.px-event-kicker')).toHaveText('Falta pouco para');
+  // Sem a frase acima do título (15/10/2026): o cabeçalho tem só o bloco da data e o nome.
+  await expect(page.locator('.px-event-kicker')).toHaveCount(0);
+  await expect(page.getByText('Falta pouco para')).toHaveCount(0);
+  await expect(page.locator('.px-event-head > *')).toHaveCount(2);
   await expect(page.locator('.px-cd-label')).toHaveText(['Dias', 'Horas', 'Min', 'Seg']);
   const nums = await page.locator('.px-cd-num').allTextContents();
   expect(nums.every(n => /^\d{2,}$/.test(n))).toBe(true);
@@ -229,24 +233,72 @@ test('pelo painel: frase personalizada aparece na página, e "Mostrar cronômetr
     await expect(admin.getByRole('button', { name: 'Salvar alterações' })).toBeEnabled();
     await admin.waitForTimeout(500);
   };
-  await edit(async () => {
-    await expect(admin.locator('#ev-countdownEnabled')).toBeChecked();
-    await expect(admin.locator('#ev-countdownPhrase')).toHaveAttribute('placeholder', 'Falta pouco para');
-    await admin.fill('#ev-countdownPhrase', 'Contagem para a festa');
-  });
-  const custom = await open(browser, 'cronometro-painel');
-  await expect(custom.locator('.px-event-kicker')).toHaveText('Contagem para a festa');
-  await custom.screenshot({ path: path.join(IMG, 'frase-360.png') });
-  await custom.context().close();
+  // O campo "Frase do cronômetro" saiu do cadastro e da edição (15/10/2026); só a caixa de ligar e desligar fica.
+  await admin.goto(`${R.base}/admin/eventos/${id}/editar`, { waitUntil: 'networkidle' });
+  await expect(admin.locator('#ev-countdownEnabled')).toBeChecked();
+  await expect(admin.locator('#ev-countdownPhrase')).toHaveCount(0);
+  await expect(admin.getByText('Frase do cronômetro')).toHaveCount(0);
+  await admin.goto(`${R.base}/admin/eventos/novo`, { waitUntil: 'networkidle' });
+  await expect(admin.locator('#ev-countdownEnabled')).toBeChecked();
+  await expect(admin.locator('#ev-countdownPhrase')).toHaveCount(0);
 
   await edit(async () => {
     await admin.locator('#ev-countdownEnabled').uncheck();
-    await expect(admin.locator('#ev-countdownPhrase')).toBeDisabled();
   });
   const off = await open(browser, 'cronometro-painel');
   await expect(off.locator('.px-event-name')).toBeVisible();
   await expect(off.locator('[data-countdown]')).toHaveCount(0);
   await expect(off.locator('.px-event-kicker')).toHaveCount(0);
   const row = await db.query('select countdown_enabled, countdown_phrase from events where id = $1', [id]);
-  expect(row.rows[0]).toEqual({ countdown_enabled: false, countdown_phrase: 'Contagem para a festa' });
+  expect(row.rows[0]).toEqual({ countdown_enabled: false, countdown_phrase: null });
+});
+
+/** Centro vertical do bloco da data e do nome, linhas do nome e o espaço entre o cabeçalho e o cronômetro. */
+const headLayout = (page: Page) =>
+  page.evaluate(() => {
+    const stub = document.querySelector('.px-event-head .px-stub')!.getBoundingClientRect();
+    const name = document.querySelector('.px-event-name')!;
+    const box = name.getBoundingClientRect();
+    const lineHeight = parseFloat(getComputedStyle(name).lineHeight);
+    const head = document.querySelector('.px-event-head')!.getBoundingClientRect();
+    const row = document.querySelector('.px-countdown-row')!.getBoundingClientRect();
+    return {
+      offset: Math.abs(stub.top + stub.height / 2 - (box.top + box.height / 2)),
+      lines: Math.round(box.height / lineHeight),
+      gap: Math.round(row.top - head.bottom),
+    };
+  });
+
+test('nome curto e longo, roxo e vermelho, a 360 e 1280 px: nome centrado no bloco da data e o mesmo espaço até o cronômetro', async ({
+  browser,
+}) => {
+  // Nome longo que quebra em duas linhas em cada largura (a fonte e a largura mudam muito do celular para o computador).
+  const names = {
+    curto: { 360: 'Noite Neon', 1280: 'Noite Neon' },
+    longo: { 360: 'Baile de Primavera', 1280: 'Baile de Primavera do Clube Comercial de Santa Maria' },
+  } as const;
+  const gaps = new Set<number>();
+  for (const [cor, accent] of [
+    ['roxo', null],
+    ['vermelho', '#E4002B'],
+  ] as const) {
+    for (const width of [360, 1280] as const) {
+      for (const kind of ['curto', 'longo'] as const) {
+        const slug = `cabecalho-${kind}-${cor}-${width}`;
+        await event(slug, { startsIn: '12 days 6 hours', endsIn: '12 days 12 hours', name: names[kind][width], accent });
+        const page = await open(browser, slug, { width });
+        await expect(page.locator('[data-countdown="antes"]')).toBeVisible();
+        await expect(page.locator('.px-event-kicker')).toHaveCount(0);
+        const l = await headLayout(page);
+        expect(l.lines, `${slug}: linhas`).toBe(kind === 'curto' ? 1 : 2);
+        expect(l.offset, `${slug}: centro do nome x centro da data`).toBeLessThanOrEqual(1.5);
+        gaps.add(l.gap);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+        await page.screenshot({ path: path.join(IMG, `cabecalho-${kind}-${cor}-${width}.png`) });
+        await page.context().close();
+      }
+    }
+  }
+  // O espaço entre o cabeçalho e o cronômetro é o mesmo com nome de uma ou de duas linhas, em qualquer cor e largura.
+  expect([...gaps]).toHaveLength(1);
 });

@@ -14,7 +14,6 @@ import {
   type AgeRating,
 } from '../domain/events';
 import { AppError } from '../domain/errors';
-import { checkCountdownPhrase, COUNTDOWN_PHRASE_MAX } from '../domain/vitrine';
 import { checkAccentColor } from '../domain/accent';
 import { normalizeName, isPhoneValid, normalizePhone } from '../domain/identity';
 import type { Clock } from '../providers/clock';
@@ -48,7 +47,6 @@ export const LIMITS = {
   priceMaxCents: 10_000_000,
   quantityMax: 100_000,
   typeNameMax: 60,
-  countdownPhraseMax: COUNTDOWN_PHRASE_MAX,
 } as const;
 
 // ---------- eventos (RF-11, RF-12, RF-19) ----------
@@ -73,7 +71,6 @@ const eventSnapshot = (e: EventRow) => ({
   closedAt: e.closedAt?.toISOString() ?? null,
   archivedAt: e.archivedAt?.toISOString() ?? null,
   countdownEnabled: e.countdownEnabled,
-  countdownPhrase: e.countdownPhrase,
   accentColor: e.accentColor,
 });
 
@@ -92,8 +89,6 @@ export interface EventInput {
   allowsMinors?: boolean;
   /** Cronômetro regressivo na página do evento (15/10/2026). Ausente na criação: ligado. */
   countdownEnabled?: boolean;
-  /** Frase acima do título durante a contagem; vazia ou nula: a padrão. Até 40 caracteres, só texto. */
-  countdownPhrase?: string | null;
   /** Cor de destaque da página do evento, `#RRGGBB`; nula ou vazia: o roxo da PartyX (0014). */
   accentColor?: string | null;
 }
@@ -160,11 +155,6 @@ function checkEvent(input: Partial<EventInput>, required: boolean) {
   }
   if (input.allowsMinors !== undefined) out.allowsMinors = input.allowsMinors;
   if (input.countdownEnabled !== undefined) out.countdownEnabled = input.countdownEnabled;
-  if (input.countdownPhrase !== undefined) {
-    const phrase = checkCountdownPhrase(input.countdownPhrase);
-    if ('problem' in phrase) errors.push({ campo: 'countdownPhrase', mensagem: phrase.problem });
-    else out.countdownPhrase = phrase.value;
-  }
   if (input.accentColor !== undefined) {
     const color = checkAccentColor(input.accentColor);
     if ('problem' in color) errors.push({ campo: 'accentColor', mensagem: color.problem });
@@ -208,7 +198,6 @@ export async function createEvent(deps: EventsDeps, actor: Actor, input: EventIn
             endsAt: data.endsAt ?? null,
             allowsMinors: data.allowsMinors ?? false,
             countdownEnabled: data.countdownEnabled ?? true,
-            countdownPhrase: data.countdownPhrase ?? null,
             accentColor: data.accentColor ?? null,
             createdAt: now,
             updatedAt: now,

@@ -91,7 +91,8 @@ Pedido do responsável: contagem regressiva até o início no topo da página do
 |---|---|
 | RF-23 (página do evento: cronômetro, estados e virada) | `src/site/eventCountdown.test.ts`, `e2e/cronometro.spec.ts` (antes, virada no zero sem recarregar, durante, depois, encerrado, 360 px em uma linha) |
 | RF-23 (hora do servidor, relógio do aparelho errado) | `server/src/api/events.integration.test.ts` (`serverNow`), `src/site/eventCountdown.test.ts` e `e2e/cronometro.spec.ts` (+7 h, -7 h, +3 dias, -45 min) |
-| RF-11 (painel: mostrar cronômetro e frase) | `server/src/api/events.integration.test.ts` (padrão, frase, 422, desligado, trilha), `e2e/cronometro.spec.ts` (pelo formulário) |
+| RF-11 (painel: mostrar cronômetro) | `server/src/api/events.integration.test.ts` (padrão, desligado, trilha; desde 15/10/2026 sem a frase: o campo é ignorado e nada é gravado), `e2e/cronometro.spec.ts` (pelo formulário, sem o campo da frase) |
+| RF-23 (cabeçalho sem a frase, 15/10/2026) | `e2e/cronometro.spec.ts` (nome curto e longo, roxo e vermelho, 360 e 1280 px: nome centrado no bloco da data e o mesmo espaço até o cronômetro) |
 | Acessibilidade e desempenho | `e2e/cronometro.spec.ts` (`role="timer"`, aviso só na troca, pausa com a aba escondida, movimento reduzido) |
 
 ### Lotes por tipo de ingresso (15/10/2026, mudança de escopo D-86)

@@ -734,17 +734,20 @@ body.px-dark .px-textlink {
   font-weight: 800;
   font-size: var(--px-t-sm);
 }
+/* Só o bloco da data e o título (sem a frase acima dele desde 15/10/2026), centrados um no outro: título de uma ou de duas linhas
+   fica no meio do bloco; o espaço até o cronômetro continua o de .px-countdown-row. */
 .px-event-head {
   position: relative;
   margin-top: calc(-1 * var(--px-s-11));
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--px-s-4);
 }
 .px-event-head .px-stub {
   flex: none;
 }
 .px-event-name {
+  flex: 1 1 auto;
   margin: 0;
   min-width: 0;
   font-family: var(--px-font-display);
@@ -756,24 +759,8 @@ body.px-dark .px-textlink {
   overflow-wrap: anywhere;
 }
 /* ---------- cronômetro até o início (15/10/2026) ---------- */
-/* A frase completa a leitura do título ("Falta pouco para" / NOME DO EVENTO); os blocos repetem o cartaz da data, com o mesmo
-   roxo, a mesma fonte condensada e o mesmo canto cortado, numa linha logo abaixo do cabeçalho (nada novo sobre a capa). */
-.px-event-heading {
-  min-width: 0;
-  display: grid;
-  gap: var(--px-s-2);
-}
-.px-event-kicker {
-  margin: 0;
-  font-family: var(--px-font-display);
-  font-size: clamp(1.125rem, 2.4vw, 1.625rem);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.01em;
-  color: var(--px-lilac);
-  text-shadow: 0 1px 14px rgb(11 11 16 / 0.7);
-  overflow-wrap: anywhere;
-}
+/* Os blocos repetem o cartaz da data, com o mesmo roxo, a mesma fonte condensada e o mesmo canto cortado, numa linha logo abaixo
+   do cabeçalho (nada novo sobre a capa). */
 .px-countdown-row {
   margin-top: var(--px-s-4);
 }

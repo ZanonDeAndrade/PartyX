@@ -77,7 +77,11 @@ export const events = pgTable(
     archivedAt: instant('archived_at'),
     /** Cronômetro regressivo na página do evento até o início (0012, 15/10/2026). Ligado por padrão. */
     countdownEnabled: boolean('countdown_enabled').notNull().default(true),
-    /** Frase acima do título durante a contagem. Nula: a padrão ("Falta pouco para"). Até 40 caracteres, só texto (sem < nem >). */
+    /**
+     * SEM USO desde 15/10/2026: a frase acima do título ("Falta pouco para") saiu da página e do painel a pedido do responsável. A
+     * coluna (e a regra `events_countdown_phrase_format`) ficam até uma limpeza futura, que a remove com migração própria; nada lê
+     * nem grava mais. Até lá, a versão anterior continua funcionando num retorno.
+     */
     countdownPhrase: text('countdown_phrase'),
     /**
      * Cor de destaque da página do evento (0014, 15/10/2026), só `#RRGGBB` em maiúsculas. Nula: o roxo da PartyX. A página deriva dela

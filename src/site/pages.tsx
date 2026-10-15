@@ -500,11 +500,9 @@ function EventSkeleton() {
             <span className="px-stub-day">00</span>
             <span className="px-stub-month">out</span>
           </span>
-          <div className="px-event-heading">
-            <p className="px-event-name">
-              <span className="px-skel-text" style={{ width: '72%' }} />
-            </p>
-          </div>
+          <p className="px-event-name">
+            <span className="px-skel-text" style={{ width: '72%' }} />
+          </p>
         </div>
         <div className="px-wrap px-countdown-row">
           <div className="px-countdown" aria-hidden="true">
@@ -576,14 +574,14 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
   const [copied, setCopied] = useState(false);
   const sale = event.sale;
   const slug = event.slug;
-  // Cronômetro: a página guarda só o estado (antes, agora, oculto), que muda poucas vezes; os segundos andam dentro do cronômetro.
-  const [countdownKind, setCountdownKind] = useState<CountdownView['kind']>(() => readCountdown(event).kind);
+  // Cronômetro: a página guarda só o último estado (antes, agora, oculto), para anunciar a troca; os segundos andam dentro do
+  // cronômetro e a página não redesenha.
   const [countdownSaid, setCountdownSaid] = useState('');
-  const lastKind = useRef(countdownKind);
+  const lastKind = useRef<CountdownView['kind'] | null>(null);
+  lastKind.current ??= readCountdown(event).kind;
   const onCountdownKind = useCallback((next: CountdownView['kind']) => {
-    const said = stateAnnouncement(lastKind.current, next);
+    const said = stateAnnouncement(lastKind.current!, next);
     lastKind.current = next;
-    setCountdownKind(next);
     if (said) setCountdownSaid(said);
   }, []);
 
@@ -631,14 +629,10 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
           style={{ ...cascade(0), ...(preview ? null : { viewTransitionName: 'px-event-head' }) }}
         >
           <DateStub iso={event.startsAt} size="lg" transitionName={preview ? undefined : dateTransitionName(event.slug)} />
-          <div className="px-event-heading">
-            {countdownKind === 'antes' && event.countdown ? (
-              <p className="px-event-kicker">{event.countdown.phrase}</p>
-            ) : null}
-            <h1 className="px-event-name" style={preview ? undefined : { viewTransitionName: titleTransitionName(event.slug) }}>
-              {event.name}
-            </h1>
-          </div>
+          {/* Só o bloco da data e o título, centrados um no outro (sem a frase acima do título desde 15/10/2026). */}
+          <h1 className="px-event-name" style={preview ? undefined : { viewTransitionName: titleTransitionName(event.slug) }}>
+            {event.name}
+          </h1>
         </div>
         {event.countdown ? (
           <>

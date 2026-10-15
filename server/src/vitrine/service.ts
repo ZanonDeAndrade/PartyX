@@ -7,7 +7,6 @@ import { previewTypes } from '../events/lots';
 import { AppError } from '../domain/errors';
 import { dateKeyInEventZone } from '../domain/time';
 import {
-  COUNTDOWN_PHRASE_DEFAULT,
   countdownLiveUntil,
   eventSale,
   searchKey,
@@ -83,7 +82,7 @@ export interface PublicEventDetail extends PublicEventCard {
    * Cronômetro até o início (15/10/2026). Nulo: desligado no painel ou evento encerrado. `liveUntil`: até quando a página mostra
    * "Acontecendo agora" (o fim, ou 8 h depois do início sem ele). A página decide antes, durante e depois pela hora do servidor.
    */
-  countdown: { phrase: string; liveUntil: string } | null;
+  countdown: { liveUntil: string } | null;
   /** Hora do servidor ao montar a resposta. A página conta por ela (diferença para o relógio do aparelho), não só pelo aparelho. */
   serverNow: string;
 }
@@ -283,7 +282,6 @@ async function detail(deps: VitrineDeps, row: EventRow, preview: boolean): Promi
     countdown:
       row.countdownEnabled && !ended
         ? {
-            phrase: row.countdownPhrase ?? COUNTDOWN_PHRASE_DEFAULT,
             liveUntil: countdownLiveUntil(row.startsAt, row.endsAt).toISOString(),
           }
         : null,

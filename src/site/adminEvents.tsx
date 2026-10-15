@@ -967,8 +967,6 @@ interface EventForm {
   allowsMinors: boolean;
   /** Cronômetro na página do evento até o início. */
   countdownEnabled: boolean;
-  /** Vazia: a frase padrão. */
-  countdownPhrase: string;
   /** Cor de destaque como digitada; vazia: o roxo da PartyX. */
   accentColor: string;
 }
@@ -986,7 +984,6 @@ const EMPTY_FORM: EventForm = {
   endTime: '',
   allowsMinors: false,
   countdownEnabled: true,
-  countdownPhrase: '',
   accentColor: '',
 };
 function formOf(e: AdminEvent): EventForm {
@@ -1006,7 +1003,6 @@ function formOf(e: AdminEvent): EventForm {
     endTime: end.time,
     allowsMinors: e.allowsMinors,
     countdownEnabled: e.countdownEnabled,
-    countdownPhrase: e.countdownPhrase ?? '',
     accentColor: e.accentColor ?? '',
   };
 }
@@ -1096,11 +1092,6 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
       if (!endIso && !e.endDate) e.endDate = 'Informe o fim: ele vai na autorização de menores.';
       if (form.ageRating === '18 anos') e.allowsMinors = 'Evento com classificação 18 anos não permite menores.';
     }
-    // Frase do cronômetro: as mesmas regras do servidor (`checkCountdownPhrase`), que confere de novo.
-    const phrase = form.countdownPhrase.trim().replace(/\s+/g, ' ');
-    if (phrase.length > meta.limits.countdownPhraseMax)
-      e.countdownPhrase = `Use no máximo ${meta.limits.countdownPhraseMax} caracteres.`;
-    else if (/[<>]/.test(phrase)) e.countdownPhrase = 'Use só texto, sem os sinais < e >.';
     // Cor de destaque: só #RRGGBB (o servidor confere de novo e grava em maiúsculas).
     if (form.accentColor.trim() && !normalizeHex(form.accentColor)) e.accentColor = ACCENT_FORMAT_ERROR;
     return e;
@@ -1165,7 +1156,6 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
       endsAt: form.endDate && form.endTime ? zonedInputsToIso(form.endDate, form.endTime) : null,
       allowsMinors: form.allowsMinors,
       countdownEnabled: form.countdownEnabled,
-      countdownPhrase: form.countdownPhrase.trim().replace(/\s+/g, ' ') || null,
       accentColor: normalizeHex(form.accentColor),
     };
     let current: AdminEvent;
@@ -1409,22 +1399,6 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
           Contagem regressiva até o início, no topo da página. Entre o início e o fim aparece "Acontecendo agora"; depois
           do fim, ou com o evento encerrado, o cronômetro some.
         </small>
-        <FormField
-          id="ev-countdownPhrase"
-          label="Frase do cronômetro (opcional)"
-          error={errors.countdownPhrase}
-          hint={`Aparece acima do nome do evento durante a contagem. Em branco: "${meta.countdownPhraseDefault}". ${form.countdownPhrase.trim().length} de ${meta.limits.countdownPhraseMax} caracteres, só texto.`}
-        >
-          <input
-            id="ev-countdownPhrase"
-            value={form.countdownPhrase}
-            maxLength={meta.limits.countdownPhraseMax}
-            placeholder={meta.countdownPhraseDefault}
-            disabled={!form.countdownEnabled}
-            onChange={e => set('countdownPhrase', e.target.value)}
-            {...described('ev-countdownPhrase', errors.countdownPhrase, true)}
-          />
-        </FormField>
       </fieldset>
       <div className="px-check px-field-wide">
         <input

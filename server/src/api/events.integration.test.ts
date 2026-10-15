@@ -1063,88 +1063,72 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
     }
     const publicEvent = async (slug: string) =>
       (await json(await app.request(`/api/public/events/${slug}`))).event as {
-        countdown: { phrase: string; liveUntil: string } | null;
+        countdown: { liveUntil: string } | null;
         serverNow: string;
       };
 
-    it('ligado por padrão, com a frase padrão, a hora do servidor e "acontecendo agora" até o fim (ou 8 h sem fim)', async () => {
+    it('ligado por padrão, com a hora do servidor e "acontecendo agora" até o fim (ou 8 h sem fim)', async () => {
       const a = await session();
-      const meta = await json(await a.get('/admin/events/meta'));
-      expect(meta.countdownPhraseDefault).toBe('Falta pouco para');
-      expect(meta.limits.countdownPhraseMax).toBe(40);
-
       const e = await published(a);
       const withEnd = await published(a, { name: 'Festa Com Fim', endsAt: '2026-12-13T04:00:00-03:00' });
       const got = await json(await a.get(`/admin/events/${e.id}`));
-      expect(got.event).toMatchObject({ countdownEnabled: true, countdownPhrase: null });
+      expect(got.event).toMatchObject({ countdownEnabled: true });
 
       clock.set('2026-10-02T09:30:15Z');
       const pub = await publicEvent(e.slug);
       expect(pub.serverNow).toBe('2026-10-02T09:30:15.000Z'); // a hora do servidor, não a do aparelho
-      expect(pub.countdown).toEqual({ phrase: 'Falta pouco para', liveUntil: '2026-12-13T09:00:00.000Z' }); // 22:00 BRT + 8 h
+      expect(pub.countdown).toEqual({ liveUntil: '2026-12-13T09:00:00.000Z' }); // 22:00 BRT + 8 h
       expect((await publicEvent(withEnd.slug)).countdown?.liveUntil).toBe('2026-12-13T07:00:00.000Z');
     });
 
-    it('frase personalizada (até 40 caracteres, só texto) e cronômetro desligado pelo painel, com trilha', async () => {
+    it('sem a frase acima do título (15/10/2026): nem no painel, nem na página, e o que vier dela é ignorado', async () => {
+      const a = await session();
+      const meta = await json(await a.get('/admin/events/meta'));
+      expect(meta).not.toHaveProperty('countdownPhraseDefault');
+      expect(meta.limits).not.toHaveProperty('countdownPhraseMax');
+      const e = await published(a);
+      // Navegador antigo que ainda mande a frase: o campo é descartado e nada é gravado (a coluna fica sem uso até a limpeza).
+      const patched = await a.patch(`/admin/events/${e.id}`, { countdownPhrase: 'Contagem para a festa', isFeatured: true });
+      expect(patched.status).toBe(200);
+      expect((await json(patched)).event.countdownPhrase).toBeNull();
+      const created = await a.post('/admin/events', eventBody({ name: 'Com Frase Antiga', countdownPhrase: 'Oi' }));
+      expect(created.status).toBe(201);
+      expect((await json(created)).event.countdownPhrase).toBeNull();
+      const stored = await sql('select countdown_phrase from events where id = $1 or name = $2', [e.id, 'Com Frase Antiga']);
+      expect(stored.rows).toEqual([{ countdown_phrase: null }, { countdown_phrase: null }]);
+      expect(await publicEvent(e.slug)).not.toHaveProperty('countdown.phrase');
+    });
+
+    it('cronômetro desligado pelo painel, com trilha', async () => {
       const a = await session();
       const e = await published(a);
-      const custom = await a.patch(`/admin/events/${e.id}`, { countdownPhrase: '  Contagem   para a festa ' });
-      expect(custom.status).toBe(200);
-      expect((await json(custom)).event.countdownPhrase).toBe('Contagem para a festa');
-      expect((await publicEvent(e.slug)).countdown?.phrase).toBe('Contagem para a festa');
-
-      // Em branco volta para a padrão.
-      expect((await json(await a.patch(`/admin/events/${e.id}`, { countdownPhrase: '   ' }))).event.countdownPhrase).toBeNull();
-      expect((await publicEvent(e.slug)).countdown?.phrase).toBe('Falta pouco para');
-
-      for (const bad of ['x'.repeat(41), 'Falta <b>pouco</b>', 'a > b']) {
-        const res = await a.patch(`/admin/events/${e.id}`, { countdownPhrase: bad });
-        expect(res.status, bad).toBe(422);
-        expect(await fieldsOf(res)).toEqual(['countdownPhrase']);
-      }
-      expect((await a.patch(`/admin/events/${e.id}`, { countdownPhrase: 'x'.repeat(40) })).status).toBe(200);
-
       const off = await a.patch(`/admin/events/${e.id}`, { countdownEnabled: false });
       expect((await json(off)).event.countdownEnabled).toBe(false);
       const pub = await publicEvent(e.slug);
       expect(pub.countdown).toBeNull();
       expect(pub.serverNow).toBeTruthy();
-      // A trilha guarda o antes e o depois de cada edição (todas com a mesma hora no relógio do teste).
       const trail = await sql("select before_json, after_json from audit_log where action = 'evento.editar' and entity_id = $1", [
         e.id,
       ]);
       expect(trail.rows).toContainEqual({
-        before_json: expect.objectContaining({ countdownEnabled: true, countdownPhrase: 'x'.repeat(40) }),
-        after_json: expect.objectContaining({ countdownEnabled: false, countdownPhrase: 'x'.repeat(40) }),
+        before_json: expect.objectContaining({ countdownEnabled: true }),
+        after_json: expect.objectContaining({ countdownEnabled: false }),
       });
-
-      // Criado já desligado e com frase.
-      const created = await a.post('/admin/events', eventBody({ name: 'Sem Cronômetro', countdownEnabled: false, countdownPhrase: 'Oi' }));
-      expect((await json(created)).event).toMatchObject({ countdownEnabled: false, countdownPhrase: 'Oi' });
+      // Criado já desligado.
+      const created = await a.post('/admin/events', eventBody({ name: 'Sem Cronômetro', countdownEnabled: false }));
+      expect((await json(created)).event).toMatchObject({ countdownEnabled: false });
     });
 
     it('evento encerrado não leva cronômetro, e a prévia do painel leva', async () => {
       const a = await session();
       const draft = await newEvent(a);
       const preview = await json(await a.get(`/admin/events/${draft.id}/preview`));
-      expect(preview.event.countdown).toMatchObject({ phrase: 'Falta pouco para' });
+      expect(preview.event.countdown).toMatchObject({ liveUntil: expect.any(String) });
       expect(preview.event.serverNow).toBe('2026-10-01T12:00:00.000Z');
 
       const e = await published(a);
       expect((await a.post(`/admin/events/${e.id}/close`)).status).toBe(200);
       expect((await publicEvent(e.slug)).countdown).toBeNull();
-    });
-
-    it('o banco recusa frase com marcação ou longa demais, mesmo por fora do painel', async () => {
-      const a = await session();
-      const e = await newEvent(a);
-      await expect(sql("update events set countdown_phrase = '<i>oi</i>' where id = $1", [e.id])).rejects.toMatchObject({
-        code: '23514',
-      });
-      await expect(sql('update events set countdown_phrase = $2 where id = $1', [e.id, 'x'.repeat(41)])).rejects.toMatchObject({
-        code: '23514',
-      });
-      await expect(sql("update events set countdown_phrase = '' where id = $1", [e.id])).rejects.toMatchObject({ code: '23514' });
     });
   });
 
