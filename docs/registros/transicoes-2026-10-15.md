@@ -52,4 +52,4 @@ Nada piorou; LCP e FCP melhoraram cerca de 150 a 220 ms (o pacote menor). Dois p
 
 ## Publicação
 
-Não publicado. Pelo fluxo de sempre, com OK do responsável antes da virada: `release-2026-10-15e`, com a migração 0015. A revisão no ar convive com o banco migrado (a 0015 só acrescenta uma coluna que ela não lê).
+Publicado em 15/10/2026 14:40 UTC, com o OK do responsável para a virada: `release-2026-10-15e`, revisão `partyx-00024-kuy`, migração 0015. Registro: `publicacao-producao-2026-10-15e.md`; retorno para a `partyx-00022-jez`, que convive com a 0015.

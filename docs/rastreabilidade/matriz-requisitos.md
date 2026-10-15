@@ -120,7 +120,7 @@ Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na pá
 
 ### Transições do site (15/10/2026)
 
-Pedido do responsável: padrão único de entrada (desfoque, esmaecer e subida curta, em cascata), capa desfocada que fica nítida na página do evento, cronômetro com troca suave, vitrine ao aparecer na tela, passar o mouse em 150 ms, troca de página com View Transitions e alternativa, painel só com esmaecer, portaria sem entradas, menos movimento, sem animação contínua, nada segurando "Continuar" ou o pagamento, LCP, CLS e TBT medidos antes e depois. Migração `0015_capa_desfocada`. Registro: `docs/registros/transicoes-2026-10-15.md`.
+Pedido do responsável: padrão único de entrada (desfoque, esmaecer e subida curta, em cascata), capa desfocada que fica nítida na página do evento, cronômetro com troca suave, vitrine ao aparecer na tela, passar o mouse em 150 ms, troca de página com View Transitions e alternativa, painel só com esmaecer, portaria sem entradas, menos movimento, sem animação contínua, nada segurando "Continuar" ou o pagamento, LCP, CLS e TBT medidos antes e depois. Migração `0015_capa_desfocada`. Publicado em 15/10/2026 (`partyx-00024-kuy`, `publicacao-producao-2026-10-15e.md`). Registro: `docs/registros/transicoes-2026-10-15.md`.
 
 | Requisito ou critério | Evidência |
 |---|---|

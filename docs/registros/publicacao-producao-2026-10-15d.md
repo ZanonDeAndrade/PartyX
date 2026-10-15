@@ -26,6 +26,8 @@ Sem mudança na Vercel, nas rotinas, na verificação de saúde e nas permissõe
 
 ## Voltar atrás
 
+> Atualização de 15/10/2026 14:40 UTC: a `partyx-00024-kuy` (transições do site, migração 0015) substituiu a `00022-jez`. A referência de retorno atual está em `publicacao-producao-2026-10-15e.md`.
+
 - **Referência de retorno a partir daqui: `partyx-00022-jez`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00020-kug ./infra/producao/deploy.sh rollback`.
 - A `00020-kug` funciona com o banco já migrado (a 0014 só acrescenta uma coluna que ela não lê): todos os eventos voltam ao roxo, e uma cor escolhida enquanto isso fica guardada para quando a versão nova voltar.
 

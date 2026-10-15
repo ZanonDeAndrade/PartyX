@@ -480,3 +480,11 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00022-jez`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00020-kug ./infra/producao/deploy.sh rollback`. A `00020-kug` convive com a 0014 (todos os eventos voltam ao roxo).
 
+> Atualização de 15/10/2026 14:40 UTC: a `partyx-00024-kuy` (seção 23) substituiu a `00022-jez`.
+
+## 23. Décima primeira publicação: transições do site e capa desfocada (15/10/2026)
+
+**Publicado:** revisão `partyx-00024-kuy` (tag `release-2026-10-15e`, commit `f3c8004`), 100% desde 15/10 14:40 UTC, com a migração `0015_capa_desfocada` (aplicada às 14:00, depois do backup sob demanda `partyx-backup-74ptg`; a candidata esperou o OK da virada). Mesma configuração. Registro: `docs/registros/publicacao-producao-2026-10-15e.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00024-kuy`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00022-jez ./infra/producao/deploy.sh rollback`. A `00022-jez` convive com a 0015 (volta o movimento anterior).
+
