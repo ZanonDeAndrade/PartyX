@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
+import { suggestAccent } from '../domain/accent';
 import { AppError } from '../domain/errors';
 
 export const BANNER_MAX_BYTES = 5 * 1024 * 1024;
@@ -119,6 +120,25 @@ export function resizeWebp(webp: Buffer, width: number): Promise<Buffer> {
     .resize({ width, withoutEnlargement: true })
     .webp({ quality: 80 })
     .toBuffer();
+}
+
+/**
+ * Nome do objeto do banner de um evento a partir da URL gravada (`.../events/<id>/<hash>.webp`), só se for desse evento. Nulo para
+ * qualquer outra forma: o nome lido nunca vem do navegador.
+ */
+export function bannerObjectName(bannerUrl: string, eventId: string): string | null {
+  const m = /(events\/([0-9a-f-]{36})\/[0-9a-f]{32}\.webp)$/.exec(bannerUrl);
+  return m && m[2] === eventId ? m[1]! : null;
+}
+
+/** Cor de destaque sugerida pela capa (0014): reduz a 48 x 48 e escolhe a cor viva mais presente (`suggestAccent`). */
+export async function accentFromImage(image: Buffer): Promise<string | null> {
+  const { data, info } = await sharp(image, { limitInputPixels: MAX_INPUT_PIXELS })
+    .resize(48, 48, { fit: 'cover' })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return suggestAccent(data, info.channels);
 }
 
 /** Nome do objeto de uma versão menor: `<hash>.webp` → `<hash>-w640.webp`. Gravada ao lado do banner. */

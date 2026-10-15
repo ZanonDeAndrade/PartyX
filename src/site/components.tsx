@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { accentPalette, stubVars } from './accent';
 import { api, type EventCard, type MaintenanceContact, type SaleKind, type SiteInfo, type TypeState } from './api';
 import { brl, dateParts, eventPath, searchPath, timeOf } from './format';
 import { IconClose, IconMenu, IconSearch } from './icons';
@@ -431,10 +432,12 @@ export function Banner({
  * Bloco de data no formato de cartaz: dia grande, mês abaixo, com o canto cortado na diagonal do X do logotipo.
  * O texto completo fica para o leitor de tela (o visual abrevia).
  */
-export function DateStub({ iso, size = 'md' }: { iso: string; size?: 'md' | 'lg' }) {
+export function DateStub({ iso, size = 'md', accent }: { iso: string; size?: 'md' | 'lg'; accent?: string | null }) {
   const p = dateParts(iso);
+  // Cor de destaque do evento (0014), só no card da vitrine: fundo e texto calculados, por variável CSS.
+  const palette = accent ? accentPalette(accent) : null;
   return (
-    <span className={`px-stub px-stub-${size}`}>
+    <span className={`px-stub px-stub-${size}`} style={palette ? (stubVars(palette) as CSSProperties) : undefined}>
       <span className="px-stub-day" aria-hidden="true">
         {p.day}
       </span>
@@ -477,7 +480,7 @@ export function EventCardView({
               </span>
             )}
           </Banner>
-          <DateStub iso={event.startsAt} />
+          <DateStub iso={event.startsAt} accent={event.accentColor} />
         </div>
         <div className="px-card-body">
           <h3 className="px-card-title">{event.name}</h3>

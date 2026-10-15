@@ -31,6 +31,13 @@
   --px-violet-soft: #ede9fe;
   --px-violet-ink: #5b21b6; /* texto sobre --px-violet-soft: 7,6:1 */
   --px-lilac: #c4b5fd; /* destaque e links sobre o preto: 10,6:1 */
+  /* Cor de destaque do evento (0014): a página do evento redefine os tokens de destaque acima e estes, só dentro dela
+     (`.px-event-scope`, valores de src/site/accent.ts). Sem cor escolhida, valem estes, iguais ao visual de antes. */
+  --px-on-accent: #ffffff; /* texto sobre --px-violet */
+  --px-violet-text: #7c3aed; /* texto em destaque sobre o branco: 5,7:1 */
+  --px-violet-line: #7c3aed; /* linhas sobre o preto: 3,4:1 */
+  --px-accent-tint: rgb(124 58 237 / 0.08); /* fundo suave sobre o preto */
+  --px-focus-glow: rgb(139 92 246 / 0.35); /* halo do campo em foco */
 
   /* ---- cor: semântica (só para estado, sempre com texto) ---- */
   --px-ok-bg: #dcfce7;

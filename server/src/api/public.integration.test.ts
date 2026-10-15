@@ -179,6 +179,7 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
       expect(card.sale).toMatchObject({ kind: 'open', minPriceCents: 8000 });
       expect(card.startsAt).toBe('2026-12-13T01:00:00.000Z');
       expect(Object.keys(card).sort()).toEqual([
+        'accentColor',
         'ageRating',
         'bannerSrcSet',
         'bannerUrl',

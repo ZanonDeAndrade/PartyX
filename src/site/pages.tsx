@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { accentPalette, accentVars } from './accent';
 import { api, minorAuthorizationUrl, type EventCard, type EventDetail, type SiteInfo } from './api';
 import { takeEmbedded } from './embedded';
 import { loadCart, saveCart } from './cart';
@@ -524,6 +525,8 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
       window.prompt('Copie o link do evento:', url);
     }
   };
+  // Cor de destaque (0014): as variáveis valem só dentro da página do evento; cabeçalho, menu e rodapé ficam com o roxo da PartyX.
+  const accent = useMemo(() => (event.accentColor ? accentPalette(event.accentColor) : null), [event.accentColor]);
   const shareNow = () => {
     // No celular, a folha de compartilhamento do sistema; no computador, a pré-visualização com as opções.
     if (typeof navigator.share === 'function' && window.matchMedia('(max-width: 639px)').matches) {
@@ -532,7 +535,11 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
   };
 
   return (
-    <>
+    <div
+      className="px-event-scope"
+      data-accent={accent ? accent.base : undefined}
+      style={accent ? (accentVars(accent) as CSSProperties) : undefined}
+    >
       <div className="px-event-hero">
         <Banner
           event={event}
@@ -684,7 +691,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
         </aside>
       </div>
       {share ? <ShareDialog event={event} onClose={() => setShare(false)} /> : null}
-    </>
+    </div>
   );
 }
 

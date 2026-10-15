@@ -1114,4 +1114,127 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
       await expect(sql("update events set countdown_phrase = '' where id = $1", [e.id])).rejects.toMatchObject({ code: '23514' });
     });
   });
+
+  describe('cor de destaque do evento (0014)', () => {
+    async function published(a: Session, o: Record<string, unknown> = {}) {
+      const e = await newEvent(a, o);
+      await newType(a, e.id);
+      expect((await a.post(`/admin/events/${e.id}/publish`)).status).toBe(200);
+      return e;
+    }
+    const publicEvent = async (slug: string) =>
+      (await json(await app.request(`/api/public/events/${slug}`))).event as { accentColor: string | null };
+    const publicCard = async (slug: string) =>
+      ((await json(await app.request('/api/public/events'))).events as { slug: string; accentColor: string | null }[]).find(
+        c => c.slug === slug,
+      );
+
+    it('sem cor: nulo no painel, na página e no card (o roxo da PartyX)', async () => {
+      const a = await session();
+      const e = await published(a);
+      expect((await json(await a.get(`/admin/events/${e.id}`))).event.accentColor).toBeNull();
+      expect((await publicEvent(e.slug)).accentColor).toBeNull();
+      expect((await publicCard(e.slug))?.accentColor).toBeNull();
+    });
+
+    it('cor válida gravada em maiúsculas, na página e no card; volta ao padrão com nulo ou vazio; trilha com antes e depois', async () => {
+      const a = await session();
+      const e = await published(a);
+      const green = await a.patch(`/admin/events/${e.id}`, { accentColor: '#15803d' });
+      expect(green.status).toBe(200);
+      expect((await json(green)).event.accentColor).toBe('#15803D');
+      expect((await publicEvent(e.slug)).accentColor).toBe('#15803D');
+      expect((await publicCard(e.slug))?.accentColor).toBe('#15803D');
+      // Cor clara (texto escuro na página) e cor escura (texto claro): o servidor guarda as duas; o contraste é da página.
+      expect((await json(await a.patch(`/admin/events/${e.id}`, { accentColor: '#FACC15' }))).event.accentColor).toBe('#FACC15');
+      expect((await json(await a.patch(`/admin/events/${e.id}`, { accentColor: '#1E3A8A' }))).event.accentColor).toBe('#1E3A8A');
+
+      expect((await json(await a.patch(`/admin/events/${e.id}`, { accentColor: null }))).event.accentColor).toBeNull();
+      expect((await publicEvent(e.slug)).accentColor).toBeNull();
+      await a.patch(`/admin/events/${e.id}`, { accentColor: '#DC2626' });
+      expect((await json(await a.patch(`/admin/events/${e.id}`, { accentColor: '  ' }))).event.accentColor).toBeNull();
+
+      const trail = await sql("select before_json, after_json from audit_log where action = 'evento.editar' and entity_id = $1", [
+        e.id,
+      ]);
+      expect(trail.rows).toContainEqual({
+        before_json: expect.objectContaining({ accentColor: null }),
+        after_json: expect.objectContaining({ accentColor: '#15803D' }),
+      });
+
+      // Criado já com cor; outra edição sem o campo não mexe nela.
+      const created = await json(await a.post('/admin/events', eventBody({ name: 'Festa Verde', accentColor: '#15803D' })));
+      expect(created.event.accentColor).toBe('#15803D');
+      const renamed = await json(await a.patch(`/admin/events/${created.event.id}`, { name: 'Festa Verde 2' }));
+      expect(renamed.event.accentColor).toBe('#15803D');
+    });
+
+    it('recusa o que não for #RRGGBB, sem gravar (422 no campo)', async () => {
+      const a = await session();
+      const e = await newEvent(a, { accentColor: '#7C3AED' });
+      for (const bad of ['red', '#fff', '#12345G', '#15803D;background:url(x)', '15803D', 'rgb(1,2,3)', '#15803D00']) {
+        const res = await a.patch(`/admin/events/${e.id}`, { accentColor: bad });
+        expect(res.status, bad).toBe(422);
+        expect(await fieldsOf(res)).toEqual(['accentColor']);
+      }
+      expect((await a.patch(`/admin/events/${e.id}`, { accentColor: 123 })).status).toBe(422);
+      const created = await a.post('/admin/events', eventBody({ name: 'Festa Ruim', accentColor: 'blue' }));
+      expect(created.status).toBe(422);
+      expect((await json(await a.get(`/admin/events/${e.id}`))).event.accentColor).toBe('#7C3AED');
+    });
+
+    it('o banco recusa formato errado mesmo por fora do painel', async () => {
+      const a = await session();
+      const e = await newEvent(a);
+      for (const bad of ['#15803d', 'red', '#FFF', '', '#15803D;']) {
+        await expect(sql('update events set accent_color = $2 where id = $1', [e.id, bad]), bad).rejects.toMatchObject({
+          code: '23514',
+        });
+      }
+      await sql("update events set accent_color = '#15803D' where id = $1", [e.id]);
+    });
+
+    it('sugestão pela capa salva: a cor viva mais presente; sem capa, 404; sem armazenamento, 503; só administrador', async () => {
+      const a = await session();
+      const e = await newEvent(a);
+      const none = await a.post(`/admin/events/${e.id}/accent-suggestion`);
+      expect(none.status).toBe(404);
+      expect(await errorCode(none)).toBe('sem_banner');
+
+      // Capa com 70% de verde vivo e o resto preto e branco: a sugestão é o verde, e nada é gravado no evento.
+      const cover = await sharp({ create: { width: 1200, height: 700, channels: 3, background: '#FFFFFF' } })
+        .composite([
+          { input: { create: { width: 840, height: 700, channels: 3, background: '#16A34A' } }, left: 0, top: 0 },
+          { input: { create: { width: 180, height: 700, channels: 3, background: '#000000' } }, left: 840, top: 0 },
+        ])
+        .jpeg()
+        .toBuffer();
+      expect((await a.put(`/admin/events/${e.id}/banner`, upload(cover))).status).toBe(200);
+      const res = await a.post(`/admin/events/${e.id}/accent-suggestion`);
+      expect(res.status).toBe(200);
+      const { color } = await json<{ color: string }>(res);
+      expect(color).toMatch(/^#[0-9A-F]{6}$/);
+      const [r, g, b] = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
+      expect(g).toBeGreaterThan(r! + 60);
+      expect(g).toBeGreaterThan(b! + 40);
+      expect((await json(await a.get(`/admin/events/${e.id}`))).event.accentColor).toBeNull();
+
+      // Capa só em cinza: sem sugestão.
+      const grey = await sharp({ create: { width: 1200, height: 700, channels: 3, background: '#808080' } }).jpeg().toBuffer();
+      await a.put(`/admin/events/${e.id}/banner`, upload(grey));
+      expect((await json(await a.post(`/admin/events/${e.id}/accent-suggestion`))).color).toBeNull();
+
+      // Arquivo sumiu do armazenamento: 503 com mensagem, sem detalhes internos.
+      storage.objects.clear();
+      const gone = await a.post(`/admin/events/${e.id}/accent-suggestion`);
+      expect(gone.status).toBe(503);
+      expect(await errorCode(gone)).toBe('capa_indisponivel');
+
+      const noStorage = await a.raw('POST', `/admin/events/${e.id}/accent-suggestion`, { json: {} }, makeApp(false));
+      expect(noStorage.status).toBe(503);
+
+      const client = await session('cliente');
+      expect((await client.post(`/admin/events/${e.id}/accent-suggestion`)).status).toBe(403);
+    });
+  });
 });

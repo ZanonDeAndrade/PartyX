@@ -106,6 +106,18 @@ Pedido do responsável, fora do escopo original (§16 exclui a virada automátic
 | RF-58, CA-28 (relatório por lote, conciliação) | idem (vendas por lote em quantidade e valor; conciliação certa numa compra dividida com preço médio quebrado; exportação com a coluna Lote) |
 | Painel e site | capturas a 360 e 1280 px; `e2e:textos` (78) sem regressão |
 
+### Cor de destaque por evento (15/10/2026)
+
+Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na página do evento (bloco da data, cronômetro, linhas de Quando, Onde e Classificação, aviso de menores, links, "Continuar" e foco) e no bloco da data do card da vitrine; cabeçalho, menu, "Painel" e rodapé com as cores da PartyX; texto preto ou branco com 4,5:1; só `#RRGGBB`, validado no servidor; CSP igual. Não publicado. Registro: `docs/registros/cor-de-destaque-2026-10-15.md`.
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-11 (painel: cor, padrão, sugestão pela capa) | `server/src/api/events.integration.test.ts` (válida em maiúsculas, inválidas 422, nula e vazia voltam ao padrão, trilha, criação com cor; sugestão pela capa salva, sem capa 404, sem armazenamento 503, só administrador), `server/src/domain/accent.test.ts`, `e2e/cor-destaque.spec.ts` (seletor, hexadecimal, aviso de contraste, voltar ao padrão, erro de formato no campo, salvar) |
+| RF-23 (página do evento com a cor), RF-20 (card da vitrine) | `e2e/cor-destaque.spec.ts` (estilos calculados com padrão, verde, amarelo e vermelho a 360 e 1280 px; cabeçalho roxo; card só com o bloco da data; sem rolagem lateral) |
+| Contraste (WCAG 2.x, 4,5:1 texto, 3:1 borda e foco) | `src/site/accent.test.ts` (cor clara com texto preto, cor escura com texto branco, faixa sem contraste ajustada e avisada, 308 cores com todos os tons conferidos) |
+| Regra no banco e reversão | `server/src/db/schema.integration.test.ts` (reversão da 0014 apaga só a coluna), `events.integration.test.ts` (CHECK recusa minúsculas, nome de cor, vazio e `;`) |
+| Sem regressão | `e2e:textos` (78), `e2e:cronometro` (7), `test:db` completo |
+
 ## Painel: promoters, compradores, ingressos, entradas, equipe e conta (11/10/2026, etapa 05 do fechamento)
 
 Interface real em `src/site/adminPeople.tsx` (ADM07 a ADM09, ADM12 a ADM15, ADM19 a ADM21, ADM24), menu lateral com gaveta no celular e exportação com estados e data (ADM23, `ExportLink`). API nova com testes: `GET /admin/buyers`, `GET /admin/buyers/:id`, `POST /admin/buyers/:id/cpf` (CPF completo sob demanda, trilha `usuario.cpf_visualizado`), `GET /admin/tickets/:id` (autor e data do cancelamento), `GET /admin/exports/promoters/:id/orders.csv`. Verificado no navegador (Chromium, 360 px e 1280 px, dados fictícios): sem rolagem horizontal e sem alvo menor que 44 px.

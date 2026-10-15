@@ -15,6 +15,8 @@ export interface EventCard {
   bannerSrcSet?: string | null;
   isFeatured: boolean;
   sale: { kind: SaleKind; label: string; minPriceCents: number | null; startsAt: string | null };
+  /** Cor de destaque (`#RRGGBB`, 0014); nula: o roxo da PartyX. Na vitrine, só o bloco da data; na página, o destaque inteiro. */
+  accentColor?: string | null;
 }
 
 export interface TicketTypeView {
@@ -563,6 +565,8 @@ export interface AdminEventRow {
   /** Cronômetro na página do evento (ligado por padrão) e a frase personalizada (nula: a padrão). */
   countdownEnabled: boolean;
   countdownPhrase: string | null;
+  /** Cor de destaque da página do evento (`#RRGGBB`); nula: o roxo da PartyX. */
+  accentColor: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -753,6 +757,7 @@ export interface EventInputBody {
   allowsMinors: boolean;
   countdownEnabled: boolean;
   countdownPhrase: string | null;
+  accentColor: string | null;
 }
 export interface TicketTypeBody {
   name: string;
@@ -1020,6 +1025,9 @@ export const api = {
       request<{ event: AdminEvent; typesClosed: number }>('POST', `/admin/events/${encodeURIComponent(id)}/stop-sales`),
     removeBanner: (id: string) =>
       request<{ event: AdminEvent }>('DELETE', `/admin/events/${encodeURIComponent(id)}/banner`),
+    /** Cor viva mais presente na capa salva (nula se a capa só tem preto, branco e cinza). Não grava nada. */
+    accentSuggestion: (id: string) =>
+      request<{ color: string | null }>('POST', `/admin/events/${encodeURIComponent(id)}/accent-suggestion`),
     eventRemoval: (id: string, signal?: AbortSignal) =>
       get<EventRemovalCheck>(`/admin/events/${encodeURIComponent(id)}/removal`, signal),
     deleteEvent: (id: string, confirmName: string) =>

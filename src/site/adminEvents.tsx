@@ -11,7 +11,9 @@ import {
   type EventStatus,
   type FieldProblem,
 } from './api';
+import { AccentField } from './adminAccent';
 import { BuyersPanel, ContingencyPanel, Gate, LiveEntriesPanel, Loading, TicketsPanel, useAdmin } from './adminPages';
+import { normalizeHex } from './accent';
 import { Layout, toast, usePageTitle } from './components';
 import {
   attractionsFromText,
@@ -966,6 +968,8 @@ interface EventForm {
   countdownEnabled: boolean;
   /** Vazia: a frase padrão. */
   countdownPhrase: string;
+  /** Cor de destaque como digitada; vazia: o roxo da PartyX. */
+  accentColor: string;
 }
 const EMPTY_FORM: EventForm = {
   name: '',
@@ -982,6 +986,7 @@ const EMPTY_FORM: EventForm = {
   allowsMinors: false,
   countdownEnabled: true,
   countdownPhrase: '',
+  accentColor: '',
 };
 function formOf(e: AdminEvent): EventForm {
   const { date, time } = isoToZonedInputs(e.startsAt);
@@ -1001,6 +1006,7 @@ function formOf(e: AdminEvent): EventForm {
     allowsMinors: e.allowsMinors,
     countdownEnabled: e.countdownEnabled,
     countdownPhrase: e.countdownPhrase ?? '',
+    accentColor: e.accentColor ?? '',
   };
 }
 const SERVER_FIELD: Record<string, string> = { startsAt: 'date', slug: 'name', endsAt: 'endDate' };
@@ -1094,6 +1100,9 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
     if (phrase.length > meta.limits.countdownPhraseMax)
       e.countdownPhrase = `Use no máximo ${meta.limits.countdownPhraseMax} caracteres.`;
     else if (/[<>]/.test(phrase)) e.countdownPhrase = 'Use só texto, sem os sinais < e >.';
+    // Cor de destaque: só #RRGGBB (o servidor confere de novo e grava em maiúsculas).
+    if (form.accentColor.trim() && !normalizeHex(form.accentColor))
+      e.accentColor = 'Use uma cor no formato #RRGGBB (por exemplo, #7C3AED).';
     return e;
   };
 
@@ -1157,6 +1166,7 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
       allowsMinors: form.allowsMinors,
       countdownEnabled: form.countdownEnabled,
       countdownPhrase: form.countdownPhrase.trim().replace(/\s+/g, ' ') || null,
+      accentColor: normalizeHex(form.accentColor),
     };
     let current: AdminEvent;
     try {
@@ -1493,6 +1503,17 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
         ) : null}
         {removeBanner ? <p className="px-small">O banner é removido ao salvar.</p> : null}
       </fieldset>
+
+      <AccentField
+        value={form.accentColor}
+        onChange={v => set('accentColor', v)}
+        error={errors.accentColor}
+        event={event}
+        newFilePending={file !== null}
+        bannerRemoved={removeBanner}
+        storageAvailable={meta.banner.available}
+        busy={busy !== ''}
+      />
 
       <div className="px-actions px-field-wide px-adm-actions">
         <button type="submit" className="px-btn px-btn-pri" disabled={busy !== ''}>

@@ -30,7 +30,9 @@ import {
 import { createLot, deleteLot, moveLot, turnTypeLot, updateLot } from '../events/lotsAdmin';
 import { logger } from '../logger';
 import {
+  accentFromImage,
   BANNER_MAX_BYTES,
+  bannerObjectName,
   BANNER_MAX_WIDTH,
   BANNER_MIN_WIDTH,
   processBanner,
@@ -57,6 +59,7 @@ const eventFields = {
   allowsMinors: z.boolean(),
   countdownEnabled: z.boolean(),
   countdownPhrase: z.string().max(600).nullable(),
+  accentColor: z.string().max(20).nullable(),
 };
 const createEventBody = z.object({
   ...eventFields,
@@ -66,6 +69,7 @@ const createEventBody = z.object({
   allowsMinors: eventFields.allowsMinors.optional(),
   countdownEnabled: eventFields.countdownEnabled.optional(),
   countdownPhrase: eventFields.countdownPhrase.optional(),
+  accentColor: eventFields.accentColor.optional(),
   slug: text.optional(),
 });
 const updateEventBody = z.object(eventFields).partial();
@@ -268,6 +272,34 @@ export function eventsRoutes(deps: AuthDeps) {
   app.delete('/admin/events/:id/banner', async c =>
     c.json({ event: await setEventBanner(evDeps, actor(c), uuid(c.req.param('id'), 'Evento'), null) }),
   );
+  /**
+   * Cor de destaque sugerida pela capa já salva (0014). Só lê: não grava nada; o painel mostra a cor e o administrador decide.
+   * Lê a versão de 640 px quando existe (menos bytes); nula se a capa não tem cor viva (só preto, branco e cinza).
+   */
+  app.post('/admin/events/:id/accent-suggestion', async c => {
+    const id = uuid(c.req.param('id'), 'Evento');
+    if (!deps.banners) {
+      throw new AppError(
+        503,
+        'armazenamento_indisponivel',
+        'O armazenamento de imagens não está configurado neste ambiente.',
+      );
+    }
+    const { event } = await getEvent(evDeps, id);
+    const name = event.bannerUrl ? bannerObjectName(event.bannerUrl, id) : null;
+    if (!name) throw new AppError(404, 'sem_banner', 'Este evento ainda não tem imagem de capa salva.');
+    let image: Buffer;
+    try {
+      image = await deps.banners.read(event.bannerWidths.includes(640) ? variantObjectName(name, 640) : name);
+    } catch (error) {
+      logger.error('não foi possível ler a capa para sugerir a cor', {
+        eventId: id,
+        erro: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError(503, 'capa_indisponivel', 'Não foi possível ler a imagem de capa agora. Tente de novo.');
+    }
+    return c.json({ color: await accentFromImage(image) });
+  });
 
   // ----- tipos de ingresso -----
   app.post('/admin/events/:id/ticket-types', async c => {

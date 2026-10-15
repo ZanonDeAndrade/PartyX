@@ -15,6 +15,7 @@ import {
 } from '../domain/events';
 import { AppError } from '../domain/errors';
 import { checkCountdownPhrase, COUNTDOWN_PHRASE_MAX } from '../domain/vitrine';
+import { checkAccentColor } from '../domain/accent';
 import { normalizeName, isPhoneValid, normalizePhone } from '../domain/identity';
 import type { Clock } from '../providers/clock';
 
@@ -73,6 +74,7 @@ const eventSnapshot = (e: EventRow) => ({
   archivedAt: e.archivedAt?.toISOString() ?? null,
   countdownEnabled: e.countdownEnabled,
   countdownPhrase: e.countdownPhrase,
+  accentColor: e.accentColor,
 });
 
 export interface EventInput {
@@ -92,6 +94,8 @@ export interface EventInput {
   countdownEnabled?: boolean;
   /** Frase acima do título durante a contagem; vazia ou nula: a padrão. Até 40 caracteres, só texto. */
   countdownPhrase?: string | null;
+  /** Cor de destaque da página do evento, `#RRGGBB`; nula ou vazia: o roxo da PartyX (0014). */
+  accentColor?: string | null;
 }
 
 /**
@@ -161,6 +165,11 @@ function checkEvent(input: Partial<EventInput>, required: boolean) {
     if ('problem' in phrase) errors.push({ campo: 'countdownPhrase', mensagem: phrase.problem });
     else out.countdownPhrase = phrase.value;
   }
+  if (input.accentColor !== undefined) {
+    const color = checkAccentColor(input.accentColor);
+    if ('problem' in color) errors.push({ campo: 'accentColor', mensagem: color.problem });
+    else out.accentColor = color.value;
+  }
   if (errors.length) throw invalid(errors);
   return out;
 }
@@ -200,6 +209,7 @@ export async function createEvent(deps: EventsDeps, actor: Actor, input: EventIn
             allowsMinors: data.allowsMinors ?? false,
             countdownEnabled: data.countdownEnabled ?? true,
             countdownPhrase: data.countdownPhrase ?? null,
+            accentColor: data.accentColor ?? null,
             createdAt: now,
             updatedAt: now,
           })

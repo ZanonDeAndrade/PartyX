@@ -99,6 +99,13 @@
       "when": 1792035045413,
       "tag": "0013_lotes_por_tipo",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792065680480,
+      "tag": "0014_cor_de_destaque",
+      "breakpoints": true
     }
   ]
 }

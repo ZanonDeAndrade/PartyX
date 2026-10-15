@@ -322,7 +322,7 @@ body.px-dark .px-footer {
   min-width: 56px;
   padding: 8px 10px 10px;
   background: var(--px-violet);
-  color: #fff;
+  color: var(--px-on-accent);
   font-family: var(--px-font-display);
   font-weight: 800;
   line-height: 0.82;
@@ -779,7 +779,7 @@ body.px-dark .px-textlink {
   align-content: center;
   padding: 9px 4px 12px;
   background: var(--px-violet);
-  color: #fff;
+  color: var(--px-on-accent);
   font-family: var(--px-font-display);
   font-weight: 800;
   line-height: 0.82;
@@ -804,7 +804,7 @@ body.px-dark .px-textlink {
   margin: 0;
   padding: 11px 18px 13px 16px;
   background: var(--px-violet);
-  color: #fff;
+  color: var(--px-on-accent);
   font-family: var(--px-font-display);
   font-size: clamp(1.375rem, 3.4vw, 1.875rem);
   font-weight: 800;
@@ -818,7 +818,7 @@ body.px-dark .px-textlink {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--px-on-accent);
 }
 /* Única animação do cronômetro: o ponto de "Acontecendo agora". Os números nunca animam. */
 @media (prefers-reduced-motion: no-preference) {
@@ -886,7 +886,7 @@ body.px-dark .px-textlink {
 }
 .px-facts > div {
   padding-left: var(--px-s-3);
-  border-left: 2px solid var(--px-violet);
+  border-left: 2px solid var(--px-violet-line);
   min-width: 0;
 }
 .px-facts dt {
@@ -958,7 +958,7 @@ body.px-dark .px-textlink {
   box-shadow: var(--px-sh-3);
 }
 .px-event-side a {
-  color: var(--px-violet) !important;
+  color: var(--px-violet-text) !important;
 }
 .px-side-head {
   display: flex;
@@ -1027,7 +1027,7 @@ body.px-dark .px-event-side .px-fine {
   margin: 4px 0 0;
   font-size: var(--px-t-sm);
   font-weight: 800;
-  color: var(--px-violet);
+  color: var(--px-violet-text);
 }
 /* Compra que passa do que resta no lote: o restante sai do próximo, com o preço dele. */
 .px-sel-note {
@@ -1546,9 +1546,21 @@ html[data-px-intro] .px-intro-static {
 .px-event-minor {
   margin: var(--px-s-4) 0 0;
   padding: var(--px-s-3) var(--px-s-4);
-  border-left: 3px solid var(--px-violet, #7c3aed);
-  background: rgba(124, 58, 237, 0.08);
+  border-left: 3px solid var(--px-violet-line);
+  background: var(--px-accent-tint);
   border-radius: var(--px-r-md);
   font-size: var(--px-t-sm);
   line-height: 1.5;
+}
+
+/* ---------- cor de destaque do evento (0014) ---------- */
+/* Invólucro da página do evento: não gera caixa (o layout segue igual); só carrega as variáveis da cor escolhida, que valem para
+   tudo dentro dele. Cabeçalho, menu e rodapé ficam fora, com as cores da PartyX. */
+.px-event-scope {
+  display: contents;
+}
+/* Com cor própria, o botão desabilitado perde a cor (fica acinzentado) além de esmaecer: qualquer cor continua parecendo desabilitada. */
+.px-event-scope[data-accent] .px-btn-pri:disabled,
+.px-event-scope[data-accent] .px-btn-pri[aria-disabled='true'] {
+  filter: saturate(0.15);
 }

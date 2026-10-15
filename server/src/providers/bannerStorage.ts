@@ -15,6 +15,8 @@ export interface BannerStorage {
    * pré-visualização e banners antigos. Devolve quantos arquivos saíram.
    */
   removeEventImages(eventId: string): Promise<number>;
+  /** Lê um arquivo gravado (a capa, para sugerir a cor de destaque). */
+  read(name: string): Promise<Buffer>;
 }
 
 /** Nome seguro de objeto: pastas e arquivo em letras minúsculas, números, hífen e ponto. Recusa `..` e barras duplas. */
@@ -56,6 +58,11 @@ export function gcsBannerStorage(bucket: string, publicBaseUrl?: string): Banner
       for (const file of files) await file.delete({ ignoreNotFound: true });
       return new Set(files.map(f => f.name)).size;
     },
+    async read(name) {
+      assertSafeObjectName(name);
+      const [data] = await client.bucket(bucket).file(name).download();
+      return data;
+    },
   };
 }
 
@@ -92,6 +99,12 @@ export class MemoryBannerStorage implements BannerStorage {
     assertSafeObjectName(name);
     this.objects.set(name, { data, contentType });
     return `https://banners.exemplo.test/${name}`;
+  }
+  async read(name: string) {
+    assertSafeObjectName(name);
+    const found = this.objects.get(name);
+    if (!found) throw new Error('arquivo não encontrado');
+    return found.data;
   }
   async removeEventImages(eventId: string) {
     const prefix = eventImagePrefix(eventId);

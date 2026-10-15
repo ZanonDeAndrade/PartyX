@@ -39,6 +39,8 @@ export interface PublicEventCard {
   bannerSrcSet: string | null;
   isFeatured: boolean;
   sale: { kind: EventSale['kind']; label: string; minPriceCents: number | null; startsAt: string | null };
+  /** Cor de destaque (`#RRGGBB`) ou nula (o roxo da PartyX). Na vitrine, só o bloco da data usa; na página, o destaque inteiro. */
+  accentColor: string | null;
 }
 
 export interface PublicTicketType {
@@ -172,6 +174,7 @@ function card(e: EventRow, types: ReturnType<typeof inputOf>[], now: Date): Publ
     bannerUrl: e.bannerUrl,
     bannerSrcSet: bannerSrcSet(e.bannerUrl, e.bannerWidths),
     isFeatured: e.isFeatured,
+    accentColor: e.accentColor,
     sale: {
       kind: sale.kind,
       label: sale.label,

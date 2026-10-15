@@ -15,6 +15,7 @@ const card = (over: Partial<PublicEventCard> = {}): PublicEventCard => ({
   bannerSrcSet: null,
   isFeatured: true,
   sale: { kind: 'open', label: 'À venda', minPriceCents: 4000, startsAt: null },
+  accentColor: null,
   ...over,
 });
 

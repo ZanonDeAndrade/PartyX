@@ -74,6 +74,11 @@ export const events = pgTable(
     countdownEnabled: boolean('countdown_enabled').notNull().default(true),
     /** Frase acima do título durante a contagem. Nula: a padrão ("Falta pouco para"). Até 40 caracteres, só texto (sem < nem >). */
     countdownPhrase: text('countdown_phrase'),
+    /**
+     * Cor de destaque da página do evento (0014, 15/10/2026), só `#RRGGBB` em maiúsculas. Nula: o roxo da PartyX. A página deriva dela
+     * os tons legíveis (texto, links, linhas, foco) e aplica por variável CSS; nunca entra em CSS como texto livre.
+     */
+    accentColor: text('accent_color'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -85,6 +90,7 @@ export const events = pgTable(
     check('events_ends_after_start', sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`),
     // Quem permite menores precisa do horário de fim (vai na autorização). Desde a 0010, sem exigir a autorização judicial.
     check('events_minors_need_end', sql`not ${t.allowsMinors} or ${t.endsAt} is not null`),
+    check('events_accent_color_format', sql`${t.accentColor} is null or ${t.accentColor} ~ '^#[0-9A-F]{6}$'`),
     check(
       'events_countdown_phrase_format',
       sql`${t.countdownPhrase} is null or (char_length(${t.countdownPhrase}) between 1 and 40 and ${t.countdownPhrase} !~ '[<>]')`,

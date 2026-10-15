@@ -623,3 +623,116 @@ body.px-dark .px-preview-bar a {
 .px-lot .px-adm-actions {
   margin: 0;
 }
+
+/* ---------- cor de destaque do evento (0014) ---------- */
+/* Controles à esquerda e a pré-visualização à direita (empilha no celular). A prévia usa as classes da página do evento
+   (bloco da data, linha de "Quando", "Continuar") dentro de .px-event-scope, com as mesmas variáveis. */
+.px-accent-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--px-s-5);
+}
+@media (min-width: 900px) {
+  .px-accent-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
+    align-items: start;
+  }
+}
+.px-accent-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-3);
+  min-width: 0;
+}
+.px-accent-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--px-s-3);
+}
+.px-accent-pick .px-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 220px;
+}
+.px-accent-swatch {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  padding: 4px;
+  border: 1px solid var(--px-line);
+  border-radius: var(--px-r-sm);
+  background: var(--px-paper);
+  cursor: pointer;
+}
+.px-accent-controls > p {
+  margin: 0;
+  min-height: 1.5em;
+}
+.px-accent-notes {
+  margin: 0;
+  padding-left: var(--px-s-5);
+  font-size: var(--px-t-sm);
+  color: var(--px-text-2);
+  display: grid;
+  gap: var(--px-s-1);
+}
+.px-accent-preview {
+  display: grid;
+  border-radius: var(--px-r-md);
+  overflow: hidden;
+  border: 1px solid var(--px-line);
+  background: var(--px-ink);
+}
+.px-accent-dark {
+  display: flex;
+  align-items: center;
+  gap: var(--px-s-4);
+  padding: var(--px-s-4);
+  color: var(--px-on-ink);
+}
+.px-accent-dark-body {
+  display: grid;
+  gap: var(--px-s-1);
+  min-width: 0;
+}
+/* A prévia imita a página do evento (fundo preto): vence as regras do painel claro para links e para .px-facts. */
+.px-accent-preview .px-accent-dark a {
+  color: var(--px-lilac);
+  min-height: 0;
+}
+.px-accent-preview .px-accent-facts {
+  grid-template-columns: minmax(0, 1fr);
+}
+.px-adm-main .px-accent-preview .px-facts > div {
+  background: none;
+  border: 0;
+  border-left: 2px solid var(--px-violet-line);
+  border-radius: 0;
+  padding: 0 0 0 var(--px-s-3);
+}
+.px-adm-main .px-accent-preview .px-facts dt {
+  color: var(--px-on-ink-3);
+}
+.px-adm-main .px-accent-preview .px-facts dd {
+  color: var(--px-on-ink);
+}
+.px-accent-card {
+  display: grid;
+  gap: var(--px-s-2);
+  margin: 0 var(--px-s-3) var(--px-s-3);
+  padding: var(--px-s-3) var(--px-s-4) var(--px-s-4);
+  border-radius: var(--px-r-md);
+  background: var(--px-paper);
+  color: var(--px-text);
+}
+.px-accent-card .px-type-flag {
+  margin: 0;
+}
+.px-accent-legend {
+  margin: 0;
+  padding: var(--px-s-2) var(--px-s-4) var(--px-s-3);
+  font-size: var(--px-t-xs);
+  color: var(--px-on-ink-2);
+  overflow-wrap: anywhere;
+}
+

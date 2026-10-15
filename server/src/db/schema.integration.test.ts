@@ -152,7 +152,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(14);
+      expect(r.rows[0].n).toBe(15);
     });
   });
 
@@ -708,6 +708,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag11 = '0011_excluir_e_arquivar_evento';
       const tag12 = '0012_cronometro_do_evento';
       const tag13 = '0013_lotes_por_tipo';
+      const tag14 = '0014_cor_de_destaque';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
@@ -717,6 +718,21 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag10)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag11)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag12)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag13)).rejects.toThrow(/não é a última/);
+
+      // 0014: só a coluna da cor de destaque (e a regra do formato); reverter a apaga, e o evento continua (roxo da PartyX).
+      const ev14 = (
+        await db.pool.query(
+          "insert into events (slug,name,starts_at,venue,address,description,age_rating,accent_color) values ('ev-14','E',now()+interval '9 days','L','A','D','Livre','#15803D') returning id",
+        )
+      ).rows[0].id;
+      await rollbackLastMigration(db.url, tag14);
+      expect(
+        (await db.pool.query("select count(*)::int as n from information_schema.columns where table_name = 'events' and column_name = 'accent_color'"))
+          .rows[0].n,
+      ).toBe(0);
+      expect((await db.pool.query('select count(*)::int as n from events where id = $1', [ev14])).rows[0].n).toBe(1);
+      await db.pool.query('delete from events where id = $1', [ev14]);
 
       // 0013: recusa com tipo em mais de um lote; com só o "Lote único", apaga lotes, divisão dos pedidos e o lote do ingresso.
       const q13 = db.pool.query.bind(db.pool);
@@ -895,8 +911,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0013 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0014 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag14);
       await rollbackLastMigration(db.url, tag13);
       await rollbackLastMigration(db.url, tag12);
       await rollbackLastMigration(db.url, tag11);

@@ -71,7 +71,7 @@ body.px-site main {
   min-height: calc(100svh - 64px);
 }
 body.px-site a {
-  color: var(--px-violet);
+  color: var(--px-violet-text);
   text-underline-offset: 0.18em;
   text-decoration-thickness: 1px;
 }
@@ -90,7 +90,7 @@ body.px-site :focus-visible {
 }
 body.px-site ::selection {
   background: var(--px-violet);
-  color: #fff;
+  color: var(--px-on-accent);
 }
 img {
   max-width: 100%;
@@ -271,14 +271,15 @@ body.px-dark .px-fine {
   opacity: 0.45;
   cursor: not-allowed;
 }
+/* --px-accent-edge só existe na página do evento com cor muito clara: a borda que faz o botão aparecer no quadro branco. */
 .px-btn-pri {
   --btn-bg: var(--px-violet);
-  --btn-fg: #fff;
-  --btn-line: var(--px-violet);
+  --btn-fg: var(--px-on-accent);
+  --btn-line: var(--px-accent-edge, var(--px-violet));
 }
 .px-btn-pri:hover {
   --btn-bg: var(--px-violet-hover);
-  --btn-line: var(--px-violet-hover);
+  --btn-line: var(--px-accent-edge, var(--px-violet-hover));
 }
 .px-btn-pri:active:not(:disabled) {
   --btn-bg: var(--px-violet-press);
@@ -350,7 +351,7 @@ body.px-dark .px-fine {
   background: none;
   padding: 0;
   font: inherit;
-  color: var(--px-violet);
+  color: var(--px-violet-text);
   text-decoration: underline;
   cursor: pointer;
   min-height: var(--px-touch);
@@ -486,7 +487,7 @@ body.px-dark .px-fine {
 .px-filters select:focus-visible {
   outline: none;
   border-color: var(--px-violet);
-  box-shadow: 0 0 0 3px rgb(139 92 246 / 0.35);
+  box-shadow: 0 0 0 3px var(--px-focus-glow);
 }
 .px-field input[aria-invalid='true'],
 .px-field textarea[aria-invalid='true'],
