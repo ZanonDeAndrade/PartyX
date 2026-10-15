@@ -120,7 +120,7 @@ Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na pá
 
 ### Seletor de cor embutido (15/10/2026)
 
-Pedido do responsável: no campo "Cor de destaque", seletor embutido (quadrado de saturação e brilho, barra de matiz, código com amostra redonda), cores prontas, "Voltar ao padrão", conta-gotas onde houver, toque e teclado com rótulos em português, prévia ao vivo e aviso de contraste mantido, no pacote do painel (`react-colorful` 5.8.1, site público sem mudança). Sem migração. Registro: `docs/registros/seletor-de-cor-2026-10-15.md`.
+Pedido do responsável: no campo "Cor de destaque", seletor embutido (quadrado de saturação e brilho, barra de matiz, código com amostra redonda), cores prontas, "Voltar ao padrão", conta-gotas onde houver, toque e teclado com rótulos em português, prévia ao vivo e aviso de contraste mantido, no pacote do painel (`react-colorful` 5.8.1, site público sem mudança). Sem migração. Publicado em 15/10/2026 (`partyx-00028-vax`, `publicacao-producao-2026-10-15g.md`). Registro: `docs/registros/seletor-de-cor-2026-10-15.md`.
 
 | Requisito ou critério | Evidência |
 |---|---|

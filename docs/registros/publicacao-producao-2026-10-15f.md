@@ -1,5 +1,7 @@
 # Publicação em produção: transições mais suaves (15/10/2026)
 
+> Atualização de 15/10/2026 18:59 UTC: a `partyx-00028-vax` (`release-2026-10-15g`, seletor de cor embutido no painel, `publicacao-producao-2026-10-15g.md`) substituiu a `00026-rim`, que fica como retorno.
+
 Pedido do responsável (Arthur): transições mais suaves ao abrir o site e ao entrar num evento (`transicoes-suaves-2026-10-15.md`), "OK antes de publicar". O OK veio às 17:35 UTC: "pode comitar e fazer deploy". O commit já estava feito; o fluxo foi direto até a virada.
 
 | Campo | Registro |

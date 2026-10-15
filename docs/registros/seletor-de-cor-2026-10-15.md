@@ -39,4 +39,4 @@ Pedido do responsável (Arthur), nesta data: trocar o seletor do sistema do camp
 
 ## Publicação
 
-Não publicado. Aguardando o OK do responsável. Sem migração: build, backup, candidata e virada; retorno para a revisão no ar (`partyx-00026-rim`).
+Publicado em 15/10/2026 18:59 UTC, com o OK do responsável ("faça commit e deploy"): `release-2026-10-15g`, revisão `partyx-00028-vax`, sem migração. Registro: `publicacao-producao-2026-10-15g.md`; retorno para a `partyx-00026-rim`. Em produção, o seletor foi conferido pelo conteúdo do pacote do painel (o painel exige login de administrador, que esta sessão não tem).

@@ -496,3 +496,11 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00026-rim`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00024-kuy ./infra/producao/deploy.sh rollback`. A `00024-kuy` usa o mesmo banco (volta a primeira versão das transições, sem o degradê da capa).
 
+> Atualização de 15/10/2026 18:59 UTC: a `partyx-00028-vax` (seção 25) substituiu a `00026-rim`.
+
+## 25. Décima terceira publicação: seletor de cor embutido no painel (15/10/2026)
+
+**Publicado:** revisão `partyx-00028-vax` (tag `release-2026-10-15g`, commit `51d5a9e`), 100% desde 15/10 18:59 UTC, sem migração (backup sob demanda `partyx-backup-dxz64` antes da candidata). Dependência nova `react-colorful` 5.8.1, só no pacote do painel. Mesma configuração. Registro: `docs/registros/publicacao-producao-2026-10-15g.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00028-vax`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00026-rim ./infra/producao/deploy.sh rollback`. A `00026-rim` usa o mesmo banco (volta o seletor do sistema; cores salvas continuam valendo).
+
