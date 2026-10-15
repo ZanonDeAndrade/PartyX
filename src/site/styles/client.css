@@ -380,6 +380,16 @@
 }
 
 /* ---------- tela cheia (U05) ---------- */
+/* A folha branca sobe 48 px e aparece (240 ms); o QR só é desenhado quando ela termina (ticketPages.tsx), nunca em movimento. */
+.px-fs-in {
+  animation: px-fs-in var(--px-dur-3) var(--px-ease-out) backwards;
+}
+@keyframes px-fs-in {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
 .px-fullscreen {
   position: fixed;
   inset: 0;

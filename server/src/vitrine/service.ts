@@ -37,6 +37,8 @@ export interface PublicEventCard {
   bannerUrl: string | null;
   /** Versões do banner por largura (`srcset`), para o celular baixar a menor. Nulo: só `bannerUrl`. */
   bannerSrcSet: string | null;
+  /** Miniatura da capa em `data:` (0015), mostrada desfocada até a capa nítida chegar. Nula: capa anterior ou sem capa. */
+  bannerPlaceholder: string | null;
   isFeatured: boolean;
   sale: { kind: EventSale['kind']; label: string; minPriceCents: number | null; startsAt: string | null };
   /** Cor de destaque (`#RRGGBB`) ou nula (o roxo da PartyX). Na vitrine, só o bloco da data usa; na página, o destaque inteiro. */
@@ -173,6 +175,7 @@ function card(e: EventRow, types: ReturnType<typeof inputOf>[], now: Date): Publ
     ageRating: e.ageRating,
     bannerUrl: e.bannerUrl,
     bannerSrcSet: bannerSrcSet(e.bannerUrl, e.bannerWidths),
+    bannerPlaceholder: e.bannerUrl ? e.bannerPlaceholder : null,
     isFeatured: e.isFeatured,
     accentColor: e.accentColor,
     sale: {

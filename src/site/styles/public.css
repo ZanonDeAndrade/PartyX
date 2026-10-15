@@ -594,6 +594,7 @@ body.px-dark .px-textlink {
 }
 .px-card-media {
   position: relative;
+  transition: transform var(--px-hover-dur) var(--px-ease-out);
 }
 .px-card-media .px-banner {
   aspect-ratio: 16 / 10;
@@ -674,8 +675,13 @@ body.px-dark .px-textlink {
   border-color: var(--px-violet);
 }
 @media (hover: hover) {
+  /* Cartão: a imagem sobe 3 px e cresce até 1,02 dentro do corte, em 150 ms. */
+  .px-card-link:hover .px-card-media {
+    transform: translateY(-3px);
+  }
   .px-card-link:hover .px-banner img {
-    transform: scale(1.045);
+    transform: scale(1.02);
+    transition-duration: var(--px-hover-dur);
   }
   .px-card-link:hover .px-card-title {
     color: var(--px-lilac);
@@ -820,10 +826,28 @@ body.px-dark .px-textlink {
   border-radius: 50%;
   background: var(--px-on-accent);
 }
-/* Única animação do cronômetro: o ponto de "Acontecendo agora". Os números nunca animam. */
+/* O ponto de "Acontecendo agora" pulsa três vezes e para: nada de animação contínua em segundo plano. */
 @media (prefers-reduced-motion: no-preference) {
   .px-live-dot {
-    animation: pxlive 1.6s ease-in-out infinite;
+    animation: pxlive 1.6s ease-in-out 3;
+  }
+}
+/* Troca de número do cronômetro (15/10/2026): só o bloco que mudou recebe um número novo, que desce um pouco e assenta em 260 ms,
+   já visível desde o começo (sem piscar). O corte diagonal do bloco recorta o que passa da borda. Com menos movimento: troca direto. */
+.px-cd-tick {
+  display: block; /* bloco, não inline-block: a altura da linha fica igual à do número sem animação */
+  white-space: nowrap; /* "03" nunca quebra em duas linhas, nem no instante da troca de fonte (regra geral de quebra do site) */
+  animation: px-cd-tick 260ms var(--px-enter-ease) backwards;
+}
+@keyframes px-cd-tick {
+  from {
+    opacity: 0.3;
+    transform: translateY(-34%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .px-cd-tick {
+    animation: none;
   }
 }
 @keyframes pxlive {
@@ -1455,14 +1479,22 @@ body.px-dark .px-event-side .px-fine {
 }
 
 /* ---------- transições de página (View Transitions) ---------- */
-::view-transition-old(root),
+/* A antiga some em 160 ms; a nova aparece em 260 ms e traz a própria entrada (cascata). A capa do cartão vira a capa da página em
+   360 ms. Tudo termina antes de 400 ms, e os cliques já passam para a página nova durante a troca (base.css). */
+::view-transition-old(root) {
+  animation: px-vt-out 160ms var(--px-ease-in) both;
+}
 ::view-transition-new(root) {
-  animation-duration: var(--px-dur-3);
-  animation-timing-function: var(--px-ease-out);
+  animation: px-fade-in 260ms var(--px-enter-ease) both;
+}
+@keyframes px-vt-out {
+  to {
+    opacity: 0;
+  }
 }
 ::view-transition-group(*) {
-  animation-duration: var(--px-dur-5);
-  animation-timing-function: var(--px-ease-out);
+  animation-duration: 360ms;
+  animation-timing-function: var(--px-enter-ease);
 }
 ::view-transition-group(px-header) {
   animation: none;
@@ -1564,3 +1596,13 @@ html[data-px-intro] .px-intro-static {
 .px-event-scope[data-accent] .px-btn-pri[aria-disabled='true'] {
   filter: saturate(0.15);
 }
+
+/* ---------- entrada da página do evento (15/10/2026) ---------- */
+/* No celular o quadro de ingressos fica abaixo da dobra e guarda a barra fixa de compra: não anima, para a barra (e o "Continuar")
+   estar na tela desde o primeiro quadro, sem esmaecer nem mudar de referência de posição. No computador entra como os outros. */
+@media (max-width: 959px) {
+  .px-event-side.px-in {
+    animation: none;
+  }
+}
+

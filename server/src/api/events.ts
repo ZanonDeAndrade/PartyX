@@ -263,7 +263,7 @@ export function eventsRoutes(deps: AuthDeps) {
       await deps.banners.put(variantObjectName(objectName, v.width), v.data, processed.contentType);
     const url = await deps.banners.put(objectName, processed.data, processed.contentType);
     const widths = [...processed.variants.map(v => v.width), processed.width];
-    const event = await setEventBanner(evDeps, actor(c), id, url, widths);
+    const event = await setEventBanner(evDeps, actor(c), id, url, widths, processed.placeholder);
     return c.json({
       event,
       banner: { width: processed.width, height: processed.height, bytes: processed.data.length },

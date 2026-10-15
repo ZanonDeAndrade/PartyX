@@ -20,7 +20,7 @@ import { stateAnnouncement, type CountdownView } from './eventCountdown';
 import { EventCountdown, readCountdown } from './eventCountdownView';
 import { brl, dateLong, dateParts, searchPath, shareLinks, timeOf } from './format';
 import { IconCheck, IconClose, IconLink, IconShare } from './icons';
-import { Roll, useFirstMount } from './motion';
+import { cascade, Roll } from './motion';
 import { Link, useRouter } from './router';
 import { useFetch } from './useFetch';
 
@@ -33,7 +33,6 @@ export function HomePage() {
   const featured = state.status === 'ok' ? state.data.featured[0] : undefined;
   const list = state.status === 'ok' ? state.data.upcoming.filter(e => e.slug !== featured?.slug) : [];
   const fromCents = featured?.sale.kind === 'open' ? featured.sale.minPriceCents : null;
-  const first = useFirstMount();
 
   return (
     <Layout dark>
@@ -110,8 +109,8 @@ export function HomePage() {
           ) : null}
           {state.status === 'ok' && list.length > 0 ? (
             <ul className="px-grid px-grid-editorial">
-              {list.map((e, i) => (
-                <EventCardView key={e.slug} event={e} index={i} animate={first} />
+              {list.map(e => (
+                <EventCardView key={e.slug} event={e} />
               ))}
             </ul>
           ) : null}
@@ -133,7 +132,6 @@ export function EventsPage() {
   const [state, retry] = useFetch(s => api.events(q, date, s), `${q}|${date}`);
   const filtering = Boolean(q || date);
   const events = state.status === 'ok' ? state.data.events : [];
-  const first = useFirstMount();
 
   const count =
     state.status === 'loading'
@@ -206,8 +204,8 @@ export function EventsPage() {
         ) : null}
         {state.status === 'ok' && events.length > 0 ? (
           <ul className="px-grid">
-            {events.map((e, i) => (
-              <EventCardView key={e.slug} event={e} index={i} animate={first} />
+            {events.map(e => (
+              <EventCardView key={e.slug} event={e} />
             ))}
           </ul>
         ) : null}
@@ -550,7 +548,9 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
         >
           {sale.kind === 'ended' ? <span className="px-ended-tag">Evento encerrado</span> : null}
         </Banner>
-        <div className="px-wrap px-event-head">
+        {/* Entrada da página (15/10/2026): data e título primeiro, depois o cronômetro, depois Quando, Onde e Classificação, em
+            cascata (--i de 0 a 4); a primeira tela fica completa em 640 ms. A capa fica nítida por conta própria (Banner). */}
+        <div className="px-wrap px-event-head px-in" style={cascade(0)}>
           <DateStub iso={event.startsAt} size="lg" />
           <div className="px-event-heading">
             {countdownKind === 'antes' && event.countdown ? (
@@ -573,7 +573,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
         <article className="px-event-main">
           <div className="px-event-title">
             <dl className="px-facts">
-              <div>
+              <div className="px-in" style={cascade(2)}>
                 <dt>Quando</dt>
                 <dd>{capital(dateLong(event.startsAt))}</dd>
                 <dd className="px-facts-sub">
@@ -581,12 +581,12 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
                   {event.endsAt ? `, fim às ${timeOf(event.endsAt)}` : ''}
                 </dd>
               </div>
-              <div>
+              <div className="px-in" style={cascade(3)}>
                 <dt>Onde</dt>
                 <dd>{event.venue}</dd>
                 <dd className="px-facts-sub">{event.address}</dd>
               </div>
-              <div>
+              <div className="px-in" style={cascade(4)}>
                 <dt>Classificação</dt>
                 <dd>{event.ageRating}</dd>
                 <dd className="px-facts-sub">
@@ -597,7 +597,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
               </div>
             </dl>
             {event.allowsMinors && !preview ? (
-              <p className="px-event-minor">
+              <p className="px-event-minor px-in" style={cascade(4)}>
                 Quem tiver 16 ou 17 anos entrega na portaria o Termo de Autorização e Responsabilidade preenchido e
                 assinado pelo responsável, com a cópia do documento dele, e apresenta o próprio documento com foto. Vale
                 também para acompanhantes.{' '}
@@ -611,7 +611,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
               </p>
             ) : null}
             {preview ? null : (
-              <div className="px-share-row">
+              <div className="px-share-row px-in" style={cascade(4)}>
                 <button type="button" className="px-btn px-btn-ghost" onClick={shareNow} aria-haspopup="dialog">
                   <IconShare size={18} />
                   Compartilhar
@@ -627,7 +627,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
             </p>
           </div>
           {sale.kind === 'ended' ? (
-            <div className="px-notice px-notice-dark" role="status">
+            <div className="px-notice px-notice-dark px-in" role="status" style={cascade(4)}>
               <b>Este evento já aconteceu</b>
               <span>As vendas não estão mais disponíveis. Esta página continua acessível para consulta pelo link.</span>
               <Link to="/eventos" className="px-btn px-btn-dark">
@@ -635,14 +635,14 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
               </Link>
             </div>
           ) : null}
-          <section aria-labelledby="sobre">
+          <section aria-labelledby="sobre" className="px-in" style={cascade(4)}>
             <h2 id="sobre" className="px-h3">
               Sobre o evento
             </h2>
             <p className="px-desc">{event.description}</p>
           </section>
           {event.attractions.length > 0 ? (
-            <section aria-labelledby="atracoes">
+            <section aria-labelledby="atracoes" className="px-in" style={cascade(4)}>
               <h2 id="atracoes" className="px-h3">
                 Atrações
               </h2>
@@ -655,7 +655,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
           ) : null}
         </article>
 
-        <aside className="px-event-side" aria-labelledby="ingressos">
+        <aside className="px-event-side px-in" aria-labelledby="ingressos" style={cascade(2)}>
           <TicketPicker
             event={event}
             notices={

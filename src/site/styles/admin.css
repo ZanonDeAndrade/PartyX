@@ -362,12 +362,7 @@ a.px-adm-card-title:hover {
   height: 100%;
   background: var(--px-violet);
   transform-origin: left center;
-  animation: pxbar var(--px-dur-5) var(--px-ease-out) both;
-}
-@keyframes pxbar {
-  from {
-    transform: scaleX(0);
-  }
+  animation: px-fade-in var(--px-admin-fade) linear both; /* painel: só esmaece, sem crescer */
 }
 .px-bars-value {
   font-variant-numeric: tabular-nums;

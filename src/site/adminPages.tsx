@@ -13,8 +13,6 @@ import {
 import { Layout, usePageTitle } from './components';
 import { brl, dateShort, timeOf } from './format';
 import { IconBack, IconClose, IconMenu } from './icons';
-import { animate, useReducedMotion } from 'motion/react';
-import { EASE_OUT } from './motion';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 import { useFetch } from './useFetch';
@@ -360,32 +358,9 @@ export function Loading({ state, retry }: { state: { status: string }; retry: ()
 
 // ---------- visão geral (RF-55) ----------
 
-/** Número que conta de 0 até o valor na primeira exibição (indicadores do painel). Depois, troca direto. */
-function useCountUp(target: number, duration = 0.7): number {
-  const reduce = useReducedMotion();
-  const [value, setValue] = useState(reduce ? target : 0);
-  const done = useRef(false);
-  useEffect(() => {
-    if (reduce || done.current) {
-      setValue(target);
-      return;
-    }
-    done.current = true;
-    const controls = animate(0, target, { duration, ease: EASE_OUT, onUpdate: v => setValue(Math.round(v)) });
-    return () => controls.stop();
-  }, [target, duration, reduce]);
-  return value;
-}
-
-/** Valor que conta de zero até o total na primeira carga; o leitor de tela recebe só o valor final. */
+/** Valor do indicador, direto: o painel é ferramenta de trabalho e não conta de zero (15/10/2026). */
 function KpiMoney({ cents }: { cents: number }) {
-  const shown = useCountUp(cents);
-  return (
-    <span>
-      <span aria-hidden="true">{brl(shown)}</span>
-      <span className="px-sr">{brl(cents)}</span>
-    </span>
-  );
+  return <span>{brl(cents)}</span>;
 }
 
 function Kpi({ title, group }: { title: string; group: SalesGroup }) {

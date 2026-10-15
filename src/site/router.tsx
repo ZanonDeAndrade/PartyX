@@ -25,20 +25,29 @@ const RouterContext = createContext<{ loc: Location; go: Go; setGuard: (message:
 /**
  * Troca de página com a View Transitions API, quando existe e o visitante não pediu menos movimento: o navegador fotografa a
  * página antiga, o React desenha a nova de forma síncrona (`flushSync`) e os elementos com o mesmo `view-transition-name`
- * (o banner do cartão e o da página do evento) se transformam um no outro. Sem suporte, a troca é imediata, como antes.
- * Páginas com QR Code de ingresso ficam fora: o QR não pode aparecer com transparência nem em movimento.
+ * (o banner do cartão e o da página do evento) se transformam um no outro. Durações em public.css (tudo abaixo de 400 ms) e os
+ * cliques passam para a página nova durante a troca.
+ * Sem suporte: a página nova esmaece em 200 ms (Web Animations). Com menos movimento: troca imediata.
+ * Ficam fora as páginas com QR Code de ingresso (o QR não pode aparecer com transparência nem em movimento) e a portaria; o painel
+ * troca na hora e só esmaece 180 ms (CSS, html[data-area='admin']).
  */
 function withTransition(update: () => void, to?: string) {
   type Transition = { ready: Promise<void>; finished: Promise<void>; updateCallbackDone: Promise<void> };
   const doc = document as Document & { startViewTransition?: (cb: () => void) => Transition };
   const qrPage = (path: string) => path.startsWith('/ingressos/') || path.startsWith('/portaria');
+  const adminPage = (path: string) => path === '/admin' || path.startsWith('/admin/');
+  const from = window.location.pathname;
   const skip =
-    !doc.startViewTransition ||
     window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-    qrPage(window.location.pathname) ||
-    (to !== undefined && qrPage(to));
+    qrPage(from) ||
+    (to !== undefined && (qrPage(to) || adminPage(to)));
   if (skip) {
     update();
+    return;
+  }
+  if (!doc.startViewTransition) {
+    flushSync(update);
+    document.getElementById('conteudo')?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
     return;
   }
   try {

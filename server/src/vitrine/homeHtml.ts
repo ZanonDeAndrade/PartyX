@@ -75,7 +75,10 @@ function heroShell(e: PublicEventCard): string {
     '<header class="px-header"><div class="px-wrap px-header-in"><span class="px-logo">',
     '<img src="/brand/partyx-logo.png" width="65" height="36" alt="" /></span></div></header>',
     '<main><section class="px-hero">',
-    `<div class="px-banner px-hero-media">${img}</div>`,
+    // Miniatura desfocada atrás da capa (0015), como no componente Banner: aparece antes de a capa nítida chegar.
+    e.bannerUrl && e.bannerPlaceholder
+      ? `<div class="px-banner px-hero-media px-banner-ph" style="--px-ph:url(&quot;${escapeHtml(e.bannerPlaceholder)}&quot;)">${img}</div>`
+      : `<div class="px-banner px-hero-media">${img}</div>`,
     '<div class="px-wrap px-hero-in">',
     '<p class="px-hero-tag">Em destaque</p>',
     `<h2 class="px-hero-title"><span>${escapeHtml(e.name)}</span></h2>`,

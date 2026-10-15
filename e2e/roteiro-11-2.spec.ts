@@ -177,6 +177,7 @@ item(1, 'Cadastro com CPF válido, inválido e repetido', async () => {
     await page.getByLabel('E-mail').fill(b.email);
     await page.getByLabel('CPF').fill(b.cpf);
     await page.getByLabel('Telefone com DDD').fill('11987654321');
+    await page.locator('#nascimento').fill('1990-05-10'); // obrigatória desde a regra de menores (0009); fictícia, maior de idade
     await page.locator('#senha').fill(buyers.ana.password);
     await page.locator('#aceite').check();
     if (S.remote) await humanReady(page);

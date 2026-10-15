@@ -78,6 +78,7 @@ async function buyer(name: string, email: string) {
       email,
       cpf: cpfFor(cpfN++),
       phone: '(11) 98765-4321',
+      birthDate: '1990-05-10', // obrigatória desde a regra de menores (0009); fictícia, maior de idade
       password: 'festa2026Forte',
       acceptedTermsVersion: lv.terms,
       acceptedPrivacyVersion: lv.privacy,

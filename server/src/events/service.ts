@@ -283,6 +283,8 @@ export async function setEventBanner(
   bannerUrl: string | null,
   /** Larguras em que o banner foi gravado (versões menores e a principal). Vazio ao remover. */
   bannerWidths: number[] = [],
+  /** Miniatura em `data:` da capa nova (0015); nula ao remover. */
+  bannerPlaceholder: string | null = null,
 ) {
   const now = deps.clock.now();
   return deps.db.transaction(async tx => {
@@ -290,7 +292,12 @@ export async function setEventBanner(
     if (before.status === 'encerrado') throw closedError();
     const [after] = await tx
       .update(events)
-      .set({ bannerUrl, bannerWidths: bannerUrl ? bannerWidths : [], updatedAt: now })
+      .set({
+        bannerUrl,
+        bannerWidths: bannerUrl ? bannerWidths : [],
+        bannerPlaceholder: bannerUrl ? bannerPlaceholder : null,
+        updatedAt: now,
+      })
       .where(eq(events.id, id))
       .returning();
     await writeAudit(tx, {

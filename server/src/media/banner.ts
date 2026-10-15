@@ -38,6 +38,8 @@ export interface ProcessedBanner {
   data: Buffer;
   /** Versão 1200x630 em JPEG para pré-visualização em WhatsApp e redes sociais. */
   share: ShareImage;
+  /** Miniatura em `data:` (WebP de 32 px) para a capa aparecer desfocada antes da nítida (0015). */
+  placeholder: string;
   contentType: 'image/webp';
   width: number;
   height: number;
@@ -82,6 +84,7 @@ export async function processBanner(input: Buffer): Promise<ProcessedBanner> {
       variants,
       data,
       share: await shareImage(input),
+      placeholder: await bannerPlaceholder(data),
       contentType: 'image/webp',
       width: info.width,
       height: info.height,
@@ -92,6 +95,31 @@ export async function processBanner(input: Buffer): Promise<ProcessedBanner> {
     // Arquivo corrompido, truncado ou grande demais em pixels.
     throw reject('imagem_invalida', 'Não foi possível ler a imagem. Escolha outro arquivo JPG, PNG ou WebP.');
   }
+}
+
+/** Limite da miniatura no banco (`events_banner_placeholder_format`). */
+export const PLACEHOLDER_MAX_CHARS = 1500;
+
+/**
+ * Miniatura da capa para o efeito "blur-up" (0015): 32 px de largura em WebP, embutida no HTML e no JSON como `data:` (cerca de
+ * 200 a 600 caracteres), então aparece sem nenhum pedido a mais. A página a mostra desfocada e troca pela capa nítida quando ela
+ * chega. Se passar do limite (imagem muito detalhada), cai para 16 px.
+ */
+export async function bannerPlaceholder(image: Buffer): Promise<string> {
+  for (const [width, quality] of [
+    [32, 40],
+    [24, 30],
+    [16, 30],
+  ] as const) {
+    const webp = await sharp(image, { limitInputPixels: MAX_INPUT_PIXELS })
+      .rotate()
+      .resize({ width })
+      .webp({ quality })
+      .toBuffer();
+    const uri = `data:image/webp;base64,${webp.toString('base64')}`;
+    if (uri.length <= PLACEHOLDER_MAX_CHARS) return uri;
+  }
+  throw new Error('miniatura da capa grande demais');
 }
 
 /** O WhatsApp ignora pré-visualização com imagem grande; a meta é ficar abaixo de ~300 KB. Reduz a qualidade até caber. */

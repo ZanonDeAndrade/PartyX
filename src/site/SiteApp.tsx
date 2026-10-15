@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import './styles/fonts.css';
 import './styles/tokens.css';
 import './styles/base.css';
@@ -17,7 +17,6 @@ import {
 import { SessionProvider, useSession } from './session';
 import { EventPage, EventsPage, HomePage, NotFoundPage } from './pages';
 import { IntroSplash } from './IntroSplash';
-import { MotionRoot } from './motion';
 import { Router, useRouter } from './router';
 
 // Cada área tem o próprio pacote (JavaScript e CSS), carregado só quando alguém entra nela. A vitrine e o acesso vão no
@@ -72,8 +71,12 @@ function Routes() {
     return () => document.body.classList.remove('px-site');
   }, []);
   // Termos ou Privacidade atualizados: o comprador aceita as versões novas antes de continuar (no login ou no checkout).
-  if (session.status === 'user' && session.pendingConsent && !LEGAL_PATHS.has(loc.path)) return <ConsentUpdatePage />;
   const where = area(loc.path);
+  // Área no <html> (antes da pintura): o movimento muda por área (base.css). Painel só esmaece; portaria não anima entradas.
+  useLayoutEffect(() => {
+    document.documentElement.dataset.area = where ?? 'site';
+  }, [where]);
+  if (session.status === 'user' && session.pendingConsent && !LEGAL_PATHS.has(loc.path)) return <ConsentUpdatePage />;
   if (where === 'checkout')
     return (
       <Suspense fallback={<AreaLoading />}>
@@ -125,17 +128,15 @@ function MaintenanceGate({ children }: { children: ReactNode }) {
 /** Vitrine pública do PartyX (Prompt 08). O protótipo navegável fica em `/prototipo`. */
 export function SiteApp() {
   return (
-    <MotionRoot>
-      <Router>
-        <SessionProvider>
-          <MaintenanceGate>
-            <Routes />
-            <ToastHost />
-          </MaintenanceGate>
-        </SessionProvider>
-        {/* Depois das rotas: a página já está montada por baixo quando a abertura aparece. */}
-        <IntroSplash />
-      </Router>
-    </MotionRoot>
+    <Router>
+      <SessionProvider>
+        <MaintenanceGate>
+          <Routes />
+          <ToastHost />
+        </MaintenanceGate>
+      </SessionProvider>
+      {/* Depois das rotas: a página já está montada por baixo quando a abertura aparece. */}
+      <IntroSplash />
+    </Router>
   );
 }

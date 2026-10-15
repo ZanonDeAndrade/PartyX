@@ -11,7 +11,7 @@ import {
 import { DateStub, ErrorBox, Layout, usePageTitle } from './components';
 import { brl, dateParts, timeOf } from './format';
 import { IconBack, IconChevron, IconDownload, IconExpand, IconReceipt, IconTicket, IconUser } from './icons';
-import { DUR, EASE_OUT, m, useReducedMotion } from './motion';
+import { cascade, useReducedMotion } from './motion';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 import { useFetch } from './useFetch';
@@ -165,7 +165,6 @@ const STATUS_ORDER: Record<TicketSummary['status'], number> = { valido: 0, utili
 function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
   const items = [...raw].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
   const first = items[0]!;
-  const reduce = useReducedMotion();
   const stacked = items.length > 1;
   const [open, setOpen] = useState(false);
   const shown = stacked && !open ? items.slice(0, 1) : items;
@@ -184,12 +183,7 @@ function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
       </header>
       <ul id={listId} className="px-wallet-list">
         {shown.map((t, i) => (
-          <m.li
-            key={t.id}
-            initial={i > 0 && !reduce ? { opacity: 0, y: -12 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: DUR.open, ease: EASE_OUT, delay: Math.min(i, 6) * 0.04 }}
-          >
+          <li key={t.id} className={i > 0 ? 'px-in' : undefined} style={i > 0 ? cascade(Math.min(i - 1, 6)) : undefined}>
             <Link to={`/ingressos/${t.id}`} className={`px-me-ticket px-me-ticket-${t.status}`}>
               <span className="px-me-ticket-text">
                 <b>{t.typeName}</b>
@@ -201,7 +195,7 @@ function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
               <StatusBadge status={t.status} />
               <IconChevron size={18} className="px-me-chev" />
             </Link>
-          </m.li>
+          </li>
         ))}
       </ul>
       {stacked ? (
@@ -472,14 +466,13 @@ export function TicketFullscreenPage({ id }: { id: string }) {
     return () => window.clearTimeout(id);
   }, []);
   return (
-    <m.div
-      className="px-fullscreen"
+    <div
+      className="px-fullscreen px-fs-in"
       role="dialog"
       aria-label="Ingresso em tela cheia"
-      initial={reduce ? false : { y: 48, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: DUR.open, ease: EASE_OUT }}
-      onAnimationComplete={() => setSettled(true)}
+      onAnimationEnd={e => {
+        if (e.target === e.currentTarget) setSettled(true);
+      }}
     >
       <div className="px-fs-bar">
         <span>{t ? `Pedido PX-${t.orderNumber}` : ''}</span>
@@ -521,7 +514,7 @@ export function TicketFullscreenPage({ id }: { id: string }) {
           <p className="px-mono px-fs-code px-tk-strike">{t.shortCode}</p>
         </>
       ) : null}
-    </m.div>
+    </div>
   );
 }
 

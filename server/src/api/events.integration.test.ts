@@ -572,6 +572,33 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
   });
 
   describe('banner (RF-13)', () => {
+    it('miniatura da capa (0015) na página e no card públicos; o banco só aceita data: WebP pequena e com capa', async () => {
+      const a = await session();
+      const e = await newEvent(a);
+      await newType(a, e.id);
+      expect((await a.put(`/admin/events/${e.id}/banner`, upload(await image(1600, 900)))).status).toBe(200);
+      expect((await a.post(`/admin/events/${e.id}/publish`)).status).toBe(200);
+      const page = (await json(await app.request(`/api/public/events/${e.slug}`))).event;
+      expect(page.bannerPlaceholder).toMatch(/^data:image\/webp;base64,/);
+      const card = (await json(await app.request('/api/public/events'))).events.find((c: { slug: string }) => c.slug === e.slug);
+      expect(card.bannerPlaceholder).toBe(page.bannerPlaceholder);
+      // Nada além de data:image/webp;base64 com base64 válido, até 1.500 caracteres, e só com capa.
+      for (const bad of [
+        'data:image/png;base64,AAAA',
+        'data:image/webp;base64,AA AA',
+        'data:image/webp;base64,AAAA");background:url(x',
+        `data:image/webp;base64,${'A'.repeat(1500)}`,
+        '',
+      ]) {
+        await expect(sql('update events set banner_placeholder = $2 where id = $1', [e.id, bad]), bad.slice(0, 30)).rejects.toMatchObject({
+          code: '23514',
+        });
+      }
+      await expect(
+        sql("update events set banner_url = null, banner_placeholder = 'data:image/webp;base64,AAAA' where id = $1", [e.id]),
+      ).rejects.toMatchObject({ code: '23514' });
+    });
+
     it('valida, redimensiona, grava no armazenamento com nome gerado e guarda a URL', async () => {
       const a = await session();
       const e = await newEvent(a);
@@ -592,6 +619,11 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
         expect((await sharp(variant.data).metadata()).width).toBe(w);
       }
       expect(body.event.bannerWidths).toEqual([640, 1080, 1600]);
+      // Miniatura da capa (0015): WebP em data:, pequena, gravada no evento e não no armazenamento.
+      expect(body.event.bannerPlaceholder).toMatch(/^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/);
+      expect(body.event.bannerPlaceholder.length).toBeLessThanOrEqual(1500);
+      const tiny = await sharp(Buffer.from(body.event.bannerPlaceholder.split(',')[1], 'base64')).metadata();
+      expect([tiny.format, tiny.width]).toEqual(['webp', 32]);
     });
 
     it('imagem menor que 1080 px não é ampliada: só a versão de 640 px', async () => {
@@ -600,8 +632,9 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
       const body = await json(await a.put(`/admin/events/${e.id}/banner`, upload(await image(900, 500))));
       expect(body.event.bannerWidths).toEqual([640, 900]);
       expect([...storage.objects.keys()].filter(k => /-w\d+\.webp$/.test(k))).toHaveLength(1);
+      expect(body.event.bannerPlaceholder).toMatch(/^data:image\/webp;base64,/);
       const removed = await json(await a.del(`/admin/events/${e.id}/banner`));
-      expect(removed.event).toMatchObject({ bannerUrl: null, bannerWidths: [] });
+      expect(removed.event).toMatchObject({ bannerUrl: null, bannerWidths: [], bannerPlaceholder: null });
     });
 
     it('o nome do arquivo e o tipo enviados pelo navegador não entram no caminho gravado', async () => {

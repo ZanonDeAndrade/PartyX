@@ -181,6 +181,7 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
       expect(Object.keys(card).sort()).toEqual([
         'accentColor',
         'ageRating',
+        'bannerPlaceholder',
         'bannerSrcSet',
         'bannerUrl',
         'isFeatured',

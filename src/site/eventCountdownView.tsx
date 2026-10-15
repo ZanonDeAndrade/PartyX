@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { cascade } from './motion';
 import type { EventDetail } from './api';
 import {
   countdownView,
@@ -27,6 +28,7 @@ const UNITS = [
  * Anda sozinho, uma vez por segundo e só com a aba visível (para com `visibilityState` escondido e volta na hora certa ao reaparecer),
  * sem chamar o servidor. Avisa a página (`onKind`) só quando o estado muda, para ela não se redesenhar a cada segundo.
  * Os números não são anunciados: ficam num `role="timer"`, que não fala as mudanças; o texto por extenso vai até os minutos.
+ * Na troca, só o número que mudou desce um pouco e assenta (260 ms, `.px-cd-tick`); com menos movimento, troca direto.
  */
 export function EventCountdown({ event, onKind }: { event: EventDetail; onKind: (kind: CountdownView['kind']) => void }) {
   const [view, setView] = useState<CountdownView>(() => readCountdown(event));
@@ -62,7 +64,7 @@ export function EventCountdown({ event, onKind }: { event: EventDetail; onKind: 
   if (view.kind === 'oculto') return null;
   if (view.kind === 'agora')
     return (
-      <div className="px-wrap px-countdown-row" data-countdown="agora">
+      <div className="px-wrap px-countdown-row px-in" data-countdown="agora" style={cascade(1)}>
         <p className="px-live">
           <span className="px-live-dot" aria-hidden="true" />
           Acontecendo agora
@@ -70,7 +72,7 @@ export function EventCountdown({ event, onKind }: { event: EventDetail; onKind: 
       </div>
     );
   return (
-    <div className="px-wrap px-countdown-row" data-countdown="antes">
+    <div className="px-wrap px-countdown-row px-in" data-countdown="antes" style={cascade(1)}>
       <div
         className="px-countdown"
         role="timer"
@@ -79,7 +81,12 @@ export function EventCountdown({ event, onKind }: { event: EventDetail; onKind: 
         <span className="px-sr">{remainingSentence(view.parts)}.</span>
         {UNITS.map(([unit, label]) => (
           <span key={unit} className="px-cd-block" data-unit={unit} aria-hidden="true">
-            <span className="px-cd-num">{pad2(view.parts[unit])}</span>
+            <span className="px-cd-num">
+              {/* Número novo a cada troca (a chave muda): desce um pouco e assenta; os blocos que não mudaram ficam parados. */}
+              <span key={pad2(view.parts[unit])} className="px-cd-tick">
+                {pad2(view.parts[unit])}
+              </span>
+            </span>
             <span className="px-cd-label">{label}</span>
           </span>
         ))}

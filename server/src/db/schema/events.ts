@@ -57,6 +57,11 @@ export const events = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::smallint[]`),
+    /**
+     * Miniatura da capa (0015, 15/10/2026): WebP de 32 px de largura em `data:` (poucas centenas de bytes), gerada no envio. A página
+     * mostra a miniatura desfocada na hora e troca pela capa nítida quando ela chega ("blur-up"). Nula: sem capa, ou capa anterior.
+     */
+    bannerPlaceholder: text('banner_placeholder'),
     status: eventStatus('status').notNull().default('rascunho'),
     isFeatured: boolean('is_featured').notNull().default(false),
     /**
@@ -91,6 +96,11 @@ export const events = pgTable(
     // Quem permite menores precisa do horário de fim (vai na autorização). Desde a 0010, sem exigir a autorização judicial.
     check('events_minors_need_end', sql`not ${t.allowsMinors} or ${t.endsAt} is not null`),
     check('events_accent_color_format', sql`${t.accentColor} is null or ${t.accentColor} ~ '^#[0-9A-F]{6}$'`),
+    check(
+      'events_banner_placeholder_format',
+      // O ";" do prefixo vai como chr(59): o gerador de migrações do Drizzle corta o texto num ";" literal.
+      sql`${t.bannerPlaceholder} is null or (${t.bannerUrl} is not null and char_length(${t.bannerPlaceholder}) <= 1500 and starts_with(${t.bannerPlaceholder}, 'data:image/webp' || chr(59) || 'base64,') and substr(${t.bannerPlaceholder}, 24) ~ '^[A-Za-z0-9+/]+={0,2}$')`,
+    ),
     check(
       'events_countdown_phrase_format',
       sql`${t.countdownPhrase} is null or (char_length(${t.countdownPhrase}) between 1 and 40 and ${t.countdownPhrase} !~ '[<>]')`,

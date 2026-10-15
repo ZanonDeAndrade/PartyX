@@ -319,7 +319,7 @@ body.px-dark .px-form .px-muted {
   overflow-y: auto;
   isolation: isolate;
 }
-/* Pulso de 200 ms: um véu branco que some. Não move nada e não atrasa o conteúdo, que já está na tela. */
+/* Destaque de 150 ms (--px-gate-flash): um véu branco que some. Não move nada e não atrasa o resultado, que já está na tela. */
 .px-gate-result::before {
   content: '';
   position: absolute;
@@ -327,7 +327,7 @@ body.px-dark .px-form .px-muted {
   z-index: -1;
   background: #fff;
   opacity: 0;
-  animation: pxgatepulse 200ms ease-out;
+  animation: pxgatepulse var(--px-gate-flash) ease-out;
 }
 @keyframes pxgatepulse {
   from {

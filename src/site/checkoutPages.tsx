@@ -21,7 +21,7 @@ import { DateStub, ErrorBox, Layout, PartyxContact, usePageTitle } from './compo
 import { mmss, useCountdown } from './countdown';
 import { brl, dateParts, maskEmail, phoneBr, timeOf } from './format';
 import { IconCheck, IconCopy } from './icons';
-import { DUR, EASE_OUT, m, useReducedMotion } from './motion';
+import { cascade } from './motion';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 
@@ -190,35 +190,23 @@ function TimerCard({ secondsLeft }: { secondsLeft: number }) {
 }
 
 /**
- * Ingresso "entrando na carteira" na confirmação: cai alguns pixels e aparece, um depois do outro. Momento discreto, sem
- * confete. Sem movimento quando o aparelho pede menos movimento.
+ * Ingresso "entrando na carteira" na confirmação: entra com o padrão do site, um depois do outro, logo depois do título. Momento
+ * discreto, sem confete. Com menos movimento, só esmaece (tokens).
  */
 function WalletItem({ index, children }: { index: number; children: ReactNode }) {
-  const reduce = useReducedMotion();
-  if (reduce) return <li>{children}</li>;
   return (
-    <m.li
-      initial={{ opacity: 0, y: -18, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: DUR.enter, ease: EASE_OUT, delay: 0.25 + Math.min(index, 5) * 0.09 }}
-    >
+    <li className="px-in" style={cascade(2 + Math.min(index, 5))}>
       {children}
-    </m.li>
+    </li>
   );
 }
 
-/** Troca de etapa dentro do pedido (forma de pagamento, Pix, resultado): o conteúdo novo entra da direita, no sentido da compra. */
+/** Troca de etapa dentro do pedido (forma de pagamento, Pix, resultado): o conteúdo novo entra com o padrão do site. */
 function Stage({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <m.div
-      key={id}
-      className="px-ck-stage"
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: DUR.open, ease: EASE_OUT }}
-    >
+    <div key={id} className="px-ck-stage px-in">
       {children}
-    </m.div>
+    </div>
   );
 }
 
@@ -685,15 +673,7 @@ function PixBox({ pix, total }: { pix: NonNullable<PaymentView['pix']>; total: n
         </div>
         <div className="px-pix-qr-box">
           {qr ? (
-            <m.img
-              src={qr}
-              alt="QR Code do Pix de pagamento"
-              width={204}
-              height={204}
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: DUR.enter, ease: EASE_OUT }}
-            />
+            <img className="px-in" src={qr} alt="QR Code do Pix de pagamento" width={204} height={204} />
           ) : (
             <span className="px-skel px-pix-qr-skel" aria-busy="true" aria-label="Gerando QR Code" />
           )}

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDrizzle } from '../db/client';
 import { createTestDatabase } from '../db/testing';
 import { MemoryBannerStorage } from '../providers/bannerStorage';
-import { backfillBannerVariants } from './bannerVariants';
+import { backfillBannerPlaceholders, backfillBannerVariants } from './bannerVariants';
 
 const ADMIN_URL = process.env.TEST_DATABASE_URL;
 
@@ -72,5 +72,38 @@ describe.skipIf(!ADMIN_URL)('versões menores dos banners antigos (integração)
     expect(again).toMatchObject({ pending: 1, updated: 0 });
     expect(storage.objects.size).toBe(2);
     expect(fetched.filter(u => u === url)).toHaveLength(2);
+  });
+
+  it('miniaturas das capas antigas (0015): confere sem gravar, grava pela versão de 640 px, não repete e só no banco', async () => {
+    const id = await event('capa-antiga', null);
+    const url = `https://banners.exemplo.test/events/${id}/${'e'.repeat(32)}.webp`;
+    await sql("update events set banner_url = $1, banner_widths = '{640,1080,1600}' where id = $2", [url, id]);
+    const storage = new MemoryBannerStorage();
+    const fetched: string[] = [];
+    const deps = {
+      db: createDrizzle(testDb.pool),
+      storage,
+      fetchImage: async (u: string) => {
+        fetched.push(u);
+        return image;
+      },
+    };
+    const placeholderOf = async () => (await sql('select banner_placeholder from events where id = $1', [id])).rows[0].banner_placeholder;
+
+    const dry = await backfillBannerPlaceholders(deps, { execute: false });
+    expect(dry.updated).toBe(0);
+    expect(await placeholderOf()).toBeNull();
+
+    const run = await backfillBannerPlaceholders(deps, { execute: true });
+    expect(run.updated).toBeGreaterThanOrEqual(1);
+    const placeholder = await placeholderOf();
+    expect(placeholder).toMatch(/^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/);
+    expect(placeholder.length).toBeLessThanOrEqual(1500);
+    expect(fetched).toContain(url.replace(/\.webp$/, '-w640.webp'));
+    expect(storage.objects.size).toBe(0);
+
+    const again = await backfillBannerPlaceholders(deps, { execute: true });
+    expect(again.updated).toBe(0);
+    expect(await placeholderOf()).toBe(placeholder);
   });
 });

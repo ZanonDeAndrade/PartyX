@@ -130,6 +130,20 @@
   --px-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --px-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --px-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+
+  /* ---- entrada (15/10/2026): padrão único do site, classe .px-in e keyframes px-enter (base.css); motion.tsx só põe índices ---- */
+  /* Desfoque e opacidade somem enquanto o item sobe um pouco. Só opacity, transform e filter: nada mexe no layout. Em cascata, cada
+     item espera um passo; a página do evento usa até o índice 4, então a primeira tela está completa em 4 x 60 + 400 = 640 ms
+     (folga para o primeiro quadro dentro dos 700 ms pedidos). */
+  --px-enter-dur: 400ms;
+  --px-enter-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --px-enter-step: 60ms;
+  --px-enter-blur: 8px;
+  --px-enter-rise: 12px;
+  --px-img-dur: 500ms; /* capa nítida sobre a miniatura desfocada */
+  --px-hover-dur: 150ms; /* passar o mouse e tocar em botões e cartões */
+  --px-admin-fade: 180ms; /* painel: só esmaecer, rápido */
+  --px-gate-flash: 150ms; /* portaria: no máximo um destaque de cor */
 }
 
 @media (min-width: 768px) {
@@ -151,5 +165,6 @@
     --px-dur-3: 0ms;
     --px-dur-4: 0ms;
     --px-dur-5: 0ms;
+    /* Entradas, troca de número, capa e cartões: nada anima (regra global de src/index.css). */
   }
 }

@@ -394,7 +394,7 @@ const SCREENS: Screen[] = [
     route: '/admin/compradores',
     state: 'corrigir e-mail ou cpf',
     who: 'admin',
-    action: seq(linkMatching(/Marina Costa/), click('Corrigir e-mail ou CPF')),
+    action: seq(linkMatching(/Marina Costa/), click('Corrigir e-mail, CPF ou nascimento')),
   },
   { id: 'ADM14', route: '/admin/ingressos', state: 'ingressos', who: 'admin' },
   { id: 'ADM15', route: `/admin/ingressos/${S.ticketValid}`, state: 'detalhe do ingresso', who: 'admin' },

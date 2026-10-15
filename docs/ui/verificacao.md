@@ -32,7 +32,7 @@ real, sem WebKit nesta medição; ver "Não verificado").
 | Abertura em vídeo fora da vitrine (pedido) | não aparece |
 | View Transitions na navegação | 0 iniciadas |
 
-Além disso, os tokens de duração vão a zero, a `motion` usa `reducedMotion="user"` e o CSS global já desliga animações e
+Além disso, os tokens de duração vão a zero (desde 15/10/2026 sem a `motion`: tudo é CSS) e o CSS global já desliga animações e
 transições nessa preferência.
 
 ## Contraste (WCAG 2.1 AA)
@@ -126,7 +126,7 @@ depois 372,83 kB no principal, o protótipo igual.
 
 | Pacote | Versão | Peso |
 | --- | --- | --- |
-| `motion` | 14.1.0 | núcleo (`m`, `LazyMotion`, `AnimatePresence`, `MotionConfig`) cerca de 7,8 kB gzip no pacote principal; recursos de animação (`domAnimation`) cerca de 15 kB gzip, carregados depois da primeira pintura; `animate` só no pacote do painel |
+| `motion` | 14.1.0 | **Removida em 15/10/2026** (`docs/registros/transicoes-2026-10-15.md`): o movimento passou a ser CSS e Web Animations API. A primeira visita caiu de 109,8 kB para 94,2 kB de JavaScript comprimido (saíram o pacote principal da `motion` e o núcleo pré-carregado); os recursos carregados depois (5,8 kB) e o pacote do painel (de 43,6 para 38,8 kB) também diminuíram |
 | `@fontsource-variable/big-shoulders-display` | 5.3.0 | 35,5 kB (woff2 latino) |
 | `@fontsource-variable/archivo` | 5.3.0 | 34,9 kB (woff2 latino) |
 | `@fontsource/big-shoulders-stencil-display` | 5.3.0 | 14,7 kB (só o 404) |

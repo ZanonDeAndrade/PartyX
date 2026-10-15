@@ -118,6 +118,18 @@ Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na pá
 | Regra no banco e reversão | `server/src/db/schema.integration.test.ts` (reversão da 0014 apaga só a coluna), `events.integration.test.ts` (CHECK recusa minúsculas, nome de cor, vazio e `;`) |
 | Sem regressão | `e2e:textos` (78), `e2e:cronometro` (7), `test:db` completo |
 
+### Transições do site (15/10/2026)
+
+Pedido do responsável: padrão único de entrada (desfoque, esmaecer e subida curta, em cascata), capa desfocada que fica nítida na página do evento, cronômetro com troca suave, vitrine ao aparecer na tela, passar o mouse em 150 ms, troca de página com View Transitions e alternativa, painel só com esmaecer, portaria sem entradas, menos movimento, sem animação contínua, nada segurando "Continuar" ou o pagamento, LCP, CLS e TBT medidos antes e depois. Migração `0015_capa_desfocada`. Registro: `docs/registros/transicoes-2026-10-15.md`.
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-23 (página do evento: entrada, capa, cronômetro), RF-20 (vitrine) | `e2e/transicoes.spec.ts` (cascata e tempos calculados pelo navegador, primeira tela em 640 ms, capa desfocada e revelada, cartões ao aparecer só na primeira vez, View Transition e alternativa), `e2e/cronometro.spec.ts` (só o número que muda anima; ponto pulsa três vezes) |
+| RF-13 (capa: miniatura no envio, remoção, preenchimento das antigas) | `server/src/api/events.integration.test.ts`, `server/src/media/bannerVariants.integration.test.ts`, `server/src/vitrine/homeHtml.test.ts`, `server/src/db/schema.integration.test.ts` (reversão da 0015) |
+| RF-28, RF-33 (compra sem espera) | `e2e/transicoes.spec.ts` ("Continuar" logo na entrada, barra de compra na tela desde o primeiro quadro), `e2e/roteiro-11-2.spec.ts` com gateway fictício (20 de 20) |
+| Painel e portaria (RF-55, RF-47, RF-48) | `e2e/transicoes.spec.ts` (painel só esmaece 180 ms, sem desfoque; portaria sem entradas e destaque de 150 ms) |
+| Acessibilidade (menos movimento) e desempenho (CA-32) | `e2e/transicoes.spec.ts` (nada anima), medição de LCP, CLS e TBT antes e depois no registro, `e2e:responsivo` (597 de 597, sem rolagem lateral) |
+
 ## Painel: promoters, compradores, ingressos, entradas, equipe e conta (11/10/2026, etapa 05 do fechamento)
 
 Interface real em `src/site/adminPeople.tsx` (ADM07 a ADM09, ADM12 a ADM15, ADM19 a ADM21, ADM24), menu lateral com gaveta no celular e exportação com estados e data (ADM23, `ExportLink`). API nova com testes: `GET /admin/buyers`, `GET /admin/buyers/:id`, `POST /admin/buyers/:id/cpf` (CPF completo sob demanda, trilha `usuario.cpf_visualizado`), `GET /admin/tickets/:id` (autor e data do cancelamento), `GET /admin/exports/promoters/:id/orders.csv`. Verificado no navegador (Chromium, 360 px e 1280 px, dados fictícios): sem rolagem horizontal e sem alvo menor que 44 px.

@@ -152,7 +152,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(15);
+      expect(r.rows[0].n).toBe(16);
     });
   });
 
@@ -709,6 +709,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag12 = '0012_cronometro_do_evento';
       const tag13 = '0013_lotes_por_tipo';
       const tag14 = '0014_cor_de_destaque';
+      const tag15 = '0015_capa_desfocada';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
@@ -719,6 +720,21 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag11)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag12)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag13)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag14)).rejects.toThrow(/não é a última/);
+
+      // 0015: só a coluna da miniatura da capa (e a regra dela); reverter a apaga, e o evento e a capa ficam.
+      const ev15 = (
+        await db.pool.query(
+          "insert into events (slug,name,starts_at,venue,address,description,age_rating,banner_url,banner_placeholder) values ('ev-15','E',now()+interval '9 days','L','A','D','Livre','https://b.test/x.webp','data:image/webp;base64,AAAA') returning id",
+        )
+      ).rows[0].id;
+      await rollbackLastMigration(db.url, tag15);
+      expect(
+        (await db.pool.query("select count(*)::int as n from information_schema.columns where table_name = 'events' and column_name = 'banner_placeholder'"))
+          .rows[0].n,
+      ).toBe(0);
+      expect((await db.pool.query('select banner_url from events where id = $1', [ev15])).rows[0].banner_url).toBe('https://b.test/x.webp');
+      await db.pool.query('delete from events where id = $1', [ev15]);
 
       // 0014: só a coluna da cor de destaque (e a regra do formato); reverter a apaga, e o evento continua (roxo da PartyX).
       const ev14 = (
@@ -911,8 +927,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0014 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0015 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag15);
       await rollbackLastMigration(db.url, tag14);
       await rollbackLastMigration(db.url, tag13);
       await rollbackLastMigration(db.url, tag12);

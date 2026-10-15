@@ -13,6 +13,7 @@ const card = (over: Partial<PublicEventCard> = {}): PublicEventCard => ({
   ageRating: '18 anos',
   bannerUrl: 'https://banners.exemplo.test/events/x/a.webp',
   bannerSrcSet: null,
+  bannerPlaceholder: null,
   isFeatured: true,
   sale: { kind: 'open', label: 'À venda', minPriceCents: 4000, startsAt: null },
   accentColor: null,
@@ -38,6 +39,15 @@ describe('página inicial com a vitrine no HTML', () => {
     expect(html).toContain('<b>Sábado, às 22:00</b>');
     expect(html).toMatch(/a partir de <b>R\$\s40,00<\/b>/);
     expect(html).toContain('fetchpriority="high"');
+  });
+
+  it('capa com miniatura (0015): a miniatura vai atrás da capa no HTML, como variável CSS escapada', () => {
+    const ph = 'data:image/webp;base64,UklGRkgAAABXRUJQ+/=';
+    const html = injectHome(TEMPLATE, { featured: [card({ bannerPlaceholder: ph })], upcoming: [] });
+    expect(html).toContain(`<div class="px-banner px-hero-media px-banner-ph" style="--px-ph:url(&quot;${ph}&quot;)"><img`);
+    // Sem capa, a miniatura não aparece.
+    const none = injectHome(TEMPLATE, { featured: [card({ bannerUrl: null, bannerPlaceholder: ph })], upcoming: [] });
+    expect(none).not.toContain('px-banner-ph');
   });
 
   it('sem destaque: só os dados, sem cópia do destaque nem preload', () => {

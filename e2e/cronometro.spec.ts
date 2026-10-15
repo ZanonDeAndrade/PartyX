@@ -173,7 +173,7 @@ test('para com a aba escondida e volta na hora certa ao reaparecer', async ({ br
   expect(Math.abs((await shownSeconds(page)) - (await remainingByDb('cronometro-aba')))).toBeLessThanOrEqual(2);
 });
 
-test('movimento: os números nunca animam; o ponto de "acontecendo agora" só pulsa sem pedido de menos movimento', async ({
+test('movimento: só o número que muda desce e assenta (260 ms); com menos movimento, troca direto; o ponto pulsa três vezes e para', async ({
   browser,
 }) => {
   await event('cronometro-movimento', { startsIn: '-30 minutes', endsIn: '2 hours' });
@@ -181,13 +181,33 @@ test('movimento: os números nunca animam; o ponto de "acontecendo agora" só pu
   const still = await open(browser, 'cronometro-movimento', { motion: 'reduce' });
   expect(await still.locator('.px-live-dot').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
   const moving = await open(browser, 'cronometro-movimento', { motion: 'no-preference' });
-  expect(await moving.locator('.px-live-dot').evaluate(el => getComputedStyle(el).animationName)).toBe('pxlive');
+  // Nada de animação contínua em segundo plano: o ponto pulsa três vezes e para.
+  expect(
+    await moving.locator('.px-live-dot').evaluate(el => [getComputedStyle(el).animationName, getComputedStyle(el).animationIterationCount]),
+  ).toEqual(['pxlive', '3']);
+
   const numbers = await open(browser, 'cronometro-numeros', { motion: 'no-preference' });
-  const style = await numbers.locator('.px-cd-num').first().evaluate(el => {
-    const s = getComputedStyle(el);
-    return { animation: s.animationName, transition: s.transitionDuration };
+  const tick = (unit: string) => numbers.locator(`.px-cd-block[data-unit="${unit}"] .px-cd-tick`);
+  expect(await tick('seconds').evaluate(el => [getComputedStyle(el).animationName, getComputedStyle(el).animationDuration])).toEqual([
+    'px-cd-tick',
+    '0.26s',
+  ]);
+  // Na troca de segundo, o número dos segundos é um elemento novo (entra animado) e o dos minutos continua o mesmo (parado).
+  await numbers.evaluate(() => {
+    (document.querySelector('[data-unit="seconds"] .px-cd-tick') as HTMLElement & { marca?: number }).marca = 1;
+    (document.querySelector('[data-unit="hours"] .px-cd-tick') as HTMLElement & { marca?: number }).marca = 1;
   });
-  expect(style).toEqual({ animation: 'none', transition: '0s' });
+  await numbers.waitForTimeout(1200);
+  const marked = await numbers.evaluate(() => ({
+    seconds: (document.querySelector('[data-unit="seconds"] .px-cd-tick') as HTMLElement & { marca?: number }).marca ?? 0,
+    hours: (document.querySelector('[data-unit="hours"] .px-cd-tick') as HTMLElement & { marca?: number }).marca ?? 0,
+  }));
+  expect(marked).toEqual({ seconds: 0, hours: 1 });
+  // Os números nunca quebram linha e o bloco não muda de altura.
+  expect(await numbers.locator('.px-cd-block').evaluateAll(els => new Set(els.map(e => Math.round(e.getBoundingClientRect().height))).size)).toBe(1);
+
+  const reduced = await open(browser, 'cronometro-numeros', { motion: 'reduce' });
+  expect(await reduced.locator('.px-cd-tick').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none');
 });
 
 test('pelo painel: frase personalizada aparece na página, e "Mostrar cronômetro" desmarcado tira o cronômetro', async ({

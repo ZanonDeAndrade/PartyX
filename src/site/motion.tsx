@@ -1,86 +1,128 @@
 /**
- * Movimento do site (biblioteca `motion`, com LazyMotion: o núcleo vai no pacote principal e os recursos de animação
- * chegam depois, em pacote próprio).
- * Durações e curvas espelham os tokens de styles/tokens.css. Regras:
- * - só `transform` e `opacity`; nada que desloque o layout;
- * - com "reduzir movimento" do aparelho, tudo vira troca instantânea (`useReducedMotion`);
- * - o QR Code do ingresso NUNCA é animado; a portaria nunca espera animação.
+ * Movimento do site (15/10/2026), sem biblioteca: CSS e, onde precisa de JavaScript, a Web Animations API. As durações e curvas
+ * ficam nos tokens de styles/tokens.css (--px-enter-*, --px-hover-dur, --px-admin-fade, --px-gate-flash); aqui só classes e índices.
+ * Regras:
+ * - só `opacity`, `transform` e `filter`; nada que desloque o layout;
+ * - com "reduzir movimento" do aparelho, nada anima (regra global em src/index.css) e os cartões já nascem visíveis;
+ * - o QR Code do ingresso NUNCA é animado; a portaria nunca espera animação; nenhuma animação segura um clique.
  */
-import { AnimatePresence, LazyMotion, m, MotionConfig, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type AnimationEvent,
+  type CSSProperties,
+  type RefCallback,
+} from 'react';
 
-/** Os recursos de animação (cerca de 24 kB comprimidos) chegam depois: a página aparece sem esperar por eles. */
-const loadFeatures = () => import('./motion-features').then(r => r.default);
+const REDUCE = '(prefers-reduced-motion: reduce)';
 
-export const DUR = { micro: 0.18, open: 0.24, enter: 0.34, page: 0.46 } as const;
-export const EASE_OUT = [0.22, 1, 0.36, 1] as const;
-export const EASE_IN_OUT = [0.65, 0, 0.35, 1] as const;
+export const prefersReducedMotion = (): boolean =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(REDUCE).matches;
 
-/** Envolve o site: carrega só os recursos de animação usados e respeita "reduzir movimento" em todos os componentes. */
-export function MotionRoot({ children }: { children: ReactNode }) {
-  return (
-    <LazyMotion features={loadFeatures} strict>
-      <MotionConfig reducedMotion="user" transition={{ duration: DUR.enter, ease: EASE_OUT }}>
-        {children}
-      </MotionConfig>
-    </LazyMotion>
-  );
-}
-
-export { AnimatePresence, m, useReducedMotion };
-
-/** Verdadeiro só na primeira montagem do componente: a entrada escalonada não se repete a cada nova busca. */
-export function useFirstMount(): boolean {
-  const first = useRef(true);
+/** "Reduzir movimento" do aparelho, acompanhando a mudança com a página aberta. */
+export function useReducedMotion(): boolean {
+  const [reduce, setReduce] = useState(prefersReducedMotion);
   useEffect(() => {
-    first.current = false;
+    if (typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia(REDUCE);
+    const update = () => setReduce(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
   }, []);
-  return first.current;
+  return reduce;
+}
+
+/** Posição na cascata (`--i`), usada pela classe `px-in`: cada posição espera um passo (--px-enter-step). */
+export const cascade = (index: number): CSSProperties => ({ '--i': index }) as CSSProperties;
+
+// ---------- cartões que entram ao aparecer na tela ----------
+
+/** Cartões já mostrados nesta visita: voltar à vitrine não repete a entrada. */
+const revealed = new Set<string>();
+const listeners = new WeakMap<Element, (index: number) => void>();
+let observer: IntersectionObserver | null = null;
+
+function revealObserver(): IntersectionObserver {
+  observer ??= new IntersectionObserver(
+    entries => {
+      // Os que apareceram juntos entram em cascata, na ordem da página (de cima para baixo, da esquerda para a direita).
+      const shown = entries
+        .filter(e => e.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top || a.boundingClientRect.left - b.boundingClientRect.left);
+      shown.forEach((entry, i) => {
+        observer!.unobserve(entry.target);
+        listeners.get(entry.target)?.(Math.min(i, 7));
+        listeners.delete(entry.target);
+      });
+    },
+    { threshold: 0.12 },
+  );
+  return observer;
 }
 
 /**
- * Entrada escalonada curta (cartões da vitrine). Cada item sobe 12 px e aparece; o atraso para no oitavo item, para a lista
- * longa não "escorrer". Sem animação quando `play` é falso (renderizações seguintes) ou com movimento reduzido.
+ * Entrada de um cartão quando ele aparece na tela (IntersectionObserver), só na primeira vez nesta visita. Antes de aparecer fica
+ * transparente (`data-reveal="wait"`); ao aparecer, entra com o padrão do site (`data-reveal="in"`), em cascata com os que apareceram
+ * junto; no fim, o atributo sai. Sem IntersectionObserver ou com menos movimento: o cartão já nasce visível.
  */
-export function staggerIn(index: number, play: boolean) {
-  if (!play) return {};
-  return {
-    initial: { opacity: 0, y: 12 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: DUR.enter, ease: EASE_OUT, delay: Math.min(index, 7) * 0.045 },
-  } as const;
+export function useReveal(id: string): {
+  ref: RefCallback<HTMLElement>;
+  props: { 'data-reveal'?: 'wait' | 'in'; style?: CSSProperties; onAnimationEnd?: (e: AnimationEvent) => void };
+} {
+  const [phase, setPhase] = useState<'wait' | 'in' | 'done'>(() =>
+    revealed.has(id) || prefersReducedMotion() || typeof IntersectionObserver === 'undefined' ? 'done' : 'wait',
+  );
+  const [index, setIndex] = useState(0);
+  const node = useRef<HTMLElement | null>(null);
+  const ref = useCallback<RefCallback<HTMLElement>>(
+    el => {
+      if (node.current && node.current !== el) {
+        revealObserver().unobserve(node.current);
+        listeners.delete(node.current);
+      }
+      node.current = el;
+      if (!el || phase !== 'wait') return;
+      listeners.set(el, i => {
+        revealed.add(id);
+        setIndex(i);
+        setPhase('in');
+      });
+      revealObserver().observe(el);
+    },
+    [id, phase],
+  );
+  if (phase === 'wait') return { ref, props: { 'data-reveal': 'wait' } };
+  if (phase === 'in') {
+    const done = (e: AnimationEvent) => {
+      if (e.target === e.currentTarget) setPhase('done');
+    };
+    return { ref, props: { 'data-reveal': 'in', style: cascade(index), onAnimationEnd: done } };
+  }
+  return { ref, props: {} };
 }
 
+// ---------- número que rola ----------
+
 /**
- * Texto que troca rolando na direção da mudança (quantidade, total). O valor antigo sai e o novo entra; a largura é a do
- * novo valor, sem empurrar o resto (o container corta o excesso verticalmente).
+ * Texto que troca rolando na direção da mudança (quantidade, total): o valor novo entra deslizando 60% e assenta em 180 ms; a primeira
+ * exibição não anima. Com menos movimento, troca direto (regra em base.css).
  */
 export function Roll({ value, className }: { value: string; className?: string }) {
-  const reduce = useReducedMotion();
   const prev = useRef(value);
-  const dir = useRef(1);
+  const dir = useRef(0);
   if (prev.current !== value) {
     const a = Number(prev.current.replace(/\D/g, '')) || 0;
     const b = Number(value.replace(/\D/g, '')) || 0;
     dir.current = b >= a ? 1 : -1;
     prev.current = value;
   }
-  if (reduce) return <span className={className}>{value}</span>;
   return (
     <span className={`px-roll ${className ?? ''}`}>
-      <AnimatePresence mode="popLayout" initial={false} custom={dir.current}>
-        <m.span
-          key={value}
-          custom={dir.current}
-          initial={{ y: `${60 * dir.current}%`, opacity: 0 }}
-          animate={{ y: '0%', opacity: 1 }}
-          exit={{ y: `${-60 * dir.current}%`, opacity: 0 }}
-          transition={{ duration: DUR.micro, ease: EASE_OUT }}
-          style={{ display: 'inline-block' }}
-        >
-          {value}
-        </m.span>
-      </AnimatePresence>
+      <span key={value} className={dir.current ? 'px-roll-in' : undefined} style={{ '--dir': dir.current } as CSSProperties}>
+        {value}
+      </span>
     </span>
   );
 }

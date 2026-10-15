@@ -13,6 +13,8 @@ export interface EventCard {
   bannerUrl: string | null;
   /** Versões do banner por largura (`srcset`); nula em banners antigos. */
   bannerSrcSet?: string | null;
+  /** Miniatura da capa em `data:` (0015), mostrada desfocada até a capa nítida chegar. */
+  bannerPlaceholder?: string | null;
   isFeatured: boolean;
   sale: { kind: SaleKind; label: string; minPriceCents: number | null; startsAt: string | null };
   /** Cor de destaque (`#RRGGBB`, 0014); nula: o roxo da PartyX. Na vitrine, só o bloco da data; na página, o destaque inteiro. */

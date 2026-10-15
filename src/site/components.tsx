@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { accentPalette, stubVars } from './accent';
 import { api, type EventCard, type MaintenanceContact, type SaleKind, type SiteInfo, type TypeState } from './api';
 import { brl, dateParts, eventPath, searchPath, timeOf } from './format';
 import { IconClose, IconMenu, IconSearch } from './icons';
-import { m, staggerIn, useReducedMotion } from './motion';
+import { useReveal } from './motion';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 
@@ -386,6 +386,9 @@ export function stripesFor(name: string, step = 10): string {
 export const bannerTransitionName = (slug: string) => `px-banner-${slug}`;
 
 /** Banner do evento. Sem imagem, listras discretas (como no protótipo), para o cartão não ficar vazio. */
+/** Miniatura aceita na variável CSS: só o formato que o servidor grava (a regra do banco é a mesma). */
+const PLACEHOLDER = /^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/;
+
 export function Banner({
   event,
   className = '',
@@ -395,7 +398,7 @@ export function Banner({
   eager = false,
   sizes = '100vw',
 }: {
-  event: Pick<EventCard, 'name' | 'bannerUrl' | 'bannerSrcSet'>;
+  event: Pick<EventCard, 'name' | 'bannerUrl' | 'bannerSrcSet' | 'bannerPlaceholder'>;
   className?: string;
   children?: ReactNode;
   step?: number;
@@ -404,16 +407,28 @@ export function Banner({
   /** Largura em que a imagem aparece, para o navegador escolher a versão (`srcset`). Padrão: a tela toda. */
   sizes?: string;
 }) {
+  // Capa desfocada que fica nítida (0015): a miniatura em data: fica por cima, desfocada, e esmaece quando a capa termina de carregar
+  // (base.css). A capa em si pinta opaca assim que chega, então o LCP não espera o efeito. Capa já em cache: sem efeito.
+  const [ready, setReady] = useState(false);
+  const imgRef = useCallback((img: HTMLImageElement | null) => {
+    if (img?.complete && img.naturalWidth > 0) setReady(true);
+  }, []);
+  const placeholder = event.bannerUrl && event.bannerPlaceholder && PLACEHOLDER.test(event.bannerPlaceholder) ? event.bannerPlaceholder : null;
   return (
     <div
-      className={`px-banner ${className}`}
+      className={`px-banner ${placeholder ? 'px-banner-ph ' : ''}${className}`}
+      data-cover={event.bannerUrl ? (ready ? 'ready' : 'loading') : undefined}
       style={{
         ...(event.bannerUrl ? null : { background: stripesFor(event.name, step) }),
         ...(transitionName ? { viewTransitionName: transitionName } : null),
+        ...(placeholder ? ({ '--px-ph': `url("${placeholder}")` } as CSSProperties) : null),
       }}
     >
       {event.bannerUrl ? (
         <img
+          ref={imgRef}
+          onLoad={() => setReady(true)}
+          onError={() => setReady(true)}
           src={event.bannerUrl}
           srcSet={event.bannerSrcSet ?? undefined}
           sizes={event.bannerSrcSet ? sizes : undefined}
@@ -453,20 +468,13 @@ export function DateStub({ iso, size = 'md', accent }: { iso: string; size?: 'md
 
 const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
-export function EventCardView({
-  event,
-  index = 0,
-  animate = false,
-}: {
-  event: EventCard;
-  index?: number;
-  animate?: boolean;
-}) {
-  const reduce = useReducedMotion();
+/** Cartão da vitrine. Entra quando aparece na tela, só na primeira vez nesta visita (useReveal), em cascata com os vizinhos. */
+export function EventCardView({ event }: { event: EventCard }) {
   const open = event.sale.kind === 'open';
   const when = dateParts(event.startsAt);
+  const reveal = useReveal(`card:${event.slug}`);
   return (
-    <m.li className="px-card" {...staggerIn(index, animate && !reduce)}>
+    <li className="px-card" ref={reveal.ref} {...reveal.props}>
       <Link to={eventPath(event.slug)} className="px-card-link" aria-label={`${event.name}, ${event.sale.label}`}>
         <div className="px-card-media">
           <Banner
@@ -502,7 +510,7 @@ export function EventCardView({
           </div>
         </div>
       </Link>
-    </m.li>
+    </li>
   );
 }
 
