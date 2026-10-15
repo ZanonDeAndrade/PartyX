@@ -26,6 +26,8 @@ Sem mudança na Vercel, nas rotinas, na verificação de saúde e nas permissõe
 
 ## Voltar atrás
 
+> Atualização de 15/10/2026 04:10 UTC: a `partyx-00020-kug` (lotes por tipo, migração 0013) substituiu a `00018-guj`. A referência de retorno atual está em `publicacao-producao-2026-10-15c.md`.
+
 - **Referência de retorno a partir daqui: `partyx-00018-guj`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00016-say ./infra/producao/deploy.sh rollback`.
 - A `00016-say` funciona com o banco já migrado (a 0012 só acrescenta colunas que ela não lê): volta a página sem o cronômetro. Não é preciso reverter a migração para voltar.
 

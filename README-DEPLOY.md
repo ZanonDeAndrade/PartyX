@@ -464,3 +464,11 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00018-guj`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00016-say ./infra/producao/deploy.sh rollback`. A `00016-say` convive com a 0012.
 
+> Atualização de 15/10/2026 04:10 UTC: a `partyx-00020-kug` (seção 21) substituiu a `00018-guj`.
+
+## 21. Nona publicação: lotes por tipo de ingresso (15/10/2026)
+
+**Publicado:** revisão `partyx-00020-kug` (tag `release-2026-10-15c`, commit `b39174a`), 100% desde 15/10 04:10 UTC, com a migração `0013_lotes_por_tipo` (aplicada às 04:08, depois do backup sob demanda `partyx-backup-4gbt4`). Mudança de escopo D-86. Mesma configuração. Registro: `docs/registros/publicacao-producao-2026-10-15c.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00020-kug`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00018-guj ./infra/producao/deploy.sh rollback`. A `00018-guj` convive com a 0013 (vende pelo preço do tipo, sem virada de lote).
+
