@@ -69,6 +69,10 @@ export const events = pgTable(
      * nova. Pedidos, ingressos, portaria, relatórios e exportações continuam como estão. Nulo: não arquivado. Pode ser desfeito.
      */
     archivedAt: instant('archived_at'),
+    /** Cronômetro regressivo na página do evento até o início (0012, 15/10/2026). Ligado por padrão. */
+    countdownEnabled: boolean('countdown_enabled').notNull().default(true),
+    /** Frase acima do título durante a contagem. Nula: a padrão ("Falta pouco para"). Até 40 caracteres, só texto (sem < nem >). */
+    countdownPhrase: text('countdown_phrase'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -80,6 +84,10 @@ export const events = pgTable(
     check('events_ends_after_start', sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`),
     // Quem permite menores precisa do horário de fim (vai na autorização). Desde a 0010, sem exigir a autorização judicial.
     check('events_minors_need_end', sql`not ${t.allowsMinors} or ${t.endsAt} is not null`),
+    check(
+      'events_countdown_phrase_format',
+      sql`${t.countdownPhrase} is null or (char_length(${t.countdownPhrase}) between 1 and 40 and ${t.countdownPhrase} !~ '[<>]')`,
+    ),
   ],
 );
 

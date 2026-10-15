@@ -6,6 +6,28 @@ import { salesState, type SalesInput, type SalesState } from './events';
 /** Um evento publicado continua na vitrine até 8 horas depois do início (como no protótipo). Encerrar é manual. */
 export const VISIBLE_AFTER_START_MS = 8 * 3_600_000;
 
+/** Cronômetro da página do evento (15/10/2026): frase padrão acima do título e o limite da frase personalizada. */
+export const COUNTDOWN_PHRASE_DEFAULT = 'Falta pouco para';
+export const COUNTDOWN_PHRASE_MAX = 40;
+
+/**
+ * Até quando a página mostra "Acontecendo agora": o fim informado, ou, sem ele, a mesma janela em que o evento fica na vitrine
+ * depois do início (8 h). Depois disso, e em evento encerrado, o cronômetro some.
+ */
+export const countdownLiveUntil = (startsAt: Date, endsAt: Date | null): Date =>
+  endsAt ?? new Date(startsAt.getTime() + VISIBLE_AFTER_START_MS);
+
+/** Frase do cronômetro como o painel a grava: espaços normalizados; vazia vira nula (a padrão). Devolve o problema, se houver. */
+export function checkCountdownPhrase(raw: string | null | undefined): { value: string | null } | { problem: string } {
+  const value = (raw ?? '').normalize('NFC').replace(/\s+/g, ' ').trim();
+  if (!value) return { value: null };
+  if (value.length > COUNTDOWN_PHRASE_MAX) return { problem: `Use no máximo ${COUNTDOWN_PHRASE_MAX} caracteres.` };
+  // Só texto: sem os sinais de marcação (a página nunca interpreta HTML, mas a frase não deve parecer que aceita).
+  if (/[<>]/.test(value)) return { problem: 'Use só texto, sem os sinais < e >.' };
+  if (/\p{Cc}/u.test(value)) return { problem: 'Use só texto.' };
+  return { value };
+}
+
 export const TYPE_LABEL: Record<SalesState, string> = {
   a_venda: 'À venda',
   em_breve: 'Em breve',

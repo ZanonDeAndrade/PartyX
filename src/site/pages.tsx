@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, minorAuthorizationUrl, type EventCard, type EventDetail, type SiteInfo } from './api';
 import { takeEmbedded } from './embedded';
 import { loadCart, saveCart } from './cart';
@@ -15,6 +15,8 @@ import {
   SearchForm,
   usePageTitle,
 } from './components';
+import { stateAnnouncement, type CountdownView } from './eventCountdown';
+import { EventCountdown, readCountdown } from './eventCountdownView';
 import { brl, dateLong, dateParts, searchPath, shareLinks, timeOf } from './format';
 import { IconCheck, IconClose, IconLink, IconShare } from './icons';
 import { Roll, useFirstMount } from './motion';
@@ -488,6 +490,16 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
   const [copied, setCopied] = useState(false);
   const sale = event.sale;
   const slug = event.slug;
+  // Cronômetro: a página guarda só o estado (antes, agora, oculto), que muda poucas vezes; os segundos andam dentro do cronômetro.
+  const [countdownKind, setCountdownKind] = useState<CountdownView['kind']>(() => readCountdown(event).kind);
+  const [countdownSaid, setCountdownSaid] = useState('');
+  const lastKind = useRef(countdownKind);
+  const onCountdownKind = useCallback((next: CountdownView['kind']) => {
+    const said = stateAnnouncement(lastKind.current, next);
+    lastKind.current = next;
+    setCountdownKind(next);
+    if (said) setCountdownSaid(said);
+  }, []);
 
   const copyLink = async () => {
     const url = `${window.location.origin}/eventos/${slug}`;
@@ -520,8 +532,22 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
         </Banner>
         <div className="px-wrap px-event-head">
           <DateStub iso={event.startsAt} size="lg" />
-          <h1 className="px-event-name">{event.name}</h1>
+          <div className="px-event-heading">
+            {countdownKind === 'antes' && event.countdown ? (
+              <p className="px-event-kicker">{event.countdown.phrase}</p>
+            ) : null}
+            <h1 className="px-event-name">{event.name}</h1>
+          </div>
         </div>
+        {event.countdown ? (
+          <>
+            <EventCountdown event={event} onKind={onCountdownKind} />
+            {/* Só a troca de estado é anunciada (começou, terminou); os segundos nunca. */}
+            <p className="px-sr" aria-live="polite" data-countdown-aviso="">
+              {countdownSaid}
+            </p>
+          </>
+        ) : null}
       </div>
       <div className="px-wrap px-event">
         <article className="px-event-main">

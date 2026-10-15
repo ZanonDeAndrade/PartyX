@@ -21,6 +21,7 @@
     "e2e:responsivo": "vite build && playwright test -c e2e/responsivo.config.ts",
     "e2e:turnstile": "vite build && playwright test -c e2e/turnstile.config.ts",
     "e2e:textos": "vite build && playwright test -c e2e/textos-longos.config.ts",
+    "e2e:cronometro": "vite build && playwright test -c e2e/cronometro.config.ts",
     "carga": "bash infra/carga/run-carga.sh",
     "preview": "vite preview",
     "db:generate": "drizzle-kit generate",

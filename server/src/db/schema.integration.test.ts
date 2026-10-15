@@ -150,7 +150,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(12);
+      expect(r.rows[0].n).toBe(13);
     });
   });
 
@@ -704,6 +704,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag9 = '0009_menores_de_idade';
       const tag10 = '0010_sem_autorizacao_judicial';
       const tag11 = '0011_excluir_e_arquivar_evento';
+      const tag12 = '0012_cronometro_do_evento';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
@@ -711,6 +712,18 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag8)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag9)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag10)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag11)).rejects.toThrow(/não é a última/);
+
+      // 0012: só as colunas do cronômetro (e a regra da frase); reverter as apaga.
+      const countdownColumns = async () =>
+        (
+          await db.pool.query(
+            "select count(*)::int as n from information_schema.columns where table_name = 'events' and column_name in ('countdown_enabled','countdown_phrase')",
+          )
+        ).rows[0].n;
+      expect(await countdownColumns()).toBe(2);
+      await rollbackLastMigration(db.url, tag12);
+      expect(await countdownColumns()).toBe(0);
 
       // 0011: recusa enquanto houver evento arquivado (voltaria para a vitrine); sem ele, apaga a coluna e volta a recusar QUALQUER
       // exclusão de evento e de tipo (gatilhos da 0001).
@@ -845,8 +858,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0011 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0012 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag12);
       await rollbackLastMigration(db.url, tag11);
       await rollbackLastMigration(db.url, tag10);
       await rollbackLastMigration(db.url, tag9);

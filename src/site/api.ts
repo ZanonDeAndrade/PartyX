@@ -1,4 +1,6 @@
 /** Cliente da API da vitrine e da compra. Tipos espelham `server/src/vitrine/service.ts` e `server/src/orders/`. */
+import { clockOffsetMs } from './eventCountdown';
+
 export type SaleKind = 'open' | 'soon' | 'out' | 'held' | 'closed' | 'ended';
 export type TypeState = 'a_venda' | 'em_breve' | 'encerrada' | 'esgotado' | 'reservado' | 'indisponivel';
 
@@ -35,6 +37,19 @@ export interface EventDetail extends EventCard {
   endsAt?: string | null;
   /** Entra quem terá 16 ou 17 anos na data do evento, com o Termo de Autorização (regras de menores). Falso: só 18+. */
   allowsMinors?: boolean;
+  /** Cronômetro até o início (`src/site/countdown.ts`). Nulo: desligado no painel ou evento encerrado. */
+  countdown?: { phrase: string; liveUntil: string } | null;
+  /** Hora do servidor ao montar a resposta. */
+  serverNow?: string;
+  /** Só no navegador: diferença entre a hora do servidor e o relógio do aparelho, medida na chegada da resposta. */
+  clockOffsetMs?: number;
+}
+
+/** Busca um evento público (ou a prévia) e anota a diferença de relógio no momento da resposta, para o cronômetro. */
+async function withClock<T extends { serverNow?: string }>(load: () => Promise<T>): Promise<T & { clockOffsetMs: number }> {
+  const sentAt = Date.now();
+  const data = await load();
+  return { ...data, clockOffsetMs: clockOffsetMs(data.serverNow, sentAt, Date.now()) };
 }
 
 export interface SiteInfo {
@@ -525,6 +540,9 @@ export interface AdminEventRow {
   closedAt: string | null;
   /** Arquivado: fora da vitrine, da busca, do link público e da lista padrão do painel, sem compra nova. Nulo: não arquivado. */
   archivedAt: string | null;
+  /** Cronômetro na página do evento (ligado por padrão) e a frase personalizada (nula: a padrão). */
+  countdownEnabled: boolean;
+  countdownPhrase: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -655,6 +673,7 @@ export interface EventsMeta {
     attractionsMax: number;
     attractionMax: number;
     typeNameMax: number;
+    countdownPhraseMax: number;
     priceMaxCents: number;
     quantityMax: number;
   };
@@ -662,6 +681,8 @@ export interface EventsMeta {
   gateWindow: { beforeHours: number; afterHours: number };
   reservationMinutes: number;
   maxTicketsPerOrder: number;
+  /** Frase do cronômetro quando o painel deixa em branco ("Falta pouco para"). */
+  countdownPhraseDefault: string;
 }
 
 export interface EventInputBody {
@@ -675,6 +696,8 @@ export interface EventInputBody {
   isFeatured: boolean;
   endsAt: string | null;
   allowsMinors: boolean;
+  countdownEnabled: boolean;
+  countdownPhrase: string | null;
 }
 export interface TicketTypeBody {
   name: string;
@@ -825,8 +848,8 @@ export const api = {
     const s = params.toString();
     return get<{ events: EventCard[]; filtering: boolean }>(`/public/events${s ? `?${s}` : ''}`, signal);
   },
-  event: async (slug: string, signal?: AbortSignal) =>
-    (await get<{ event: EventDetail }>(`/public/events/${encodeURIComponent(slug)}`, signal)).event,
+  event: (slug: string, signal?: AbortSignal) =>
+    withClock(async () => (await get<{ event: EventDetail }>(`/public/events/${encodeURIComponent(slug)}`, signal)).event),
 
   me: (signal?: AbortSignal) =>
     get<{ user: SessionUser; csrfToken: string; pendingConsent?: boolean }>('/auth/me', signal),
@@ -912,10 +935,12 @@ export const api = {
     event: (id: string, signal?: AbortSignal) =>
       get<{ event: AdminEvent; ticketTypes: AdminTicketType[] }>(`/admin/events/${encodeURIComponent(id)}`, signal),
     eventPreview: (id: string, signal?: AbortSignal) =>
-      get<{ event: EventDetail & { status: EventStatus } }>(
-        `/admin/events/${encodeURIComponent(id)}/preview`,
-        signal,
-      ).then(r => r.event),
+      withClock(() =>
+        get<{ event: EventDetail & { status: EventStatus } }>(
+          `/admin/events/${encodeURIComponent(id)}/preview`,
+          signal,
+        ).then(r => r.event),
+      ),
     createEvent: (body: EventInputBody) => request<{ event: AdminEvent }>('POST', '/admin/events', body),
     updateEvent: (id: string, body: Partial<EventInputBody>) =>
       request<{ event: AdminEvent }>('PATCH', `/admin/events/${encodeURIComponent(id)}`, body),

@@ -4,7 +4,16 @@ import { events, ticketTypes } from '../db/schema';
 import { availableQuantity, salesState } from '../domain/events';
 import { AppError } from '../domain/errors';
 import { dateKeyInEventZone } from '../domain/time';
-import { eventSale, searchKey, TYPE_LABEL, typeNote, VISIBLE_AFTER_START_MS, type EventSale } from '../domain/vitrine';
+import {
+  COUNTDOWN_PHRASE_DEFAULT,
+  countdownLiveUntil,
+  eventSale,
+  searchKey,
+  TYPE_LABEL,
+  typeNote,
+  VISIBLE_AFTER_START_MS,
+  type EventSale,
+} from '../domain/vitrine';
 import { reservedByType } from '../events/service';
 import { bannerSrcSet, shareImageUrl } from '../media/banner';
 import type { Clock } from '../providers/clock';
@@ -55,6 +64,13 @@ export interface PublicEventDetail extends PublicEventCard {
   /** Imagem 1200x630 para pré-visualização em redes sociais; nula se não houver banner. */
   shareImageUrl: string | null;
   ticketTypes: PublicTicketType[];
+  /**
+   * Cronômetro até o início (15/10/2026). Nulo: desligado no painel ou evento encerrado. `liveUntil`: até quando a página mostra
+   * "Acontecendo agora" (o fim, ou 8 h depois do início sem ele). A página decide antes, durante e depois pela hora do servidor.
+   */
+  countdown: { phrase: string; liveUntil: string } | null;
+  /** Hora do servidor ao montar a resposta. A página conta por ela (diferença para o relógio do aparelho), não só pelo aparelho. */
+  serverNow: string;
 }
 
 async function load(deps: VitrineDeps, rows: EventRow[]) {
@@ -211,6 +227,14 @@ async function detail(deps: VitrineDeps, row: EventRow, preview: boolean): Promi
     endsAt: row.endsAt?.toISOString() ?? null,
     allowsMinors: row.allowsMinors,
     shareImageUrl: row.bannerUrl ? shareImageUrl(row.bannerUrl) : null,
+    countdown:
+      row.countdownEnabled && !ended
+        ? {
+            phrase: row.countdownPhrase ?? COUNTDOWN_PHRASE_DEFAULT,
+            liveUntil: countdownLiveUntil(row.startsAt, row.endsAt).toISOString(),
+          }
+        : null,
+    serverNow: now.toISOString(),
     ticketTypes: types.map(t => {
       // Em evento encerrado nada está à venda, qualquer que seja o período do tipo.
       const state = ended && salesState(t, now) === 'a_venda' ? 'encerrada' : salesState(t, now);

@@ -83,6 +83,17 @@ Pedido do responsável: excluir de verdade só o evento sem pedido (em qualquer 
 | Corrida com pedido entrando | idem (pedido em andamento segura a exclusão e ela é recusada; exclusão em andamento faz o pedido falhar como "evento indisponível" sem deixar pedido nem reserva; rajada de 12 rodadas sem impasse nem pedido órfão) |
 | Regras no banco | `server/src/db/schema.integration.test.ts` (evento e tipo só saem sem uso; `partyx_app` apaga evento sem uso e é recusado com pedido; reversão da 0011 recusa com arquivado e devolve os gatilhos `forbid_delete`), `server/src/db/appRole.cluster.test.ts` (DELETE só em `events` e `ticket_types`, não em histórico) |
 
+### Cronômetro na página do evento (15/10/2026)
+
+Pedido do responsável: contagem regressiva até o início no topo da página do evento (estilo do bloco da data), "Acontecendo agora" entre o início e o fim, some depois; ligar, desligar e frase pelo painel; hora do servidor. Registro: `docs/registros/cronometro-evento-2026-10-15.md`.
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-23 (página do evento: cronômetro, estados e virada) | `src/site/eventCountdown.test.ts`, `e2e/cronometro.spec.ts` (antes, virada no zero sem recarregar, durante, depois, encerrado, 360 px em uma linha) |
+| RF-23 (hora do servidor, relógio do aparelho errado) | `server/src/api/events.integration.test.ts` (`serverNow`), `src/site/eventCountdown.test.ts` e `e2e/cronometro.spec.ts` (+7 h, -7 h, +3 dias, -45 min) |
+| RF-11 (painel: mostrar cronômetro e frase) | `server/src/api/events.integration.test.ts` (padrão, frase, 422, desligado, trilha), `e2e/cronometro.spec.ts` (pelo formulário) |
+| Acessibilidade e desempenho | `e2e/cronometro.spec.ts` (`role="timer"`, aviso só na troca, pausa com a aba escondida, movimento reduzido) |
+
 ## Painel: promoters, compradores, ingressos, entradas, equipe e conta (11/10/2026, etapa 05 do fechamento)
 
 Interface real em `src/site/adminPeople.tsx` (ADM07 a ADM09, ADM12 a ADM15, ADM19 a ADM21, ADM24), menu lateral com gaveta no celular e exportação com estados e data (ADM23, `ExportLink`). API nova com testes: `GET /admin/buyers`, `GET /admin/buyers/:id`, `POST /admin/buyers/:id/cpf` (CPF completo sob demanda, trilha `usuario.cpf_visualizado`), `GET /admin/tickets/:id` (autor e data do cancelamento), `GET /admin/exports/promoters/:id/orders.csv`. Verificado no navegador (Chromium, 360 px e 1280 px, dados fictícios): sem rolagem horizontal e sem alvo menor que 44 px.

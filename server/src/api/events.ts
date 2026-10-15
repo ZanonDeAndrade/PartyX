@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAdmin } from '../auth/permissions';
 import type { AuthDeps, AuthVariables } from '../auth/types';
 import { AGE_RATINGS } from '../domain/events';
+import { COUNTDOWN_PHRASE_DEFAULT } from '../domain/vitrine';
 import { AppError } from '../domain/errors';
 import {
   LIMITS,
@@ -53,6 +54,8 @@ const eventFields = {
   isFeatured: z.boolean(),
   endsAt: instant.nullable(),
   allowsMinors: z.boolean(),
+  countdownEnabled: z.boolean(),
+  countdownPhrase: z.string().max(600).nullable(),
 };
 const createEventBody = z.object({
   ...eventFields,
@@ -60,6 +63,8 @@ const createEventBody = z.object({
   isFeatured: eventFields.isFeatured.optional(),
   endsAt: eventFields.endsAt.optional(),
   allowsMinors: eventFields.allowsMinors.optional(),
+  countdownEnabled: eventFields.countdownEnabled.optional(),
+  countdownPhrase: eventFields.countdownPhrase.optional(),
   slug: text.optional(),
 });
 const updateEventBody = z.object(eventFields).partial();
@@ -126,6 +131,7 @@ export function eventsRoutes(deps: AuthDeps) {
         attractionsMax: LIMITS.attractionsMax,
         attractionMax: LIMITS.attractionMax,
         typeNameMax: LIMITS.typeNameMax,
+        countdownPhraseMax: LIMITS.countdownPhraseMax,
         priceMaxCents: LIMITS.priceMaxCents,
         quantityMax: LIMITS.quantityMax,
       },
@@ -135,6 +141,7 @@ export function eventsRoutes(deps: AuthDeps) {
         afterHours: deps.config.GATE_CLOSED_WINDOW_AFTER_HOURS,
       },
       reservationMinutes: deps.config.RESERVATION_MINUTES,
+      countdownPhraseDefault: COUNTDOWN_PHRASE_DEFAULT,
       maxTicketsPerOrder: deps.config.MAX_TICKETS_PER_ORDER,
     }),
   );

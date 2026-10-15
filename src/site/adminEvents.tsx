@@ -961,6 +961,10 @@ interface EventForm {
   endDate: string;
   endTime: string;
   allowsMinors: boolean;
+  /** Cronômetro na página do evento até o início. */
+  countdownEnabled: boolean;
+  /** Vazia: a frase padrão. */
+  countdownPhrase: string;
 }
 const EMPTY_FORM: EventForm = {
   name: '',
@@ -975,6 +979,8 @@ const EMPTY_FORM: EventForm = {
   endDate: '',
   endTime: '',
   allowsMinors: false,
+  countdownEnabled: true,
+  countdownPhrase: '',
 };
 function formOf(e: AdminEvent): EventForm {
   const { date, time } = isoToZonedInputs(e.startsAt);
@@ -992,6 +998,8 @@ function formOf(e: AdminEvent): EventForm {
     endDate: end.date,
     endTime: end.time,
     allowsMinors: e.allowsMinors,
+    countdownEnabled: e.countdownEnabled,
+    countdownPhrase: e.countdownPhrase ?? '',
   };
 }
 const SERVER_FIELD: Record<string, string> = { startsAt: 'date', slug: 'name', endsAt: 'endDate' };
@@ -1080,6 +1088,11 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
       if (!endIso && !e.endDate) e.endDate = 'Informe o fim: ele vai na autorização de menores.';
       if (form.ageRating === '18 anos') e.allowsMinors = 'Evento com classificação 18 anos não permite menores.';
     }
+    // Frase do cronômetro: as mesmas regras do servidor (`checkCountdownPhrase`), que confere de novo.
+    const phrase = form.countdownPhrase.trim().replace(/\s+/g, ' ');
+    if (phrase.length > meta.limits.countdownPhraseMax)
+      e.countdownPhrase = `Use no máximo ${meta.limits.countdownPhraseMax} caracteres.`;
+    else if (/[<>]/.test(phrase)) e.countdownPhrase = 'Use só texto, sem os sinais < e >.';
     return e;
   };
 
@@ -1141,6 +1154,8 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
       isFeatured: form.isFeatured,
       endsAt: form.endDate && form.endTime ? zonedInputsToIso(form.endDate, form.endTime) : null,
       allowsMinors: form.allowsMinors,
+      countdownEnabled: form.countdownEnabled,
+      countdownPhrase: form.countdownPhrase.trim().replace(/\s+/g, ' ') || null,
     };
     let current: AdminEvent;
     try {
@@ -1366,6 +1381,39 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
             {errors.allowsMinors}
           </small>
         ) : null}
+      </fieldset>
+      <fieldset className="px-field-wide px-fieldset">
+        <legend>Cronômetro na página do evento</legend>
+        <div className="px-check">
+          <input
+            id="ev-countdownEnabled"
+            type="checkbox"
+            checked={form.countdownEnabled}
+            onChange={e => set('countdownEnabled', e.target.checked)}
+            aria-describedby="ev-countdownEnabled-ajuda"
+          />
+          <label htmlFor="ev-countdownEnabled">Mostrar cronômetro</label>
+        </div>
+        <small id="ev-countdownEnabled-ajuda" className="px-muted">
+          Contagem regressiva até o início, no topo da página. Entre o início e o fim aparece "Acontecendo agora"; depois
+          do fim, ou com o evento encerrado, o cronômetro some.
+        </small>
+        <FormField
+          id="ev-countdownPhrase"
+          label="Frase do cronômetro (opcional)"
+          error={errors.countdownPhrase}
+          hint={`Aparece acima do nome do evento durante a contagem. Em branco: "${meta.countdownPhraseDefault}". ${form.countdownPhrase.trim().length} de ${meta.limits.countdownPhraseMax} caracteres, só texto.`}
+        >
+          <input
+            id="ev-countdownPhrase"
+            value={form.countdownPhrase}
+            maxLength={meta.limits.countdownPhraseMax}
+            placeholder={meta.countdownPhraseDefault}
+            disabled={!form.countdownEnabled}
+            onChange={e => set('countdownPhrase', e.target.value)}
+            {...described('ev-countdownPhrase', errors.countdownPhrase, true)}
+          />
+        </FormField>
       </fieldset>
       <div className="px-check px-field-wide">
         <input
