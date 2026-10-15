@@ -504,3 +504,17 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00028-vax`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00026-rim ./infra/producao/deploy.sh rollback`. A `00026-rim` usa o mesmo banco (volta o seletor do sistema; cores salvas continuam valendo).
 
+> Atualização de 15/10/2026 23:07 UTC: a `partyx-00030-jos` (seção 26) substituiu a `00028-vax`.
+
+## 26. Décima quarta publicação: transferência de ingresso e textos novos (15/10/2026)
+
+**Publicado:** revisão `partyx-00030-jos` (tag `release-2026-10-15h`, commit `3ad718a`), 100% desde 15/10 23:07 UTC.
+- **Migração:** `0016_transferencia_e_aceite_da_politica`, aplicada às 21:16, depois do backup sob demanda `partyx-backup-kt724`.
+- **Textos:** Termos 1.2, Privacidade 1.2 e Política de Cancelamento, Troca e Reembolso 1.0, com vigência em 15/10/2026 e o OK do Bernardo antes da virada.
+- **Configuração:** a mesma, mais `CANCELLATION_VERSION` e `CANCELLATION_DATE`.
+- **Registro:** `docs/registros/publicacao-producao-2026-10-15h.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00030-jos`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00028-vax ./infra/producao/deploy.sh rollback`.
+- A `00028-vax` convive com a 0016, mas é segura **só antes da primeira transferência**: ela mostra o ingresso pelo pedido.
+- Voltar também volta os Termos e a Privacidade 1.1 e tira a Política do ar.
+

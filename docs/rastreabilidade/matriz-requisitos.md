@@ -126,7 +126,7 @@ Pedido do responsável:
 - **Textos:** Termos e Privacidade 1.2;
 - **D-80 atualizada:** aceite da Política gravado no checkout.
 
-Migração 0016. Registro: `docs/registros/transferencia-e-cancelamento-2026-10-15.md`. **Não publicado.**
+Migração 0016. Registro: `docs/registros/transferencia-e-cancelamento-2026-10-15.md`. Publicado em 15/10/2026, com o OK do Bernardo aos textos (`partyx-00030-jos`, `publicacao-producao-2026-10-15h.md`).
 
 | Requisito ou critério | Evidência |
 |---|---|

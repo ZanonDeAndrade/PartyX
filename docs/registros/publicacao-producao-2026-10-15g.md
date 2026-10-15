@@ -1,5 +1,7 @@
 # Publicação em produção: seletor de cor embutido no painel (15/10/2026)
 
+> Atualização de 15/10/2026 23:07 UTC: a `partyx-00030-jos` (`release-2026-10-15h`, transferência de ingresso e textos novos, `publicacao-producao-2026-10-15h.md`) substituiu a `00028-vax`, que fica como retorno, segura só antes da primeira transferência.
+
 Pedido do responsável (Arthur): seletor de cor embutido no campo "Cor de destaque" (`seletor-de-cor-2026-10-15.md`), "fluxo de sempre, com meu OK antes da virada". O OK veio às 18:54 UTC: "faça commit e deploy". O commit já estava feito; o fluxo foi direto até a virada.
 
 | Campo | Registro |

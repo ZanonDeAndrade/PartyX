@@ -1,6 +1,6 @@
 # Política de Cancelamento, Troca e Reembolso 1.0 e transferência de ingresso (15/10/2026)
 
-**Estado: implementado e testado no local; nada na nuvem.** Os textos novos precisam do OK do Bernardo antes da virada.
+**Estado: publicado em 15/10/2026 23:07 UTC** (`release-2026-10-15h`, revisão `partyx-00030-jos`, migração 0016), com o OK do Bernardo aos três textos, informado pelo responsável antes da virada. Registro: `publicacao-producao-2026-10-15h.md`.
 
 **Decisões do responsável sobre o plano (15/10/2026):**
 - transferência como mudança de escopo (D-87), com o `CLAUDE.md` atualizado;

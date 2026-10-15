@@ -6,7 +6,7 @@ Preparado em 14/10/2026. **Nada aqui foi executado.** A publicação de 13/10 de
 
 | # | Item | Como se comprova | Feito em | Por quem |
 |---|---|---|---|---|
-| 1.1 | Termos de Uso, Política de Privacidade e Política de Cancelamento fornecidos (D-11) | Arquivos em `conteudo-legal/`, com versão e data de cada um | 14/10/2026, **só Termos 1.0 e Privacidade 1.0** (bastam para o cadastro, D-84). Falta a Política de Cancelamento, exigida para vender | Arthur (responsável) |
+| 1.1 | Termos de Uso, Política de Privacidade e Política de Cancelamento fornecidos (D-11) | Arquivos em `conteudo-legal/`, com versão e data de cada um | **Feito em 15/10/2026:** Termos 1.2, Privacidade 1.2 e Política de Cancelamento, Troca e Reembolso 1.0 publicados (`release-2026-10-15h`, `partyx-00030-jos`), com o OK do Bernardo informado por Arthur. A Política deixou de ser pendência para vender. Antes: 14/10/2026, só Termos 1.0 e Privacidade 1.0 (bastam para o cadastro, D-84) | Arthur (responsável); OK do Bernardo |
 | 1.2 | Dados da PartyX para o rodapé e os e-mails (razão social, CNPJ, contato) | Variáveis `PARTYX_*` e `EMAIL_REPLY_TO` preenchidas | 14/10/2026: `PARTYX_*` no `env.prod.yaml`; `EMAIL_REPLY_TO` vazio de propósito (cai no e-mail de atendimento) | Arthur (responsável) |
 | 1.3 | Identidade visual aprovada por escrito (CA-33) | Registro em `aprovacao-visual.md` | | |
 | 1.4 | Gateway de produção confirmado por escrito (D-01) | Registro em `decisoes-pendentes.md` | | |
