@@ -456,3 +456,11 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Papel recém-criado:** a primeira ligação ao bucket pode falhar com "does not exist in the resource's hierarchy" enquanto o papel propaga; repetir `deploy.sh banners-iam` depois de alguns segundos (idempotente).
 
+> Atualização de 15/10/2026 03:20 UTC: a `partyx-00018-guj` (seção 20) substituiu a `00016-say`.
+
+## 20. Oitava publicação: cronômetro na página do evento (15/10/2026)
+
+**Publicado:** revisão `partyx-00018-guj` (tag `release-2026-10-15b`, commit `023f46b`), 100% desde 15/10 03:20 UTC, com a migração `0012_cronometro_do_evento` (aplicada às 03:19, depois do backup sob demanda `partyx-backup-rnp76`). Mesma configuração. Registro: `docs/registros/publicacao-producao-2026-10-15b.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00018-guj`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00016-say ./infra/producao/deploy.sh rollback`. A `00016-say` convive com a 0012.
+

@@ -30,6 +30,8 @@ Sem mudança na Vercel, nas rotinas e na verificação de saúde.
 
 ## Voltar atrás
 
+> Atualização de 15/10/2026 03:20 UTC: a `partyx-00018-guj` (cronômetro na página do evento, migração 0012) substituiu a `00016-say`. A referência de retorno atual está em `publicacao-producao-2026-10-15b.md`.
+
 - **Referência de retorno a partir daqui: `partyx-00016-say`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00014-bax ./infra/producao/deploy.sh rollback`.
 - A `00014-bax` funciona com o banco já migrado (ficou no ar com a 0011 aplicada das 02:49 às 02:56): não conhece `archived_at`, então um evento arquivado voltaria a aparecer no site enquanto ela estiver no ar. Desarquive antes de voltar, ou volte e reverta a 0011 (a reversão recusa com arquivado).
 - Eventos excluídos não voltam com o rollback (ficam só na trilha `evento.excluir`). A cópia `partyx-20261015T024908Z.dump` é de antes de qualquer exclusão.
