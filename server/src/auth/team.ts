@@ -12,7 +12,7 @@ import {
   normalizeName,
   normalizePhone,
 } from '../domain/identity';
-import { newTemporaryPassword } from '../domain/password';
+import { newTemporaryPassword, passwordProblem } from '../domain/password';
 import { pgError, type FieldError } from './service';
 import { revokeUserSessions } from './sessions';
 import type { AuthDeps, Role } from './types';
@@ -177,7 +177,7 @@ async function loadTarget(tx: Tx, id: string, staffOnly: boolean): Promise<Row> 
 
 async function audit(
   tx: Tx,
-  deps: AuthDeps,
+  deps: Pick<AuthDeps, 'clock'>,
   actor: Actor,
   action: string,
   entityId: string,
@@ -205,11 +205,43 @@ export interface CreateMemberInput extends MemberInput {
   role: StaffRole;
 }
 
+type CreateDeps = Pick<AuthDeps, 'db' | 'hasher' | 'clock'>;
+
 /** Cria o acesso com senha temporária aleatória. A senha só existe na resposta desta chamada. */
-export async function createMember(deps: AuthDeps, actor: Actor, input: CreateMemberInput) {
-  const data = checkMember(input, true);
+export async function createMember(deps: CreateDeps, actor: Actor, input: CreateMemberInput) {
   const temporaryPassword = newTemporaryPassword();
-  const passwordHash = await deps.hasher.hash(temporaryPassword);
+  const member = await insertMember(deps, actor, input, temporaryPassword);
+  return { member, temporaryPassword };
+}
+
+/**
+ * Cria o acesso pelo terminal (`server/scripts/create-staff.ts`), com a senha temporária digitada sem eco por quem executa.
+ * Para quando já existe administrador (o bootstrap só cria o primeiro). Mesmas regras do painel: quem age precisa ser
+ * administrador ativo, o primeiro acesso exige trocar a senha e a trilha registra `equipe.criar`, aqui com o motivo.
+ * Não existe rota HTTP para esta função; a senha não volta na resposta.
+ */
+export async function createMemberWithPassword(
+  deps: CreateDeps,
+  actor: Actor,
+  input: CreateMemberInput,
+  password: string,
+  reason: string,
+): Promise<TeamMember> {
+  const problem = passwordProblem(password);
+  if (problem) throw invalid([{ campo: 'password', mensagem: problem }]);
+  if (reason.trim().length < 5) throw invalid([{ campo: 'reason', mensagem: 'Informe o motivo da criação.' }]);
+  return insertMember(deps, actor, input, password, reason.trim());
+}
+
+async function insertMember(
+  deps: CreateDeps,
+  actor: Actor,
+  input: CreateMemberInput,
+  password: string,
+  reason?: string,
+): Promise<TeamMember> {
+  const data = checkMember(input, true);
+  const passwordHash = await deps.hasher.hash(password);
   const now = deps.clock.now();
   try {
     const member = await deps.db.transaction(async tx => {
@@ -228,10 +260,10 @@ export async function createMember(deps: AuthDeps, actor: Actor, input: CreateMe
           updatedAt: now,
         })
         .returning(memberColumns);
-      await audit(tx, deps, actor, 'equipe.criar', created!.id, null, snapshot(created!));
+      await audit(tx, deps, actor, 'equipe.criar', created!.id, null, snapshot(created!), reason);
       return created!;
     });
-    return { member: asStaff(member), temporaryPassword };
+    return asStaff(member);
   } catch (error) {
     return conflict(error);
   }

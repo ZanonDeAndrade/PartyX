@@ -27,6 +27,7 @@
     "db:migrate": "tsx --env-file-if-exists=.env server/scripts/migrate.ts",
     "db:rollback": "tsx --env-file-if-exists=.env server/scripts/rollback.ts",
     "admin:bootstrap": "tsx --env-file-if-exists=.env server/scripts/bootstrap-admin.ts",
+    "admin:create-staff": "tsx --env-file-if-exists=.env server/scripts/create-staff.ts",
     "jobs:expire": "tsx --env-file-if-exists=.env server/scripts/expire-reservations.ts",
     "tickets:backfill": "tsx --env-file-if-exists=.env server/scripts/backfill-tickets.ts",
     "banners:versoes": "tsx --env-file-if-exists=.env server/scripts/banner-variants.ts",

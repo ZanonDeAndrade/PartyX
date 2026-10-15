@@ -126,6 +126,19 @@ BOOTSTRAP_ADMIN_NAME="Nome Sobrenome" BOOTSTRAP_ADMIN_EMAIL=pessoa@dominio.com n
 - Nunca promove conta existente: se o e-mail já pertence a alguém, recusa.
 - Em homologação e produção rode com a `DATABASE_URL` do ambiente; o e-mail e o nome do administrador inicial vêm do cliente (insumo 14, equipe).
 
+## Equipe seguinte pelo terminal (`admin:create-staff`)
+
+Com um administrador já existente, o caminho normal é o painel (`/admin/equipe`, senha aleatória mostrada uma vez). Quando a senha temporária precisa ser digitada por quem executa, sem eco:
+
+```
+STAFF_ACTOR_EMAIL=<administrador ativo> STAFF_NAME="Nome Sobrenome" STAFF_EMAIL=pessoa@dominio.com \
+STAFF_ROLE=administrador STAFF_REASON="motivo" STAFF_PASSWORD=<vinda de um read -s> npm run admin:create-staff
+```
+
+- Mesma função do painel (`createMemberWithPassword` em `server/src/auth/team.ts`): quem responde pela criação precisa ser administrador ativo, a troca de senha é obrigatória no primeiro acesso e a trilha registra `equipe.criar` com o autor e o **motivo**. Não existe rota HTTP para ela.
+- Recusa senha fora da regra, motivo vazio, autor que não é administrador ativo e e-mail em uso (nunca promove conta existente). `STAFF_EXPECT_ENV=producao` recusa banco sem a marca de produção.
+- A senha só entra pelo ambiente do processo e nunca é impressa. Na produção, um script de apoio fora do Git pede a senha duas vezes sem eco e lê a URL do banco do Secret Manager.
+
 ## Premissas e decisões abertas
 
 | ID | Tema | O que foi feito | Precisa de |

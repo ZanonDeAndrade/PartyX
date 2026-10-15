@@ -78,7 +78,7 @@ Interface real em `src/site/adminPeople.tsx` (ADM07 a ADM09, ADM12 a ADM15, ADM1
 | Requisito ou critério | Evidência |
 |---|---|
 | RF-06 (correção de e-mail e CPF só pelo administrador, motivo, trilha) | `server/src/api/panel.integration.test.ts` (detalhe do comprador), `src/site/format.test.ts` |
-| RF-08 (equipe: criar, editar, ativar e desativar) | `server/src/api/team.integration.test.ts`, `src/site/adminPeople.tsx` |
+| RF-08 (equipe: criar, editar, ativar e desativar) | `server/src/api/team.integration.test.ts` (inclui a criação pelo terminal, `admin:create-staff`, de 14/10/2026), `src/site/adminPeople.tsx` |
 | RF-18, CA-10 (promoters, código único) | `server/src/api/events.integration.test.ts`, `src/site/adminPeople.tsx` (código repetido no campo, verificado no navegador) |
 | RF-57 (compradores e ingressos) | `server/src/api/panel.integration.test.ts` (lista, detalhe, ingresso) |
 | CA-05 (validador sem telas nem rotas do administrador) | `server/src/api/security.integration.test.ts` (16 telas, 403 G04), `server/src/api/panel.integration.test.ts` (rotas novas, 403) |

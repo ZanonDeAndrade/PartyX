@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app';
 import { bootstrapFirstAdmin } from '../auth/bootstrap';
-import { setMemberActive } from '../auth/team';
+import { createMemberWithPassword, setMemberActive } from '../auth/team';
 import { loadConfig } from '../config';
 import { createDrizzle } from '../db/client';
 import { createTestDatabase } from '../db/testing';
@@ -598,6 +598,57 @@ describe.skipIf(!ADMIN_URL)('equipe e permissões (integração)', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].actor_id).toBeNull();
       if (r.status === 'criado') expect(JSON.stringify(rows)).not.toContain(r.temporaryPassword);
+    });
+  });
+
+  describe('administrador seguinte pelo terminal (create-staff)', () => {
+    const deps = () => ({ db: createDrizzle(testDb.pool), hasher: argon2Hasher, clock });
+    const typed = 'digitada-sem-eco-7';
+    const reason = 'Conta do titular da PartyX (controlador dos dados)';
+    const input = { name: 'Titular da Silva', email: 'Titular@PartyX.test', role: 'administrador' as const };
+
+    it('cria com a senha digitada, exige troca e grava autor e motivo na trilha, sem a senha', async () => {
+      const actor = await seed('administrador');
+      const member = await createMemberWithPassword(deps(), actor, input, typed, reason);
+      expect(member).toMatchObject({
+        email: 'titular@partyx.test',
+        role: 'administrador',
+        isActive: true,
+        mustChangePassword: true,
+      });
+
+      const { rows } = await sql("select actor_id, entity_id, reason, after_json from audit_log where action = 'equipe.criar'");
+      expect(rows).toEqual([expect.objectContaining({ actor_id: actor.id, entity_id: member.id, reason })]);
+      expect(JSON.stringify(rows)).not.toContain(typed);
+      expect(JSON.stringify(rows)).not.toContain('argon2');
+
+      // Entra com a senha digitada, mas só usa a área depois de trocar.
+      const b = browser();
+      expect((await b.login('titular@partyx.test', typed)).status).toBe(200);
+      expect(await errorCode(await b.send('GET', '/admin/team'))).toBe('troca_de_senha_obrigatoria');
+      expect((await b.send('POST', '/me/password', { currentPassword: typed, newPassword: 'nova-senha-2026' })).status).toBe(200);
+      expect((await b.send('GET', '/admin/team')).status).toBe(200);
+    });
+
+    it('recusa senha fraca, motivo vazio, autor sem administrador ativo e e-mail em uso, sem gravar nada', async () => {
+      const actor = await seed('administrador');
+      const inactive = await seed('administrador', { active: false });
+      const validator = await seed('validador');
+      const client = await seed('cliente');
+      const before = (await sql('select count(*)::int as n from users')).rows[0].n;
+
+      await expect(createMemberWithPassword(deps(), actor, input, 'curta', reason)).rejects.toMatchObject({ status: 422 });
+      await expect(createMemberWithPassword(deps(), actor, input, typed, '  ')).rejects.toMatchObject({ status: 422 });
+      await expect(createMemberWithPassword(deps(), inactive, input, typed, reason)).rejects.toMatchObject({ status: 403 });
+      await expect(createMemberWithPassword(deps(), validator, input, typed, reason)).rejects.toMatchObject({ status: 403 });
+      // Não promove conta existente: e-mail de cliente é recusado e o cliente continua cliente.
+      await expect(
+        createMemberWithPassword(deps(), actor, { ...input, email: client.email }, typed, reason),
+      ).rejects.toMatchObject({ status: 422 });
+      expect((await sql('select role from users where id = $1', [client.id])).rows[0].role).toBe('cliente');
+
+      expect((await sql('select count(*)::int as n from users')).rows[0].n).toBe(before);
+      expect((await sql("select count(*)::int as n from audit_log where action = 'equipe.criar'")).rows[0].n).toBe(0);
     });
   });
 });
