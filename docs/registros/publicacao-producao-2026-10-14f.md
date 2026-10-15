@@ -34,6 +34,8 @@ Sem mudança na Vercel, nas rotinas e na verificação de saúde.
 
 ## Voltar atrás
 
+> Atualização de 15/10/2026 02:56 UTC: a `partyx-00016-say` (excluir e arquivar evento, migração 0011) substituiu a `00014-bax`. A referência de retorno atual está em `publicacao-producao-2026-10-15.md`.
+
 - **Referência de retorno a partir daqui: `partyx-00014-bax`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00012-vem ./infra/producao/deploy.sh rollback`.
 - A `00012-vem` funciona com o banco já migrado: ela ficou quase cinco horas no ar com a 0010 aplicada (21:27 a 02:09). Volta o termo antigo, com nome empresarial e endereço, e o painel volta a pedir a autorização judicial em evento com menores (a regra do banco não a exige mais). Não é preciso reverter a migração para voltar.
 - Reverter a 0010 só depois de voltar a revisão, e só se nenhum evento com menores tiver sido gravado sem o número (a reversão recusa).

@@ -446,3 +446,13 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00014-bax`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00012-vem ./infra/producao/deploy.sh rollback`. A `00012-vem` convive com a 0010; não é preciso reverter a migração para voltar.
 
+> Atualização de 15/10/2026 02:56 UTC: a `partyx-00016-say` (seção 19) substituiu a `00014-bax`.
+
+## 19. Sétima publicação: excluir evento sem uso e arquivar (15/10/2026)
+
+**Publicado:** revisão `partyx-00016-say` (tag `release-2026-10-15`, commit `3acdea3`), 100% desde 15/10 02:56 UTC, com a migração `0011_excluir_e_arquivar_evento` (aplicada às 02:49, depois do backup sob demanda `partyx-backup-whm9n`) e o papel novo `partyxBannerCleanup` no bucket dos banners (`deploy.sh banners-iam`, também chamado pelo `setup`). Mesma configuração. Registro: `docs/registros/publicacao-producao-2026-10-15.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00016-say`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00014-bax ./infra/producao/deploy.sh rollback`. A `00014-bax` convive com a 0011, mas mostraria de novo no site um evento arquivado: desarquive antes. Evento excluído não volta com rollback.
+
+**Papel recém-criado:** a primeira ligação ao bucket pode falhar com "does not exist in the resource's hierarchy" enquanto o papel propaga; repetir `deploy.sh banners-iam` depois de alguns segundos (idempotente).
+
