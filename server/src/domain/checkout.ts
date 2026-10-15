@@ -1,4 +1,5 @@
 import { availableQuantity, salesState, type SalesInput, type SalesState } from './events';
+import { allocateLots, typeLotsView, type Lot, type LotChange } from './lots';
 
 /** Regras puras do carrinho e da reserva. Sem I/O: o banco só entra em `orders/service.ts`. */
 
@@ -22,16 +23,43 @@ export interface ItemFailure {
   available?: number;
 }
 
-export interface PlannedLine {
-  ticketTypeId: string;
+/** Parte de uma linha que sai de um lote, pelo preço dele (0013). Uma linha pode ter mais de uma, quando o lote à venda não bastava. */
+export interface PlannedLot {
+  lotId: string;
   name: string;
+  position: number;
   quantity: number;
   unitPriceCents: number;
   subtotalCents: number;
 }
 
+export interface PlannedLine {
+  ticketTypeId: string;
+  name: string;
+  quantity: number;
+  /** Preço de cada unidade; com mais de um lote na linha, a média arredondada (o valor certo é o de cada lote em `lots`). */
+  unitPriceCents: number;
+  subtotalCents: number;
+  /** De que lote sai cada parte. Vazio só para tipo sem lotes (versão anterior aos lotes). */
+  lots: PlannedLot[];
+}
+
+/** Lotes dos tipos pedidos, como gravados, e as reservas válidas por lote (0013). */
+export interface LotsForPlan {
+  byType: ReadonlyMap<string, readonly Lot[]>;
+  reservedByLot: ReadonlyMap<string, number>;
+}
+
+/** Novo estado dos lotes de um tipo depois desta compra (viradas causadas por ela), para gravar na mesma transação. */
+export interface LotUpdate {
+  ticketTypeId: string;
+  lots: Lot[];
+  changes: LotChange[];
+}
+
 export type Plan =
-  { ok: true; lines: PlannedLine[]; totalCents: number; units: number } | { ok: false; failures: ItemFailure[] };
+  | { ok: true; lines: PlannedLine[]; totalCents: number; units: number; lotUpdates: LotUpdate[] }
+  | { ok: false; failures: ItemFailure[] };
 
 export interface ItemProblem {
   field: string;
@@ -73,9 +101,11 @@ export function planOrder(
   types: ReadonlyMap<string, TypeForPlan>,
   reservedByType: ReadonlyMap<string, number>,
   now: Date,
+  lots?: LotsForPlan,
 ): Plan {
   const failures: ItemFailure[] = [];
   const lines: PlannedLine[] = [];
+  const lotUpdates: LotUpdate[] = [];
   for (const item of items) {
     const type = types.get(item.ticketTypeId);
     if (!type) {
@@ -89,6 +119,43 @@ export function planOrder(
       continue;
     }
     const available = availableQuantity(input);
+    const typeLots = lots?.byType.get(type.id);
+    if (lots && typeLots && typeLots.length > 0) {
+      // Com lotes: primeiro o lote à venda; se não bastar, o restante sai do próximo, pelo preço dele (0013).
+      const alloc = allocateLots(typeLots, lots.reservedByLot, now, item.quantity, available);
+      if (!alloc.ok) {
+        const view = typeLotsView(typeLots, lots.reservedByLot, now, available);
+        failures.push(
+          alloc.available > 0
+            ? { ticketTypeId: type.id, reason: 'quantidade_indisponivel', available: alloc.available }
+            : { ticketTypeId: type.id, reason: view.waitingStart ? 'em_breve' : 'esgotado' },
+        );
+        continue;
+      }
+      const lotById = new Map(alloc.lots.map(l => [l.id, l]));
+      const parts: PlannedLot[] = alloc.parts.map(p => {
+        const l = lotById.get(p.lotId)!;
+        return {
+          lotId: p.lotId,
+          name: l.name,
+          position: l.position,
+          quantity: p.quantity,
+          unitPriceCents: p.unitPriceCents,
+          subtotalCents: p.unitPriceCents * p.quantity,
+        };
+      });
+      const subtotal = parts.reduce((t, p) => t + p.subtotalCents, 0);
+      lines.push({
+        ticketTypeId: type.id,
+        name: type.name,
+        quantity: item.quantity,
+        unitPriceCents: Math.round(subtotal / item.quantity),
+        subtotalCents: subtotal,
+        lots: parts,
+      });
+      lotUpdates.push({ ticketTypeId: type.id, lots: alloc.lots, changes: alloc.changes });
+      continue;
+    }
     if (item.quantity > available) {
       failures.push({ ticketTypeId: type.id, reason: 'quantidade_indisponivel', available });
       continue;
@@ -99,6 +166,7 @@ export function planOrder(
       quantity: item.quantity,
       unitPriceCents: type.priceCents,
       subtotalCents: type.priceCents * item.quantity,
+      lots: [],
     });
   }
   if (failures.length) return { ok: false, failures };
@@ -107,6 +175,7 @@ export function planOrder(
     lines,
     totalCents: lines.reduce((t, l) => t + l.subtotalCents, 0),
     units: lines.reduce((t, l) => t + l.quantity, 0),
+    lotUpdates,
   };
 }
 

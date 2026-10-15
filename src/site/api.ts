@@ -20,7 +20,16 @@ export interface EventCard {
 export interface TicketTypeView {
   id: string;
   name: string;
-  priceCents: number;
+  /** Preço do lote à venda; nulo quando nenhum lote está à venda (o do próximo não aparece antes de ele abrir). */
+  priceCents: number | null;
+  /** Lote à venda, quando o tipo vende em lotes; nulo no tipo de lote único. */
+  lot?: { name: string; position: number } | null;
+  /** Unidades que restam no lote à venda quando há próximo lote (o excedente sai do próximo, com o preço dele). */
+  lotRemaining?: number | null;
+  /** "Últimas unidades deste lote". */
+  lastUnits?: boolean;
+  /** "Próximo lote: em breve" (sem o preço). */
+  nextLot?: boolean;
   state: TypeState;
   label: string;
   note: string;
@@ -205,12 +214,23 @@ export interface BuyerCheck {
   } | null;
 }
 
+/** Parte de uma linha que saiu de um lote, pelo preço dele (a compra se divide quando o lote à venda não basta). */
+export interface OrderLineLot {
+  lotId: string;
+  name: string;
+  position: number;
+  quantity: number;
+  unitPriceCents: number;
+  subtotalCents: number;
+}
 export interface OrderLine {
   ticketTypeId: string;
   name: string;
   quantity: number;
   unitPriceCents: number;
   subtotalCents: number;
+  /** Lotes de onde saíram as unidades. Vazio em pedido anterior aos lotes. */
+  lots?: OrderLineLot[];
 }
 
 export interface Summary {
@@ -570,7 +590,42 @@ export interface AdminTicketType {
   salesStartAt: string;
   salesEndAt: string;
   isActive: boolean;
+  /** "Últimas unidades deste lote" na página do evento. */
+  lastUnitsNotice: boolean;
   salesState: 'a_venda' | 'em_breve' | 'encerrada' | 'indisponivel' | 'esgotado' | 'reservado';
+  /** Lotes em ordem, com a situação de agora. */
+  lots: AdminLot[];
+}
+
+/** Lote no painel (`server/src/events/service.ts`, `LotView`). */
+export interface AdminLot {
+  id: string;
+  position: number;
+  name: string;
+  priceCents: number;
+  quantity: number;
+  carriedIn: number;
+  passedOut: number;
+  discarded: number;
+  capacity: number;
+  sold: number;
+  reserved: number;
+  available: number;
+  status: 'aguardando' | 'a_venda' | 'encerrado';
+  closeReason: 'esgotado' | 'data' | 'manual' | null;
+  closedAt: string | null;
+  salesStartAt: string | null;
+  salesEndAt: string | null;
+  leftoverPolicy: 'passar' | 'descartar';
+  hasOrders: boolean;
+}
+export interface LotBody {
+  name?: string;
+  priceCents: number;
+  quantity: number;
+  salesStartAt?: string | null;
+  salesEndAt?: string | null;
+  leftoverPolicy?: 'passar' | 'descartar';
 }
 
 export interface Promoter {
@@ -706,6 +761,7 @@ export interface TicketTypeBody {
   salesStartAt: string;
   salesEndAt: string;
   isActive: boolean;
+  lastUnitsNotice?: boolean;
 }
 
 /**
@@ -755,7 +811,16 @@ export function uploadBanner(
 export interface SalesReport {
   criterion: string;
   period: { from: string | null; to: string | null };
-  lines: { eventId: string; eventName: string; typeId: string; typeName: string; tickets: number; cents: number }[];
+  lines: {
+    eventId: string;
+    eventName: string;
+    typeId: string;
+    typeName: string;
+    tickets: number;
+    cents: number;
+    /** Vendas por lote dentro do tipo, na ordem dos lotes. */
+    lots?: { lotId: string; lotName: string; tickets: number; cents: number }[];
+  }[];
   byEvent: { eventId: string; eventName: string; tickets: number; cents: number }[];
   totals: { tickets: number; cents: number };
   reconciliation: { ok: boolean | null; ordersCents: number; itemsCents: number; orders: number };
@@ -975,6 +1040,17 @@ export const api = {
       ),
     updateTicketType: (id: string, body: Partial<TicketTypeBody>) =>
       request<{ ticketType: AdminTicketType }>('PATCH', `/admin/ticket-types/${encodeURIComponent(id)}`, body),
+    createLot: (typeId: string, body: LotBody) =>
+      request<{ ticketType: AdminTicketType }>('POST', `/admin/ticket-types/${encodeURIComponent(typeId)}/lots`, body),
+    updateLot: (id: string, body: Partial<LotBody>) =>
+      request<{ ticketType: AdminTicketType }>('PATCH', `/admin/lots/${encodeURIComponent(id)}`, body),
+    deleteLot: (id: string) => request<{ ticketType: AdminTicketType }>('DELETE', `/admin/lots/${encodeURIComponent(id)}`),
+    moveLot: (id: string, direction: 'subir' | 'descer') =>
+      request<{ ticketType: AdminTicketType }>('POST', `/admin/lots/${encodeURIComponent(id)}/move`, { direction }),
+    turnLot: (typeId: string, leftover: 'passar' | 'descartar') =>
+      request<{ ticketType: AdminTicketType }>('POST', `/admin/ticket-types/${encodeURIComponent(typeId)}/turn-lot`, {
+        leftover,
+      }),
     orders: (query: string, signal?: AbortSignal) =>
       get<{ page: number; pageSize: number; total: number; orders: AdminOrderRow[] }>(
         `/admin/orders?${query}`,

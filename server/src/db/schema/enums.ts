@@ -41,3 +41,10 @@ export const emailTemplate = pgEnum('email_template', [
   'pagamento_sem_estoque',
 ]);
 export const emailStatus = pgEnum('email_status', ['pendente', 'enviado', 'falhou']);
+
+/** Lotes por tipo de ingresso (0013, 15/10/2026): só um à venda por vez em cada tipo; o encerrado não volta. */
+export const lotStatus = pgEnum('lot_status', ['aguardando', 'a_venda', 'encerrado']);
+/** Por que o lote encerrou: esgotou (com próximo lote), passou a data de fim, ou virada manual no painel. */
+export const lotCloseReason = pgEnum('lot_close_reason', ['esgotado', 'data', 'manual']);
+/** O que fazer com as unidades que sobram na virada automática: passam para o próximo lote ou são descartadas. */
+export const lotLeftover = pgEnum('lot_leftover', ['passar', 'descartar']);

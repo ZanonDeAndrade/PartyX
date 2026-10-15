@@ -8,15 +8,18 @@ import {
   events,
   loginAttempts,
   minorTermAcceptances,
+  orderItemLots,
   orderItems,
   orders,
   passwordResets,
   paymentEvents,
   sessions,
+  ticketLots,
   ticketTypes,
   tickets,
   users,
 } from '../db/schema';
+import { typeWithLotName } from '../events/lots';
 import { writeAudit } from '../db/audit';
 import { onlyDigits } from '../domain/cpf';
 import { AppError } from '../domain/errors';
@@ -103,14 +106,17 @@ export async function exportSubjectData(deps: PrivacyDeps, userId: string) {
   const orderIds = orderRows.map(o => o.id);
   const itemRows = orderIds.length
     ? await deps.db
+        // Uma linha por lote (0013): numa compra dividida entre lotes, cada parte com o preço que foi pago por ela.
         .select({
           orderId: orderItems.orderId,
-          type: ticketTypes.name,
-          quantity: orderItems.quantity,
-          unit: orderItems.unitPriceCents,
+          type: typeWithLotName,
+          quantity: sql<number>`coalesce(${orderItemLots.quantity}, ${orderItems.quantity})`,
+          unit: sql<number>`coalesce(${orderItemLots.unitPriceCents}, ${orderItems.unitPriceCents})`,
         })
         .from(orderItems)
         .innerJoin(ticketTypes, eq(ticketTypes.id, orderItems.ticketTypeId))
+        .leftJoin(orderItemLots, eq(orderItemLots.orderItemId, orderItems.id))
+        .leftJoin(ticketLots, eq(ticketLots.id, orderItemLots.lotId))
         .where(inArray(orderItems.orderId, orderIds))
     : [];
   const ticketRows = orderIds.length

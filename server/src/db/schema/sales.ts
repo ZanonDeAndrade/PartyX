@@ -17,7 +17,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { createdAt, instant, updatedAt } from './columns';
 import { orderStatus, paymentMethod, reservationStatus, ticketStatus } from './enums';
-import { events, promoters, ticketTypes } from './events';
+import { events, promoters, ticketLots, ticketTypes } from './events';
 import { users } from './users';
 
 /** Número do pedido exibido ao cliente (PX-10001...). */
@@ -118,6 +118,42 @@ export const orderItems = pgTable(
   ],
 );
 
+/**
+ * De que lote saíram as unidades de cada item do pedido, e por qual preço (0013, 15/10/2026). Um item (um por tipo) pode ter unidades de
+ * mais de um lote, quando o lote à venda não bastava: o restante sai do próximo lote, pelo preço dele. O preço fica preso aqui no momento
+ * da reserva; quem estiver pagando quando o lote virar paga o preço reservado. Itens anteriores aos lotes ganham o "Lote único".
+ */
+export const orderItemLots = pgTable(
+  'order_item_lots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orderItemId: uuid('order_item_id').notNull(),
+    orderId: uuid('order_id').notNull(),
+    ticketTypeId: uuid('ticket_type_id').notNull(),
+    eventId: uuid('event_id').notNull(),
+    lotId: uuid('lot_id').notNull(),
+    quantity: integer('quantity').notNull(),
+    unitPriceCents: integer('unit_price_cents').notNull(),
+  },
+  t => [
+    foreignKey({
+      name: 'order_item_lots_item_fk',
+      columns: [t.orderItemId, t.orderId, t.ticketTypeId, t.eventId],
+      foreignColumns: [orderItems.id, orderItems.orderId, orderItems.ticketTypeId, orderItems.eventId],
+    }),
+    foreignKey({
+      name: 'order_item_lots_lot_fk',
+      columns: [t.lotId, t.ticketTypeId],
+      foreignColumns: [ticketLots.id, ticketLots.ticketTypeId],
+    }),
+    uniqueIndex('order_item_lots_item_lot_key').on(t.orderItemId, t.lotId),
+    index('order_item_lots_lot_idx').on(t.lotId),
+    index('order_item_lots_order_idx').on(t.orderId),
+    check('order_item_lots_quantity_positive', sql`${t.quantity} > 0`),
+    check('order_item_lots_price_positive', sql`${t.unitPriceCents} > 0`),
+  ],
+);
+
 /** Reserva temporária ao iniciar o pagamento (RF-33). Não é venda: a venda é o ingresso emitido. */
 export const reservations = pgTable(
   'reservations',
@@ -175,6 +211,8 @@ export const tickets = pgTable(
     validatedBy: uuid('validated_by').references(() => users.id),
     cancelledAt: instant('cancelled_at'),
     cancelReason: text('cancel_reason'),
+    /** Lote de onde a unidade saiu (0013). Nulo só em ingresso emitido por uma versão anterior aos lotes. */
+    lotId: uuid('lot_id'),
   },
   t => [
     foreignKey({
@@ -188,6 +226,11 @@ export const tickets = pgTable(
     index('tickets_order_idx').on(t.orderId),
     index('tickets_event_status_idx').on(t.eventId, t.status),
     index('tickets_type_idx').on(t.ticketTypeId),
+    foreignKey({
+      name: 'tickets_lot_fk',
+      columns: [t.lotId, t.ticketTypeId],
+      foreignColumns: [ticketLots.id, ticketLots.ticketTypeId],
+    }),
     check('tickets_code_strength', sql`length(${t.code}) >= 22 and ${t.code} ~ '^[A-Za-z0-9_-]+$'`),
     check('tickets_short_code_format', sql`${t.shortCode} ~ '^PX-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$'`),
     check('tickets_unit_index_positive', sql`${t.unitIndex} > 0`),

@@ -141,16 +141,18 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
           'global_limit_counters',
           'job_leases',
           'minor_term_acceptances',
+          'ticket_lots',
+          'order_item_lots',
         ]),
       );
-      expect(tables).toHaveLength(19);
+      expect(tables).toHaveLength(21);
     });
 
     it('podem rodar de novo sem erro nem duplicar o histórico', async () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(13);
+      expect(r.rows[0].n).toBe(14);
     });
   });
 
@@ -705,6 +707,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag10 = '0010_sem_autorizacao_judicial';
       const tag11 = '0011_excluir_e_arquivar_evento';
       const tag12 = '0012_cronometro_do_evento';
+      const tag13 = '0013_lotes_por_tipo';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
@@ -713,6 +716,40 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag9)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag10)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag11)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag12)).rejects.toThrow(/não é a última/);
+
+      // 0013: recusa com tipo em mais de um lote; com só o "Lote único", apaga lotes, divisão dos pedidos e o lote do ingresso.
+      const q13 = db.pool.query.bind(db.pool);
+      const ev13 = (
+        await q13(
+          "insert into events (slug,name,starts_at,venue,address,description,age_rating) values ('ev-13','E',now()+interval '9 days','L','A','D','Livre') returning id",
+        )
+      ).rows[0].id;
+      const type13 = (
+        await q13(
+          "insert into ticket_types (event_id,name,price_cents,quantity_total,sales_start_at,sales_end_at) values ($1,'Pista',100,10,now(),now()+interval '1 day') returning id",
+          [ev13],
+        )
+      ).rows[0].id;
+      await q13(
+        "insert into ticket_lots (ticket_type_id,event_id,position,name,price_cents,quantity,status) values ($1,$2,1,'1º lote',100,5,'a_venda'), ($1,$2,2,'2º lote',150,5,'aguardando')",
+        [type13, ev13],
+      );
+      await expect(rollbackLastMigration(db.url, tag13)).rejects.toThrow(/mais de um lote/);
+      await q13("delete from ticket_lots where name = '2º lote'");
+      await rollbackLastMigration(db.url, tag13);
+      expect((await q13("select to_regclass('ticket_lots') as a, to_regclass('order_item_lots') as b")).rows[0]).toEqual({
+        a: null,
+        b: null,
+      });
+      expect(
+        (await q13("select count(*)::int as n from information_schema.columns where table_name = 'tickets' and column_name = 'lot_id'"))
+          .rows[0].n,
+      ).toBe(0);
+      await q13('alter table ticket_types disable trigger ticket_types_delete_only_unused');
+      await q13('delete from ticket_types where id = $1', [type13]);
+      await q13('alter table ticket_types enable trigger ticket_types_delete_only_unused');
+      await q13('delete from events where id = $1', [ev13]);
 
       // 0012: só as colunas do cronômetro (e a regra da frase); reverter as apaga.
       const countdownColumns = async () =>
@@ -858,8 +895,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0012 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0013 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag13);
       await rollbackLastMigration(db.url, tag12);
       await rollbackLastMigration(db.url, tag11);
       await rollbackLastMigration(db.url, tag10);
@@ -933,7 +971,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       r = await db.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'");
-      expect(r.rows[0].n).toBe(19); // 18 até a 0008 + minor_term_acceptances (0009)
+      expect(r.rows[0].n).toBe(21); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013)
     } finally {
       await db.drop();
     }

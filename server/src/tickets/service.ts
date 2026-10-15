@@ -1,6 +1,7 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client';
-import { events, orders, ticketTypes, tickets } from '../db/schema';
+import { events, orders, ticketLots, ticketTypes, tickets } from '../db/schema';
+import { typeWithLotName } from '../events/lots';
 import { AppError } from '../domain/errors';
 import { verifyQr, type QrKeys } from '../domain/ticketCode';
 
@@ -44,7 +45,8 @@ const columns = {
   usedAt: tickets.usedAt,
   qrPayload: tickets.qrPayload,
   unitIndex: tickets.unitIndex,
-  typeName: ticketTypes.name,
+  // "Pista · 2º lote" (0013); "Lote único" e ingresso anterior aos lotes: só o tipo.
+  typeName: typeWithLotName,
   slug: events.slug,
   eventName: events.name,
   startsAt: events.startsAt,
@@ -99,7 +101,8 @@ const base = (db: Db) =>
     .from(tickets)
     .innerJoin(orders, eq(orders.id, tickets.orderId))
     .innerJoin(events, eq(events.id, tickets.eventId))
-    .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId));
+    .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+    .leftJoin(ticketLots, eq(ticketLots.id, tickets.lotId));
 
 /** Meus ingressos (RF-42): só os do próprio comprador, do evento mais próximo ao mais distante. */
 export async function listMyTickets(db: Db, userId: string): Promise<TicketSummary[]> {

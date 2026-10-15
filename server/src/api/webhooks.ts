@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { settleAllLots } from '../events/lotsAdmin';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { bodyLimit } from 'hono/body-limit';
@@ -104,7 +105,9 @@ export function webhookRoutes(deps: WebhookDeps) {
       // A fila de e-mails anda mesmo sem gateway: cadastro e recuperação de senha também dependem dela.
       const emails = mail ? await processOutbox(mail, { limit: 50 }) : null;
       const leases = await purgeOldLeases(deps.db);
-      if (!deps.gateway) return c.json({ status: 'sem_gateway', emails, leases });
+      // Lotes (0013): grava as viradas por data que nenhuma compra disparou (a página já mostrava o lote certo sem gravar).
+      const lots = await settleAllLots({ db: deps.db, clock: deps.clock });
+      if (!deps.gateway) return c.json({ status: 'sem_gateway', emails, leases, lots });
       const summary = await runReconciliation(reconcileDeps(deps.gateway));
       // Rede de segurança: pedido pago sem ingresso (pago antes do emissor existir) recebe o que falta. Idempotente.
       const recovered = await backfillTickets({ db: deps.db, qr: deps.config.qr });
@@ -113,7 +116,7 @@ export function webhookRoutes(deps: WebhookDeps) {
         failed: summary.orders.failed,
         expiredOrders: summary.expired.orders,
       });
-      return c.json({ status: 'ok', summary, tickets: recovered, emails, leases });
+      return c.json({ status: 'ok', summary, tickets: recovered, emails, leases, lots });
     } finally {
       await releaseLease(deps.db, 'reconcile-daily', lease);
     }

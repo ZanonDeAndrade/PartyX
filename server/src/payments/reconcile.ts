@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { writeAudit, type Tx } from '../db/audit';
-import { orderItems, orders, reservations, tickets, ticketTypes, users } from '../db/schema';
+import { orderItemLots, orderItems, orders, reservations, ticketLots, tickets, ticketTypes, users } from '../db/schema';
 import { AppError } from '../domain/errors';
 import { approvalOutcome, canTransition, type OrderStatus } from '../domain/orderState';
 import { checkSnapshotAgainstOrder, intentFor, type PaymentSnapshot } from '../domain/payment';
@@ -401,6 +401,17 @@ async function applyApproval(
         .update(ticketTypes)
         .set({ quantitySold: sql`${ticketTypes.quantitySold} + ${item.quantity}` })
         .where(eq(ticketTypes.id, item.ticketTypeId));
+    }
+    // Vendidos de cada lote (0013), com os tipos já trancados: o lote em que a reserva foi feita, mesmo que ele já tenha virado.
+    const lotParts = await tx
+      .select({ lotId: orderItemLots.lotId, quantity: orderItemLots.quantity })
+      .from(orderItemLots)
+      .where(eq(orderItemLots.orderId, orderId));
+    for (const part of lotParts) {
+      await tx
+        .update(ticketLots)
+        .set({ quantitySold: sql`${ticketLots.quantitySold} + ${part.quantity}`, updatedAt: now })
+        .where(eq(ticketLots.id, part.lotId));
     }
     await tx
       .update(reservations)

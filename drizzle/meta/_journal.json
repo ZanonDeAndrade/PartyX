@@ -92,6 +92,13 @@
       "when": 1792033295689,
       "tag": "0012_cronometro_do_evento",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792035045413,
+      "tag": "0013_lotes_por_tipo",
+      "breakpoints": true
     }
   ]
 }

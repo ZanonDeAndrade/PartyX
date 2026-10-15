@@ -315,6 +315,7 @@ describe.skipIf(!ADMIN_URL)('excluir e arquivar evento (integração)', () => {
         await other.query('commit');
         await expect(removal).rejects.toMatchObject({ status: 409, code: 'evento_com_registros' });
       } finally {
+        await other.query('rollback').catch(() => {}); // nunca devolver ao pool uma transação aberta ou abortada
         other.release();
       }
       expect(await exists(e.id)).toBe(true);
@@ -333,6 +334,7 @@ describe.skipIf(!ADMIN_URL)('excluir e arquivar evento (integração)', () => {
         await other.query('select id from events where id = $1 for update', [e.id]);
         const order = buy(b, e);
         await sleep(300);
+        await other.query('delete from ticket_lots where event_id = $1', [e.id]); // lotes antes dos tipos (0013)
         await other.query('delete from ticket_types where event_id = $1', [e.id]);
         await other.query('delete from events where id = $1', [e.id]);
         await other.query('commit');
@@ -340,6 +342,7 @@ describe.skipIf(!ADMIN_URL)('excluir e arquivar evento (integração)', () => {
         expect(res.status).toBe(409);
         expect(await code(res)).toBe('evento_indisponivel');
       } finally {
+        await other.query('rollback').catch(() => {}); // nunca devolver ao pool uma transação aberta ou abortada
         other.release();
       }
       expect((await sql('select count(*)::int as n from orders')).rows[0].n).toBe(0);

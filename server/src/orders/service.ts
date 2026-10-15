@@ -1,7 +1,17 @@
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import type { Tx } from '../db/audit';
-import { events, minorTermAcceptances, orderItems, orders, promoters, reservations, ticketTypes } from '../db/schema';
+import {
+  events,
+  minorTermAcceptances,
+  orderItemLots,
+  orderItems,
+  orders,
+  promoters,
+  reservations,
+  ticketLots,
+  ticketTypes,
+} from '../db/schema';
 import {
   checkShape,
   planOrder,
@@ -16,6 +26,7 @@ import { DECLINE_REASONS, type DeclineReason } from '../domain/payment';
 import { isCouponCodeValid, normalizeCouponCode } from '../domain/events';
 import type { Config, SupportContact } from '../config';
 import { reservedByType } from '../events/service';
+import { previewTypes, saveLots, settleTypes } from '../events/lots';
 import type { Clock } from '../providers/clock';
 import { salesBlockers } from '../legal/documents';
 import { logger } from '../logger';
@@ -195,7 +206,9 @@ export async function quote(deps: OrdersDeps, input: CheckoutInput, userId?: str
     rows.map(r => r.id),
     now,
   );
-  const plan = planOrder(input.items, forPlan(rows), reserved, now);
+  // Lotes como valeriam agora, sem gravar: o resumo é informação; quem grava é `createOrder`, com os tipos trancados.
+  const lots = await previewTypes(deps.db, rows, now);
+  const plan = planOrder(input.items, forPlan(rows), reserved, now, { byType: lots.byType, reservedByLot: lots.reserved });
   if (!plan.ok) throw stockError(plan.failures);
   await resolveCoupon(deps.db, input.couponCode);
   const code = normalizeCouponCode(input.couponCode ?? '');
@@ -269,6 +282,20 @@ async function view(
     .innerJoin(ticketTypes, eq(ticketTypes.id, orderItems.ticketTypeId))
     .where(eq(orderItems.orderId, orderId))
     .orderBy(asc(orderItems.ticketTypeId));
+  // De que lote saiu cada parte da linha (0013), na ordem dos lotes.
+  const parts = await db
+    .select({
+      ticketTypeId: orderItemLots.ticketTypeId,
+      lotId: orderItemLots.lotId,
+      name: ticketLots.name,
+      position: ticketLots.position,
+      quantity: orderItemLots.quantity,
+      unitPriceCents: orderItemLots.unitPriceCents,
+    })
+    .from(orderItemLots)
+    .innerJoin(ticketLots, eq(ticketLots.id, orderItemLots.lotId))
+    .where(eq(orderItemLots.orderId, orderId))
+    .orderBy(asc(ticketLots.position));
   const resv = await db
     .select()
     .from(reservations)
@@ -295,7 +322,16 @@ async function view(
       allowsMinors: order.eventAllowsMinors,
     },
     buyerMinor: order.o.buyerMinor,
-    items: items.map(i => ({ ...i, subtotalCents: i.quantity * i.unitPriceCents })),
+    items: items.map(i => {
+      const lots = parts
+        .filter(p => p.ticketTypeId === i.ticketTypeId)
+        .map(({ ticketTypeId: _t, ...p }) => ({ ...p, subtotalCents: p.quantity * p.unitPriceCents }));
+      return {
+        ...i,
+        subtotalCents: lots.length ? lots.reduce((t, p) => t + p.subtotalCents, 0) : i.quantity * i.unitPriceCents,
+        lots,
+      };
+    }),
     totalCents: order.o.totalCents,
     coupon,
     paymentMethod: order.o.paymentMethod,
@@ -428,12 +464,17 @@ export async function createOrder(
       await release(tx, p.id, now);
     }
 
+    // Viradas devidas agora (data de fim, esgotado, reservas vencidas de lote encerrado), gravadas com os tipos trancados.
+    const settled = await settleTypes(tx, rows, now);
     const reserved = await reservedByType(
       tx,
       rows.map(r => r.id),
       now,
     );
-    const plan = planOrder(input.items, forPlan(rows), reserved, now);
+    const plan = planOrder(input.items, forPlan(rows), reserved, now, {
+      byType: settled.byType,
+      reservedByLot: settled.reserved,
+    });
     if (!plan.ok) throw stockError(plan.failures);
     if (input.expectedTotalCents !== undefined && input.expectedTotalCents !== plan.totalCents) {
       throw new AppError(409, 'preco_alterado', 'O valor do pedido mudou. Confira o novo total antes de continuar.', {
@@ -467,13 +508,28 @@ export async function createOrder(
       });
     }
     for (const line of plan.lines) {
-      await tx.insert(orderItems).values({
-        orderId: order!.id,
-        eventId: event.id,
-        ticketTypeId: line.ticketTypeId,
-        quantity: line.quantity,
-        unitPriceCents: line.unitPriceCents,
-      });
+      const [item] = await tx
+        .insert(orderItems)
+        .values({
+          orderId: order!.id,
+          eventId: event.id,
+          ticketTypeId: line.ticketTypeId,
+          quantity: line.quantity,
+          unitPriceCents: line.unitPriceCents,
+        })
+        .returning({ id: orderItems.id });
+      // O preço de cada lote fica preso aqui: quem estiver pagando quando o lote virar paga o preço reservado.
+      for (const part of line.lots) {
+        await tx.insert(orderItemLots).values({
+          orderItemId: item!.id,
+          orderId: order!.id,
+          ticketTypeId: line.ticketTypeId,
+          eventId: event.id,
+          lotId: part.lotId,
+          quantity: part.quantity,
+          unitPriceCents: part.unitPriceCents,
+        });
+      }
       await tx.insert(reservations).values({
         orderId: order!.id,
         ticketTypeId: line.ticketTypeId,
@@ -481,6 +537,12 @@ export async function createOrder(
         expiresAt,
         createdAt: now,
       });
+    }
+    // Viradas causadas por esta compra (o lote esgotou e havia próximo), com os tipos ainda trancados.
+    for (const update of plan.lotUpdates) {
+      if (update.changes.length === 0) continue;
+      const type = rows.find(r => r.id === update.ticketTypeId)!;
+      await saveLots(tx, type, settled.byType.get(type.id) ?? [], update.lots, update.changes, null, now);
     }
     return order!.id;
   });

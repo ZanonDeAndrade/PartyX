@@ -94,6 +94,18 @@ Pedido do responsável: contagem regressiva até o início no topo da página do
 | RF-11 (painel: mostrar cronômetro e frase) | `server/src/api/events.integration.test.ts` (padrão, frase, 422, desligado, trilha), `e2e/cronometro.spec.ts` (pelo formulário) |
 | Acessibilidade e desempenho | `e2e/cronometro.spec.ts` (`role="timer"`, aviso só na troca, pausa com a aba escondida, movimento reduzido) |
 
+### Lotes por tipo de ingresso (15/10/2026, mudança de escopo D-86)
+
+Pedido do responsável, fora do escopo original (§16 exclui a virada automática de lotes; tratado como mudança, §16.2): lotes em ordem em cada tipo, um à venda por vez, virada automática (esgotou, com próximo lote; passou o fim) e manual, sobra passada ou descartada, compra dividida entre lotes, preço preso na reserva, relatórios por lote. Registro: `docs/registros/lotes-por-tipo-2026-10-15.md`.
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-14, RF-15 (lotes, preço e período por lote) | `server/src/domain/lots.test.ts` (virada por esgotamento, por data e manual; sobra passada e descartada; reserva que vence depois da virada; próximo lote com início futuro), `server/src/api/lots.integration.test.ts` |
+| RF-16, RF-17, CA-15, CA-16 (estoque e teto do tipo) | `server/src/api/lots.integration.test.ts` (compra simultânea no último ingresso do lote, com e sem próximo lote; compra dividida; tipo sem próximo lote esgota; soma dos lotes dentro da capacidade) |
+| RF-33, RF-34 (preço preso na reserva) | idem ("preço preso na reserva": virada manual no meio do pagamento, pedido pago pelo preço reservado, ingresso do lote dele) |
+| RF-58, CA-28 (relatório por lote, conciliação) | idem (vendas por lote em quantidade e valor; conciliação certa numa compra dividida com preço médio quebrado; exportação com a coluna Lote) |
+| Painel e site | capturas a 360 e 1280 px; `e2e:textos` (78) sem regressão |
+
 ## Painel: promoters, compradores, ingressos, entradas, equipe e conta (11/10/2026, etapa 05 do fechamento)
 
 Interface real em `src/site/adminPeople.tsx` (ADM07 a ADM09, ADM12 a ADM15, ADM19 a ADM21, ADM24), menu lateral com gaveta no celular e exportação com estados e data (ADM23, `ExportLink`). API nova com testes: `GET /admin/buyers`, `GET /admin/buyers/:id`, `POST /admin/buyers/:id/cpf` (CPF completo sob demanda, trilha `usuario.cpf_visualizado`), `GET /admin/tickets/:id` (autor e data do cancelamento), `GET /admin/exports/promoters/:id/orders.csv`. Verificado no navegador (Chromium, 360 px e 1280 px, dados fictícios): sem rolagem horizontal e sem alvo menor que 44 px.

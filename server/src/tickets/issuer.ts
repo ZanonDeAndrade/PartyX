@@ -1,7 +1,7 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import type { Tx } from '../db/audit';
-import { orderItems, orders, tickets, users } from '../db/schema';
+import { orderItemLots, orderItems, orders, ticketLots, tickets, users } from '../db/schema';
 import { newShortCode, newTicketCode, signQr, type QrKeys } from '../domain/ticketCode';
 import { logger } from '../logger';
 import type { TicketIssuer } from '../payments/reconcile';
@@ -36,6 +36,23 @@ export async function issueForOrder(tx: Tx, qr: QrConfig, order: OrderToIssue): 
     .from(tickets)
     .where(eq(tickets.orderId, order.id));
   const have = new Set(existing.map(t => `${t.orderItemId}:${t.unitIndex}`));
+  // Lote de cada unidade (0013): as unidades do item seguem a ordem dos lotes (as primeiras do lote mais antigo). Item sem a divisão
+  // por lote (pedido de uma versão anterior) fica sem lote no ingresso.
+  const parts = await tx
+    .select({ orderItemId: orderItemLots.orderItemId, lotId: orderItemLots.lotId, quantity: orderItemLots.quantity })
+    .from(orderItemLots)
+    .innerJoin(ticketLots, eq(ticketLots.id, orderItemLots.lotId))
+    .where(eq(orderItemLots.orderId, order.id))
+    .orderBy(asc(ticketLots.position));
+  const lotOfUnit = (orderItemId: string, unit: number): string | null => {
+    let upTo = 0;
+    for (const p of parts) {
+      if (p.orderItemId !== orderItemId) continue;
+      upTo += p.quantity;
+      if (unit <= upTo) return p.lotId;
+    }
+    return null;
+  };
 
   let missing = order.items.flatMap(item =>
     Array.from({ length: item.quantity }, (_, i) => ({ item, unit: i + 1 })).filter(
@@ -52,6 +69,7 @@ export async function issueForOrder(tx: Tx, qr: QrConfig, order: OrderToIssue): 
         ticketTypeId: item.ticketTypeId,
         eventId: order.eventId,
         unitIndex: unit,
+        lotId: lotOfUnit(item.orderItemId, unit),
         holderName: buyer.name,
         code,
         shortCode: newShortCode(),

@@ -73,11 +73,12 @@ export interface EventSale {
  */
 export function eventSale(
   eventStatus: 'rascunho' | 'publicado' | 'encerrado',
-  types: (SalesInput & { priceCents: number })[],
+  /** `state` e `soonAt`: já calculados com os lotes (0013); sem eles, pelo tipo. */
+  types: (SalesInput & { priceCents: number; state?: SalesState; soonAt?: Date })[],
   now: Date,
 ): EventSale {
   if (eventStatus === 'encerrado') return { kind: 'ended', label: 'Evento encerrado' };
-  const states = types.map(t => ({ t, state: salesState(t, now) }));
+  const states = types.map(t => ({ t: { ...t, salesStartAt: t.soonAt ?? t.salesStartAt }, state: t.state ?? salesState(t, now) }));
 
   const on = states.filter(x => x.state === 'a_venda');
   if (on.length) return { kind: 'open', label: 'À venda', minPriceCents: Math.min(...on.map(x => x.t.priceCents)) };

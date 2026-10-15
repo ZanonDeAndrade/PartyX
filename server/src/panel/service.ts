@@ -1,7 +1,8 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { writeAudit } from '../db/audit';
-import { auditLog, events, orders, paymentEvents, ticketTypes, tickets, users } from '../db/schema';
+import { auditLog, events, orders, paymentEvents, ticketLots, ticketTypes, tickets, users } from '../db/schema';
+import { typeWithLotName } from '../events/lots';
 import { maskCpf } from '../domain/cpf';
 import { AppError } from '../domain/errors';
 import { dateKeyInEventZone, EVENT_TIMEZONE } from '../domain/time';
@@ -286,15 +287,21 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
     .limit(1);
   if (!order) throw new AppError(404, 'nao_encontrado', 'Pedido não encontrado.');
 
+  // Uma linha por lote (0013): "Pista · 1º lote" e "Pista · 2º lote" quando a compra se dividiu; "Lote único" mostra só o tipo.
   const items = await deps.db.execute<{ name: string; quantity: number; unit_price_cents: number }>(sql`
-    select t.name, i.quantity, i.unit_price_cents from order_items i join ticket_types t on t.id = i.ticket_type_id
-     where i.order_id = ${orderId} order by t.name`);
+    select case when l.name is null or l.name = 'Lote único' then t.name else t.name || ' · ' || l.name end as name,
+           coalesce(il.quantity, i.quantity) as quantity, coalesce(il.unit_price_cents, i.unit_price_cents) as unit_price_cents
+      from order_items i
+      join ticket_types t on t.id = i.ticket_type_id
+      left join order_item_lots il on il.order_item_id = i.id
+      left join ticket_lots l on l.id = il.lot_id
+     where i.order_id = ${orderId} order by t.name, l.position`);
   const orderTickets = await deps.db
     .select({
       id: tickets.id,
       shortCode: tickets.shortCode,
       status: tickets.status,
-      typeName: ticketTypes.name,
+      typeName: typeWithLotName,
       holderName: tickets.holderName,
       usedAt: tickets.usedAt,
       cancelledAt: tickets.cancelledAt,
@@ -302,6 +309,7 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
     })
     .from(tickets)
     .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+    .leftJoin(ticketLots, eq(ticketLots.id, tickets.lotId))
     .where(eq(tickets.orderId, orderId))
     .orderBy(ticketTypes.name, tickets.unitIndex);
 
@@ -462,11 +470,13 @@ export async function eventTickets(
   const where = sql.join(conds, sql` and `);
   const rows = await deps.db.execute<Record<string, unknown>>(sql`
     select t.id, t.short_code, t.status::text as status, t.holder_name, t.used_at, t.cancelled_at, t.cancel_reason, t.issued_at,
-           ty.name as type_name, o.id as order_id, o.number as order_number, o.status::text as order_status,
+           case when l.name is null or l.name = 'Lote único' then ty.name else ty.name || ' · ' || l.name end as type_name,
+           o.id as order_id, o.number as order_number, o.status::text as order_status,
            u.email as buyer_email, u.cpf as buyer_cpf, v.name as validator_name,
            count(*) over()::int as total_rows
       from tickets t
       join ticket_types ty on ty.id = t.ticket_type_id
+      left join ticket_lots l on l.id = t.lot_id
       join orders o on o.id = t.order_id
       join users u on u.id = o.user_id
       left join users v on v.id = t.validated_by

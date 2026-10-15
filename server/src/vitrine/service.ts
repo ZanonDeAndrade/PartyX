@@ -1,7 +1,9 @@
 import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { events, ticketTypes } from '../db/schema';
-import { availableQuantity, salesState } from '../domain/events';
+import { availableQuantity, salesState, type SalesState } from '../domain/events';
+import { lastUnits, lotSalesState, typeLotsView, type Lot, type TypeLotsView } from '../domain/lots';
+import { previewTypes } from '../events/lots';
 import { AppError } from '../domain/errors';
 import { dateKeyInEventZone } from '../domain/time';
 import {
@@ -42,7 +44,16 @@ export interface PublicEventCard {
 export interface PublicTicketType {
   id: string;
   name: string;
-  priceCents: number;
+  /** Preço do lote à venda. Nulo quando nenhum lote está à venda (o do próximo não aparece antes de ele abrir). */
+  priceCents: number | null;
+  /** Lote à venda, quando o tipo vende em lotes (mais de um). Tipo de lote único: nulo, como antes dos lotes. */
+  lot: { name: string; position: number } | null;
+  /** Unidades que ainda restam no lote à venda, quando há próximo lote (para avisar que o excedente sai do próximo). */
+  lotRemaining: number | null;
+  /** "Últimas unidades deste lote" (se ligado no tipo). */
+  lastUnits: boolean;
+  /** "Próximo lote: em breve" (sem o preço). */
+  nextLot: boolean;
   state: ReturnType<typeof salesState>;
   label: string;
   note: string;
@@ -75,7 +86,7 @@ export interface PublicEventDetail extends PublicEventCard {
 
 async function load(deps: VitrineDeps, rows: EventRow[]) {
   const now = deps.clock.now();
-  if (rows.length === 0) return { now, byEvent: new Map<string, ReturnType<typeof inputOf>[]>() };
+  if (rows.length === 0) return { now, byEvent: new Map<string, TypeInput[]>() };
   const types = await deps.db
     .select()
     .from(ticketTypes)
@@ -91,17 +102,43 @@ async function load(deps: VitrineDeps, rows: EventRow[]) {
     types.map(t => t.id),
     now,
   );
-  const byEvent = new Map<string, ReturnType<typeof inputOf>[]>();
+  // Lotes como valem agora, sem gravar (0013): a página mostra o lote certo mesmo antes de alguém comprar.
+  const lots = await previewTypes(deps.db, types, now);
+  const byEvent = new Map<string, TypeInput[]>();
   for (const t of types) {
     const list = byEvent.get(t.eventId) ?? [];
-    list.push(inputOf(t, reserved.get(t.id) ?? 0));
+    list.push(inputOf(t, reserved.get(t.id) ?? 0, lots.byType.get(t.id) ?? [], lots.reserved, now));
     byEvent.set(t.eventId, list);
   }
   return { now, byEvent };
 }
 
-function inputOf(t: typeof ticketTypes.$inferSelect, reserved: number) {
-  return {
+interface TypeInput {
+  id: string;
+  name: string;
+  priceCents: number;
+  isActive: boolean;
+  salesStartAt: Date;
+  salesEndAt: Date;
+  quantityTotal: number;
+  quantitySold: number;
+  quantityReserved: number;
+  lastUnitsNotice: boolean;
+  /** Estado com os lotes, e a visão dos lotes (0013). */
+  state: SalesState;
+  lots: TypeLotsView;
+  /** Início do próximo lote, quando nenhum está à venda e um aguarda a data: "Vendas a partir de". */
+  soonAt?: Date;
+}
+
+function inputOf(
+  t: typeof ticketTypes.$inferSelect,
+  reserved: number,
+  lots: readonly Lot[],
+  reservedByLot: ReadonlyMap<string, number>,
+  now: Date,
+): TypeInput {
+  const base = {
     id: t.id,
     name: t.name,
     priceCents: t.priceCents,
@@ -111,6 +148,16 @@ function inputOf(t: typeof ticketTypes.$inferSelect, reserved: number) {
     quantityTotal: t.quantityTotal,
     quantitySold: t.quantitySold,
     quantityReserved: reserved,
+    lastUnitsNotice: t.lastUnitsNotice,
+  };
+  const view = typeLotsView(lots, reservedByLot, now, availableQuantity(base));
+  const waiting = view.waitingStart ? lots.find(l => l.status === 'aguardando') : undefined;
+  return {
+    ...base,
+    priceCents: view.current?.priceCents ?? t.priceCents,
+    state: lotSalesState(salesState(base, now), view),
+    lots: view,
+    soonAt: waiting?.salesStartAt ?? undefined,
   };
 }
 
@@ -237,15 +284,24 @@ async function detail(deps: VitrineDeps, row: EventRow, preview: boolean): Promi
     serverNow: now.toISOString(),
     ticketTypes: types.map(t => {
       // Em evento encerrado nada está à venda, qualquer que seja o período do tipo.
-      const state = ended && salesState(t, now) === 'a_venda' ? 'encerrada' : salesState(t, now);
+      const state = ended && t.state === 'a_venda' ? 'encerrada' : t.state;
+      const current = t.lots.current;
+      const inLots = t.lots.lotCount > 0;
+      const available = inLots ? (current?.available ?? 0) : availableQuantity(t);
+      // Nenhum lote à venda e um aguardando a data: "Próximo lote: em breve", sem o preço dele.
+      const betweenLots = inLots && !current && t.lots.waitingStart && state === 'em_breve';
       return {
         id: t.id,
         name: t.name,
-        priceCents: t.priceCents,
+        priceCents: inLots ? (current?.priceCents ?? null) : t.priceCents,
+        lot: current && t.lots.lotCount > 1 ? { name: current.name, position: current.position } : null,
+        lotRemaining: current && t.lots.hasNext && state === 'a_venda' ? available : null,
+        lastUnits: Boolean(current && t.lastUnitsNotice && state === 'a_venda' && lastUnits(available, current.capacity)),
+        nextLot: state === 'a_venda' && t.lots.hasNext,
         state,
         label: TYPE_LABEL[state],
-        note: typeNote(state, t),
-        canBuy: !preview && state === 'a_venda' && availableQuantity(t) > 0,
+        note: betweenLots ? 'Próximo lote: em breve.' : typeNote(state, t),
+        canBuy: !preview && state === 'a_venda' && available > 0,
       };
     }),
   };

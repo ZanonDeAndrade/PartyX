@@ -220,24 +220,31 @@ export async function exportSales(
 ): Promise<CsvExport> {
   const r = await salesReport({ db: deps.db }, f);
   const evName = f.eventId ? await eventName(deps.db, f.eventId) : 'Todos';
+  // Uma linha por lote (0013) quando o tipo vende em lotes; o "Lote único" fica numa linha só, com a coluna do lote em branco.
+  const rowsByLot = r.lines.flatMap((l): Cell[][] => {
+    const named = l.lots.filter(x => x.lotName !== 'Lote único');
+    if (named.length === 0) return [[l.eventName, l.typeName, '', int(l.tickets), money(l.cents)]];
+    return l.lots.map(x => [l.eventName, l.typeName, x.lotName, int(x.tickets), money(x.cents)]);
+  });
   const csv = toCsv(
-    ['Evento', 'Tipo de ingresso', 'Ingressos', 'Valor (R$)'],
-    r.lines.map(l => [l.eventName, l.typeName, int(l.tickets), money(l.cents)]),
+    ['Evento', 'Tipo de ingresso', 'Lote', 'Ingressos', 'Valor (R$)'],
+    rowsByLot,
     [
-      ['TOTAL', '', int(r.totals.tickets), money(r.totals.cents)],
-      ['Soma dos pedidos pagos (R$)', '', '', money(r.reconciliation.ordersCents)],
+      ['TOTAL', '', '', int(r.totals.tickets), money(r.totals.cents)],
+      ['Soma dos pedidos pagos (R$)', '', '', '', money(r.reconciliation.ordersCents)],
       [
         'Conciliação',
+        '',
         r.reconciliation.ok === null
           ? 'não se aplica com filtro de tipo'
           : r.reconciliation.ok
             ? 'confere'
             : 'DIVERGENTE',
       ],
-      ['Receita bruta (inclui estornados e contestados) (R$)', '', '', money(r.reversals.grossCents)],
-      ['Estornados (R$)', '', int(r.reversals.refunded.tickets), money(r.reversals.refunded.cents)],
-      ['Contestados (R$)', '', int(r.reversals.contested.tickets), money(r.reversals.contested.cents)],
-      ['Receita líquida (R$)', '', '', money(r.reversals.netCents)],
+      ['Receita bruta (inclui estornados e contestados) (R$)', '', '', '', money(r.reversals.grossCents)],
+      ['Estornados (R$)', '', '', int(r.reversals.refunded.tickets), money(r.reversals.refunded.cents)],
+      ['Contestados (R$)', '', '', int(r.reversals.contested.tickets), money(r.reversals.contested.cents)],
+      ['Receita líquida (R$)', '', '', '', money(r.reversals.netCents)],
       ['Critério', r.criterion],
       [
         'Filtros aplicados',

@@ -4,7 +4,8 @@ import { and, eq, sql } from 'drizzle-orm';
 import type { Config } from '../config';
 import type { Db } from '../db/client';
 import type { Tx } from '../db/audit';
-import { emailLog, events, orders, ticketTypes, tickets, users } from '../db/schema';
+import { emailLog, events, orders, ticketLots, ticketTypes, tickets, users } from '../db/schema';
+import { typeWithLotName } from '../events/lots';
 import { formatInEventZone, formatEventDateTime } from '../domain/time';
 import { logger } from '../logger';
 import type { Clock } from '../providers/clock';
@@ -175,11 +176,13 @@ async function compose(
   // Só pedido pago, e ainda com ingresso válido. Se foi estornado antes de o e-mail sair, ele não vai: diria o contrário da verdade.
   if (!order || order.status !== 'pago' || !order.paidAt) return { skip: 'pedido_nao_pago' };
   const units = await deps.db
-    .select({ type: ticketTypes.name, n: sql<number>`count(*)::int` })
+    // "Pista · 2º lote" (0013): o e-mail mostra o lote comprado; "Lote único" mostra só o tipo.
+    .select({ type: typeWithLotName, n: sql<number>`count(*)::int` })
     .from(tickets)
     .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+    .leftJoin(ticketLots, eq(ticketLots.id, tickets.lotId))
     .where(and(eq(tickets.orderId, order.id), eq(tickets.status, 'valido')))
-    .groupBy(ticketTypes.name);
+    .groupBy(typeWithLotName);
   const total = units.reduce((t, u) => t + u.n, 0);
   if (total === 0) return { skip: 'sem_ingressos' };
   const data = {

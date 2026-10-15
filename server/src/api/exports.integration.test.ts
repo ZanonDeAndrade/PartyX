@@ -393,8 +393,10 @@ describe.skipIf(!ADMIN_URL)('exportações e contingência (integração)', () =
       const rows = parseCsv(await (await adm.get(`/admin/exports/sales.csv?eventId=${e.id}`)).text());
       expect(rows.slice(1, 1 + screen.lines.length)).toHaveLength(screen.lines.length);
       const total = rows.find(r => r[0] === 'TOTAL')!;
-      expect(total[2]).toBe(String(screen.totals.tickets));
-      expect(total[3]).toBe((screen.totals.cents / 100).toFixed(2).replace('.', ','));
+      // Colunas: Evento, Tipo, Lote (0013), Ingressos, Valor.
+      expect(rows[0]).toEqual(['Evento', 'Tipo de ingresso', 'Lote', 'Ingressos', 'Valor (R$)']);
+      expect(total[3]).toBe(String(screen.totals.tickets));
+      expect(total[4]).toBe((screen.totals.cents / 100).toFixed(2).replace('.', ','));
       const rank = parseCsv(await (await adm.get('/admin/exports/promoters.csv')).text());
       expect(rank[1]![2]).toBe('ANA10');
       const fee = parseCsv(await (await adm.get('/admin/exports/fee.csv?month=2026-12')).text());

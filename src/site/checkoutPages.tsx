@@ -8,6 +8,7 @@ import {
   type DeclineReason,
   type LegalDocument,
   minorAuthorizationUrl,
+  type OrderLineLot,
   type OrderView,
   type PaymentOptions,
   type PaymentView,
@@ -36,9 +37,45 @@ function useRequireLogin(returnTo: string) {
 
 interface AsideData {
   event: { name: string; startsAt: string; venue: string };
-  items: { name: string; quantity: number; subtotalCents: number }[];
+  items: LineWithLots[];
   totalCents: number;
   coupon: { code: string } | null;
+}
+
+interface LineWithLots {
+  ticketTypeId?: string;
+  name: string;
+  quantity: number;
+  unitPriceCents?: number;
+  subtotalCents: number;
+  lots?: OrderLineLot[];
+}
+
+/**
+ * Uma linha por lote (0013): a compra que se dividiu entre lotes aparece como "Pista · 1º lote" e "Pista · 2º lote", cada uma com o
+ * preço dela. O "Lote único" (tipo que não vende em lotes) e o pedido anterior aos lotes ficam numa linha só, como antes.
+ */
+function linesByLot(items: LineWithLots[]) {
+  return items.flatMap(i => {
+    const lots = i.lots ?? [];
+    if (!lots.some(l => l.name !== 'Lote único'))
+      return [
+        {
+          key: i.ticketTypeId ?? i.name,
+          name: i.name,
+          quantity: i.quantity,
+          unitPriceCents: i.unitPriceCents ?? Math.round(i.subtotalCents / i.quantity),
+          subtotalCents: i.subtotalCents,
+        },
+      ];
+    return lots.map(l => ({
+      key: `${i.ticketTypeId ?? i.name}:${l.lotId}`,
+      name: `${i.name} · ${l.name}`,
+      quantity: l.quantity,
+      unitPriceCents: l.unitPriceCents,
+      subtotalCents: l.subtotalCents,
+    }));
+  });
 }
 
 const STEPS = ['Revisão', 'Pagamento', 'Confirmação'] as const;
@@ -90,8 +127,8 @@ function CheckoutShell({
               </div>
               {badge ? <div className="px-ck-badges">{badge}</div> : null}
               <ul className="px-ck-lines">
-                {aside.items.map(i => (
-                  <li key={i.name}>
+                {linesByLot(aside.items).map(i => (
+                  <li key={i.key}>
                     <span>
                       {i.quantity} × {i.name}
                     </span>
@@ -371,8 +408,8 @@ export function CheckoutPage({ slug }: { slug: string }) {
             </Link>
           </div>
           <ul className="px-ck-review-lines">
-            {summary.items.map(i => (
-              <li key={i.ticketTypeId}>
+            {linesByLot(summary.items).map(i => (
+              <li key={i.key}>
                 <span>
                   <span>
                     <b>{i.quantity} ×</b> {i.name}

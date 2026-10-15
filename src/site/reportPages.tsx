@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { api } from './api';
 import { ExportLink, Gate, Loading, Pager, TableWrap, useAdmin } from './adminPages';
 import { usePageTitle } from './components';
@@ -131,14 +131,31 @@ export function SalesReportPage() {
                 </tr>
               </thead>
               <tbody>
-                {r.lines.map(l => (
-                  <tr key={l.typeId}>
-                    <td>{l.eventName}</td>
-                    <td>{l.typeName}</td>
-                    <td>{l.tickets}</td>
-                    <td className="px-nowrap">{brl(l.cents)}</td>
-                  </tr>
-                ))}
+                {r.lines.map(l => {
+                  // Vendas por lote (0013), logo abaixo do tipo; o "Lote único" não abre linhas.
+                  const lots = (l.lots ?? []).some(x => x.lotName !== 'Lote único') ? (l.lots ?? []) : [];
+                  return (
+                    <Fragment key={l.typeId}>
+                      <tr>
+                        <td>{l.eventName}</td>
+                        <td>{l.typeName}</td>
+                        <td>{l.tickets}</td>
+                        <td className="px-nowrap">{brl(l.cents)}</td>
+                      </tr>
+                      {lots.map(x => (
+                        <tr key={x.lotId} className="px-lot-row">
+                          <td aria-hidden="true" />
+                          <td>
+                            <span className="px-sr">{l.typeName}, </span>
+                            {x.lotName}
+                          </td>
+                          <td>{x.tickets}</td>
+                          <td className="px-nowrap">{brl(x.cents)}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
                 {r.byEvent.length > 1
                   ? r.byEvent.map(e => (
                       <tr key={`s${e.eventId}`} className="px-subtotal">

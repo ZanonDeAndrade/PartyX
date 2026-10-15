@@ -27,6 +27,7 @@ import {
   updatePromoter,
   updateTicketType,
 } from '../events/service';
+import { createLot, deleteLot, moveLot, turnTypeLot, updateLot } from '../events/lotsAdmin';
 import { logger } from '../logger';
 import {
   BANNER_MAX_BYTES,
@@ -76,8 +77,29 @@ const typeFields = {
   salesStartAt: instant,
   salesEndAt: instant,
   isActive: z.boolean(),
+  lastUnitsNotice: z.boolean(),
 };
-const createTypeBody = z.object({ ...typeFields, isActive: typeFields.isActive.optional() });
+const createTypeBody = z.object({
+  ...typeFields,
+  isActive: typeFields.isActive.optional(),
+  lastUnitsNotice: typeFields.lastUnitsNotice.optional(),
+});
+const lotFields = {
+  name: text,
+  priceCents: z.number(),
+  quantity: z.number(),
+  salesStartAt: instant.nullable(),
+  salesEndAt: instant.nullable(),
+  leftoverPolicy: z.enum(['passar', 'descartar']),
+};
+const createLotBody = z.object({
+  ...lotFields,
+  name: lotFields.name.optional(),
+  salesStartAt: lotFields.salesStartAt.optional(),
+  salesEndAt: lotFields.salesEndAt.optional(),
+  leftoverPolicy: lotFields.leftoverPolicy.optional(),
+});
+const updateLotBody = z.object(lotFields).partial();
 const updateTypeBody = z.object(typeFields).partial();
 
 const promoterBody = z.object({
@@ -259,6 +281,30 @@ export function eventsRoutes(deps: AuthDeps) {
     const body = await parseJson(c, updateTypeBody);
     return c.json({
       ticketType: await updateTicketType(evDeps, actor(c), uuid(c.req.param('id'), 'Tipo de ingresso'), body),
+    });
+  });
+
+  // ----- lotes (0013): criar, editar, apagar, reordenar e virar; cada resposta traz o tipo com os lotes atualizados -----
+  app.post('/admin/ticket-types/:id/lots', async c => {
+    const body = await parseJson(c, createLotBody);
+    return c.json({ ticketType: await createLot(evDeps, actor(c), uuid(c.req.param('id'), 'Tipo de ingresso'), body) }, 201);
+  });
+  app.patch('/admin/lots/:id', async c => {
+    const body = await parseJson(c, updateLotBody);
+    return c.json({ ticketType: await updateLot(evDeps, actor(c), uuid(c.req.param('id'), 'Lote'), body) });
+  });
+  app.delete('/admin/lots/:id', async c =>
+    c.json({ ticketType: await deleteLot(evDeps, actor(c), uuid(c.req.param('id'), 'Lote')) }),
+  );
+  app.post('/admin/lots/:id/move', async c => {
+    const body = await parseJson(c, z.object({ direction: z.enum(['subir', 'descer']) }));
+    return c.json({ ticketType: await moveLot(evDeps, actor(c), uuid(c.req.param('id'), 'Lote'), body.direction) });
+  });
+  /** "Virar para o próximo lote": encerra o lote à venda; a sobra passa para o próximo (padrão) ou é descartada. */
+  app.post('/admin/ticket-types/:id/turn-lot', async c => {
+    const body = await parseJson(c, z.object({ leftover: z.enum(['passar', 'descartar']) }));
+    return c.json({
+      ticketType: await turnTypeLot(evDeps, actor(c), uuid(c.req.param('id'), 'Tipo de ingresso'), body.leftover),
     });
   });
 

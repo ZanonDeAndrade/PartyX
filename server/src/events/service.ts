@@ -1,7 +1,9 @@
 import { and, asc, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { writeAudit, type Tx } from '../db/audit';
-import { events, promoters, reservations, ticketTypes } from '../db/schema';
+import { events, orderItemLots, promoters, reservations, ticketLots, ticketTypes } from '../db/schema';
+import { lotCapacity, lotRemaining, lotSalesState, typeLotsView, type Lot } from '../domain/lots';
+import { lotsByType, previewTypes } from './lots';
 import {
   AGE_RATINGS,
   availableQuantity,
@@ -537,6 +539,8 @@ export async function deleteEvent(deps: EventsDeps, actor: Actor, id: string, co
     if (normalizeName(confirmName) !== normalizeName(event.name)) {
       throw invalid([{ campo: 'confirmName', mensagem: 'Digite o nome do evento exatamente como aparece para confirmar.' }]);
     }
+    // Os lotes saem antes dos tipos (0013); num evento sem pedido, nenhum lote foi usado.
+    await tx.delete(ticketLots).where(eq(ticketLots.eventId, id));
     const types = await tx
       .delete(ticketTypes)
       .where(eq(ticketTypes.eventId, id))
@@ -594,10 +598,75 @@ export async function setEventArchived(deps: EventsDeps, actor: Actor, id: strin
 
 // ---------- tipos de ingresso (RF-14, RF-15, RF-16, RF-17) ----------
 
+/** Lote no painel (0013): quantidade, recebido, passado adiante, descartado, vendidos, reservados, disponíveis e situação agora. */
+export interface LotView {
+  id: string;
+  position: number;
+  name: string;
+  priceCents: number;
+  quantity: number;
+  carriedIn: number;
+  passedOut: number;
+  discarded: number;
+  capacity: number;
+  sold: number;
+  reserved: number;
+  available: number;
+  status: Lot['status'];
+  closeReason: Lot['closeReason'];
+  closedAt: Date | null;
+  salesStartAt: Date | null;
+  salesEndAt: Date | null;
+  leftoverPolicy: Lot['leftoverPolicy'];
+  /** Algum pedido (em qualquer situação) usou este lote: não pode ser apagado; com vendas, o preço não muda. */
+  hasOrders: boolean;
+}
+
 export interface TypeView extends TypeRow {
   quantityReserved: number;
   available: number;
   salesState: ReturnType<typeof salesState>;
+  /** Lotes em ordem, já com as viradas devidas agora (sem gravar). */
+  lots: LotView[];
+}
+
+/** Lotes de um tipo para o painel, a partir do estado acertado agora (`previewTypes`). */
+function lotViews(lots: readonly Lot[], reserved: ReadonlyMap<string, number>, typeAvailable: number, used: Set<string>) {
+  return lots.map((l): LotView => {
+    const r = reserved.get(l.id) ?? 0;
+    const free = Math.max(0, lotRemaining(l, r));
+    return {
+      id: l.id,
+      position: l.position,
+      name: l.name,
+      priceCents: l.priceCents,
+      quantity: l.quantity,
+      carriedIn: l.carriedIn,
+      passedOut: l.passedOut,
+      discarded: l.discarded,
+      capacity: lotCapacity(l),
+      sold: l.quantitySold,
+      reserved: r,
+      available: l.status === 'encerrado' ? 0 : l.status === 'a_venda' ? Math.min(free, typeAvailable) : free,
+      status: l.status,
+      closeReason: l.closeReason,
+      closedAt: l.closedAt,
+      salesStartAt: l.salesStartAt,
+      salesEndAt: l.salesEndAt,
+      leftoverPolicy: l.leftoverPolicy,
+      hasOrders: used.has(l.id),
+    };
+  });
+}
+
+/** Lotes que algum pedido usou. */
+export async function lotsWithOrders(db: Db | Tx, typeIds: string[]): Promise<Set<string>> {
+  if (typeIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ lotId: orderItemLots.lotId })
+    .from(orderItemLots)
+    .where(inArray(orderItemLots.ticketTypeId, typeIds));
+  return new Set(rows.map(r => r.lotId));
 }
 
 /** Soma das reservas ativas e dentro do prazo, por tipo. */
@@ -617,14 +686,41 @@ export async function reservedByType(db: Db | Tx, typeIds: string[], now: Date):
   return new Map(rows.map(r => [r.id, r.n]));
 }
 
-function viewType(row: TypeRow, reserved: number, now: Date): TypeView {
+function viewType(
+  row: TypeRow,
+  reserved: number,
+  now: Date,
+  lots: { lots: readonly Lot[]; reservedByLot: ReadonlyMap<string, number>; used: Set<string> } = {
+    lots: [],
+    reservedByLot: new Map(),
+    used: new Set(),
+  },
+): TypeView {
   const input = { ...row, quantityReserved: reserved };
+  const typeAvailable = availableQuantity(input);
+  const view = typeLotsView(lots.lots, lots.reservedByLot, now, typeAvailable);
   return {
     ...row,
     quantityReserved: reserved,
-    available: availableQuantity(input),
-    salesState: salesState(input, now),
+    available: view.lotCount ? (view.current?.available ?? 0) : typeAvailable,
+    salesState: lotSalesState(salesState(input, now), view),
+    lots: lotViews(lots.lots, lots.reservedByLot, typeAvailable, lots.used),
   };
+}
+
+/** Visões dos tipos de um evento, com os lotes acertados agora (sem gravar). */
+export async function viewTypes(db: Db | Tx, rows: TypeRow[], now: Date): Promise<TypeView[]> {
+  const ids = rows.map(t => t.id);
+  const reserved = await reservedByType(db, ids, now);
+  const lots = await previewTypes(db, rows, now);
+  const used = await lotsWithOrders(db, ids);
+  return rows.map(t =>
+    viewType(t, reserved.get(t.id) ?? 0, now, {
+      lots: lots.byType.get(t.id) ?? [],
+      reservedByLot: lots.reserved,
+      used,
+    }),
+  );
 }
 
 export interface TypeInput {
@@ -634,6 +730,8 @@ export interface TypeInput {
   salesStartAt: Date;
   salesEndAt: Date;
   isActive?: boolean;
+  /** "Últimas unidades deste lote" na página do evento (0013). */
+  lastUnitsNotice?: boolean;
 }
 
 function checkType(input: Partial<TypeInput>, required: boolean) {
@@ -666,6 +764,7 @@ function checkType(input: Partial<TypeInput>, required: boolean) {
     } else out[key] = v;
   }
   if (input.isActive !== undefined) out.isActive = input.isActive;
+  if (input.lastUnitsNotice !== undefined) out.lastUnitsNotice = input.lastUnitsNotice;
   if (errors.length) throw invalid(errors);
   return out;
 }
@@ -678,6 +777,7 @@ const typeSnapshot = (t: TypeRow) => ({
   salesStartAt: t.salesStartAt.toISOString(),
   salesEndAt: t.salesEndAt.toISOString(),
   isActive: t.isActive,
+  lastUnitsNotice: t.lastUnitsNotice,
 });
 
 function typeConflict(error: unknown): never {
@@ -707,6 +807,7 @@ export async function createTicketType(deps: EventsDeps, actor: Actor, eventId: 
           salesStartAt: data.salesStartAt!,
           salesEndAt: data.salesEndAt!,
           isActive: data.isActive ?? true,
+          lastUnitsNotice: data.lastUnitsNotice ?? true,
           createdAt: now,
           updatedAt: now,
         })
@@ -720,9 +821,22 @@ export async function createTicketType(deps: EventsDeps, actor: Actor, eventId: 
         after: typeSnapshot(created!),
         at: now,
       });
+      // Todo tipo nasce com um lote (0013): o "Lote único", com o preço e a capacidade do tipo, já à venda. Para vender em lotes,
+      // reduza a quantidade dele e crie os próximos.
+      await tx.insert(ticketLots).values({
+        ticketTypeId: created!.id,
+        eventId,
+        position: 1,
+        name: 'Lote único',
+        priceCents: created!.priceCents,
+        quantity: created!.quantityTotal,
+        status: 'a_venda',
+        createdAt: now,
+        updatedAt: now,
+      });
       return created!;
     });
-    return viewType(row, 0, now);
+    return (await viewTypes(deps.db, [row], now))[0]!;
   } catch (error) {
     return typeConflict(error);
   }
@@ -759,6 +873,39 @@ export async function updateTicketType(deps: EventsDeps, actor: Actor, typeId: s
           );
         }
       }
+      // Lotes (0013): o preço mora no lote, e a capacidade do tipo é o teto da soma deles. Tipo de lote único: o lote acompanha.
+      const typeLots = (await lotsByType(tx, [typeId])).get(typeId) ?? [];
+      const only = typeLots.length === 1 ? typeLots[0]! : null;
+      if (data.priceCents !== undefined && data.priceCents !== before.priceCents) {
+        if (typeLots.length > 1)
+          throw new AppError(409, 'preco_no_lote', 'Este tipo vende em lotes: mude o preço no lote.');
+        if (only && only.quantitySold > 0)
+          throw new AppError(
+            409,
+            'lote_com_vendas',
+            'O lote já tem vendas e o preço dele não pode mudar. Crie um novo lote com o preço novo.',
+          );
+      }
+      if (data.quantityTotal !== undefined && typeLots.length > 1) {
+        const planned = typeLots.reduce((t, l) => t + l.quantity, 0);
+        if (data.quantityTotal < planned)
+          throw new AppError(
+            409,
+            'capacidade_abaixo_dos_lotes',
+            `A capacidade não pode ser menor que a soma dos lotes (${planned}). Reduza a quantidade de um lote antes.`,
+            { lotes: planned },
+          );
+      }
+      if (only && (data.priceCents !== undefined || data.quantityTotal !== undefined)) {
+        await tx
+          .update(ticketLots)
+          .set({
+            ...(data.priceCents !== undefined ? { priceCents: data.priceCents } : {}),
+            ...(data.quantityTotal !== undefined ? { quantity: data.quantityTotal } : {}),
+            updatedAt: now,
+          })
+          .where(eq(ticketLots.id, only.id));
+      }
       const [after] = await tx
         .update(ticketTypes)
         .set({ ...data, updatedAt: now })
@@ -779,9 +926,9 @@ export async function updateTicketType(deps: EventsDeps, actor: Actor, typeId: s
         after: typeSnapshot(after!),
         at: now,
       });
-      return { row: after!, reserved };
+      return { row: after! };
     });
-    return viewType(result.row, result.reserved, now);
+    return (await viewTypes(deps.db, [result.row], now))[0]!;
   } catch (error) {
     return typeConflict(error);
   }
@@ -802,12 +949,7 @@ export async function getEvent(deps: EventsDeps, id: string) {
     .from(ticketTypes)
     .where(eq(ticketTypes.eventId, id))
     .orderBy(asc(ticketTypes.salesStartAt), asc(ticketTypes.name));
-  const reserved = await reservedByType(
-    deps.db,
-    types.map(t => t.id),
-    now,
-  );
-  return { event, ticketTypes: types.map(t => viewType(t, reserved.get(t.id) ?? 0, now)) };
+  return { event, ticketTypes: await viewTypes(deps.db, types, now) };
 }
 
 // ---------- promoters (RF-18, CA-10) ----------

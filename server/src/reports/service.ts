@@ -37,6 +37,11 @@ function paidIn(p: Period): SQL[] {
   return out;
 }
 const all = (conds: SQL[]): SQL => sql.join(conds, sql` and `);
+/**
+ * Valor de uma linha do pedido: a soma por lote quando a compra se dividiu entre lotes (0013), porque o preço unitário do item é então a
+ * média arredondada; senão, quantidade vezes preço. Mantém a conciliação com os pedidos (CA-28) centavo a centavo.
+ */
+const ITEM_CENTS = sql`coalesce((select sum(il.quantity * il.unit_price_cents) from order_item_lots il where il.order_item_id = i.id), i.quantity * i.unit_price_cents)`;
 
 // ---------- vendas por evento e por tipo (RF-58, CA-28) ----------
 
@@ -54,7 +59,7 @@ export async function salesReport(deps: ReportDeps, f: SalesFilter) {
 
   const rows = await deps.db.execute<Record<string, unknown>>(sql`
     select e.id as event_id, e.name as event_name, e.starts_at, ty.id as type_id, ty.name as type_name,
-           sum(i.quantity)::int as qty, sum(i.quantity * i.unit_price_cents)::bigint as cents
+           sum(i.quantity)::int as qty, sum(${ITEM_CENTS})::bigint as cents
       from orders o
       join order_items i on i.order_id = o.id
       join ticket_types ty on ty.id = i.ticket_type_id
@@ -63,6 +68,22 @@ export async function salesReport(deps: ReportDeps, f: SalesFilter) {
      group by e.id, e.name, e.starts_at, ty.id, ty.name
      order by e.starts_at, e.name, ty.name`);
 
+  // Vendas por lote dentro de cada tipo (0013): quantidade e valor de cada lote, na ordem dos lotes.
+  const lotConds: SQL[] = [...base, sql`o.status = 'pago'`];
+  if (f.typeId) lotConds.push(sql`il.ticket_type_id = ${f.typeId}`);
+  const lotRows = await deps.db.execute<Record<string, unknown>>(sql`
+    select il.ticket_type_id as type_id, l.id as lot_id, l.name as lot_name, l.position,
+           sum(il.quantity)::int as qty, sum(il.quantity * il.unit_price_cents)::bigint as cents
+      from orders o
+      join order_item_lots il on il.order_id = o.id
+      join ticket_lots l on l.id = il.lot_id
+     where ${all(lotConds)}
+     group by il.ticket_type_id, l.id, l.name, l.position
+     order by l.position`);
+  const lotsOf = (typeId: string) =>
+    lotRows.rows
+      .filter(r => r.type_id === typeId)
+      .map(r => ({ lotId: r.lot_id as string, lotName: r.lot_name as string, tickets: num(r.qty), cents: num(r.cents) }));
   const lines = rows.rows.map(r => ({
     eventId: r.event_id as string,
     eventName: r.event_name as string,
@@ -70,6 +91,7 @@ export async function salesReport(deps: ReportDeps, f: SalesFilter) {
     typeName: r.type_name as string,
     tickets: num(r.qty),
     cents: num(r.cents),
+    lots: lotsOf(r.type_id as string),
   }));
   const byEvent = new Map<string, { eventId: string; eventName: string; tickets: number; cents: number }>();
   for (const l of lines) {
@@ -106,7 +128,7 @@ export async function salesReport(deps: ReportDeps, f: SalesFilter) {
 
   const daily = await deps.db.execute<{ day: string; qty: number; cents: string }>(sql`
     select to_char(o.paid_at at time zone ${TZ}, 'YYYY-MM-DD') as day, sum(i.quantity)::int as qty,
-           sum(i.quantity * i.unit_price_cents)::bigint as cents
+           sum(${ITEM_CENTS})::bigint as cents
       from orders o join order_items i on i.order_id = o.id
      where ${all(itemConds)}
      group by 1 order by 1 limit 400`);
@@ -142,7 +164,7 @@ export async function promoterRanking(deps: ReportDeps, f: Period & { eventId?: 
   const rows = await deps.db.execute<Record<string, unknown>>(sql`
     select p.id, p.name, p.coupon_code, p.is_active,
            coalesce(sum(i.quantity), 0)::int as qty,
-           coalesce(sum(i.quantity * i.unit_price_cents), 0)::bigint as cents,
+           coalesce(sum(${ITEM_CENTS}), 0)::bigint as cents,
            count(distinct o.id)::int as orders
       from promoters p
       left join orders o on ${all(on)}
@@ -175,7 +197,7 @@ export async function promoterRanking(deps: ReportDeps, f: Period & { eventId?: 
   }));
 
   const none = await deps.db.execute<{ qty: number; cents: string; orders: number }>(sql`
-    select coalesce(sum(i.quantity), 0)::int as qty, coalesce(sum(i.quantity * i.unit_price_cents), 0)::bigint as cents, count(distinct o.id)::int as orders
+    select coalesce(sum(i.quantity), 0)::int as qty, coalesce(sum(${ITEM_CENTS}), 0)::bigint as cents, count(distinct o.id)::int as orders
       from orders o join order_items i on i.order_id = o.id
      where ${all([sql`o.status = 'pago'`, sql`o.promoter_id is null`, ...paidIn(f), ...(f.eventId ? [sql`o.event_id = ${f.eventId}`] : [])])}`);
   return {

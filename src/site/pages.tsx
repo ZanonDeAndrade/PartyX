@@ -319,7 +319,12 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
   // Remove do carrinho o que deixou de estar à venda.
   const chosen = Object.entries(qty).filter(([id, n]) => n > 0 && buyable.has(id));
   const units = chosen.reduce((t, [, n]) => t + n, 0);
-  const total = chosen.reduce((t, [id, n]) => t + n * buyable.get(id)!.priceCents, 0);
+  // Lotes: o que passar do que resta no lote à venda sai do próximo, com o preço dele, que só aparece no resumo (antes de pagar).
+  const inLot = (id: string, n: number) => Math.min(n, buyable.get(id)!.lotRemaining ?? n);
+  const total = chosen.reduce((t, [id, n]) => t + inLot(id, n) * (buyable.get(id)!.priceCents ?? 0), 0);
+  const fromNextLot = chosen.reduce((t, [id, n]) => t + n - inLot(id, n), 0);
+  // O total mostra só o que já tem preço; o que sai do próximo lote aparece na linha pequena e no resumo, com o valor.
+  const unitsText = `${units} ${units === 1 ? 'ingresso' : 'ingressos'}${fromNextLot > 0 ? `, ${fromNextLot} do próximo lote` : ''}`;
   const change = (id: string, delta: number) =>
     setQty(q => {
       const next = Math.max(0, (q[id] ?? 0) + delta);
@@ -348,9 +353,14 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
           return (
             <li key={t.id} className={`px-type ${t.canBuy ? '' : 'px-type-off'}`}>
               <div className="px-type-info">
-                <h3>{t.name}</h3>
-                <p className="px-type-price">{brl(t.priceCents)}</p>
+                <h3>
+                  {t.name}
+                  {t.lot ? <span className="px-type-lot"> · {t.lot.name}</span> : null}
+                </h3>
+                {t.priceCents !== null ? <p className="px-type-price">{brl(t.priceCents)}</p> : null}
+                {t.lastUnits ? <p className="px-type-flag">Últimas unidades deste lote</p> : null}
                 {t.note ? <p className="px-type-note">{t.note}</p> : null}
+                {t.nextLot ? <p className="px-type-note">Próximo lote: em breve.</p> : null}
               </div>
               {t.canBuy ? (
                 <div className="px-stepper" role="group" aria-label={`Quantidade de ${t.name}`}>
@@ -385,26 +395,31 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
         <>
           {units > 0 ? (
             <ul className="px-lines px-sel-lines">
-              {chosen.map(([id, n]) => (
-                <li key={id}>
-                  <span>
-                    {n} × {buyable.get(id)!.name}
-                  </span>
-                  <span className="px-nowrap">{brl(n * buyable.get(id)!.priceCents)}</span>
-                </li>
-              ))}
+              {chosen.map(([id, n]) => {
+                const extra = n - inLot(id, n);
+                return (
+                  <li key={id}>
+                    <span>
+                      {n} × {buyable.get(id)!.name}
+                      {extra > 0 ? (
+                        <small className="px-sel-note">
+                          {inLot(id, n)} {inLot(id, n) === 1 ? 'sai' : 'saem'} deste lote e {extra} do próximo, com o preço
+                          dele. Você vê o valor no resumo, antes de pagar.
+                        </small>
+                      ) : null}
+                    </span>
+                    <span className="px-nowrap">{brl(inLot(id, n) * (buyable.get(id)!.priceCents ?? 0))}</span>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
           <p className="px-total px-total-row-side">
             <span>
               Total
-              {units > 0 ? (
-                <small>
-                  {units} {units === 1 ? 'ingresso' : 'ingressos'}
-                </small>
-              ) : null}
+              {units > 0 ? <small>{unitsText}</small> : null}
             </span>
-            <b>
+            <b className="px-nowrap">
               <Roll value={brl(total)} />
             </b>
           </p>
@@ -426,10 +441,8 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
           </p>
           <div className="px-mobbar">
             <div>
-              <small>
-                {units === 0 ? 'Escolha a quantidade' : `${units} ${units === 1 ? 'ingresso' : 'ingressos'}`}
-              </small>
-              <b>
+              <small>{units === 0 ? 'Escolha a quantidade' : unitsText}</small>
+              <b className="px-nowrap">
                 <Roll value={brl(total)} />
               </b>
             </div>

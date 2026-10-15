@@ -530,3 +530,96 @@ body.px-dark .px-preview-bar a {
   color: var(--px-text) !important;
   text-decoration: none;
 }
+
+/* Vendas por lote (0013): linhas abaixo do tipo, recuadas e mais leves. */
+.px-lot-row td {
+  color: var(--px-text-2);
+  font-size: var(--px-t-sm);
+}
+.px-lot-row td:nth-child(2) {
+  padding-left: var(--px-s-5);
+}
+
+/* Lotes de cada tipo (0013): uma faixa por lote, em ordem; o à venda com a borda roxa, o encerrado mais apagado. */
+.px-lots {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--px-s-3);
+  padding-top: var(--px-s-3);
+  border-top: 1px solid var(--px-line);
+}
+.px-lots-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--px-s-2);
+}
+.px-lots-head .px-adm-actions {
+  margin: 0;
+}
+.px-lots-title {
+  margin: 0;
+  font-size: var(--px-t-md);
+  font-weight: 800;
+}
+.px-lot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--px-s-2);
+}
+.px-lot {
+  display: grid;
+  gap: var(--px-s-2);
+  min-width: 0;
+  padding: var(--px-s-3);
+  border: 1px solid var(--px-line);
+  border-left: 3px solid var(--px-line);
+  border-radius: var(--px-r-sm);
+}
+.px-lot-a_venda {
+  border-left-color: var(--px-violet);
+}
+.px-lot-encerrado {
+  color: var(--px-text-3);
+}
+.px-lot-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--px-s-2);
+}
+.px-lot-name {
+  min-width: 0;
+  font-weight: 800;
+}
+.px-lot-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--px-s-1) var(--px-s-3);
+  margin: 0;
+}
+@media (min-width: 520px) {
+  .px-lot-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.px-lot-stats dt {
+  font-size: var(--px-t-xs);
+  color: var(--px-text-3);
+}
+.px-lot-stats dd {
+  margin: 0;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.px-lot-stats small {
+  font-weight: 500;
+  color: var(--px-text-3);
+}
+.px-lot .px-adm-actions {
+  margin: 0;
+}

@@ -4,6 +4,7 @@ import {
   ApiError,
   uploadBanner,
   type AdminEvent,
+  type AdminLot,
   type AdminTicketType,
   type EventRemovalCheck,
   type EventsMeta,
@@ -1905,8 +1906,8 @@ function TicketTypesPanel({
                   </div>
                   <dl className="px-adm-stats">
                     <div>
-                      <dt>Preço</dt>
-                      <dd>{brl(t.priceCents)}</dd>
+                      <dt>{t.lots.length > 1 ? 'Preço do lote à venda' : 'Preço'}</dt>
+                      <dd>{t.lots.some(l => l.status === 'a_venda') ? brl(t.priceCents) : '—'}</dd>
                     </div>
                     <div>
                       <dt>Capacidade</dt>
@@ -1930,13 +1931,14 @@ function TicketTypesPanel({
                   {!closed ? (
                     <div className="px-adm-actions" role="group" aria-label={`Ações de ${t.name}`}>
                       <button type="button" className="px-btn" disabled={!meta} onClick={() => setEditing(t)}>
-                        Editar
+                        Editar tipo
                       </button>
                       <button type="button" className="px-btn" onClick={() => setToggling(t)}>
                         {t.isActive ? 'Desativar' : 'Ativar'}
                       </button>
                     </div>
                   ) : null}
+                  {meta ? <LotsSection type={t} closed={closed} meta={meta} onChanged={onChanged} /> : null}
                 </li>
               );
             })}
@@ -1997,6 +1999,7 @@ interface TypeForm {
   endDate: string;
   endTime: string;
   isActive: boolean;
+  lastUnitsNotice: boolean;
 }
 const TYPE_FIELD: Record<string, string> = {
   priceCents: 'price',
@@ -2031,6 +2034,7 @@ function TicketTypeDialog({
         endDate: e.date,
         endTime: e.time,
         isActive: type.isActive,
+        lastUnitsNotice: type.lastUnitsNotice,
       };
     }
     const now = isoToZonedInputs(new Date().toISOString());
@@ -2044,8 +2048,12 @@ function TicketTypeDialog({
       endDate: end.date,
       endTime: end.time,
       isActive: true,
+      lastUnitsNotice: true,
     };
   }, [type, event.startsAt]);
+  // Lotes (0013): com mais de um lote, o preço fica em cada lote; com lote único, o preço do tipo é o dele (travado se já vendeu).
+  const inLots = Boolean(type && type.lots.length > 1);
+  const priceLocked = Boolean(type && type.lots.length === 1 && type.lots[0]!.sold > 0);
   const [form, setForm] = useState<TypeForm>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
@@ -2081,7 +2089,7 @@ function TicketTypeDialog({
     const name = form.name.trim();
     if (!name) errs.name = 'Informe o nome do tipo de ingresso.';
     else if (name.length > meta.limits.typeNameMax) errs.name = `Use no máximo ${meta.limits.typeNameMax} caracteres.`;
-    const priceCents = centsFromMasked(form.price);
+    const priceCents = inLots ? type!.priceCents : centsFromMasked(form.price);
     if (priceCents < 1)
       errs.price = 'Informe um valor maior que zero. Ingresso gratuito e cortesia não fazem parte do sistema.';
     else if (priceCents > meta.limits.priceMaxCents) errs.price = `O valor máximo é ${brl(meta.limits.priceMaxCents)}.`;
@@ -2108,6 +2116,7 @@ function TicketTypeDialog({
       salesStartAt: start!,
       salesEndAt: end!,
       isActive: form.isActive,
+      lastUnitsNotice: form.lastUnitsNotice,
     };
     setBusy(true);
     try {
@@ -2151,7 +2160,7 @@ function TicketTypeDialog({
           id="tt-name"
           label="Nome"
           error={errors.name}
-          hint="Ex.: Pista, Camarote, Meia-entrada, 1º lote. Lotes são tipos separados: não há virada automática de lote."
+          hint="Ex.: Pista, Camarote, Meia-entrada. Para vender em lotes, salve o tipo e crie os lotes dentro dele."
         >
           <input
             id="tt-name"
@@ -2162,21 +2171,33 @@ function TicketTypeDialog({
           />
         </FormField>
         <div className="px-form-grid">
-          <FormField id="tt-price" label="Valor" error={errors.price}>
-            <div className="px-money">
-              <span aria-hidden="true">R$</span>
-              <input
-                id="tt-price"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="0,00"
-                value={form.price}
-                onChange={e => set('price', e.target.value ? maskedFromCents(centsFromMasked(e.target.value)) : '')}
-                aria-label="Valor em reais"
-                {...described('tt-price', errors.price)}
-              />
-            </div>
-          </FormField>
+          {inLots ? (
+            <p className="px-small px-muted px-field-wide">
+              Este tipo vende em lotes: o preço fica em cada lote, na lista de lotes do tipo.
+            </p>
+          ) : (
+            <FormField
+              id="tt-price"
+              label="Valor"
+              error={errors.price}
+              hint={priceLocked ? 'O lote já tem vendas: o preço não muda. Para outro preço, crie um novo lote.' : undefined}
+            >
+              <div className="px-money">
+                <span aria-hidden="true">R$</span>
+                <input
+                  id="tt-price"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="0,00"
+                  value={form.price}
+                  disabled={priceLocked}
+                  onChange={e => set('price', e.target.value ? maskedFromCents(centsFromMasked(e.target.value)) : '')}
+                  aria-label="Valor em reais"
+                  {...described('tt-price', errors.price, priceLocked)}
+                />
+              </div>
+            </FormField>
+          )}
           <FormField
             id="tt-quantity"
             label="Quantidade total"
@@ -2234,6 +2255,18 @@ function TicketTypeDialog({
           />
           <label htmlFor="tt-active">Ativo (à venda dentro do período)</label>
         </div>
+        <div className="px-check">
+          <input
+            id="tt-lastUnits"
+            type="checkbox"
+            checked={form.lastUnitsNotice}
+            onChange={e => set('lastUnitsNotice', e.target.checked)}
+          />
+          <label htmlFor="tt-lastUnits">
+            Avisar "Últimas unidades deste lote" na página do evento{' '}
+            <span className="px-small px-muted">(com menos de 10 unidades, ou menos de 10% do lote)</span>
+          </label>
+        </div>
         <p className="px-small px-muted">
           Horários de Brasília. O limite de {meta.maxTicketsPerOrder} ingressos por compra vale para o pedido inteiro,
           somando os tipos, e é configurado no servidor (MAX_TICKETS_PER_ORDER), não por tipo. Tipos de meia-entrada
@@ -2245,6 +2278,551 @@ function TicketTypeDialog({
           </button>
           <button type="submit" className="px-btn px-btn-pri" disabled={busy}>
             {busy ? 'Salvando…' : type ? 'Salvar tipo' : 'Criar tipo'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ---------- lotes de cada tipo (0013, 15/10/2026) ----------
+
+const LOT_STATE: Record<AdminLot['status'], [string, string]> = {
+  aguardando: ['neu', 'Aguardando'],
+  a_venda: ['ok', 'À venda'],
+  encerrado: ['dark', 'Encerrado'],
+};
+const CLOSE_REASON: Record<NonNullable<AdminLot['closeReason']>, string> = {
+  esgotado: 'esgotou',
+  data: 'pela data de fim',
+  manual: 'virada manual',
+};
+const lotWhen = (l: Pick<AdminLot, 'salesStartAt' | 'salesEndAt'>) =>
+  l.salesStartAt && l.salesEndAt
+    ? `De ${whenText(l.salesStartAt)} até ${whenText(l.salesEndAt)}`
+    : l.salesStartAt
+      ? `A partir de ${whenText(l.salesStartAt)}`
+      : l.salesEndAt
+        ? `Até ${whenText(l.salesEndAt)}`
+        : '';
+
+/**
+ * Lotes de um tipo: preço, quantidade, vendidos, reservados, disponíveis e situação de cada um, e as ações (novo lote, virar, editar,
+ * reordenar, apagar). As regras ficam no servidor (`server/src/events/lotsAdmin.ts`); a tela só orienta e mostra o que ele responde.
+ */
+function LotsSection({
+  type,
+  closed,
+  meta,
+  onChanged,
+}: {
+  type: AdminTicketType;
+  closed: boolean;
+  meta: EventsMeta;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState<AdminLot | 'novo' | null>(null);
+  const [turning, setTurning] = useState(false);
+  const [removing, setRemoving] = useState<AdminLot | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const lots = type.lots;
+  const current = lots.find(l => l.status === 'a_venda') ?? null;
+  const next = current ? lots.find(l => l.status === 'aguardando' && l.position > current.position) : undefined;
+  const single = lots.length === 1;
+  const move = async (lot: AdminLot, direction: 'subir' | 'descer') => {
+    try {
+      await api.admin.moveLot(lot.id, direction);
+      onChanged();
+    } catch (err) {
+      toast(errorText(err, 'Não foi possível mudar a ordem.'));
+    }
+  };
+  const remove = async () => {
+    if (!removing) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.admin.deleteLot(removing.id);
+      toast(`"${removing.name}" foi apagado.`);
+      setRemoving(null);
+      onChanged();
+    } catch (err) {
+      setError(errorText(err, 'Não foi possível apagar o lote.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="px-lots" aria-label={`Lotes de ${type.name}`}>
+      <div className="px-lots-head">
+        <h3 className="px-lots-title">{single ? 'Lote' : `Lotes (${lots.length})`}</h3>
+        {!closed ? (
+          <div className="px-adm-actions" role="group" aria-label={`Ações dos lotes de ${type.name}`}>
+            <button type="button" className="px-btn" onClick={() => setEditing('novo')}>
+              Novo lote
+            </button>
+            {current ? (
+              <button type="button" className="px-btn" onClick={() => setTurning(true)}>
+                {next ? 'Virar para o próximo lote' : 'Encerrar o lote'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      {single && lots[0]!.name === 'Lote único' ? (
+        <p className="px-small px-muted">
+          Vende num lote só. Para vender em lotes, reduza a quantidade deste e crie os próximos: cada lote tem preço e
+          quantidade próprios, e o próximo abre quando este esgota, chega ao fim ou é virado à mão.
+        </p>
+      ) : null}
+      <ol className="px-lot-list">
+        {lots.map((l, i) => {
+          const [tone, label] = LOT_STATE[l.status];
+          const prev = lots[i - 1];
+          const after = lots[i + 1];
+          const moves = !closed && l.status === 'aguardando';
+          return (
+            <li key={l.id} className={`px-lot px-lot-${l.status}`}>
+              <div className="px-lot-main">
+                <span className="px-lot-name">
+                  {l.name} · <span className="px-nowrap">{brl(l.priceCents)}</span>
+                </span>
+                <span className={`px-badge px-badge-${tone}`}>
+                  {label}
+                  {l.status === 'encerrado' && l.closeReason ? ` (${CLOSE_REASON[l.closeReason]})` : ''}
+                </span>
+              </div>
+              <dl className="px-lot-stats">
+                <div>
+                  <dt>Quantidade</dt>
+                  <dd>
+                    {l.capacity}
+                    {l.capacity !== l.quantity ? <small> de {l.quantity}</small> : null}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Vendidos</dt>
+                  <dd>{l.sold}</dd>
+                </div>
+                <div>
+                  <dt>Reservados</dt>
+                  <dd>{l.reserved}</dd>
+                </div>
+                <div>
+                  <dt>Disponíveis</dt>
+                  <dd>
+                    <b>{l.available}</b>
+                  </dd>
+                </div>
+              </dl>
+              {l.carriedIn || l.passedOut || l.discarded || lotWhen(l) ? (
+                <p className="px-small px-muted">
+                  {[
+                    lotWhen(l),
+                    l.carriedIn ? `${l.carriedIn} recebidas de lotes anteriores` : '',
+                    l.passedOut ? `${l.passedOut} passadas adiante` : '',
+                    l.discarded ? `${l.discarded} descartadas` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              ) : null}
+              {!closed && l.status !== 'encerrado' ? (
+                <div className="px-adm-actions" role="group" aria-label={`Ações de ${l.name}`}>
+                  <button type="button" className="px-btn" onClick={() => setEditing(l)}>
+                    Editar
+                  </button>
+                  {moves && prev?.status === 'aguardando' ? (
+                    <button type="button" className="px-btn" aria-label={`Subir ${l.name}`} onClick={() => move(l, 'subir')}>
+                      Subir
+                    </button>
+                  ) : null}
+                  {moves && after?.status === 'aguardando' ? (
+                    <button type="button" className="px-btn" aria-label={`Descer ${l.name}`} onClick={() => move(l, 'descer')}>
+                      Descer
+                    </button>
+                  ) : null}
+                  {l.status === 'aguardando' && !l.hasOrders && !single ? (
+                    <button type="button" className="px-btn px-btn-danger-line" onClick={() => setRemoving(l)}>
+                      Apagar
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+      {editing ? (
+        <LotDialog
+          type={type}
+          lot={editing === 'novo' ? null : editing}
+          meta={meta}
+          onCancel={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            onChanged();
+          }}
+        />
+      ) : null}
+      {turning && current ? (
+        <TurnLotDialog
+          type={type}
+          current={current}
+          next={next ?? null}
+          onCancel={() => setTurning(false)}
+          onDone={() => {
+            setTurning(false);
+            onChanged();
+          }}
+        />
+      ) : null}
+      {removing ? (
+        <ConfirmDialog
+          title={`Apagar "${removing.name}"?`}
+          confirmLabel="Apagar lote"
+          danger
+          busy={busy}
+          error={error || null}
+          onConfirm={remove}
+          onCancel={() => {
+            setRemoving(null);
+            setError('');
+          }}
+        >
+          <p>O lote ainda não começou a vender e nenhum pedido o usou. Os lotes depois dele sobem uma posição.</p>
+        </ConfirmDialog>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Virar o lote à mão: o lote à venda encerra agora e o próximo começa (se a data de início dele permitir). Pergunta o que fazer com as
+ * unidades que sobraram (nem vendidas nem reservadas): passam para o próximo (padrão) ou são descartadas. Sem próximo, o tipo para.
+ */
+function TurnLotDialog({
+  type,
+  current,
+  next,
+  onCancel,
+  onDone,
+}: {
+  type: AdminTicketType;
+  current: AdminLot;
+  next: AdminLot | null;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  const [leftover, setLeftover] = useState<'passar' | 'descartar'>(next ? 'passar' : 'descartar');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const left = current.available;
+  const confirm = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.admin.turnLot(type.id, leftover);
+      toast(next ? `${type.name}: "${next.name}" é o lote à venda.` : `${type.name}: "${current.name}" foi encerrado.`);
+      onDone();
+    } catch (err) {
+      setError(errorText(err, 'Não foi possível virar o lote.'));
+      setBusy(false);
+    }
+  };
+  return (
+    <ConfirmDialog
+      title={next ? `Virar ${type.name} para "${next.name}"?` : `Encerrar "${current.name}" de ${type.name}?`}
+      confirmLabel={next ? 'Virar lote' : 'Encerrar lote'}
+      danger={!next}
+      busy={busy}
+      error={error || null}
+      onConfirm={confirm}
+      onCancel={onCancel}
+    >
+      <p>
+        {next ? (
+          <>
+            <b>{current.name}</b> ({brl(current.priceCents)}) encerra agora e <b>{next.name}</b> ({brl(next.priceCents)})
+            {next.salesStartAt && new Date(next.salesStartAt).getTime() > Date.now()
+              ? ` começa a vender em ${whenText(next.salesStartAt)}.`
+              : ' começa a vender na hora.'}
+          </>
+        ) : (
+          <>
+            Não há próximo lote: <b>{type.name}</b> para de vender e aparece como esgotado.
+          </>
+        )}
+      </p>
+      {left > 0 && next ? (
+        <fieldset className="px-fieldset">
+          <legend>
+            {left} {left === 1 ? 'unidade sobrou' : 'unidades sobraram'} neste lote
+          </legend>
+          <div className="px-check">
+            <input
+              id="turn-passar"
+              type="radio"
+              name="sobra"
+              checked={leftover === 'passar'}
+              onChange={() => setLeftover('passar')}
+            />
+            <label htmlFor="turn-passar">Passar para {next.name} (padrão)</label>
+          </div>
+          <div className="px-check">
+            <input
+              id="turn-descartar"
+              type="radio"
+              name="sobra"
+              checked={leftover === 'descartar'}
+              onChange={() => setLeftover('descartar')}
+            />
+            <label htmlFor="turn-descartar">Descartar: não serão vendidas</label>
+          </div>
+        </fieldset>
+      ) : left > 0 ? (
+        <p className="px-small">{left} unidades que sobraram não serão vendidas.</p>
+      ) : null}
+      <p className="px-small px-muted">
+        Quem está pagando uma reserva deste lote continua com o preço dele. A virada fica na trilha de auditoria.
+      </p>
+    </ConfirmDialog>
+  );
+}
+
+interface LotForm {
+  name: string;
+  price: string;
+  quantity: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  leftoverPolicy: 'passar' | 'descartar';
+}
+const LOT_FIELD: Record<string, string> = {
+  priceCents: 'price',
+  salesStartAt: 'startDate',
+  salesEndAt: 'endDate',
+};
+
+/** Criar ou editar um lote. Com vendas, o preço fica travado; a soma das quantidades não passa da capacidade do tipo. */
+function LotDialog({
+  type,
+  lot,
+  meta,
+  onCancel,
+  onSaved,
+}: {
+  type: AdminTicketType;
+  lot: AdminLot | null;
+  meta: EventsMeta;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const position = lot?.position ?? (type.lots.at(-1)?.position ?? 0) + 1;
+  const initial = useMemo<LotForm>(() => {
+    const s = lot?.salesStartAt ? isoToZonedInputs(lot.salesStartAt) : { date: '', time: '' };
+    const e = lot?.salesEndAt ? isoToZonedInputs(lot.salesEndAt) : { date: '', time: '' };
+    return {
+      name: lot?.name ?? '',
+      price: lot ? maskedFromCents(lot.priceCents) : '',
+      quantity: lot ? String(lot.quantity) : '',
+      startDate: s.date,
+      startTime: s.time,
+      endDate: e.date,
+      endTime: e.time,
+      leftoverPolicy: lot?.leftoverPolicy ?? 'passar',
+    };
+  }, [lot]);
+  const [form, setForm] = useState<LotForm>(initial);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const priceLocked = Boolean(lot && lot.sold > 0);
+  const others = type.lots.filter(l => l.id !== lot?.id).reduce((t, l) => t + l.quantity, 0);
+  const room = type.quantityTotal - others;
+  const set = <K extends keyof LotForm>(key: K, value: LotForm[K]) => {
+    setForm(f => ({ ...f, [key]: value }));
+    setErrors(e => (e[key] ? { ...e, [key]: '' } : e));
+  };
+  useEffect(() => {
+    formRef.current?.querySelector<HTMLElement>('#lot-name')?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !busy && onCancel();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel, busy]);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    const errs: Record<string, string> = {};
+    const priceCents = centsFromMasked(form.price);
+    if (priceCents < 1) errs.price = 'Informe um valor maior que zero.';
+    else if (priceCents > meta.limits.priceMaxCents) errs.price = `O valor máximo é ${brl(meta.limits.priceMaxCents)}.`;
+    const quantity = Number(form.quantity);
+    if (!/^\d+$/.test(form.quantity.trim()) || quantity < 1)
+      errs.quantity = 'Informe uma quantidade inteira maior que zero.';
+    else if (quantity > room)
+      errs.quantity = `Cabem no máximo ${room} neste lote: a capacidade do tipo é ${type.quantityTotal} e os outros lotes somam ${others}.`;
+    const start = form.startDate ? zonedInputsToIso(form.startDate, form.startTime || '00:00') : null;
+    const end = form.endDate ? zonedInputsToIso(form.endDate, form.endTime || '23:59') : null;
+    if (form.startDate && !start) errs.startDate = 'Data ou horário inválido.';
+    if (form.endDate && !end) errs.endDate = 'Data ou horário inválido.';
+    if (start && end && new Date(end) <= new Date(start)) errs.endDate = 'O fim precisa ser depois do início.';
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      formRef.current?.querySelector<HTMLElement>(`#lot-${Object.keys(errs)[0]}`)?.focus();
+      return;
+    }
+    const body = {
+      ...(form.name.trim() ? { name: form.name.trim() } : {}),
+      priceCents,
+      quantity,
+      salesStartAt: start,
+      salesEndAt: end,
+      leftoverPolicy: form.leftoverPolicy,
+    };
+    setBusy(true);
+    try {
+      if (lot) await api.admin.updateLot(lot.id, priceLocked ? { ...body, priceCents: lot.priceCents } : body);
+      else await api.admin.createLot(type.id, body);
+      toast(lot ? `"${form.name.trim() || lot.name}" foi salvo.` : 'Lote criado.');
+      onSaved();
+    } catch (err) {
+      const fe = fieldErrors(err, LOT_FIELD);
+      if (Object.keys(fe).length) setErrors(fe);
+      else setFormError(errorText(err, 'Não foi possível salvar o lote.'));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="px-modal-bg" onClick={() => !busy && onCancel()}>
+      <form
+        ref={formRef}
+        className="px-modal px-modal-wide"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lot-title"
+        onSubmit={submit}
+        onClick={e => e.stopPropagation()}
+        noValidate
+      >
+        <h2 id="lot-title" className="px-h3">
+          {lot ? `Editar "${lot.name}" de ${type.name}` : `Novo lote de ${type.name}`}
+        </h2>
+        {formError ? (
+          <p className="px-notice px-notice-err" role="alert">
+            {formError}
+          </p>
+        ) : null}
+        <div className="px-form-grid">
+          <FormField id="lot-name" label="Nome (opcional)" error={errors.name}>
+            <input
+              id="lot-name"
+              value={form.name}
+              maxLength={60}
+              placeholder={`${position}º lote`}
+              onChange={e => set('name', e.target.value)}
+              {...described('lot-name', errors.name)}
+            />
+          </FormField>
+          <FormField
+            id="lot-price"
+            label="Valor"
+            error={errors.price}
+            hint={priceLocked ? 'O lote já tem vendas: o preço não muda.' : undefined}
+          >
+            <div className="px-money">
+              <span aria-hidden="true">R$</span>
+              <input
+                id="lot-price"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="0,00"
+                value={form.price}
+                disabled={priceLocked}
+                onChange={e => set('price', e.target.value ? maskedFromCents(centsFromMasked(e.target.value)) : '')}
+                aria-label="Valor em reais"
+                {...described('lot-price', errors.price, priceLocked)}
+              />
+            </div>
+          </FormField>
+          <FormField
+            id="lot-quantity"
+            label="Quantidade"
+            error={errors.quantity}
+            hint={`Cabem até ${room}: capacidade do tipo ${type.quantityTotal}, outros lotes ${others}.`}
+          >
+            <input
+              id="lot-quantity"
+              inputMode="numeric"
+              value={form.quantity}
+              onChange={e => set('quantity', e.target.value.replace(/\D/g, '').slice(0, 6))}
+              {...described('lot-quantity', errors.quantity, true)}
+            />
+          </FormField>
+          <FormField id="lot-startDate" label="Início: data (opcional)" error={errors.startDate}>
+            <input
+              id="lot-startDate"
+              type="date"
+              value={form.startDate}
+              onChange={e => set('startDate', e.target.value)}
+              {...described('lot-startDate', errors.startDate)}
+            />
+          </FormField>
+          <FormField id="lot-startTime" label="Início: horário">
+            <input id="lot-startTime" type="time" value={form.startTime} onChange={e => set('startTime', e.target.value)} />
+          </FormField>
+          <FormField id="lot-endDate" label="Fim: data (opcional)" error={errors.endDate}>
+            <input
+              id="lot-endDate"
+              type="date"
+              value={form.endDate}
+              onChange={e => set('endDate', e.target.value)}
+              {...described('lot-endDate', errors.endDate)}
+            />
+          </FormField>
+          <FormField id="lot-endTime" label="Fim: horário">
+            <input id="lot-endTime" type="time" value={form.endTime} onChange={e => set('endTime', e.target.value)} />
+          </FormField>
+        </div>
+        <fieldset className="px-fieldset">
+          <legend>Na virada automática (esgotou ou chegou ao fim), as unidades que sobrarem</legend>
+          <div className="px-check">
+            <input
+              id="lot-passar"
+              type="radio"
+              name="lot-leftover"
+              checked={form.leftoverPolicy === 'passar'}
+              onChange={() => set('leftoverPolicy', 'passar')}
+            />
+            <label htmlFor="lot-passar">Passam para o próximo lote (padrão)</label>
+          </div>
+          <div className="px-check">
+            <input
+              id="lot-descartar"
+              type="radio"
+              name="lot-leftover"
+              checked={form.leftoverPolicy === 'descartar'}
+              onChange={() => set('leftoverPolicy', 'descartar')}
+            />
+            <label htmlFor="lot-descartar">São descartadas</label>
+          </div>
+        </fieldset>
+        <p className="px-small px-muted">
+          Horários de Brasília. Só um lote fica à venda por vez: o próximo abre quando este esgota, chega ao fim ou é
+          virado à mão. Sem datas, o lote vende até esgotar ou ser virado.
+        </p>
+        <div className="px-actions">
+          <button type="button" className="px-btn" onClick={onCancel} disabled={busy}>
+            Cancelar
+          </button>
+          <button type="submit" className="px-btn px-btn-pri" disabled={busy}>
+            {busy ? 'Salvando…' : lot ? 'Salvar lote' : 'Criar lote'}
           </button>
         </div>
       </form>

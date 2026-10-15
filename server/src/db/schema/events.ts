@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -12,7 +13,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createdAt, instant, updatedAt } from './columns';
-import { eventStatus } from './enums';
+import { eventStatus, lotCloseReason, lotLeftover, lotStatus } from './enums';
 
 /**
  * Eventos. O ciclo é rascunho, publicado e encerrado. Só o evento SEM uso (nenhum pedido, em qualquer situação, e nenhuma leitura de
@@ -92,7 +93,8 @@ export const events = pgTable(
 );
 
 /**
- * Pista, VIP, Camarote e outros. Lotes são tipos com nome e período próprios (sem virada automática).
+ * Pista, VIP, Camarote e outros. Cada tipo vende em lotes (`ticket_lots`, 0013): o preço mora no lote à venda (espelhado aqui) e a
+ * capacidade do tipo é o teto da soma dos lotes.
  * `quantity_sold` só muda dentro de transação com bloqueio de linha (seção 6.2).
  */
 export const ticketTypes = pgTable(
@@ -110,6 +112,8 @@ export const ticketTypes = pgTable(
     salesStartAt: instant('sales_start_at').notNull(),
     salesEndAt: instant('sales_end_at').notNull(),
     isActive: boolean('is_active').notNull().default(true),
+    /** Mostra "Últimas unidades deste lote" na página do evento quando falta pouco no lote à venda (0013). */
+    lastUnitsNotice: boolean('last_units_notice').notNull().default(true),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -123,6 +127,70 @@ export const ticketTypes = pgTable(
     check('ticket_types_sold_in_range', sql`${t.quantitySold} >= 0 and ${t.quantitySold} <= ${t.quantityTotal}`),
     check('ticket_types_sales_window', sql`${t.salesEndAt} > ${t.salesStartAt}`),
     check('ticket_types_name_not_blank', sql`length(btrim(${t.name})) > 0`),
+  ],
+);
+
+/**
+ * Lotes de um tipo de ingresso (0013, 15/10/2026), em ordem (`position`: 1º, 2º...). Cada um com nome, preço, quantidade e, se quiser,
+ * início e fim. Só um fica à venda por vez em cada tipo; a virada é automática (esgotou, com próximo lote, ou passou o fim) ou manual no
+ * painel, e nunca volta atrás. A capacidade do tipo (`ticket_types.quantity_total`) continua sendo o teto, conferida como antes.
+ *
+ * Capacidade do lote = `quantity` + `carried_in` (recebido: sobra de lotes anteriores e reservas vencidas de lote encerrado)
+ * - `passed_out` (passado adiante) - `discarded` (descartado na virada). `quantity_sold` sobe na confirmação do pagamento, como o do
+ * tipo. Mudança de lote só com a linha do tipo trancada (`FOR UPDATE`), a mesma trava da compra e da confirmação.
+ */
+export const ticketLots = pgTable(
+  'ticket_lots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ticketTypeId: uuid('ticket_type_id').notNull(),
+    eventId: uuid('event_id').notNull(),
+    position: smallint('position').notNull(),
+    name: text('name').notNull(),
+    /** Centavos. Preso ao pedido no momento da reserva (`order_item_lots.unit_price_cents`). */
+    priceCents: integer('price_cents').notNull(),
+    quantity: integer('quantity').notNull(),
+    carriedIn: integer('carried_in').notNull().default(0),
+    passedOut: integer('passed_out').notNull().default(0),
+    discarded: integer('discarded').notNull().default(0),
+    quantitySold: integer('quantity_sold').notNull().default(0),
+    salesStartAt: instant('sales_start_at'),
+    salesEndAt: instant('sales_end_at'),
+    leftoverPolicy: lotLeftover('leftover_policy').notNull().default('passar'),
+    status: lotStatus('status').notNull().default('aguardando'),
+    closedAt: instant('closed_at'),
+    closeReason: lotCloseReason('close_reason'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  t => [
+    foreignKey({
+      name: 'ticket_lots_type_fk',
+      columns: [t.ticketTypeId, t.eventId],
+      foreignColumns: [ticketTypes.id, ticketTypes.eventId],
+    }),
+    uniqueIndex('ticket_lots_type_position_key').on(t.ticketTypeId, t.position),
+    // Alvo das chaves compostas que impedem lote de outro tipo no item do pedido e no ingresso.
+    unique('ticket_lots_id_type_key').on(t.id, t.ticketTypeId),
+    uniqueIndex('ticket_lots_one_on_sale')
+      .on(t.ticketTypeId)
+      .where(sql`${t.status} = 'a_venda'`),
+    check('ticket_lots_position_positive', sql`${t.position} > 0`),
+    check('ticket_lots_name_not_blank', sql`length(btrim(${t.name})) > 0`),
+    check('ticket_lots_price_positive', sql`${t.priceCents} > 0`),
+    check('ticket_lots_quantity_positive', sql`${t.quantity} > 0`),
+    check(
+      'ticket_lots_counters',
+      sql`${t.carriedIn} >= 0 and ${t.passedOut} >= 0 and ${t.discarded} >= 0 and ${t.quantitySold} >= 0`,
+    ),
+    check(
+      'ticket_lots_sales_window',
+      sql`${t.salesEndAt} is null or ${t.salesStartAt} is null or ${t.salesEndAt} > ${t.salesStartAt}`,
+    ),
+    check(
+      'ticket_lots_closed_has_time',
+      sql`(${t.status} = 'encerrado') = (${t.closedAt} is not null and ${t.closeReason} is not null)`,
+    ),
   ],
 );
 

@@ -1017,6 +1017,25 @@ body.px-dark .px-event-side .px-fine {
   font-size: var(--px-t-sm);
   color: var(--px-text-3);
 }
+/* Lotes (0013): "2º lote · R$ 140,00"; o nome do lote fica mais leve que o preço. */
+.px-type-lot {
+  font-weight: 700;
+  color: var(--px-text-2);
+}
+/* "Últimas unidades deste lote": o único aviso que pede atenção no card. */
+.px-type-flag {
+  margin: 4px 0 0;
+  font-size: var(--px-t-sm);
+  font-weight: 800;
+  color: var(--px-violet);
+}
+/* Compra que passa do que resta no lote: o restante sai do próximo, com o preço dele. */
+.px-sel-note {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--px-t-xs, 0.75rem);
+  color: var(--px-text-3);
+}
 .px-type-off h3,
 .px-type-off .px-type-price {
   color: var(--px-text-3);
