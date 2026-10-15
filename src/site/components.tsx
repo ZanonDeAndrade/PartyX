@@ -1,10 +1,20 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { accentPalette, stubVars } from './accent';
 import { api, type EventCard, type MaintenanceContact, type SaleKind, type SiteInfo, type TypeState } from './api';
 import { brl, dateParts, eventPath, searchPath, timeOf } from './format';
 import { IconClose, IconMenu, IconSearch } from './icons';
 import { useReveal } from './motion';
-import { Link, useRouter } from './router';
+import { eventLinkProps } from './prefetch';
+import { dateTransitionName, Link, titleTransitionName, useRouter } from './router';
 import { useSession } from './session';
 
 /** Logo branca com fundo transparente (gerada por reference/tools/brand-assets.mjs). Cabeçalho e rodapé são escuros. */
@@ -152,6 +162,11 @@ export function Header() {
                   <Link to="/entrar" className="px-enter">
                     Entrar
                   </Link>
+                ) : session.status === 'loading' ? (
+                  // Lugar do "Entrar" guardado enquanto a sessão é conferida: os ícones não pulam quando ele aparece (CLS).
+                  <span className="px-enter" style={{ visibility: 'hidden' }} aria-hidden="true">
+                    Entrar
+                  </span>
                 ) : null}
                 {user?.role === 'cliente' ? (
                   <Link to="/meus-ingressos" className="px-navlink px-only-desk">
@@ -328,7 +343,8 @@ export function Layout({
   /** Portaria: sem rodapé, para nada competir com a leitura. */
   footer?: boolean;
 }) {
-  useEffect(() => {
+  // Antes da pintura: a página escura nunca aparece um quadro com o fundo claro (e vice-versa).
+  useLayoutEffect(() => {
     document.body.classList.toggle('px-dark', dark);
     return () => document.body.classList.remove('px-dark');
   }, [dark]);
@@ -407,8 +423,9 @@ export function Banner({
   /** Largura em que a imagem aparece, para o navegador escolher a versão (`srcset`). Padrão: a tela toda. */
   sizes?: string;
 }) {
-  // Capa desfocada que fica nítida (0015): a miniatura em data: fica por cima, desfocada, e esmaece quando a capa termina de carregar
-  // (base.css). A capa em si pinta opaca assim que chega, então o LCP não espera o efeito. Capa já em cache: sem efeito.
+  // Capa (0015): a miniatura (já desfocada pelo servidor) fica por cima e esmaece em 700 ms quando a capa termina de carregar; na
+  // página do evento a capa ainda assenta de 1,04 para 1 (base.css). A capa pinta opaca assim que chega, então o LCP não espera o
+  // efeito. Capa já em cache (voltar, vir do cartão pré-carregado): nada disso acontece.
   const [ready, setReady] = useState(false);
   const imgRef = useCallback((img: HTMLImageElement | null) => {
     if (img?.complete && img.naturalWidth > 0) setReady(true);
@@ -438,6 +455,7 @@ export function Banner({
           decoding="async"
         />
       ) : null}
+      {event.bannerUrl ? <span className="px-banner-cover" aria-hidden="true" /> : null}
       {children}
     </div>
   );
@@ -447,12 +465,26 @@ export function Banner({
  * Bloco de data no formato de cartaz: dia grande, mês abaixo, com o canto cortado na diagonal do X do logotipo.
  * O texto completo fica para o leitor de tela (o visual abrevia).
  */
-export function DateStub({ iso, size = 'md', accent }: { iso: string; size?: 'md' | 'lg'; accent?: string | null }) {
+export function DateStub({
+  iso,
+  size = 'md',
+  accent,
+  transitionName,
+}: {
+  iso: string;
+  size?: 'md' | 'lg';
+  accent?: string | null;
+  /** Nome de View Transition: o bloco do cartão vira o da página do evento. */
+  transitionName?: string;
+}) {
   const p = dateParts(iso);
   // Cor de destaque do evento (0014), só no card da vitrine: fundo e texto calculados, por variável CSS.
   const palette = accent ? accentPalette(accent) : null;
   return (
-    <span className={`px-stub px-stub-${size}`} style={palette ? (stubVars(palette) as CSSProperties) : undefined}>
+    <span
+      className={`px-stub px-stub-${size}`}
+      style={{ ...(palette ? (stubVars(palette) as CSSProperties) : null), ...(transitionName ? { viewTransitionName: transitionName } : null) }}
+    >
       <span className="px-stub-day" aria-hidden="true">
         {p.day}
       </span>
@@ -468,18 +500,30 @@ export function DateStub({ iso, size = 'md', accent }: { iso: string; size?: 'md
 
 const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
-/** Cartão da vitrine. Entra quando aparece na tela, só na primeira vez nesta visita (useReveal), em cascata com os vizinhos. */
-export function EventCardView({ event }: { event: EventCard }) {
+/**
+ * Cartão da vitrine. Entra quando aparece na tela, só na primeira vez nesta visita (useReveal), em cascata com os vizinhos. Ao ser
+ * tocado, focado ou sobrevoado, pré-carrega o evento e a capa; no clique, espera até 500 ms essa busca terminar para a página abrir
+ * já com o conteúdo. A capa e o título têm nomes de View Transition: viram a capa e o título da página.
+ */
+export function EventCardView({ event, priority = false }: { event: EventCard; priority?: boolean }) {
+  const { go } = useRouter();
   const open = event.sale.kind === 'open';
   const when = dateParts(event.startsAt);
   const reveal = useReveal(`card:${event.slug}`);
+  const path = eventPath(event.slug);
   return (
     <li className="px-card" ref={reveal.ref} {...reveal.props}>
-      <Link to={eventPath(event.slug)} className="px-card-link" aria-label={`${event.name}, ${event.sale.label}`}>
+      <Link
+        to={path}
+        className="px-card-link"
+        aria-label={`${event.name}, ${event.sale.label}`}
+        {...eventLinkProps(event, () => go(path))}
+      >
         <div className="px-card-media">
           <Banner
             event={event}
             transitionName={bannerTransitionName(event.slug)}
+            eager={priority}
             sizes="(min-width: 1024px) 66vw, (min-width: 640px) 50vw, 100vw"
           >
             {open ? null : (
@@ -488,10 +532,12 @@ export function EventCardView({ event }: { event: EventCard }) {
               </span>
             )}
           </Banner>
-          <DateStub iso={event.startsAt} accent={event.accentColor} />
+          <DateStub iso={event.startsAt} accent={event.accentColor} transitionName={dateTransitionName(event.slug)} />
         </div>
         <div className="px-card-body">
-          <h3 className="px-card-title">{event.name}</h3>
+          <h3 className="px-card-title" style={{ viewTransitionName: titleTransitionName(event.slug) }}>
+            {event.name}
+          </h3>
           <p className="px-card-when">
             {capitalize(when.weekday)}, {timeOf(event.startsAt)}
           </p>
@@ -514,22 +560,67 @@ export function EventCardView({ event }: { event: EventCard }) {
   );
 }
 
-export function CardSkeletons({ n = 3 }: { n?: number }) {
+/**
+ * Esqueleto dos cartões com a mesma estrutura e as mesmas classes do cartão (título, quando, local, rodapé com o botão invisível):
+ * a altura é a do cartão de verdade, então nada pula quando ele chega.
+ */
+export function CardSkeletons({ n = 3, className = 'px-grid' }: { n?: number; className?: string }) {
   return (
-    <ul className="px-grid px-grid-skel" aria-hidden="true">
+    <ul className={`${className} px-grid-skel`} aria-hidden="true">
       {Array.from({ length: n }, (_, i) => (
         <li key={i} className="px-card">
           <div className="px-card-media">
             <div className="px-banner px-skel" />
           </div>
           <div className="px-card-body">
-            <span className="px-skel-line" style={{ width: '80%', height: 26 }} />
-            <span className="px-skel-line" style={{ width: '45%' }} />
-            <span className="px-skel-line" style={{ width: '60%' }} />
+            <h3 className="px-card-title">
+              <span className="px-skel-text" style={{ width: '78%' }} />
+            </h3>
+            <p className="px-card-when">
+              <span className="px-skel-text" style={{ width: '46%' }} />
+            </p>
+            <p className="px-card-venue">
+              <span className="px-skel-text" style={{ width: '62%' }} />
+            </p>
+            <div className="px-card-foot">
+              <p className="px-price">
+                <span className="px-skel-text" style={{ width: 96 }} />
+              </p>
+              <span className="px-cta px-skel-ghost">Comprar</span>
+            </div>
           </div>
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Troca do esqueleto pelo conteúdo sem pulo: quando o conteúdo chega, o mesmo esqueleto (o React reaproveita os elementos, nada é
+ * desenhado de novo) passa a ficar por cima e esmaece (420 ms) enquanto o conteúdo entra por baixo. Se o conteúdo já chegou
+ * (pré-carregado ou no HTML), não há esqueleto nem troca.
+ */
+export function SkeletonSwap({ loading, skeleton, children }: { loading: boolean; skeleton: ReactNode; children: ReactNode }) {
+  const [fading, setFading] = useState(false);
+  const [was, setWas] = useState(loading);
+  if (was !== loading) {
+    setWas(loading);
+    if (was && !loading) setFading(true);
+  }
+  const showSkeleton = loading || fading;
+  return (
+    <div className="px-xfade">
+      {loading ? null : children}
+      {showSkeleton ? (
+        <div
+          className={loading ? undefined : 'px-xfade-out'}
+          aria-hidden={loading ? undefined : true}
+          onAnimationEnd={e => e.target === e.currentTarget && setFading(false)}
+        >
+          {skeleton}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

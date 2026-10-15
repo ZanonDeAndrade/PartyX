@@ -433,6 +433,10 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
       expect(html).not.toContain('content="padrao"'); // as tags padrão foram trocadas, sem duplicar
       expect(html.match(/<title>/g)).toHaveLength(1);
       expect(html).toContain('<div id="root">');
+      // A capa começa a baixar junto com o HTML (15/10/2026), na largura da página.
+      expect(html).toContain(
+        `<link rel="preload" as="image" href="https://banners.exemplo.test/events/${e.id}/${'a'.repeat(32)}.webp" />`,
+      );
     });
 
     it('sem banner: cartão simples, sem og:image', async () => {
@@ -440,6 +444,7 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
       const html = await (await get(`/eventos/${e.slug}`)).text();
       expect(html).toContain('og:title');
       expect(html).not.toContain('og:image');
+      expect(html).not.toContain('rel="preload" as="image"');
       expect(html).toContain('twitter:card" content="summary"');
     });
 

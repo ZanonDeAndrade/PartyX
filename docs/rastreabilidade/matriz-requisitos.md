@@ -130,6 +130,17 @@ Pedido do responsável: padrão único de entrada (desfoque, esmaecer e subida c
 | Painel e portaria (RF-55, RF-47, RF-48) | `e2e/transicoes.spec.ts` (painel só esmaece 180 ms, sem desfoque; portaria sem entradas e destaque de 150 ms) |
 | Acessibilidade (menos movimento) e desempenho (CA-32) | `e2e/transicoes.spec.ts` (nada anima), medição de LCP, CLS e TBT antes e depois no registro, `e2e:responsivo` (597 de 597, sem rolagem lateral) |
 
+### Transições suaves, segunda versão (15/10/2026)
+
+Pedido do responsável: as transições ainda estavam bruscas. Curva `cubic-bezier(0.16, 1, 0.3, 1)`, 720 ms, subida de 8 px, desfoque de 4 px só em texto, cascata com sobreposição (100 ms); capa sem desfoque animado (troca de 700 ms e zoom de 1,04 para 1 em 1200 ms); cartão para evento com elementos compartilhados e pré-carregamento; fundo escuro desde o primeiro quadro; esqueletos do mesmo tamanho com troca cruzada; fontes de reserva com as mesmas medidas; menos movimento com esmaecer simples. Sem migração. Registro: `docs/registros/transicoes-suaves-2026-10-15.md`.
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-23, RF-20 (evento e vitrine: entrada, capa, troca de página, pré-carregamento) | `e2e/transicoes.spec.ts` (12 casos: cascata e curva lidas do navegador, capa por troca e zoom sem filtro, degradê da capa, entrada pelo cartão sem esqueleto e com nomes compartilhados, alternativa de 350 ms, esqueleto do mesmo tamanho e troca cruzada, fundo escuro sem JavaScript, fontes atrasadas sem mudar de tamanho, menos movimento com 250 ms), vídeos antes e depois |
+| RF-26 (HTML da página do evento) | `server/src/api/public.integration.test.ts` (`preload` da capa no HTML, sem capa nenhum) |
+| RF-13 (miniatura de 48 px já desfocada) | `server/src/api/events.integration.test.ts` |
+| CA-32 e desempenho | LCP, CLS e TBT antes e depois e fluidez quadro a quadro no registro; `e2e:responsivo` (597), `e2e:textos` (78), `e2e:cronometro` (7), `e2e:cor` (6), roteiro 11.2 fictício (20) |
+
 ## Painel: promoters, compradores, ingressos, entradas, equipe e conta (11/10/2026, etapa 05 do fechamento)
 
 Interface real em `src/site/adminPeople.tsx` (ADM07 a ADM09, ADM12 a ADM15, ADM19 a ADM21, ADM24), menu lateral com gaveta no celular e exportação com estados e data (ADM23, `ExportLink`). API nova com testes: `GET /admin/buyers`, `GET /admin/buyers/:id`, `POST /admin/buyers/:id/cpf` (CPF completo sob demanda, trilha `usuario.cpf_visualizado`), `GET /admin/tickets/:id` (autor e data do cancelamento), `GET /admin/exports/promoters/:id/orders.csv`. Verificado no navegador (Chromium, 360 px e 1280 px, dados fictícios): sem rolagem horizontal e sem alvo menor que 44 px.

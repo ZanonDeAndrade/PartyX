@@ -14,6 +14,7 @@ import {
   Layout,
   PartyxContact,
   SearchForm,
+  SkeletonSwap,
   usePageTitle,
 } from './components';
 import { stateAnnouncement, type CountdownView } from './eventCountdown';
@@ -21,8 +22,22 @@ import { EventCountdown, readCountdown } from './eventCountdownView';
 import { brl, dateLong, dateParts, searchPath, shareLinks, timeOf } from './format';
 import { IconCheck, IconClose, IconLink, IconShare } from './icons';
 import { cascade, Roll } from './motion';
-import { Link, useRouter } from './router';
+import { eventLinkProps, pendingEvent, prefetchedEvent } from './prefetch';
+import { dateTransitionName, enteringByViewTransition, Link, titleTransitionName, useRouter } from './router';
 import { useFetch } from './useFetch';
+
+/**
+ * Estilo de entrada do destaque na primeira renderização. Com o destaque do HTML do servidor ainda na tela (primeira carga), lê o
+ * esmaecer dele (Web Animations) e continua do mesmo ponto; se ele já terminou, não anima. Vindo por View Transition, não anima.
+ */
+function heroEntrance(): CSSProperties | undefined {
+  const shell = document.querySelector('#root .px-hero-in');
+  if (shell) {
+    const fade = shell.getAnimations()[0];
+    return fade ? { animationDelay: `-${Math.round(Number(fade.currentTime ?? 0))}ms` } : { animation: 'none' };
+  }
+  return enteringByViewTransition() ? { animation: 'none' } : undefined;
+}
 
 export function HomePage() {
   usePageTitle('PartyX · Ingressos');
@@ -33,6 +48,9 @@ export function HomePage() {
   const featured = state.status === 'ok' ? state.data.featured[0] : undefined;
   const list = state.status === 'ok' ? state.data.upcoming.filter(e => e.slug !== featured?.slug) : [];
   const fromCents = featured?.sale.kind === 'open' ? featured.sale.minPriceCents : null;
+  // Texto do destaque: esmaece em 600 ms ao abrir o site (CSS, .px-hero-in). Se o HTML do servidor já está na tela, a versão do React
+  // continua o esmaecer de onde ele parou (atraso negativo), sem recomeçar; vindo de outra página por View Transition, não repete.
+  const [heroStyle] = useState(heroEntrance);
 
   return (
     <Layout dark>
@@ -52,13 +70,15 @@ export function HomePage() {
             eager
             transitionName={bannerTransitionName(featured.slug)}
           />
-          <div className="px-wrap px-hero-in">
+          <div className="px-wrap px-hero-in" style={heroStyle}>
             <p className="px-hero-tag">Em destaque</p>
-            <h2 className="px-hero-title">
-              <Link to={`/eventos/${featured.slug}`}>{featured.name}</Link>
+            <h2 className="px-hero-title" style={{ viewTransitionName: titleTransitionName(featured.slug) }}>
+              <Link to={`/eventos/${featured.slug}`} {...eventLinkProps(featured, () => go(`/eventos/${featured.slug}`))}>
+                {featured.name}
+              </Link>
             </h2>
             <div className="px-hero-meta">
-              <DateStub iso={featured.startsAt} size="lg" />
+              <DateStub iso={featured.startsAt} size="lg" transitionName={dateTransitionName(featured.slug)} />
               <p>
                 <b>
                   {capital(dateParts(featured.startsAt).weekday)}, às {timeOf(featured.startsAt)}
@@ -67,7 +87,11 @@ export function HomePage() {
               </p>
             </div>
             <div className="px-hero-cta">
-              <Link to={`/eventos/${featured.slug}`} className="px-btn px-btn-pri px-btn-lg">
+              <Link
+                to={`/eventos/${featured.slug}`}
+                className="px-btn px-btn-pri px-btn-lg"
+                {...eventLinkProps(featured, () => go(`/eventos/${featured.slug}`))}
+              >
                 {featured.sale.kind === 'open' ? 'Comprar ingressos' : 'Ver evento'}
               </Link>
               {fromCents !== null ? (
@@ -96,7 +120,7 @@ export function HomePage() {
               Ver todos os eventos
             </Link>
           </div>
-          {state.status === 'loading' ? <CardSkeletons /> : null}
+          <SkeletonSwap loading={state.status === 'loading'} skeleton={<CardSkeletons className="px-grid px-grid-editorial" />}>
           {state.status === 'error' ? <ErrorBox onRetry={retry} /> : null}
           {state.status === 'ok' && !featured && list.length === 0 ? (
             <div className="px-box">
@@ -114,6 +138,7 @@ export function HomePage() {
               ))}
             </ul>
           ) : null}
+          </SkeletonSwap>
         </section>
       </div>
     </Layout>
@@ -185,7 +210,7 @@ export function EventsPage() {
         <p className="px-count" role="status" aria-live="polite">
           {count}
         </p>
-        {state.status === 'loading' ? <CardSkeletons /> : null}
+        <SkeletonSwap loading={state.status === 'loading'} skeleton={<CardSkeletons />}>
         {state.status === 'error' ? <ErrorBox onRetry={retry} /> : null}
         {state.status === 'ok' && events.length === 0 ? (
           <div className="px-box">
@@ -204,11 +229,13 @@ export function EventsPage() {
         ) : null}
         {state.status === 'ok' && events.length > 0 ? (
           <ul className="px-grid">
-            {events.map(e => (
-              <EventCardView key={e.slug} event={e} />
+            {events.map((e, i) => (
+              // O primeiro cartão costuma ser o maior conteúdo da tela (LCP): a imagem dele não espera o carregamento preguiçoso.
+              <EventCardView key={e.slug} event={e} priority={i === 0} />
             ))}
           </ul>
         ) : null}
+        </SkeletonSwap>
       </div>
     </Layout>
   );
@@ -462,8 +489,61 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
   );
 }
 
+/** Esqueleto da página do evento com as mesmas peças e classes da página (capa, data, título, cronômetro, Quando, Onde e Classificação). */
+function EventSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Carregando evento">
+      <div className="px-event-hero">
+        <div className="px-banner px-skel px-event-banner" />
+        <div className="px-wrap px-event-head">
+          <span className="px-stub px-stub-lg px-stub-skel" aria-hidden="true">
+            <span className="px-stub-day">00</span>
+            <span className="px-stub-month">out</span>
+          </span>
+          <div className="px-event-heading">
+            <p className="px-event-name">
+              <span className="px-skel-text" style={{ width: '72%' }} />
+            </p>
+          </div>
+        </div>
+        <div className="px-wrap px-countdown-row">
+          <div className="px-countdown" aria-hidden="true">
+            {['Dias', 'Horas', 'Min', 'Seg'].map(l => (
+              <span key={l} className="px-cd-block px-stub-skel">
+                <span className="px-cd-num">00</span>
+                <span className="px-cd-label">{l}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="px-wrap px-event">
+        <div className="px-event-main">
+          <dl className="px-facts">
+            {[60, 70, 40].map(w => (
+              <div key={w}>
+                <dt>
+                  <span className="px-skel-text" style={{ width: 64 }} />
+                </dt>
+                <dd>
+                  <span className="px-skel-text" style={{ width: `${w}%` }} />
+                </dd>
+                <dd className="px-facts-sub">
+                  <span className="px-skel-text" style={{ width: '50%' }} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EventPage({ slug }: { slug: string }) {
-  const [state, retry] = useFetch(s => api.event(slug, s), slug);
+  // Pré-carregado no toque ou mouse sobre o cartão (prefetch.ts): a página nasce com o conteúdo; se a busca ainda está andando,
+  // espera por ela em vez de buscar de novo.
+  const [state, retry] = useFetch(s => pendingEvent(slug) ?? api.event(slug, s), slug, prefetchedEvent(slug));
   usePageTitle(state.status === 'ok' ? `${state.data.name} · PartyX` : 'Evento · PartyX');
 
   if (state.status === 'error' && state.code === 404) return <NotFoundPage />;
@@ -471,24 +551,14 @@ export function EventPage({ slug }: { slug: string }) {
 
   return (
     <Layout dark>
-      {state.status === 'loading' ? (
-        <div aria-busy="true" aria-label="Carregando evento">
-          <div className="px-event-hero">
-            <div className="px-banner px-skel px-event-banner" />
-          </div>
-          <div className="px-wrap px-event-skel">
-            <span className="px-skel-line" style={{ width: '70%', height: 48 }} />
-            <span className="px-skel-line" style={{ width: '40%', height: 18 }} />
-            <span className="px-skel-line" style={{ width: '55%', height: 18 }} />
-          </div>
-        </div>
-      ) : null}
       {state.status === 'error' ? (
         <div className="px-wrap">
           <ErrorBox onRetry={retry} />
         </div>
       ) : null}
-      {event ? <EventView event={event} /> : null}
+      <SkeletonSwap loading={state.status === 'loading'} skeleton={<EventSkeleton />}>
+        {event ? <EventView event={event} /> : null}
+      </SkeletonSwap>
     </Layout>
   );
 }
@@ -499,6 +569,10 @@ export function EventPage({ slug }: { slug: string }) {
  */
 export function EventView({ event, preview = false }: { event: EventDetail; preview?: boolean }) {
   const [share, setShare] = useState(false);
+  // Entrada em cascata só quando a página não vem de uma View Transition (do cartão, a capa e o título já chegam transformados e o
+  // resto da página esmaece junto com a troca).
+  const [entrance] = useState(() => !enteringByViewTransition());
+  const IN = entrance ? ' px-in' : '';
   const [copied, setCopied] = useState(false);
   const sale = event.sale;
   const slug = event.slug;
@@ -550,18 +624,25 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
         </Banner>
         {/* Entrada da página (15/10/2026): data e título primeiro, depois o cronômetro, depois Quando, Onde e Classificação, em
             cascata (--i de 0 a 4); a primeira tela fica completa em 640 ms. A capa fica nítida por conta própria (Banner). */}
-        <div className="px-wrap px-event-head px-in" style={cascade(0)}>
-          <DateStub iso={event.startsAt} size="lg" />
+        {/* Cabeçalho com nome próprio na troca de página: fica por cima da capa que cresce (senão a base escura da capa o cobriria
+            até o fim da troca). Data e título têm nomes compartilhados com o cartão. */}
+        <div
+          className={`px-wrap px-event-head${IN}`}
+          style={{ ...cascade(0), ...(preview ? null : { viewTransitionName: 'px-event-head' }) }}
+        >
+          <DateStub iso={event.startsAt} size="lg" transitionName={preview ? undefined : dateTransitionName(event.slug)} />
           <div className="px-event-heading">
             {countdownKind === 'antes' && event.countdown ? (
               <p className="px-event-kicker">{event.countdown.phrase}</p>
             ) : null}
-            <h1 className="px-event-name">{event.name}</h1>
+            <h1 className="px-event-name" style={preview ? undefined : { viewTransitionName: titleTransitionName(event.slug) }}>
+              {event.name}
+            </h1>
           </div>
         </div>
         {event.countdown ? (
           <>
-            <EventCountdown event={event} onKind={onCountdownKind} />
+            <EventCountdown event={event} onKind={onCountdownKind} entrance={entrance} />
             {/* Só a troca de estado é anunciada (começou, terminou); os segundos nunca. */}
             <p className="px-sr" aria-live="polite" data-countdown-aviso="">
               {countdownSaid}
@@ -573,7 +654,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
         <article className="px-event-main">
           <div className="px-event-title">
             <dl className="px-facts">
-              <div className="px-in" style={cascade(2)}>
+              <div className={IN.trim() || undefined} style={cascade(2)}>
                 <dt>Quando</dt>
                 <dd>{capital(dateLong(event.startsAt))}</dd>
                 <dd className="px-facts-sub">
@@ -581,12 +662,12 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
                   {event.endsAt ? `, fim às ${timeOf(event.endsAt)}` : ''}
                 </dd>
               </div>
-              <div className="px-in" style={cascade(3)}>
+              <div className={IN.trim() || undefined} style={cascade(3)}>
                 <dt>Onde</dt>
                 <dd>{event.venue}</dd>
                 <dd className="px-facts-sub">{event.address}</dd>
               </div>
-              <div className="px-in" style={cascade(4)}>
+              <div className={IN.trim() || undefined} style={cascade(4)}>
                 <dt>Classificação</dt>
                 <dd>{event.ageRating}</dd>
                 <dd className="px-facts-sub">
@@ -597,7 +678,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
               </div>
             </dl>
             {event.allowsMinors && !preview ? (
-              <p className="px-event-minor px-in" style={cascade(4)}>
+              <p className={`px-event-minor${IN}`} style={cascade(4)}>
                 Quem tiver 16 ou 17 anos entrega na portaria o Termo de Autorização e Responsabilidade preenchido e
                 assinado pelo responsável, com a cópia do documento dele, e apresenta o próprio documento com foto. Vale
                 também para acompanhantes.{' '}
@@ -611,7 +692,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
               </p>
             ) : null}
             {preview ? null : (
-              <div className="px-share-row px-in" style={cascade(4)}>
+              <div className={`px-share-row${IN}`} style={cascade(4)}>
                 <button type="button" className="px-btn px-btn-ghost" onClick={shareNow} aria-haspopup="dialog">
                   <IconShare size={18} />
                   Compartilhar
@@ -627,7 +708,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
             </p>
           </div>
           {sale.kind === 'ended' ? (
-            <div className="px-notice px-notice-dark px-in" role="status" style={cascade(4)}>
+            <div className={`px-notice px-notice-dark${IN}`} role="status" style={cascade(4)}>
               <b>Este evento já aconteceu</b>
               <span>As vendas não estão mais disponíveis. Esta página continua acessível para consulta pelo link.</span>
               <Link to="/eventos" className="px-btn px-btn-dark">
@@ -635,14 +716,14 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
               </Link>
             </div>
           ) : null}
-          <section aria-labelledby="sobre" className="px-in" style={cascade(4)}>
+          <section aria-labelledby="sobre" className={IN.trim() || undefined} style={cascade(4)}>
             <h2 id="sobre" className="px-h3">
               Sobre o evento
             </h2>
             <p className="px-desc">{event.description}</p>
           </section>
           {event.attractions.length > 0 ? (
-            <section aria-labelledby="atracoes" className="px-in" style={cascade(4)}>
+            <section aria-labelledby="atracoes" className={IN.trim() || undefined} style={cascade(4)}>
               <h2 id="atracoes" className="px-h3">
                 Atrações
               </h2>
@@ -655,7 +736,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
           ) : null}
         </article>
 
-        <aside className="px-event-side px-in" aria-labelledby="ingressos" style={cascade(2)}>
+        <aside className={`px-event-side${entrance ? ' px-in-block' : ''}`} aria-labelledby="ingressos" style={cascade(2)}>
           <TicketPicker
             event={event}
             notices={

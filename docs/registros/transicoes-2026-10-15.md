@@ -1,5 +1,7 @@
 # Transições suaves no site (15/10/2026)
 
+> Atualização de 15/10/2026: o responsável achou as transições bruscas e pediu parâmetros mais suaves. A segunda versão está em `transicoes-suaves-2026-10-15.md` e substitui os tokens, a capa e a troca de página descritos aqui.
+
 Pedido do responsável (Arthur), nesta data: transições no estilo do vídeo de referência da página do evento (a capa começa desfocada e fica nítida; os elementos entram com desfoque e esmaecer, em cascata, subindo um pouco), com um padrão único de tokens, versão discreta no painel, nada na portaria, menos movimento respeitado, nenhuma animação contínua, nada segurando "Continuar" ou o pagamento, e LCP, CLS e TBT medidos antes e depois no celular, sem piorar. Regras do pedido: testes, capturas, commit local, OK antes da virada.
 
 ## Como ficou

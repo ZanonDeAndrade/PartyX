@@ -3,7 +3,7 @@
  * ficam nos tokens de styles/tokens.css (--px-enter-*, --px-hover-dur, --px-admin-fade, --px-gate-flash); aqui só classes e índices.
  * Regras:
  * - só `opacity`, `transform` e `filter`; nada que desloque o layout;
- * - com "reduzir movimento" do aparelho, nada anima (regra global em src/index.css) e os cartões já nascem visíveis;
+ * - com "reduzir movimento" do aparelho, só esmaecer simples (tokens de tokens.css: 250 ms, sem subir, desfocar nem cascata);
  * - o QR Code do ingresso NUNCA é animado; a portaria nunca espera animação; nenhuma animação segura um clique.
  */
 import {
@@ -64,15 +64,16 @@ function revealObserver(): IntersectionObserver {
 
 /**
  * Entrada de um cartão quando ele aparece na tela (IntersectionObserver), só na primeira vez nesta visita. Antes de aparecer fica
- * transparente (`data-reveal="wait"`); ao aparecer, entra com o padrão do site (`data-reveal="in"`), em cascata com os que apareceram
- * junto; no fim, o atributo sai. Sem IntersectionObserver ou com menos movimento: o cartão já nasce visível.
+ * transparente (`data-reveal="wait"`); ao aparecer, sobe e esmaece (sem desfoque: é um bloco grande) em cascata com os que
+ * apareceram junto; no fim, o atributo sai. Sem IntersectionObserver: já nasce visível.
  */
 export function useReveal(id: string): {
   ref: RefCallback<HTMLElement>;
   props: { 'data-reveal'?: 'wait' | 'in'; style?: CSSProperties; onAnimationEnd?: (e: AnimationEvent) => void };
 } {
+  // Com menos movimento também entra, só esmaecendo (tokens). Sem IntersectionObserver: já nasce visível.
   const [phase, setPhase] = useState<'wait' | 'in' | 'done'>(() =>
-    revealed.has(id) || prefersReducedMotion() || typeof IntersectionObserver === 'undefined' ? 'done' : 'wait',
+    revealed.has(id) || typeof IntersectionObserver === 'undefined' ? 'done' : 'wait',
   );
   const [index, setIndex] = useState(0);
   const node = useRef<HTMLElement | null>(null);

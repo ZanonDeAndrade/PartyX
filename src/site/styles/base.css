@@ -849,6 +849,7 @@ body.px-dark .px-box p {
 /* ---------- carregando ---------- */
 .px-skel,
 .px-skel-line,
+.px-skel-text,
 .px-skel-rows span,
 .px-me-skel span,
 .px-table-skel span {
@@ -857,11 +858,32 @@ body.px-dark .px-box p {
   background: var(--px-line-2);
 }
 body.px-dark .px-skel,
-body.px-dark .px-skel-line {
+body.px-dark .px-skel-line,
+body.px-dark .px-skel-text {
   background: var(--px-ink-2);
+}
+/* Esqueleto dentro do próprio texto (título, data, local): ocupa a altura da linha de verdade, então o esqueleto e o conteúdo têm o
+   mesmo tamanho. O botão invisível guarda a altura do rodapé do cartão. */
+.px-skel-text {
+  display: inline-block;
+  height: 0.8em;
+  max-width: 100%;
+  vertical-align: middle;
+  border-radius: var(--px-r-xs);
+}
+.px-skel-ghost {
+  visibility: hidden;
+}
+/* Bloco da data e do cronômetro no esqueleto: só a forma (mesmo tamanho), sem cor nem número (public.css vem depois, então a
+   especificidade é maior). */
+.px-stub.px-stub-skel,
+.px-cd-block.px-stub-skel {
+  background: var(--px-ink-2);
+  color: transparent;
 }
 .px-skel::after,
 .px-skel-line::after,
+.px-skel-text::after,
 .px-skel-rows span::after,
 .px-me-skel span::after,
 .px-table-skel span::after {
@@ -873,7 +895,8 @@ body.px-dark .px-skel-line {
   animation: pxshimmer 1.6s var(--px-ease-in-out) infinite;
 }
 body.px-dark .px-skel::after,
-body.px-dark .px-skel-line::after {
+body.px-dark .px-skel-line::after,
+body.px-dark .px-skel-text::after {
   background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.06), transparent);
 }
 .px-skel-line {
@@ -1383,14 +1406,21 @@ body.px-dark .px-skel-line::after {
   padding-top: var(--px-s-7);
 }
 
-/* ---------- movimento (15/10/2026): padrão único de entrada, por área ---------- */
-/* Entrada: o item chega desfocado, transparente e 12 px abaixo, e assenta (tokens --px-enter-*). Em cascata, `--i` é a posição
-   (0, 1, 2…) e cada uma espera um passo. O preenchimento é só "backwards": no fim, nada sobra no elemento (sem filter nem transform
-   permanentes, que mudariam a referência de posição de quem é fixo, como a barra de compra do celular). Só opacity, filter e transform. */
+/* ---------- movimento (15/10/2026): padrão único, por área ---------- */
+/* Tokens em tokens.css (--px-enter-*, --px-cover-*, --px-page-*). Texto e blocos pequenos (.px-in): esmaecer, subir até 8 px e
+   desfoque de até 4 px. Blocos grandes e cartões (.px-in-block, cartões da vitrine): só esmaecer e subir. Em cascata, `--i` é a
+   posição e cada uma começa um passo depois da anterior, que ainda está entrando (sobreposição). Preenchimento só "backwards": no
+   fim nada sobra no elemento (filter ou transform permanentes mudariam a referência de posição da barra fixa de compra). */
 @keyframes px-enter {
   from {
     opacity: 0;
     filter: blur(var(--px-enter-blur));
+    transform: translateY(var(--px-enter-rise));
+  }
+}
+@keyframes px-lift {
+  from {
+    opacity: 0;
     transform: translateY(var(--px-enter-rise));
   }
 }
@@ -1399,23 +1429,41 @@ body.px-dark .px-skel-line::after {
     opacity: 0;
   }
 }
+@keyframes px-fade-out {
+  to {
+    opacity: 0;
+  }
+}
 .px-in {
   animation: px-enter var(--px-enter-dur) var(--px-enter-ease) backwards;
   animation-delay: calc(var(--i, 0) * var(--px-enter-step));
 }
-/* Cartão da vitrine: escondido até entrar na tela (IntersectionObserver, só na primeira vez); então entra como os outros. */
+.px-in-block,
+[data-reveal='in'] {
+  animation: px-lift var(--px-enter-dur) var(--px-enter-ease) backwards;
+  animation-delay: calc(var(--i, 0) * var(--px-enter-step));
+}
+/* Cartão da vitrine: transparente até aparecer na tela (IntersectionObserver, só na primeira vez); então entra como os outros. */
 [data-reveal='wait'] {
   opacity: 0;
 }
-[data-reveal='in'] {
-  animation: px-enter var(--px-enter-dur) var(--px-enter-ease) backwards;
-  animation-delay: calc(var(--i, 0) * var(--px-enter-step));
+
+/* Esqueleto que sai (SkeletonSwap, components.tsx): fica por cima do conteúdo e esmaece enquanto o conteúdo entra (troca cruzada). */
+.px-xfade {
+  position: relative;
+}
+.px-xfade-out {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  pointer-events: none;
+  animation: px-fade-out 420ms var(--px-enter-ease) forwards;
 }
 
-/* Número que rola (Roll, motion.tsx): o valor novo desliza 60% na direção da mudança e assenta em 180 ms. */
+/* Número que rola (Roll, motion.tsx): o valor novo desliza 60% na direção da mudança e assenta. */
 .px-roll-in {
   display: inline-block;
-  animation: px-roll-in 180ms var(--px-enter-ease) backwards;
+  animation: px-roll-in 260ms var(--px-enter-ease) backwards;
 }
 @keyframes px-roll-in {
   from {
@@ -1424,32 +1472,41 @@ body.px-dark .px-skel-line::after {
   }
 }
 
-/* Capa desfocada que fica nítida ("blur-up", 0015). A miniatura de 32 px (--px-ph, em data:) fica atrás da capa (::before; é o que
-   aparece no HTML do servidor, sem JavaScript) e, na página montada, também numa camada por cima (::after) enquanto a capa carrega
-   (data-cover, components.tsx). Quando a capa termina de carregar, a camada de cima esmaece em 500 ms e revela a capa nítida, que já
-   estava pintada por baixo: o LCP não espera o efeito. Capa sem miniatura (enviada antes da 0015): a camada é a cor de fundo. */
+/* Capa (0015): troca da miniatura pela capa nítida, sem filtro de desfoque (a miniatura de 48 px já vem desfocada do servidor).
+   - ::before: a miniatura atrás da capa. É o que o HTML do servidor mostra sem JavaScript; a capa nítida cobre quando chega.
+   - .px-banner-cover (components.tsx): a miniatura por cima enquanto a capa carrega (data-cover="loading"). Quando a capa termina,
+     ela esmaece em 700 ms, revelando a capa nítida, que já estava pintada por baixo (o LCP não espera o efeito). Fica abaixo do
+     degradê do ::after da capa. Sem miniatura (capa anterior à 0015): a camada é a cor de fundo.
+   - Na capa da página do evento, a capa nítida assenta de 1,04 para 1 em 1200 ms (propriedade `scale`, separada do `transform` da
+     paralaxe). will-change só enquanto carrega. Capa já em cache (voltar, vir do cartão): nada disso acontece. */
 .px-banner-ph::before {
   content: '';
   position: absolute;
-  inset: -24px;
+  inset: 0;
   background: var(--px-ph) center / cover no-repeat;
-  filter: blur(16px);
 }
-.px-banner[data-cover]::after {
-  content: '';
+.px-banner-cover {
   position: absolute;
-  inset: -24px;
-  z-index: 1;
+  inset: 0;
   background: var(--px-ph, none) center / cover no-repeat var(--px-ink-2);
-  filter: blur(16px);
   pointer-events: none;
-  transition: opacity var(--px-img-dur) var(--px-enter-ease);
+  transition: opacity var(--px-cover-fade) var(--px-enter-ease);
 }
-.px-banner[data-cover='ready']::after {
+.px-banner[data-cover='loading'] .px-banner-cover {
+  will-change: opacity;
+}
+.px-banner[data-cover='ready'] .px-banner-cover {
   opacity: 0;
 }
-/* Selo do cartão e etiqueta de encerrado ficam acima da camada. */
-.px-banner > :not(img) {
+.px-event-banner[data-cover] img {
+  transition: scale var(--px-cover-zoom) var(--px-enter-ease);
+}
+.px-event-banner[data-cover='loading'] img {
+  scale: var(--px-cover-scale);
+  will-change: scale;
+}
+/* Selo do cartão e etiqueta de encerrado acima da camada e do degradê. */
+.px-banner > :not(img):not(.px-banner-cover) {
   z-index: 2;
 }
 
@@ -1463,8 +1520,8 @@ body.px-dark .px-skel-line::after {
   }
 }
 
-/* Troca de página (View Transitions, router.tsx): a página antiga some rápido e a nova aparece; a nova traz a própria entrada.
-   Durante a troca os cliques passam para a página nova: nenhuma transição segura um clique. */
+/* Troca de página (View Transitions, router.tsx; durações em public.css). Durante a troca os cliques passam para a página nova:
+   nenhuma transição segura um clique. */
 ::view-transition {
   pointer-events: none;
 }
@@ -1474,6 +1531,7 @@ html[data-area='admin'] #conteudo {
   animation: px-fade-in var(--px-admin-fade) linear backwards;
 }
 html[data-area='admin'] .px-in,
+html[data-area='admin'] .px-in-block,
 html[data-area='admin'] [data-reveal='in'] {
   animation: px-fade-in var(--px-admin-fade) linear backwards;
 }
@@ -1485,6 +1543,7 @@ html[data-area='admin'] .px-toast {
 
 /* Portaria: nada entra animado; o resultado da leitura aparece na hora (o destaque de cor de 150 ms fica em gate.css). */
 html[data-area='portaria'] .px-in,
+html[data-area='portaria'] .px-in-block,
 html[data-area='portaria'] [data-reveal],
 html[data-area='portaria'] .px-modal,
 html[data-area='portaria'] .px-modal-bg,
@@ -1495,18 +1554,25 @@ html[data-area='portaria'] .px-toast {
   opacity: 1;
 }
 
-/* Menos movimento: a regra global de src/index.css desliga animações e transições dos elementos; ela não alcança pseudoelementos,
-   então o brilho do esqueleto e a camada da capa param aqui (a capa nítida aparece direto). */
+/* Menos movimento: só esmaecer simples (tokens: 250 ms, sem subir, desfocar, crescer nem cascata). A regra global de src/index.css
+   vale só fora do site (protótipo). Aqui param o que se move de lugar: brilho do esqueleto, indicador girando (vira um pulso de
+   opacidade), número que rola, toque que afunda. */
 @media (prefers-reduced-motion: reduce) {
   .px-skel::after,
   .px-skel-line::after,
+  .px-skel-text::after,
   .px-skel-rows span::after,
   .px-me-skel span::after,
   .px-table-skel span::after {
     animation: none;
   }
-  .px-banner[data-cover]::after {
-    transition: none;
+  .px-spinner {
+    animation: pxpulse 1.6s var(--px-ease-in-out) infinite;
+  }
+  .px-roll-in {
+    animation: none;
+  }
+  .px-btn:active:not(:disabled) {
+    transform: none;
   }
 }
-

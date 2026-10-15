@@ -30,7 +30,16 @@ const UNITS = [
  * Os números não são anunciados: ficam num `role="timer"`, que não fala as mudanças; o texto por extenso vai até os minutos.
  * Na troca, só o número que mudou desce um pouco e assenta (260 ms, `.px-cd-tick`); com menos movimento, troca direto.
  */
-export function EventCountdown({ event, onKind }: { event: EventDetail; onKind: (kind: CountdownView['kind']) => void }) {
+export function EventCountdown({
+  event,
+  onKind,
+  entrance = true,
+}: {
+  event: EventDetail;
+  onKind: (kind: CountdownView['kind']) => void;
+  /** Entra em cascata com a página (posição 1); falso quando a página veio de uma View Transition. */
+  entrance?: boolean;
+}) {
   const [view, setView] = useState<CountdownView>(() => readCountdown(event));
   const kind = useRef(view.kind);
   const report = useRef(onKind);
@@ -64,7 +73,7 @@ export function EventCountdown({ event, onKind }: { event: EventDetail; onKind: 
   if (view.kind === 'oculto') return null;
   if (view.kind === 'agora')
     return (
-      <div className="px-wrap px-countdown-row px-in" data-countdown="agora" style={cascade(1)}>
+      <div className={`px-wrap px-countdown-row${entrance ? ' px-in' : ''}`} data-countdown="agora" style={cascade(1)}>
         <p className="px-live">
           <span className="px-live-dot" aria-hidden="true" />
           Acontecendo agora
@@ -72,7 +81,7 @@ export function EventCountdown({ event, onKind }: { event: EventDetail; onKind: 
       </div>
     );
   return (
-    <div className="px-wrap px-countdown-row px-in" data-countdown="antes" style={cascade(1)}>
+    <div className={`px-wrap px-countdown-row${entrance ? ' px-in' : ''}`} data-countdown="antes" style={cascade(1)}>
       <div
         className="px-countdown"
         role="timer"

@@ -72,10 +72,13 @@ function Routes() {
   }, []);
   // Termos ou Privacidade atualizados: o comprador aceita as versões novas antes de continuar (no login ou no checkout).
   const where = area(loc.path);
-  // Área no <html> (antes da pintura): o movimento muda por área (base.css). Painel só esmaece; portaria não anima entradas.
+  // Área no <html> (antes da pintura): o movimento muda por área (base.css). Painel só esmaece; portaria não anima entradas. A marca
+  // da vitrine (fundo preto desde o primeiro quadro, posta por public/intro/gate.js) acompanha a página: sai nas páginas claras.
+  const vitrine = loc.path === '/' || loc.path === '/eventos' || /^\/eventos\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(loc.path);
   useLayoutEffect(() => {
     document.documentElement.dataset.area = where ?? 'site';
-  }, [where]);
+    document.documentElement.toggleAttribute('data-px-vitrine', vitrine);
+  }, [where, vitrine]);
   if (session.status === 'user' && session.pendingConsent && !LEGAL_PATHS.has(loc.path)) return <ConsentUpdatePage />;
   if (where === 'checkout')
     return (

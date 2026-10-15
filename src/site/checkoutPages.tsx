@@ -204,7 +204,7 @@ function WalletItem({ index, children }: { index: number; children: ReactNode })
 /** Troca de etapa dentro do pedido (forma de pagamento, Pix, resultado): o conteúdo novo entra com o padrão do site. */
 function Stage({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <div key={id} className="px-ck-stage px-in">
+    <div key={id} className="px-ck-stage px-in-block">
       {children}
     </div>
   );
@@ -673,7 +673,7 @@ function PixBox({ pix, total }: { pix: NonNullable<PaymentView['pix']>; total: n
         </div>
         <div className="px-pix-qr-box">
           {qr ? (
-            <img className="px-in" src={qr} alt="QR Code do Pix de pagamento" width={204} height={204} />
+            <img className="px-in-block" src={qr} alt="QR Code do Pix de pagamento" width={204} height={204} />
           ) : (
             <span className="px-skel px-pix-qr-skel" aria-busy="true" aria-label="Gerando QR Code" />
           )}

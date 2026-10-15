@@ -407,6 +407,10 @@ body.px-dark .px-footer {
 .px-hero-in {
   padding-top: var(--px-s-11);
   padding-bottom: var(--px-s-7);
+  /* Ao abrir o site, o texto do destaque esmaece em 600 ms (a imagem não: ela aparece pela miniatura e pela capa, e esmaecê-la atrasaria
+     o LCP). Só CSS: vale também para o HTML do servidor, sem esperar o JavaScript (se ele atrasar, o destaque aparece normal); a versão
+     do React continua de onde o HTML parou (pages.tsx). */
+  animation: px-fade-in var(--px-home-fade) var(--px-enter-ease) backwards;
 }
 .px-hero-tag {
   display: inline-block;
@@ -674,8 +678,8 @@ body.px-dark .px-textlink {
   background: var(--px-violet);
   border-color: var(--px-violet);
 }
-@media (hover: hover) {
-  /* Cartão: a imagem sobe 3 px e cresce até 1,02 dentro do corte, em 150 ms. */
+/* Cartão: a imagem sobe 3 px e cresce até 1,02 dentro do corte, em 150 ms (sem pedido de menos movimento). */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .px-card-link:hover .px-card-media {
     transform: translateY(-3px);
   }
@@ -683,6 +687,8 @@ body.px-dark .px-textlink {
     transform: scale(1.02);
     transition-duration: var(--px-hover-dur);
   }
+}
+@media (hover: hover) {
   .px-card-link:hover .px-card-title {
     color: var(--px-lilac);
   }
@@ -693,15 +699,14 @@ body.px-dark .px-textlink {
     border-color: var(--px-on-ink-2);
   }
 }
-.px-card-link:active .px-card-media {
-  transform: scale(0.985);
-  transition: transform var(--px-dur-1) var(--px-ease-out);
+@media (prefers-reduced-motion: no-preference) {
+  .px-card-link:active .px-card-media {
+    transform: scale(0.985);
+    transition: transform var(--px-dur-1) var(--px-ease-out);
+  }
 }
 .px-card-link:focus-visible {
   outline-offset: 6px;
-}
-.px-grid-skel .px-skel-line {
-  margin-bottom: 8px;
 }
 
 /* ---------- página do evento (P03, C01) ---------- */
@@ -832,17 +837,17 @@ body.px-dark .px-textlink {
     animation: pxlive 1.6s ease-in-out 3;
   }
 }
-/* Troca de número do cronômetro (15/10/2026): só o bloco que mudou recebe um número novo, que desce um pouco e assenta em 260 ms,
+/* Troca de número do cronômetro (15/10/2026): só o bloco que mudou recebe um número novo, que desce um pouco e assenta em 380 ms,
    já visível desde o começo (sem piscar). O corte diagonal do bloco recorta o que passa da borda. Com menos movimento: troca direto. */
 .px-cd-tick {
   display: block; /* bloco, não inline-block: a altura da linha fica igual à do número sem animação */
   white-space: nowrap; /* "03" nunca quebra em duas linhas, nem no instante da troca de fonte (regra geral de quebra do site) */
-  animation: px-cd-tick 260ms var(--px-enter-ease) backwards;
+  animation: px-cd-tick 380ms var(--px-enter-ease) backwards;
 }
 @keyframes px-cd-tick {
   from {
-    opacity: 0.3;
-    transform: translateY(-34%);
+    opacity: 0.35;
+    transform: translateY(-26%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1479,21 +1484,17 @@ body.px-dark .px-event-side .px-fine {
 }
 
 /* ---------- transições de página (View Transitions) ---------- */
-/* A antiga some em 160 ms; a nova aparece em 260 ms e traz a própria entrada (cascata). A capa do cartão vira a capa da página em
-   360 ms. Tudo termina antes de 400 ms, e os cliques já passam para a página nova durante a troca (base.css). */
+/* Troca cruzada de 450 ms entre a página antiga e a nova. Do cartão para o evento, a imagem do cartão cresce e vira a capa e o título
+   acompanha (elementos compartilhados, 600 ms); a página nova não repete a própria entrada (pages.tsx). Cabeçalho parado. Os cliques
+   passam para a página nova durante a troca (base.css). */
 ::view-transition-old(root) {
-  animation: px-vt-out 160ms var(--px-ease-in) both;
+  animation: px-fade-out var(--px-page-fade) var(--px-enter-ease) both;
 }
 ::view-transition-new(root) {
-  animation: px-fade-in 260ms var(--px-enter-ease) both;
-}
-@keyframes px-vt-out {
-  to {
-    opacity: 0;
-  }
+  animation: px-fade-in var(--px-page-fade) var(--px-enter-ease) both;
 }
 ::view-transition-group(*) {
-  animation-duration: 360ms;
+  animation-duration: 600ms;
   animation-timing-function: var(--px-enter-ease);
 }
 ::view-transition-group(px-header) {
@@ -1601,7 +1602,7 @@ html[data-px-intro] .px-intro-static {
 /* No celular o quadro de ingressos fica abaixo da dobra e guarda a barra fixa de compra: não anima, para a barra (e o "Continuar")
    estar na tela desde o primeiro quadro, sem esmaecer nem mudar de referência de posição. No computador entra como os outros. */
 @media (max-width: 959px) {
-  .px-event-side.px-in {
+  .px-event-side.px-in-block {
     animation: none;
   }
 }

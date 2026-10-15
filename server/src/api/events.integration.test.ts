@@ -619,11 +619,11 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
         expect((await sharp(variant.data).metadata()).width).toBe(w);
       }
       expect(body.event.bannerWidths).toEqual([640, 1080, 1600]);
-      // Miniatura da capa (0015): WebP em data:, pequena, gravada no evento e não no armazenamento.
+      // Miniatura da capa (0015): WebP de 48 px (já desfocada) em data:, pequena, gravada no evento e não no armazenamento.
       expect(body.event.bannerPlaceholder).toMatch(/^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/);
       expect(body.event.bannerPlaceholder.length).toBeLessThanOrEqual(1500);
       const tiny = await sharp(Buffer.from(body.event.bannerPlaceholder.split(',')[1], 'base64')).metadata();
-      expect([tiny.format, tiny.width]).toEqual(['webp', 32]);
+      expect([tiny.format, tiny.width]).toEqual(['webp', 48]);
     });
 
     it('imagem menor que 1080 px não é ampliada: só a versão de 640 px', async () => {

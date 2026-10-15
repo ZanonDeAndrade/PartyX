@@ -126,16 +126,19 @@ lugares sem as fontes da marca, de propósito (compatibilidade e impressão).
 
 ## Movimento
 
-Padrão único desde 15/10/2026 (`docs/registros/transicoes-2026-10-15.md`), em CSS e Web Animations API, sem biblioteca:
-`src/site/motion.tsx` só põe classes e índices.
+Padrão único desde 15/10/2026 (`docs/registros/transicoes-2026-10-15.md` e a segunda versão, mais suave,
+`docs/registros/transicoes-suaves-2026-10-15.md`), em CSS e Web Animations API, sem biblioteca: `src/site/motion.tsx` só põe classes
+e índices.
 
 | Token | Valor | Uso |
 | --- | --- | --- |
-| `--px-enter-dur` | 400 ms | Entrada padrão (classe `.px-in`, keyframes `px-enter`) |
-| `--px-enter-ease` | `cubic-bezier(0.22, 1, 0.36, 1)` | Curva da entrada (igual a `--px-ease-out`) |
-| `--px-enter-step` | 60 ms | Intervalo da cascata (`--i` é a posição) |
-| `--px-enter-blur`, `--px-enter-rise` | 8 px, 12 px | Ponto de partida: desfocado, 12 px abaixo e transparente |
-| `--px-img-dur` | 500 ms | Capa nítida revelada sob a miniatura desfocada |
+| `--px-enter-dur` | 720 ms | Entrada de texto e cartões (`.px-in`, `.px-in-block`, cartões da vitrine) |
+| `--px-enter-ease` | `cubic-bezier(0.16, 1, 0.3, 1)` | Saída longa e macia |
+| `--px-enter-step` | 100 ms | Intervalo da cascata (`--i`): o seguinte começa com o anterior ainda entrando |
+| `--px-enter-blur`, `--px-enter-rise` | 4 px, 8 px | Ponto de partida; desfoque só em texto e blocos pequenos (`.px-in`) |
+| `--px-cover-fade`, `--px-cover-zoom`, `--px-cover-scale` | 700 ms, 1200 ms, 1,04 | Capa: troca da miniatura pela nítida e zoom de 1,04 para 1, sem desfoque |
+| `--px-page-fade`, `--px-page-fade-alt` | 450 ms, 350 ms | Troca de página com e sem View Transitions |
+| `--px-home-fade` | 600 ms | Texto do destaque ao abrir o site |
 | `--px-hover-dur` | 150 ms | Passar o mouse e tocar em botões e cartões |
 | `--px-admin-fade` | 180 ms | Painel: só esmaecer |
 | `--px-gate-flash` | 150 ms | Portaria: destaque do resultado |
@@ -143,26 +146,28 @@ Padrão único desde 15/10/2026 (`docs/registros/transicoes-2026-10-15.md`), em 
 
 | Onde | O que se move | Por quê |
 | --- | --- | --- |
-| Evento | Capa desfocada (miniatura de 32 px embutida) que fica nítida; data e título, cronômetro e Quando, Onde e Classificação entram em cascata; a primeira tela fica completa em 640 ms | O momento de abertura da página, um só |
-| Cronômetro | Só o número que muda desce um pouco e assenta (260 ms), já visível | Mostra a passagem sem piscar |
-| Vitrine | Cartões entram em cascata quando aparecem na tela (IntersectionObserver), só na primeira vez | Mostrar que a lista chegou, uma vez |
-| Cartão para evento | Banner compartilhado (View Transitions, 360 ms); a página antiga some em 160 ms | O evento escolhido "vira" a página; sem suporte, a página nova esmaece em 200 ms (Web Animations) |
+| Abrir o site | Fundo preto desde o primeiro quadro na vitrine (`public/intro/gate.js`); texto do destaque esmaece 600 ms só por CSS (o React continua do mesmo ponto); cartões em cascata | Nada pisca e nada espera o JavaScript |
+| Evento | Capa: miniatura de 48 px (já desfocada no servidor) troca pela nítida em 700 ms e a capa assenta de 1,04 para 1 em 1200 ms; data e título, cronômetro e Quando, Onde e Classificação entram em cascata com sobreposição (1120 ms no total) | O momento de abertura da página, um só |
+| Cartão para evento | Pré-carrega no toque, foco ou mouse; View Transition: capa, título e data compartilhados (600 ms), cabeçalho do evento por cima da capa, o resto em troca cruzada de 450 ms; a página não repete a cascata. Sem suporte: esmaecer de 350 ms | O evento escolhido "vira" a página, já com o conteúdo |
+| Esqueletos | Mesmas classes e medidas do conteúdo; quando o conteúdo chega, o esqueleto esmaece por cima (420 ms) | Sem pulo nem piscada |
+| Cronômetro | Só o número que muda desce um pouco e assenta (380 ms), já visível | Mostra a passagem sem piscar |
 | Botões e cartões | Botão sobe 1 px; cartão sobe 3 px e a imagem cresce até 1,02 (150 ms); o toque afunda um pouco | Resposta ao gesto, só no site e na compra |
 | Evento (computador) | Paralaxe leve do banner guiada pela rolagem (CSS, a partir de 768 px) | Profundidade sem JavaScript |
-| Quantidade e total | Número rola na direção da mudança (180 ms) | Confirma o toque |
-| Compra | Etapa nova, QR do Pix e ingressos da confirmação entram com o padrão | Sentido de avanço; nada segura um clique |
+| Quantidade e total | Número rola na direção da mudança (260 ms) | Confirma o toque |
+| Compra | Etapa nova e QR do Pix sobem e esmaecem (sem desfoque); ingressos da confirmação com o padrão | Sentido de avanço; nada segura um clique |
 | Carteira | Ingressos extras entram ao abrir a pilha | Mostra o que foi aberto |
 | Tela cheia | A folha branca sobe; o QR só é desenhado depois que ela para | O QR nunca é animado |
 | Painel | Só esmaece (180 ms) ao trocar de página, inclusive a pré-visualização do evento; indicadores mostram o valor direto | Ferramenta de trabalho: parecer rápido |
 | Portaria | Nenhuma entrada animada; destaque de 150 ms por baixo do resultado | Resultado imediato |
 
-Regras: só `opacity`, `transform` e `filter`; nada de layout animado. As entradas usam preenchimento "backwards": no fim nada sobra
-no elemento (filtro ou transformação permanentes mudariam a referência de posição da barra fixa de compra). No celular o quadro de
-ingressos não anima, para a barra de compra estar na tela desde o primeiro quadro. Durante uma View Transition os cliques passam
-para a página nova. Nada anima continuamente em segundo plano (o ponto de "Acontecendo agora" pulsa três vezes e para; esqueleto e
-indicador de carregamento só enquanto carrega). Com "reduzir movimento" do aparelho, nada anima (regra global de `src/index.css`,
-mais os pseudoelementos em `base.css`), as View Transitions e a rolagem suave não acontecem e a abertura em vídeo não toca. O QR do
-ingresso nunca recebe animação, filtro, transparência ou recorte: as páginas de ingresso ficam fora das View Transitions.
+Regras: animações grandes só com `opacity` e `transform` (capa: `scale`); desfoque só em texto e blocos pequenos; `will-change` só
+enquanto a capa carrega. As entradas usam preenchimento "backwards": no fim nada sobra no elemento. No celular o quadro de ingressos
+não anima, para a barra de compra estar na tela desde o primeiro quadro. Durante uma View Transition os cliques passam para a página
+nova. Nada anima continuamente em segundo plano. Fontes de reserva (`fonts.css`) com as medidas da Archivo e da Big Shoulders: nada
+muda de tamanho quando a fonte chega. Com "reduzir movimento" do aparelho: só esmaecer simples de 250 ms (sem subir, desfocar,
+crescer, cascata nem View Transition), o que se move de lugar para (esqueleto, indicador girando, número que rola) e a abertura em
+vídeo não toca. O QR do ingresso nunca recebe animação, filtro, transparência ou recorte: as páginas de ingresso ficam fora das View
+Transitions.
 
 ## Componentes
 

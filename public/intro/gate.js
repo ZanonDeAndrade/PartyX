@@ -8,6 +8,8 @@
 (function () {
   var path = location.pathname.replace(/\/+$/, '') || '/';
   var vitrine = path === '/' || path === '/eventos' || /^\/eventos\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path);
+  // Vitrine (escura): fundo preto desde o primeiro quadro, mesmo antes do CSS do React e do JavaScript (src/index.css).
+  if (vitrine) document.documentElement.setAttribute('data-px-vitrine', '');
   var seen = true;
   try {
     seen = sessionStorage.getItem('partyx_intro_seen') === '1';

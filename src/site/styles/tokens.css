@@ -56,9 +56,9 @@
   --px-info-fg: var(--px-violet-ink);
 
   /* ---- tipo ---- */
-  --px-font-display: 'Big Shoulders Display Variable', 'Archivo Narrow', 'Arial Narrow', sans-serif;
+  --px-font-display: 'Big Shoulders Display Variable', 'Big Shoulders Fallback', 'Archivo Narrow', 'Arial Narrow', sans-serif;
   --px-font-stencil: 'Big Shoulders Stencil Display', var(--px-font-display);
-  --px-font-ui: 'Archivo Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --px-font-ui: 'Archivo Variable', 'Archivo Fallback', 'Archivo Fallback Android', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --px-font-code: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
   /* Interface: terça maior (1,25) a partir de 16 px. */
@@ -131,16 +131,21 @@
   --px-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --px-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
 
-  /* ---- entrada (15/10/2026): padrão único do site, classe .px-in e keyframes px-enter (base.css); motion.tsx só põe índices ---- */
-  /* Desfoque e opacidade somem enquanto o item sobe um pouco. Só opacity, transform e filter: nada mexe no layout. Em cascata, cada
-     item espera um passo; a página do evento usa até o índice 4, então a primeira tela está completa em 4 x 60 + 400 = 640 ms
-     (folga para o primeiro quadro dentro dos 700 ms pedidos). */
-  --px-enter-dur: 400ms;
-  --px-enter-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --px-enter-step: 60ms;
-  --px-enter-blur: 8px;
-  --px-enter-rise: 12px;
-  --px-img-dur: 500ms; /* capa nítida sobre a miniatura desfocada */
+  /* ---- movimento suave (15/10/2026, segunda versão): tokens únicos; classes em base.css, motion.tsx só põe índices ---- */
+  /* Saída longa e macia. Texto e blocos pequenos (.px-in): esmaecer, subir no máximo 8 px e desfoque de no máximo 4 px. Blocos grandes
+     e cartões (.px-in-block, cartões da vitrine): só esmaecer e subir, sem desfoque. Cascata com sobreposição: cada item começa
+     100 ms depois do anterior, que ainda está entrando (720 ms). Capa: troca da miniatura pela nítida e zoom leve, sem desfoque. */
+  --px-enter-dur: 720ms;
+  --px-enter-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --px-enter-step: 100ms;
+  --px-enter-blur: 4px;
+  --px-enter-rise: 8px;
+  --px-cover-fade: 700ms; /* miniatura para a capa nítida */
+  --px-cover-zoom: 1200ms; /* capa de 1,04 para 1 */
+  --px-cover-scale: 1.04;
+  --px-page-fade: 450ms; /* troca de página: o resto da página esmaece */
+  --px-page-fade-alt: 350ms; /* sem View Transitions */
+  --px-home-fade: 600ms; /* vitrine ao abrir o site */
   --px-hover-dur: 150ms; /* passar o mouse e tocar em botões e cartões */
   --px-admin-fade: 180ms; /* painel: só esmaecer, rápido */
   --px-gate-flash: 150ms; /* portaria: no máximo um destaque de cor */
@@ -157,7 +162,7 @@
   }
 }
 
-/* Menos movimento: tudo vira troca instantânea (ou quase), em todo o site. */
+/* Menos movimento: só esmaecer simples. Nada sobe, desfoca, cresce ou entra em cascata; componentes (janelas, avisos) trocam na hora. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --px-dur-1: 0ms;
@@ -165,6 +170,15 @@
     --px-dur-3: 0ms;
     --px-dur-4: 0ms;
     --px-dur-5: 0ms;
-    /* Entradas, troca de número, capa e cartões: nada anima (regra global de src/index.css). */
+    --px-enter-dur: 250ms;
+    --px-enter-step: 0ms;
+    --px-enter-blur: 0px;
+    --px-enter-rise: 0px;
+    --px-cover-fade: 250ms;
+    --px-cover-zoom: 0ms;
+    --px-cover-scale: 1;
+    --px-page-fade: 250ms;
+    --px-page-fade-alt: 250ms;
+    --px-home-fade: 250ms;
   }
 }

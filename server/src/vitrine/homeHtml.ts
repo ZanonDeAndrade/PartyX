@@ -1,5 +1,5 @@
 import { formatInEventZone } from '../domain/time';
-import { escapeHtml } from './og';
+import { bannerPreload, escapeHtml } from './og';
 import type { PublicEventCard } from './service';
 
 export interface HomeData {
@@ -29,14 +29,8 @@ export function safeJson(value: unknown): string {
 export function injectHome(template: string, data: HomeData): string {
   const tags: string[] = [];
   const featured = data.featured[0];
-  if (featured?.bannerUrl && /^https?:\/\//i.test(featured.bannerUrl)) {
-    const srcset = featured.bannerSrcSet
-      ? ` imagesrcset="${escapeHtml(featured.bannerSrcSet)}" imagesizes="100vw"`
-      : '';
-    tags.push(
-      `<link rel="preload" as="image" href="${escapeHtml(featured.bannerUrl)}"${srcset} fetchpriority="high" />`,
-    );
-  }
+  const preload = featured ? bannerPreload(featured) : null;
+  if (preload) tags.push(preload);
   tags.push(`<script id="${HOME_DATA_ID}" type="application/json">${safeJson(data)}</script>`);
   const head = template.replace('</head>', () => `    ${tags.join('\n    ')}\n  </head>`);
   if (!featured) return head;

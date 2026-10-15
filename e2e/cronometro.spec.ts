@@ -173,7 +173,7 @@ test('para com a aba escondida e volta na hora certa ao reaparecer', async ({ br
   expect(Math.abs((await shownSeconds(page)) - (await remainingByDb('cronometro-aba')))).toBeLessThanOrEqual(2);
 });
 
-test('movimento: só o número que muda desce e assenta (260 ms); com menos movimento, troca direto; o ponto pulsa três vezes e para', async ({
+test('movimento: só o número que muda desce e assenta (380 ms); com menos movimento, troca direto; o ponto pulsa três vezes e para', async ({
   browser,
 }) => {
   await event('cronometro-movimento', { startsIn: '-30 minutes', endsIn: '2 hours' });
@@ -190,7 +190,7 @@ test('movimento: só o número que muda desce e assenta (260 ms); com menos movi
   const tick = (unit: string) => numbers.locator(`.px-cd-block[data-unit="${unit}"] .px-cd-tick`);
   expect(await tick('seconds').evaluate(el => [getComputedStyle(el).animationName, getComputedStyle(el).animationDuration])).toEqual([
     'px-cd-tick',
-    '0.26s',
+    '0.38s',
   ]);
   // Na troca de segundo, o número dos segundos é um elemento novo (entra animado) e o dos minutos continua o mesmo (parado).
   await numbers.evaluate(() => {

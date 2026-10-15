@@ -16,9 +16,12 @@ body {
   height: 100%;
 }
 
-/* Abertura em vídeo (public/intro/gate.js): o fundo já nasce preto, sem piscar claro antes do JavaScript carregar. */
+/* Abertura em vídeo e vitrine (public/intro/gate.js marca antes da primeira pintura): o fundo já nasce preto, sem piscar claro
+   antes do JavaScript carregar. A marca da vitrine sai quando o site vai para uma página clara (SiteApp.tsx). */
 html[data-px-intro],
-html[data-px-intro] body {
+html[data-px-intro] body,
+html[data-px-vitrine],
+html[data-px-vitrine] body {
   background: #0b0b10;
 }
 
@@ -77,8 +80,10 @@ textarea {
   }
 }
 
+/* Menos movimento no protótipo: nada anima. O site (body.px-site) tem a própria regra, só com esmaecer simples (styles/base.css). */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  body:not(.px-site),
+  body:not(.px-site) * {
     animation: none !important;
     transition: none !important;
   }

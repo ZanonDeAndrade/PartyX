@@ -101,19 +101,21 @@ export async function processBanner(input: Buffer): Promise<ProcessedBanner> {
 export const PLACEHOLDER_MAX_CHARS = 1500;
 
 /**
- * Miniatura da capa para o efeito "blur-up" (0015): 32 px de largura em WebP, embutida no HTML e no JSON como `data:` (cerca de
- * 200 a 600 caracteres), então aparece sem nenhum pedido a mais. A página a mostra desfocada e troca pela capa nítida quando ela
- * chega. Se passar do limite (imagem muito detalhada), cai para 16 px.
+ * Miniatura da capa (0015): 48 px de largura em WebP, **já desfocada aqui** (sigma 1,2), embutida no HTML e no JSON como `data:`
+ * (cerca de 150 a 400 caracteres), então aparece sem nenhum pedido a mais. Ampliada pelo navegador, fica lisa sem filtro de
+ * desfoque na página (filtro animado em imagem grande trava no celular); a página troca pela capa nítida com um esmaecer.
+ * Se passar do limite (imagem muito detalhada), cai para 32 e 24 px.
  */
 export async function bannerPlaceholder(image: Buffer): Promise<string> {
-  for (const [width, quality] of [
-    [32, 40],
-    [24, 30],
-    [16, 30],
+  for (const [width, sigma, quality] of [
+    [48, 1.2, 50],
+    [32, 1, 40],
+    [24, 0.8, 30],
   ] as const) {
     const webp = await sharp(image, { limitInputPixels: MAX_INPUT_PIXELS })
       .rotate()
       .resize({ width })
+      .blur(sigma)
       .webp({ quality })
       .toBuffer();
     const uri = `data:image/webp;base64,${webp.toString('base64')}`;

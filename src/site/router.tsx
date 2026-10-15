@@ -22,12 +22,26 @@ const RouterContext = createContext<{ loc: Location; go: Go; setGuard: (message:
   setGuard: () => {},
 });
 
+/** Verdadeiro só enquanto o React desenha a página nova dentro de uma View Transition: a página então não repete a própria entrada. */
+let insideViewTransition = false;
+export const enteringByViewTransition = (): boolean => insideViewTransition;
+
+/** Nome compartilhado do título do evento (cartão, destaque e página), para ele acompanhar a capa na troca de página. */
+export const titleTransitionName = (slug: string) => `px-titulo-${slug}`;
+/** Nome compartilhado do bloco da data do evento (cartão, destaque e página). */
+export const dateTransitionName = (slug: string) => `px-data-${slug}`;
+
+/** Esmaece o conteúdo da página nova (Web Animations): troca sem View Transitions ou com menos movimento. */
+function fadeIn(ms: number) {
+  document.getElementById('conteudo')?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
+}
+
 /**
- * Troca de página com a View Transitions API, quando existe e o visitante não pediu menos movimento: o navegador fotografa a
- * página antiga, o React desenha a nova de forma síncrona (`flushSync`) e os elementos com o mesmo `view-transition-name`
- * (o banner do cartão e o da página do evento) se transformam um no outro. Durações em public.css (tudo abaixo de 400 ms) e os
- * cliques passam para a página nova durante a troca.
- * Sem suporte: a página nova esmaece em 200 ms (Web Animations). Com menos movimento: troca imediata.
+ * Troca de página com a View Transitions API, quando existe: o navegador fotografa a página antiga, o React desenha a nova de forma
+ * síncrona (`flushSync`) e as duas se cruzam em 450 ms; os elementos com o mesmo `view-transition-name` (capa e título do cartão e
+ * da página do evento) se transformam um no outro em 600 ms. Cabeçalho parado. Durações em public.css; os cliques passam para a
+ * página nova durante a troca.
+ * Sem suporte: a página nova esmaece em 350 ms (Web Animations). Com menos movimento: só esmaece, 250 ms, sem View Transition.
  * Ficam fora as páginas com QR Code de ingresso (o QR não pode aparecer com transparência nem em movimento) e a portaria; o painel
  * troca na hora e só esmaece 180 ms (CSS, html[data-area='admin']).
  */
@@ -37,21 +51,29 @@ function withTransition(update: () => void, to?: string) {
   const qrPage = (path: string) => path.startsWith('/ingressos/') || path.startsWith('/portaria');
   const adminPage = (path: string) => path === '/admin' || path.startsWith('/admin/');
   const from = window.location.pathname;
-  const skip =
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-    qrPage(from) ||
-    (to !== undefined && (qrPage(to) || adminPage(to)));
-  if (skip) {
+  if (qrPage(from) || (to !== undefined && (qrPage(to) || adminPage(to)))) {
     update();
+    return;
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    flushSync(update);
+    fadeIn(250);
     return;
   }
   if (!doc.startViewTransition) {
     flushSync(update);
-    document.getElementById('conteudo')?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
+    fadeIn(350);
     return;
   }
   try {
-    const t = doc.startViewTransition!(() => flushSync(update));
+    const t = doc.startViewTransition!(() => {
+      insideViewTransition = true;
+      try {
+        flushSync(update);
+      } finally {
+        insideViewTransition = false;
+      }
+    });
     // Duas navegações seguidas (entrar e ser redirecionado, por exemplo) fazem o navegador pular a primeira transição e
     // rejeitar as promessas dela. A página já foi atualizada; a rejeição não é erro.
     const ignore = () => {};

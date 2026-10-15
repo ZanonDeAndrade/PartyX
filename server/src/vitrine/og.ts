@@ -10,6 +10,8 @@ export interface PageMeta {
   description: string;
   url: string;
   imageUrl?: string;
+  /** `<link rel="preload">` da capa (página do evento), já pronto (bannerPreload). */
+  preload?: string;
 }
 
 export const SITE_TITLE = 'PartyX · Ingressos';
@@ -43,7 +45,23 @@ export function metaTags(meta: PageMeta): string {
       `<meta name="twitter:image" content="${escapeHtml(image)}" />`,
     );
   }
+  if (meta.preload) tags.push(meta.preload);
   return `<!--og:start-->\n    ${tags.join('\n    ')}\n    <!--og:end-->`;
+}
+
+/**
+ * `preload` da capa (página do evento e destaque da página inicial): a capa começa a baixar junto com o HTML, nas mesmas larguras do
+ * `<img>` (tela toda), em vez de esperar o JavaScript e a API. Na página inicial, prioridade alta (o destaque já está no HTML e é o
+ * LCP); na do evento, prioridade normal, para não atrasar o JavaScript, que desenha a página. Nulo sem capa.
+ */
+export function bannerPreload(
+  event: { bannerUrl: string | null; bannerSrcSet: string | null },
+  priority: 'high' | 'auto' = 'high',
+): string | null {
+  if (!event.bannerUrl || !isHttpUrl(event.bannerUrl)) return null;
+  const srcset = event.bannerSrcSet ? ` imagesrcset="${escapeHtml(event.bannerSrcSet)}" imagesizes="100vw"` : '';
+  const prio = priority === 'high' ? ' fetchpriority="high"' : '';
+  return `<link rel="preload" as="image" href="${escapeHtml(event.bannerUrl)}"${srcset}${prio} />`;
 }
 
 /** Troca a região marcada do `index.html` pelas tags da página. Sem a região, insere antes de `</head>`. */
@@ -66,5 +84,6 @@ export function eventMeta(event: PublicEventDetail, baseUrl: string): PageMeta {
     description,
     url: `${baseUrl.replace(/\/$/, '')}/eventos/${event.slug}`,
     imageUrl: event.shareImageUrl ?? undefined,
+    preload: bannerPreload(event, 'auto') ?? undefined,
   };
 }
