@@ -440,3 +440,9 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Sem migração:** a conferência do backup do dia (`infra/operacao/check-backup.sh`) basta antes da candidata; backup sob demanda só quando houver migração.
 
+## 18. Sexta publicação: termo de autorização revisto, sem autorização judicial (14 e 15/10/2026)
+
+**Publicado:** revisão `partyx-00014-bax` (tag `release-2026-10-14f`, commit `20a82c8`), 100% desde 15/10 02:09 UTC, com a migração `0010_sem_autorizacao_judicial` (aplicada às 21:27 de 14/10, depois do backup sob demanda `partyx-backup-xsznp`). Termo com logo e CNPJ no cabeçalho e atendimento da configuração no rodapé; autorização judicial fora do sistema; mesma configuração. Registro: `docs/registros/publicacao-producao-2026-10-14f.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00014-bax`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00012-vem ./infra/producao/deploy.sh rollback`. A `00012-vem` convive com a 0010; não é preciso reverter a migração para voltar.
+

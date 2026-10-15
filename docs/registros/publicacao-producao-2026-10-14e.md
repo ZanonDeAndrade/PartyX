@@ -30,6 +30,8 @@ Sem mudança na Vercel, nas rotinas e na verificação de saúde.
 
 ## Voltar atrás
 
+> Atualização de 15/10/2026 02:09 UTC: a `partyx-00014-bax` (termo revisto, sem autorização judicial, migração 0010) substituiu a `00012-vem`. A referência de retorno atual está em `publicacao-producao-2026-10-14f.md`.
+
 - **Referência de retorno a partir daqui: `partyx-00012-vem`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00010-ced ./infra/producao/deploy.sh rollback` (mesmo banco, mesmos textos; volta só o leiaute e as frases antigas).
 
 ## Pendente
