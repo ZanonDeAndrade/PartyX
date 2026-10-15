@@ -106,6 +106,58 @@ export function PasswordDialog({ onClose, onDone }: { onClose: () => void; onDon
 }
 
 /** Minha conta (U06): nome e telefone editáveis; e-mail e CPF só o atendimento corrige. */
+/**
+ * Conta anterior à data de nascimento obrigatória: informa a data uma vez (depois, só a PartyX corrige). Necessária para comprar e para
+ * receber ingresso numa transferência (D-87). Fora do formulário do perfil: tem o próprio envio.
+ */
+function BirthDateForm({ onSaved }: { onSaved: () => Promise<void> }) {
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.setBirthDate(value);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? (err.fields.birthDate ?? err.message) : 'Não foi possível salvar a data.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="px-field px-birth-missing" role="group" aria-labelledby="nascimento-falta">
+      <span id="nascimento-falta" className="px-ro-label">
+        Data de nascimento
+      </span>
+      <small className="px-hint">
+        Informe uma vez: ela é usada para comprar e para receber ingressos transferidos. Depois, só a PartyX corrige.
+      </small>
+      <div className="px-birth-row">
+        <input
+          id="conta-nascimento"
+          type="date"
+          value={value}
+          autoComplete="bday"
+          aria-label="Data de nascimento"
+          onChange={e => setValue(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? 'conta-nascimento-erro' : undefined}
+        />
+        <button type="button" className="px-btn" disabled={busy || !value} onClick={save}>
+          {busy ? 'Salvando…' : 'Salvar data'}
+        </button>
+      </div>
+      {error ? (
+        <small id="conta-nascimento-erro" className="px-error" role="alert">
+          {error}
+        </small>
+      ) : null}
+    </div>
+  );
+}
+
 export function MyAccountPage() {
   usePageTitle('Minha conta · PartyX');
   const { go } = useRouter();
@@ -196,6 +248,7 @@ export function MyAccountPage() {
               </div>
             ) : null}
           </div>
+          {user.birthDate ? null : <BirthDateForm onSaved={() => session.reload()} />}
           <p className="px-hint">
             E-mail, CPF e data de nascimento não podem ser alterados por aqui. Para corrigir,{' '}
             <PartyxContact lead="fale com o atendimento da PartyX" />.

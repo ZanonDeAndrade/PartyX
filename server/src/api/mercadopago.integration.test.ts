@@ -232,7 +232,7 @@ describe.skipIf(!ADMIN_URL)('Mercado Pago (API de Orders) de ponta a ponta, com 
   }
 
   async function newOrder(s: Awaited<ReturnType<typeof buyer>>, e: { slug: string; type: string }, quantity: number) {
-    const res = await s.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.type, quantity }] });
+    const res = await s.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: e.type, quantity }] });
     expect(res.status).toBe(201);
     return ((await res.json()) as { order: { id: string } }).order.id;
   }

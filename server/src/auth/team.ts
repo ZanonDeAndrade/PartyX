@@ -1,5 +1,5 @@
-import { and, asc, eq, gt, inArray } from 'drizzle-orm';
-import { auditLog, events, orders, users } from '../db/schema';
+import { and, asc, eq, gt, inArray, isNotNull } from 'drizzle-orm';
+import { auditLog, events, orders, tickets, users } from '../db/schema';
 import { ageOnEvent, ADULT_AGE, isCalendarDate } from '../domain/age';
 import { dateKeyInEventZone } from '../domain/time';
 import { maskCpf, isValidCpf, onlyDigits } from '../domain/cpf';
@@ -432,6 +432,18 @@ export async function correctIdentity(deps: AuthDeps, actor: Actor, id: string, 
             .where(eq(orders.id, o.id));
         }
         ordersRecomputed = future.length;
+        // Ingressos recebidos numa transferência (D-87): a marca de menor é do titular, também refeita para eventos futuros.
+        const held = await tx
+          .select({ id: tickets.id, startsAt: events.startsAt })
+          .from(tickets)
+          .innerJoin(events, eq(events.id, tickets.eventId))
+          .where(and(eq(tickets.holderUserId, id), isNotNull(tickets.holderMinor), gt(events.startsAt, now)));
+        for (const t of held) {
+          await tx
+            .update(tickets)
+            .set({ holderMinor: ageOnEvent(birthDate, t.startsAt) < ADULT_AGE })
+            .where(eq(tickets.id, t.id));
+        }
       }
       // A data de nascimento não vai para a trilha (dado pessoal): só o registro de que foi corrigida.
       const after2 =

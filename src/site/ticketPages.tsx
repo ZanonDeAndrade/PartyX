@@ -2,7 +2,9 @@ import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
 import {
   api,
+  ApiError,
   minorAuthorizationUrl,
+  type LegalDocument,
   type OrderRow,
   type OrderView,
   type TicketDetail,
@@ -10,14 +12,23 @@ import {
 } from './api';
 import { DateStub, ErrorBox, Layout, usePageTitle } from './components';
 import { brl, dateParts, timeOf } from './format';
-import { IconBack, IconChevron, IconDownload, IconExpand, IconReceipt, IconTicket, IconUser } from './icons';
+import {
+  IconBack,
+  IconChevron,
+  IconDownload,
+  IconExpand,
+  IconReceipt,
+  IconShare,
+  IconTicket,
+  IconUser,
+} from './icons';
 import { cascade, useReducedMotion } from './motion';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 import { useFetch } from './useFetch';
 
 /** Leva o visitante ao login e de volta (como no checkout). */
-function useLoggedIn(returnTo: string): boolean {
+export function useLoggedIn(returnTo: string): boolean {
   const { go } = useRouter();
   const session = useSession();
   useEffect(() => {
@@ -189,7 +200,7 @@ function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
                 <b>{t.typeName}</b>
                 <small>
                   <span className="px-mono">{t.shortCode}</span>
-                  <span>{t.holderName}</span>
+                  <span>{t.receivedFrom ? `Recebido de ${t.receivedFrom.name}` : t.holderName}</span>
                 </small>
               </span>
               <StatusBadge status={t.status} />
@@ -219,7 +230,10 @@ function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
  * comprador quando ele é menor; em branco para acompanhante). Quem tiver 16 ou 17 anos entrega o termo assinado na portaria.
  */
 function MinorAuthorizationLinks({ items }: { items: TicketSummary[] }) {
-  const orders = [...new Map(items.map(t => [t.orderId, t.orderNumber])).entries()];
+  // Ingresso recebido numa transferência (D-87): o pedido é de outra pessoa; a autorização sai por ingresso, em nome de quem recebeu.
+  const orders = [...new Map(items.filter(t => !t.receivedFrom).map(t => [t.orderId, t.orderNumber])).entries()];
+  const received = items.filter(t => t.receivedFrom);
+  const many = orders.length + received.length > 1;
   return (
     <div className="px-wallet-minor">
       <p>
@@ -229,7 +243,13 @@ function MinorAuthorizationLinks({ items }: { items: TicketSummary[] }) {
       {orders.map(([orderId, number]) => (
         <a key={orderId} href={minorAuthorizationUrl.order(orderId)} download className="px-btn px-btn-sec">
           <IconDownload size={18} />
-          {orders.length > 1 ? `Autorização para menores · pedido PX-${number}` : 'Autorização para menores (PDF)'}
+          {many ? `Autorização para menores · pedido PX-${number}` : 'Autorização para menores (PDF)'}
+        </a>
+      ))}
+      {received.map(t => (
+        <a key={t.id} href={minorAuthorizationUrl.ticket(t.id)} download className="px-btn px-btn-sec">
+          <IconDownload size={18} />
+          {many ? `Autorização para menores · ingresso ${t.shortCode}` : 'Autorização para menores (PDF)'}
         </a>
       ))}
     </div>
@@ -317,6 +337,8 @@ export function TicketPage({ id }: { id: string }) {
     );
   }
   const t = state.status === 'ok' ? state.data : null;
+  // Transferência (D-87): até 2 horas antes do evento, só ingresso válido.
+  const canTransfer = t?.status === 'valido' && Date.now() < new Date(t.transferUntil).getTime();
   const invalid =
     t?.status === 'cancelado'
       ? {
@@ -353,7 +375,9 @@ export function TicketPage({ id }: { id: string }) {
               <StatusBadge status={t.status} />
             </div>
             <div className="px-tk-qr">
-              {t.qrPayload && !invalid ? (
+              {t.minorTermPending && !invalid ? (
+                <MinorTermGate ticket={t} onAccepted={retry} />
+              ) : t.qrPayload && !invalid ? (
                 <>
                   <div className="px-tk-qrbox">
                     <QrImage payload={t.qrPayload} size={232} label={`QR Code do ingresso ${t.shortCode}`} />
@@ -390,17 +414,26 @@ export function TicketPage({ id }: { id: string }) {
                 <dd>{t.typeName}</dd>
               </div>
               <div>
-                <dt>Comprador</dt>
+                <dt>Titular</dt>
                 <dd>{t.holderName}</dd>
               </div>
               <div>
                 <dt>Código</dt>
                 <dd className="px-mono">{t.shortCode}</dd>
               </div>
-              <div>
-                <dt>Pedido</dt>
-                <dd className="px-mono">PX-{t.orderNumber}</dd>
-              </div>
+              {t.receivedFrom ? (
+                <div>
+                  <dt>Recebido de</dt>
+                  <dd>
+                    {t.receivedFrom.name}, {dayMonthYear(t.receivedFrom.at)}
+                  </dd>
+                </div>
+              ) : (
+                <div>
+                  <dt>Pedido</dt>
+                  <dd className="px-mono">PX-{t.orderNumber}</dd>
+                </div>
+              )}
             </dl>
             <div className="px-tk-actions">
               {t.qrPayload && !invalid ? (
@@ -409,19 +442,97 @@ export function TicketPage({ id }: { id: string }) {
                   Abrir em tela cheia
                 </Link>
               ) : null}
-              <a className="px-btn px-btn-outline px-btn-lg" href={`/api/tickets/${t.id}/pdf`} download>
-                <IconDownload size={18} />
-                Baixar PDF
-              </a>
+              {t.minorTermPending ? null : (
+                <a className="px-btn px-btn-outline px-btn-lg" href={`/api/tickets/${t.id}/pdf`} download>
+                  <IconDownload size={18} />
+                  Baixar PDF
+                </a>
+              )}
+              {canTransfer ? (
+                <Link to={`/ingressos/${t.id}/transferir`} className="px-btn px-btn-outline px-btn-lg">
+                  <IconShare size={18} />
+                  Transferir
+                </Link>
+              ) : null}
             </div>
           </article>
           <p className="px-fine px-fine-dark">
             Cada ingresso vale uma entrada. Não envie a imagem do QR Code para ninguém: quem passar primeiro na portaria
             usa o ingresso.
+            {canTransfer
+              ? ` Para passar o ingresso a outra pessoa, use Transferir até ${dayMonthYear(t.transferUntil)} às ${timeOf(t.transferUntil)}.`
+              : ''}
           </p>
         </>
       ) : null}
     </MeShell>
+  );
+}
+
+/**
+ * Recebido numa transferência com 16 ou 17 anos (D-87): no lugar do QR, o Termo de Ciência para Menores de Idade, com a caixa nunca
+ * pré-marcada. Aceito, o QR aparece. Na portaria, a pessoa entrega a autorização assinada pelo responsável.
+ */
+function MinorTermGate({ ticket, onAccepted }: { ticket: TicketDetail; onAccepted: () => void }) {
+  const [term, setTerm] = useState<LegalDocument | null>(null);
+  const [accepted, setAccepted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const ctl = new AbortController();
+    api
+      .legalDocument('termo-menor', ctl.signal)
+      .then(setTerm)
+      .catch(() => setError('Não foi possível carregar o termo. Tente de novo.'));
+    return () => ctl.abort();
+  }, []);
+  const accept = async () => {
+    if (!term?.version) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api.acceptTicketMinorTerm(ticket.id, term.version);
+      onAccepted();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Não foi possível registrar o aceite. Tente de novo.');
+      if (e instanceof ApiError && e.code === 'versao_desatualizada') setTerm(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="px-tk-term" aria-labelledby="termo-recebido">
+      <h2 id="termo-recebido">Aceite o Termo de Ciência para ver o QR Code</h2>
+      <p>
+        Você recebeu este ingresso e terá 16 ou 17 anos na data do evento. Leia e aceite o termo; na portaria, entregue o
+        Termo de Autorização e Responsabilidade assinado pelo seu responsável.
+      </p>
+      <div className="px-tk-termtext" tabIndex={0} aria-label="Texto do Termo de Ciência para Menores de Idade">
+        {term ? (
+          term.blocks.map((b, i) => (b.type === 'heading' ? <h3 key={i}>{b.text}</h3> : <p key={i}>{b.text}</p>))
+        ) : (
+          <p aria-busy="true">Carregando o termo…</p>
+        )}
+      </div>
+      <div className="px-check">
+        <input
+          id="aceite-termo-recebido"
+          type="checkbox"
+          checked={accepted}
+          disabled={!term}
+          onChange={e => setAccepted(e.target.checked)}
+        />
+        <label htmlFor="aceite-termo-recebido">Li e aceito o Termo de Ciência para Menores de Idade.</label>
+      </div>
+      {error ? (
+        <p className="px-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <button type="button" className="px-btn px-btn-pri" disabled={!accepted || busy || !term} onClick={accept}>
+        {busy ? 'Registrando…' : 'Aceitar e mostrar o QR Code'}
+      </button>
+    </section>
   );
 }
 

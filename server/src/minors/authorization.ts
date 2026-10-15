@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Config } from '../config';
 import type { Db } from '../db/client';
-import { events, orders, users } from '../db/schema';
+import { events, orders, tickets, users } from '../db/schema';
 import { AppError } from '../domain/errors';
 import { legalDocument, minorDocsBlockers } from '../legal/documents';
 import { logger } from '../logger';
@@ -79,6 +79,32 @@ export async function orderAuthorizationPdf(deps: AuthorizationDeps, userId: str
   if (!row) throw new AppError(404, 'nao_encontrado', 'Pedido não encontrado.');
   const event = assertAvailable(deps, row.event);
   const minor = row.buyerMinor && row.birthDate && !row.gone ? { name: row.name, birthDate: row.birthDate } : null;
+  return { bytes: await render(deps, event, minor), slug: event.slug };
+}
+
+/**
+ * Autorização de um ingresso da conta (D-87: ingresso recebido numa transferência). Só o titular atual. Se ele terá 16 ou 17 anos na
+ * data do evento (`holder_minor`, ou o pedido quando o ingresso continua com quem comprou), sai com o nome e a data de nascimento dele;
+ * senão, em branco.
+ */
+export async function ticketAuthorizationPdf(deps: AuthorizationDeps, userId: string, ticketId: string) {
+  const [row] = await deps.db
+    .select({
+      event: events,
+      minor: sql<boolean>`coalesce(${tickets.holderMinor}, ${orders.buyerMinor})`,
+      name: users.name,
+      birthDate: users.birthDate,
+      gone: users.anonymizedAt,
+    })
+    .from(tickets)
+    .innerJoin(orders, eq(orders.id, tickets.orderId))
+    .innerJoin(events, eq(events.id, tickets.eventId))
+    .innerJoin(users, eq(users.id, tickets.holderUserId))
+    .where(and(eq(tickets.id, ticketId), eq(tickets.holderUserId, userId)))
+    .limit(1);
+  if (!row) throw new AppError(404, 'nao_encontrado', 'Ingresso não encontrado.');
+  const event = assertAvailable(deps, row.event);
+  const minor = row.minor && row.birthDate && !row.gone ? { name: row.name, birthDate: row.birthDate } : null;
   return { bytes: await render(deps, event, minor), slug: event.slug };
 }
 

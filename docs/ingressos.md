@@ -10,7 +10,8 @@ Implementado em 01/10/2026 (Prompt 13): RF-38 a RF-43 e CA-20 a CA-22. Código e
 
 - **Idempotente:** `(item, unidade)` é único e o `INSERT` ignora o que já existe. Notificação repetida, simultânea, rotina de recuperação ou segunda chamada na mesma transação: sempre os mesmos 3 ingressos, com os mesmos códigos. Uma colisão de código (improvável) gera código novo e tenta de novo (até 5 vezes).
 - **Recuperação:** `backfillTickets` emite o que falta em pedidos **pagos** sem ingresso (por exemplo, pagos antes de o emissor existir). Roda na rotina do Scheduler e por `npm run tickets:backfill`. Nunca emite para estornado, contestado ou "pago sem estoque".
-- **Sem CPF** no ingresso, no QR ou no PDF (D-07). **Sem transferência** de titularidade: não existe rota que altere o titular.
+- **Sem CPF** no ingresso, no QR ou no PDF (D-07).
+- **Transferência (D-87, 15/10/2026):** na emissão, o titular é o comprador. Depois, o titular pode passar o ingresso para outra conta (`tickets/transfer.ts`, rotas `POST /api/tickets/:id/transfer/preview` e `/transfer`): a mesma linha muda de titular (`holder_user_id`, `holder_name`), com código, código curto e QR novos; o QR antigo é reconhecido e recusado na portaria. O pedido, o pagamento e o reembolso continuam do comprador. Detalhes em `docs/registros/transferencia-e-cancelamento-2026-10-15.md`.
 
 ## Códigos e QR (RF-39, CA-22) — `domain/ticketCode.ts`
 

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { devices, expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { scanQr } from './support/camera';
 import {
+  acceptPolicy,
   api,
   apiLogin,
   chooseTickets,
@@ -480,6 +481,7 @@ item(10, 'Esgotamento: última unidade disputada por dois compradores', async ()
   for (const p of [a.page, b.page]) {
     await chooseTickets(p, S.base, slug, { 'Ultima unidade': 1 });
     await expect(p.getByRole('heading', { name: 'Revise seu pedido' })).toBeVisible();
+    await acceptPolicy(p);
   }
   // Os dois clicam ao mesmo tempo.
   await Promise.all([a.page, b.page].map(p => p.getByRole('button', { name: 'Ir para o pagamento' }).first().click()));

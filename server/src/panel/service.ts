@@ -472,13 +472,15 @@ export async function eventTickets(
     select t.id, t.short_code, t.status::text as status, t.holder_name, t.used_at, t.cancelled_at, t.cancel_reason, t.issued_at,
            case when l.name is null or l.name = 'Lote único' then ty.name else ty.name || ' · ' || l.name end as type_name,
            o.id as order_id, o.number as order_number, o.status::text as order_status,
-           u.email as buyer_email, u.cpf as buyer_cpf, v.name as validator_name,
+           u.email as holder_email, u.cpf as holder_cpf, (t.holder_user_id <> o.user_id) as transferred,
+           v.name as validator_name,
            count(*) over()::int as total_rows
       from tickets t
       join ticket_types ty on ty.id = t.ticket_type_id
       left join ticket_lots l on l.id = t.lot_id
       join orders o on o.id = t.order_id
-      join users u on u.id = o.user_id
+      -- Conta do titular atual (D-87): depois de uma transferência, e-mail e CPF de quem recebeu, não de quem comprou.
+      join users u on u.id = t.holder_user_id
       left join users v on v.id = t.validated_by
      where ${where}
      order by t.holder_name, t.short_code
@@ -494,8 +496,9 @@ export async function eventTickets(
       status: r.status as string,
       typeName: r.type_name as string,
       holderName: r.holder_name as string,
-      buyerEmail: r.buyer_email as string,
-      buyerCpf: r.buyer_cpf ? maskCpf(r.buyer_cpf as string) : null,
+      holderEmail: r.holder_email as string,
+      holderCpf: r.holder_cpf ? maskCpf(r.holder_cpf as string) : null,
+      transferred: r.transferred === true,
       orderId: r.order_id as string,
       orderNumber: num(r.order_number),
       orderStatus: r.order_status as string,

@@ -8,7 +8,8 @@ import { formatInEventZone } from '../domain/time';
 import { logger } from '../logger';
 import type { Clock } from '../providers/clock';
 import { lookupByQr } from '../tickets/service';
-import type { QrKeys } from '../domain/ticketCode';
+import { minorTermPendingSql, transferredCode } from '../tickets/transfer';
+import { verifyQr, type QrKeys } from '../domain/ticketCode';
 
 /**
  * Portaria (RF-44 a RF-54). A verificação e a marcação de uso acontecem **no servidor**: o aparelho só mostra o resultado.
@@ -76,6 +77,12 @@ export interface GateOutcome {
   counter: Counter;
   method: 'camera' | 'manual';
 }
+
+/** QR de antes de uma transferência (D-87): o ingresso passou para outra conta e ganhou QR novo. */
+export const OLD_TRANSFERRED_QR = 'QR antigo: este ingresso foi transferido e este QR não vale mais';
+/** Ingresso recebido com 16 ou 17 anos sem o Termo de Ciência aceito (D-87). */
+export const TERM_PENDING =
+  'Recebido numa transferência: o titular precisa aceitar o Termo de Ciência em Meus ingressos antes de entrar';
 
 const MESSAGES: Record<GateOutcomeResult, string> = {
   menor_confirmar:
@@ -200,6 +207,8 @@ type TicketRow = {
   status: 'valido' | 'utilizado' | 'cancelado';
   usedAt: Date | null;
   buyerMinor: boolean;
+  /** Recebido numa transferência com 16 ou 17 anos e o Termo de Ciência ainda não aceito (D-87): não entra até aceitar. */
+  minorTermPending: boolean;
 };
 
 async function ticketById(db: Db, id: string): Promise<TicketRow | null> {
@@ -212,7 +221,9 @@ async function ticketById(db: Db, id: string): Promise<TicketRow | null> {
       eventId: tickets.eventId,
       status: tickets.status,
       usedAt: tickets.usedAt,
-      buyerMinor: orders.buyerMinor,
+      // Menor pelo titular atual (D-87); sem transferência, o pedido, como antes.
+      buyerMinor: sql<boolean>`coalesce(${tickets.holderMinor}, ${orders.buyerMinor})`,
+      minorTermPending: minorTermPendingSql,
     })
     .from(tickets)
     .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
@@ -249,11 +260,11 @@ async function outcome(
   result: GateOutcomeResult,
   method: 'camera' | 'manual',
   ticket: TicketRow | null,
-  extra: { firstEntry?: GateOutcome['firstEntry']; otherEvent?: string | null } = {},
+  extra: { firstEntry?: GateOutcome['firstEntry']; otherEvent?: string | null; message?: string } = {},
 ): Promise<GateOutcome> {
   return {
     result,
-    message: MESSAGES[result],
+    message: extra.message ?? MESSAGES[result],
     ticket:
       ticket && result !== 'invalido'
         ? {
@@ -287,6 +298,10 @@ async function admit(
 ): Promise<GateOutcome> {
   const now = deps.clock.now();
   const before = (await ticketById(deps.db, ticketId))!;
+  // Recebido numa transferência com 16 ou 17 anos sem o Termo de Ciência aceito (D-87): não entra, nem com a confirmação do
+  // validador. A pessoa aceita no celular, em Meus ingressos, e a leitura é feita de novo.
+  if (before.minorTermPending && before.status === 'valido')
+    return outcome(deps, eventId, 'menor_confirmar', method, before, { message: TERM_PENDING });
   // Pedido de comprador menor (regras de menores): a entrada só acontece com a confirmação do validador, que conferiu a idade de quem
   // está na frente. Sem ela, nada é consumido e a tela pede a conferência. Ingresso já usado ou cancelado segue o caminho normal.
   if (before.buyerMinor && before.status === 'valido' && !minorCheck)
@@ -341,6 +356,11 @@ export async function scan(deps: GateDeps, v: Validator, input: { eventId: strin
   if (!found.ok) {
     // Só o começo do que foi lido (prefixo e versão), nunca o suficiente para reconstituir um código.
     await record(deps.db, v, input.eventId, 'invalido', 'camera', null, input.qr.slice(0, 24), now);
+    // Assinatura certa e código desconhecido: pode ser o QR antigo de um ingresso transferido (D-87). A tela explica, sem mostrar
+    // quem é o titular novo.
+    const check = found.reason === 'desconhecido' ? verifyQr(deps.keys, input.qr) : null;
+    if (check?.ok && (await transferredCode(deps.db, check.code)))
+      return outcome(deps, input.eventId, 'invalido', 'camera', null, { message: OLD_TRANSFERRED_QR });
     return outcome(deps, input.eventId, 'invalido', 'camera', null);
   }
   const ticket = (await ticketById(deps.db, found.ticket.id))!;
@@ -484,11 +504,12 @@ export async function searchTickets(
       email: users.email,
       status: tickets.status,
       usedAt: tickets.usedAt,
-      buyerMinor: orders.buyerMinor,
+      buyerMinor: sql<boolean>`coalesce(${tickets.holderMinor}, ${orders.buyerMinor})`,
     })
     .from(tickets)
     .innerJoin(orders, eq(orders.id, tickets.orderId))
-    .innerJoin(users, eq(users.id, orders.userId))
+    // CPF e e-mail da conta do titular atual (D-87): depois de uma transferência, não são mais os de quem comprou.
+    .innerJoin(users, eq(users.id, tickets.holderUserId))
     .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
     .where(and(eq(tickets.eventId, input.eventId), cond))
     .orderBy(asc(tickets.holderName), asc(tickets.shortCode))

@@ -164,7 +164,7 @@ function page(
   doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Tipo', M, fields);
   doc.fillColor(INK).font('Helvetica-Bold').fontSize(typeSize).text(typeName, M, fields + 13, { width: 230 });
   const typeEnd = doc.y;
-  doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Comprador', 300, fields);
+  doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Titular', 300, fields);
   doc.fillColor(INK).font('Helvetica-Bold').fontSize(holderSize).text(holder, 300, fields + 13, { width: holderW });
 
   // Picote: linha tracejada com meia-lua nas bordas, separando o canhoto do QR. Abaixo do mais alto dos dois campos.

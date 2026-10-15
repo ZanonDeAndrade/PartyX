@@ -118,7 +118,14 @@ export function compra() {
 
   const pedido = http.post(
     `${BASE}/api/orders`,
-    JSON.stringify({ eventSlug: SLUG, items: [{ ticketTypeId: TYPE, quantity: QTD }], couponCode: null }),
+    JSON.stringify({
+      eventSlug: SLUG,
+      items: [{ ticketTypeId: TYPE, quantity: QTD }],
+      couponCode: null,
+      // Aceite da Política de Cancelamento, Troca e Reembolso (D-80 atualizada); local e homologação usam a versão fictícia.
+      cancellationAccepted: true,
+      cancellationVersion: __ENV.CANCELLATION_VERSION || 'ficticio-0',
+    }),
     // 409 = estoque acabou: recusa esperada depois do esgotamento, não é erro do sistema.
     { headers: auth, tags: { etapa: 'compra_2_pedido_reserva' }, responseCallback: http.expectedStatuses(201, 409) },
   );

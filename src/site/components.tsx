@@ -96,7 +96,7 @@ function MenuDrawer({ onClose }: { onClose: () => void }) {
           ) : null}
           {item('/termos-de-uso', 'Termos de Uso', true)}
           {item('/privacidade', 'Política de Privacidade', true)}
-          {item('/politica-de-cancelamento', 'Cancelamento e reembolso', true)}
+          {item('/politica-de-cancelamento', 'Cancelamento, troca e reembolso', true)}
         </nav>
       </aside>
     </div>

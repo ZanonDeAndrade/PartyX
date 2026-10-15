@@ -1,4 +1,4 @@
-import { Client, BASE, seed } from './lib.mjs';
+import { Client, BASE, seed, policy } from './lib.mjs';
 const out = []; const ok = (name, cond, info = '') => { out.push({ name, ok: !!cond, info }); console.log(cond ? 'OK  ' : 'FALHA', name, info); };
 const ev = (await new Client().get(`/api/public/events/${seed.slug}`)).json;
 const types = (ev.event ?? ev).ticketTypes; const pista = types.find(t => t.name === 'Pista');
@@ -6,9 +6,9 @@ ok('vitrine mostra evento e tipos', pista?.canBuy);
 const buyer = new Client(); await buyer.signup(1); ok('cadastro + sessão', true);
 const quote = await buyer.post('/api/checkout/quote', { eventSlug: seed.slug, items: [{ ticketTypeId: pista.id, quantity: 3 }] });
 ok('cotação 3 x R$ 80', quote.status === 200 && quote.json.summary.totalCents === 24000, JSON.stringify(quote.json?.summary?.totalCents));
-const forged = await buyer.post('/api/orders', { eventSlug: seed.slug, items: [{ ticketTypeId: pista.id, quantity: 3 }], expectedTotalCents: 100 });
+const forged = await buyer.post('/api/orders', { ...(await policy()), eventSlug: seed.slug, items: [{ ticketTypeId: pista.id, quantity: 3 }], expectedTotalCents: 100 });
 ok('total adulterado é recusado ou ignorado, nunca aceito a R$ 1', forged.status !== 201 || forged.json.order.totalCents === 24000, forged.status);
-let order = forged.status === 201 ? forged.json.order : (await buyer.post('/api/orders', { eventSlug: seed.slug, items: [{ ticketTypeId: pista.id, quantity: 3 }] })).json.order;
+let order = forged.status === 201 ? forged.json.order : (await buyer.post('/api/orders', { ...(await policy()), eventSlug: seed.slug, items: [{ ticketTypeId: pista.id, quantity: 3 }] })).json.order;
 ok('pedido pendente com total do servidor', order.totalCents === 24000 && order.status === 'pendente');
 const pay = await buyer.post(`/api/orders/${order.id}/payment`, { method: 'pix' }); ok('Pix criado', pay.status === 201);
 const card = await buyer.post(`/api/orders/${order.id}/payment`, { method: 'cartao', number: '4111111111111111', cvv: '123' }); ok('dados de cartão no corpo são recusados', card.status >= 400 && card.status < 500, card.status);
@@ -33,9 +33,9 @@ ok('administrador cancela ingresso', canc.status === 200, canc.status);
 ok('portaria recusa o cancelado', (await val.post('/api/gate/scan', { eventId: seed.eventId, qr: q2 })).json.result === 'cancelado');
 // recusa e expiração
 const b2 = new Client(); await b2.signup(3);
-const o2 = (await b2.post('/api/orders', { eventSlug: seed.slug, items: [{ ticketTypeId: pista.id, quantity: 1 }] })).json.order; await b2.post(`/api/orders/${o2.id}/payment`, { method: 'pix' });
+const o2 = (await b2.post('/api/orders', { ...(await policy()), eventSlug: seed.slug, items: [{ ticketTypeId: pista.id, quantity: 1 }] })).json.order; await b2.post(`/api/orders/${o2.id}/payment`, { method: 'pix' });
 ok('cartão/Pix recusado: sem ingresso', (await b2.post(`/api/dev/mock-gateway/${o2.id}/recusado`)).json.outcome === 'recusado' && ((await b2.get('/api/tickets')).json.tickets ?? []).length === 0);
-const o3 = (await b2.post('/api/orders', { eventSlug: seed.slug, items: [{ ticketTypeId: pista.id, quantity: 1 }] })).json.order; await b2.post(`/api/orders/${o3.id}/payment`, { method: 'pix' });
+const o3 = (await b2.post('/api/orders', { ...(await policy()), eventSlug: seed.slug, items: [{ ticketTypeId: pista.id, quantity: 1 }] })).json.order; await b2.post(`/api/orders/${o3.id}/payment`, { method: 'pix' });
 ok('Pix vencido no gateway expira o pedido', (await b2.post(`/api/dev/mock-gateway/${o3.id}/expirado`)).json.outcome === 'expirado');
 // relatórios e exportações
 const month = new Date().toISOString().slice(0, 7);

@@ -19,7 +19,8 @@ Este arquivo vale para as próximas tarefas no repositório. Antes de implementa
 - Emitir um registro e um QR distinto por unidade: código aleatório de 144 bits mais HMAC. Repetições de webhook não duplicam ingressos.
 - Check-in por `UPDATE` condicional do ingresso válido, preservando a primeira entrada. Sem validação offline. Busca manual mostra CPF mascarado; ingresso, QR e PDF não exibem CPF sem decisão expressa do cliente.
 - Taxa mensal conta `tickets` pelo mês de `orders.paid_at`, independentemente do estado atual do pedido ou ingresso. Cancelar ingresso não executa estorno financeiro; estorno é operação do gateway/cliente.
-- Não implementar itens excluídos no §16 do PDF: desconto por cupom, comissão de promoter, lotes automáticos, cortesias/lista de convidados, transferência, assentos/mapa, bilheteria/POS, app nativo, notas fiscais, SMS/WhatsApp automático, múltiplos gateways, cashless, migração de outras plataformas ou atendimento ao comprador pela contratada. Lista impressa de contingência não é validação offline.
+- Não implementar itens excluídos no §16 do PDF: desconto por cupom, comissão de promoter, lotes automáticos, cortesias/lista de convidados, assentos/mapa, bilheteria/POS, app nativo, notas fiscais, SMS/WhatsApp automático, múltiplos gateways, cashless, migração de outras plataformas ou atendimento ao comprador pela contratada. Lista impressa de contingência não é validação offline.
+- Exceção decidida: a transferência de ingresso entre contas foi incluída como mudança de escopo (D-87, 15/10/2026, `docs/registros/transferencia-e-cancelamento-2026-10-15.md`). O pedido, o pagamento e o reembolso continuam do comprador; a transferência troca o titular e o QR na mesma linha do ingresso, numa transação.
 
 ## Convenções e segurança
 

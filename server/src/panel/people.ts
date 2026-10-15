@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { writeAudit } from '../db/audit';
 import { maskCpf, onlyDigits } from '../domain/cpf';
+import { transferHistory } from '../tickets/transfer';
 import { AppError } from '../domain/errors';
 import { foldName } from '../gate/service';
 import type { Clock } from '../providers/clock';
@@ -182,12 +183,14 @@ export async function ticketDetail(deps: PeopleDeps, id: string) {
              ty.name as type_name, ty.price_cents, e.id as event_id, e.name as event_name, e.starts_at,
              o.id as order_id, o.number as order_number, o.status::text as order_status, o.paid_at,
              u.id as buyer_id, u.name as buyer_name, u.email as buyer_email, u.cpf as buyer_cpf,
+             h.id as holder_id, h.name as holder_account_name, h.email as holder_email, h.cpf as holder_cpf,
              v.name as validator_name
         from tickets t
         join ticket_types ty on ty.id = t.ticket_type_id
         join events e on e.id = t.event_id
         join orders o on o.id = t.order_id
         join users u on u.id = o.user_id
+        join users h on h.id = t.holder_user_id
         left join users v on v.id = t.validated_by
        where t.id = ${id}`)
   ).rows;
@@ -226,6 +229,13 @@ export async function ticketDetail(deps: PeopleDeps, id: string) {
         email: t.buyer_email as string,
         cpf: t.buyer_cpf ? maskCpf(t.buyer_cpf as string) : null,
       },
+      // Conta do titular atual (D-87): a mesma do comprador até a primeira transferência.
+      holder: {
+        id: t.holder_id as string,
+        name: t.holder_account_name as string,
+        email: t.holder_email as string,
+        cpf: t.holder_cpf ? maskCpf(t.holder_cpf as string) : null,
+      },
       entry: t.used_at ? { at: iso(t.used_at)!, validator: (t.validator_name as string | null) ?? null } : null,
       cancellation: t.cancelled_at
         ? {
@@ -242,5 +252,7 @@ export async function ticketDetail(deps: PeopleDeps, id: string) {
       method: a.method as string,
       validator: a.validator as string,
     })),
+    // Transferências (D-87), da mais nova para a mais antiga, com o desfazer do administrador.
+    transfers: await transferHistory(deps.db, id),
   };
 }

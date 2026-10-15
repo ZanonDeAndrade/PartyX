@@ -9,7 +9,14 @@ import type SMTPTransport from 'nodemailer/lib/smtp-transport';
  * até o cliente definir provedor, domínio e remetente, D-09), o envio falha de forma explícita, o item fica na fila
  * (`email_log`) e o alerta dispara.
  */
-export type EmailTemplate = 'cadastro' | 'recuperacao_senha' | 'compra_confirmada' | 'pagamento_sem_estoque';
+export type EmailTemplate =
+  | 'cadastro'
+  | 'recuperacao_senha'
+  | 'compra_confirmada'
+  | 'pagamento_sem_estoque'
+  | 'transferencia_enviada'
+  | 'transferencia_recebida'
+  | 'transferencia_desfeita';
 
 /** O que a mensagem significa: modelo, destinatário e os dados usados para compor. */
 export interface EmailMessage {

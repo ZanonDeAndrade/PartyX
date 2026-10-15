@@ -132,7 +132,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
     method: 'pix' | 'cartao' = 'pix',
   ) {
     const items = qty.map((quantity, i) => ({ ticketTypeId: e.types[i]!, quantity }));
-    const created = await s.post('/orders', { eventSlug: e.slug, items });
+    const created = await s.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items });
     expect(created.status).toBe(201);
     const order = (await json(created)).order as { id: string; totalCents: number };
     expect((await s.post(`/orders/${order.id}/payment`, { method })).status).toBe(201);
@@ -637,7 +637,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       const b = await user();
       const p = await pay(a, e, [1], 'cartao');
       expect(
-        (await b.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.types[0], quantity: 1 }] })).status,
+        (await b.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: e.types[0], quantity: 1 }] })).status,
       ).toBe(409);
       mock.simulate.setStatus(p.paymentId, 'recusado');
       expect((await json(await hook(p.paymentId))).outcome).toBe('recusado');
@@ -646,7 +646,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       expect(await resvOf(p.orderId)).toEqual(['liberada']);
       expect(await sold(e.types[0]!)).toBe(0);
       expect(
-        (await b.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.types[0], quantity: 1 }] })).status,
+        (await b.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: e.types[0], quantity: 1 }] })).status,
       ).toBe(201);
       expect((await json(await a.get(`/orders/${p.orderId}`))).order.status).toBe('nao_concluido');
     });
@@ -752,7 +752,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
         mock.simulate.setStatus(pa.paymentId, 'aprovado');
         const [late, reserve] = await Promise.all([
           hook(pa.paymentId),
-          b.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.types[0], quantity: 1 }] }),
+          b.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: e.types[0], quantity: 1 }] }),
         ]);
         expect(late.status).toBe(200);
         const rows = (
@@ -781,6 +781,32 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       expect((await order(p.orderId)).status).toBe('pago');
       return { e, a, ...p };
     }
+
+    it('estorno depois de uma transferência (D-87): o pedido e o reembolso continuam de quem comprou; o transferido é cancelado', async () => {
+      const p = await paidOrder(2);
+      const b = await user();
+      const [recipient] = (await sql("select id, email from users where role = 'cliente' order by created_at desc, email desc limit 1"))
+        .rows as { id: string; email: string }[];
+      await sql("update users set birth_date = '1995-01-01' where id = $1", [recipient!.id]);
+      const [first] = (await sql('select id from tickets where order_id = $1 order by unit_index limit 1', [p.orderId])).rows;
+      const moved = await p.a.post(`/tickets/${first.id}/transfer`, { destination: recipient!.email, confirm: true });
+      expect(moved.status).toBe(200);
+      const ownerOf = async () => (await sql('select user_id from orders where id = $1', [p.orderId])).rows[0].user_id as string;
+      const buyerId = await ownerOf();
+      expect(buyerId).not.toBe(recipient!.id);
+
+      mock.simulate.setStatus(p.paymentId, 'estornado');
+      expect((await json(await hook(p.paymentId))).outcome).toBe('estornado');
+      // O pedido (e o reembolso, feito pelo gateway no meio de pagamento dele) continua de quem comprou.
+      const after = await order(p.orderId);
+      expect(after.status).toBe('estornado');
+      expect(await ownerOf()).toBe(buyerId);
+      // Os dois ingressos do pedido são cancelados, inclusive o que estava com quem recebeu.
+      expect(await ticketsOf(p.orderId)).toEqual(['cancelado', 'cancelado']);
+      const mine = (await json(await b.get('/tickets'))).tickets as { id: string; status: string }[];
+      expect(mine).toEqual([expect.objectContaining({ id: first.id, status: 'cancelado' })]);
+      expect((await json(await b.get(`/tickets/${first.id}`))).ticket.qrPayload).toBeNull();
+    });
 
     it('estorno no gateway cancela os ingressos, mantém paid_at e não devolve estoque', async () => {
       const p = await paidOrder(3);
@@ -992,7 +1018,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       mock.simulate.setStatus(p.paymentId, 'estornado');
       await hook(p.paymentId);
       expect(await sold(e.types[0]!)).toBe(2);
-      const again = await b.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.types[0]!, quantity: 1 }] });
+      const again = await b.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: e.types[0]!, quantity: 1 }] });
       expect([409, 422]).toContain(again.status);
     });
 
@@ -1092,7 +1118,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
     it('criar o pedido não agenda nada; criar a cobrança agenda a 1ª verificação para 1 minuto depois, só daquele pedido', async () => {
       const e = await event();
       const a = await user('cliente', qapp);
-      const created = await a.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.types[0]!, quantity: 2 }] });
+      const created = await a.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: e.types[0]!, quantity: 2 }] });
       expect(created.status).toBe(201);
       const id = (await json(created)).order.id as string;
       expect(queue.tasks).toEqual([]);
@@ -1318,7 +1344,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
     it('tarefa antiga, de pedido sem cobrança: com reserva viva reagenda; com reserva vencida expira e libera o estoque', async () => {
       const e = await event([{ total: 1 }]);
       const a = await user('cliente', qapp);
-      const created = await a.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.types[0]!, quantity: 1 }] });
+      const created = await a.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: e.types[0]!, quantity: 1 }] });
       const id = (await json(created)).order.id as string;
       expect(await run(id, 1)).toMatchObject({ outcome: 'reagendado' }); // ainda dentro dos 10 min de reserva
       clock.advance(11 * 60_000);

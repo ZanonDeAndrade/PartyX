@@ -32,7 +32,7 @@ import { privacyRoutes } from './privacy';
 import { teamRoutes } from './team';
 import { ticketRoutes } from './tickets';
 import { parseJson } from './validate';
-import { signupBlockers, signupTextsProvisional } from '../legal/documents';
+import { legalVersion, signupBlockers, signupTextsProvisional } from '../legal/documents';
 
 /** Dados do usuário que a interface pode ver. O CPF sai mascarado; o hash da senha nunca sai. */
 function publicUser(user: AuthState['user']) {
@@ -127,6 +127,9 @@ export function authRoutes(deps: AuthDeps) {
       privacy: deps.config.legal.privacy,
       termsDate: deps.config.legalDates.terms,
       privacyDate: deps.config.legalDates.privacy,
+      // Política de Cancelamento, Troca e Reembolso: a versão que o checkout manda com o aceite (D-80 atualizada).
+      cancellation: legalVersion(deps.config, 'cancelamento'),
+      cancellationDate: deps.config.legalDates.cancellation,
       ready: deps.config.legal.ready && signupBlockers(deps.config).length === 0,
       provisional: deps.config.legal.provisional || signupTextsProvisional(deps.config),
     }),

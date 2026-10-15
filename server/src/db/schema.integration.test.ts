@@ -143,16 +143,52 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
           'minor_term_acceptances',
           'ticket_lots',
           'order_item_lots',
+          'ticket_transfers',
+          'ticket_minor_acceptances',
+          'cancellation_acceptances',
         ]),
       );
-      expect(tables).toHaveLength(21);
+      expect(tables).toHaveLength(24);
+    });
+
+    it('0016: titular do ingresso preenchido com o comprador (também para quem não o informa); histórico só de inclusão', async () => {
+      const s = await paidSale();
+      const row = (await q('select holder_user_id, holder_minor from tickets where id = $1', [s.ticket])).rows[0];
+      expect(row).toEqual({ holder_user_id: s.buyer, holder_minor: null });
+      const other = await user();
+      const t = (
+        await q(
+          `insert into ticket_transfers (ticket_id,event_id,from_user_id,to_user_id,actor_id,old_short_code,new_short_code,old_code_sha256)
+           values ($1,$2,$3,$4,$3,'PX-AAAA-AAAA','PX-BBBB-BBBB',$5) returning id`,
+          [s.ticket, s.ev, s.buyer, other, 'a'.repeat(64)],
+        )
+      ).rows[0].id;
+      await expect(q("update ticket_transfers set reason = 'x' where id = $1", [t])).rejects.toThrow(/apenas inclusão/);
+      await expect(q('delete from ticket_transfers where id = $1', [t])).rejects.toThrow();
+      // Desfazer exige motivo; transferência do titular não tem; para a mesma conta, não.
+      await expect(
+        q(
+          `insert into ticket_transfers (ticket_id,event_id,from_user_id,to_user_id,actor_id,reverts_id,old_short_code,new_short_code,old_code_sha256)
+           values ($1,$2,$3,$4,$3,$5,'PX-BBBB-BBBB','PX-CCCC-CCCC',$6)`,
+          [s.ticket, s.ev, other, s.buyer, t, 'b'.repeat(64)],
+        ),
+      ).rejects.toThrow(/ticket_transfers_reason_on_revert/);
+      await expect(
+        q(
+          `insert into ticket_transfers (ticket_id,event_id,from_user_id,to_user_id,actor_id,old_short_code,new_short_code,old_code_sha256)
+           values ($1,$2,$3,$3,$3,'PX-BBBB-BBBB','PX-CCCC-CCCC',$4)`,
+          [s.ticket, s.ev, other, 'c'.repeat(64)],
+        ),
+      ).rejects.toThrow(/ticket_transfers_other_account/);
+      await q("insert into cancellation_acceptances (user_id,order_id,policy_version) values ($1,$2,'1.0')", [s.buyer, s.order.id]);
+      await expect(q('delete from cancellation_acceptances where order_id = $1', [s.order.id])).rejects.toThrow();
     });
 
     it('podem rodar de novo sem erro nem duplicar o histórico', async () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(16);
+      expect(r.rows[0].n).toBe(17);
     });
   });
 
@@ -710,7 +746,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag13 = '0013_lotes_por_tipo';
       const tag14 = '0014_cor_de_destaque';
       const tag15 = '0015_capa_desfocada';
+      const tag16 = '0016_transferencia_e_aceite_da_politica';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag15)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag7)).rejects.toThrow(/não é a última/);
@@ -721,6 +759,64 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag12)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag13)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag14)).rejects.toThrow(/não é a última/);
+
+      // 0016: recusa com transferência gravada (quem é o titular de cada ingresso); sem ela, apaga as três tabelas e o titular do
+      // ingresso, e o ingresso continua (do comprador, como antes).
+      const q16 = db.pool.query.bind(db.pool);
+      const u16 = (
+        await q16("insert into users (name,email,cpf,password_hash,role) values ('Ana','ana16@partyx.test','52998224725','x','cliente') returning id")
+      ).rows[0].id;
+      const u16b = (
+        await q16("insert into users (name,email,cpf,password_hash,role) values ('Bia','bia16@partyx.test','11144477735','x','cliente') returning id")
+      ).rows[0].id;
+      const ev16 = (
+        await q16("insert into events (slug,name,starts_at,venue,address,description,age_rating) values ('ev-16','E',now()+interval '9 days','L','A','D','Livre') returning id")
+      ).rows[0].id;
+      const type16 = (
+        await q16("insert into ticket_types (event_id,name,price_cents,quantity_total,sales_start_at,sales_end_at) values ($1,'Pista',100,10,now(),now()+interval '1 day') returning id", [ev16])
+      ).rows[0].id;
+      const o16 = (await q16('insert into orders (user_id,event_id,total_cents) values ($1,$2,100) returning id', [u16, ev16])).rows[0].id;
+      const i16 = (await q16('insert into order_items (order_id,event_id,ticket_type_id,quantity,unit_price_cents) values ($1,$2,$3,1,100) returning id', [o16, ev16, type16])).rows[0].id;
+      const t16 = (
+        await q16(
+          "insert into tickets (order_item_id,order_id,ticket_type_id,event_id,unit_index,holder_name,code,short_code,qr_payload) values ($1,$2,$3,$4,1,'Ana','abcdefghijklmnopqrstuvwx','PX-AAAA-BBBB','p') returning id",
+          [i16, o16, type16, ev16],
+        )
+      ).rows[0].id;
+      await q16(
+        `insert into ticket_transfers (ticket_id,event_id,from_user_id,to_user_id,actor_id,old_short_code,new_short_code,old_code_sha256)
+         values ($1,$2,$3,$4,$3,'PX-AAAA-BBBB','PX-CCCC-DDDD',$5)`,
+        [t16, ev16, u16, u16b, 'f'.repeat(64)],
+      );
+      await expect(rollbackLastMigration(db.url, tag16)).rejects.toThrow(/transferências de ingresso gravadas/);
+      await q16('alter table ticket_transfers disable trigger ticket_transfers_forbid_delete');
+      await q16('delete from ticket_transfers');
+      await rollbackLastMigration(db.url, tag16);
+      expect(
+        (await q16("select to_regclass('ticket_transfers') as a, to_regclass('cancellation_acceptances') as b, to_regclass('ticket_minor_acceptances') as c")).rows[0],
+      ).toEqual({ a: null, b: null, c: null });
+      expect(
+        (await q16("select count(*)::int as n from information_schema.columns where table_name = 'tickets' and column_name in ('holder_user_id','holder_minor')")).rows[0].n,
+      ).toBe(0);
+      expect((await q16('select holder_name from tickets where id = $1', [t16])).rows[0].holder_name).toBe('Ana');
+      await q16('alter table tickets disable trigger tickets_forbid_delete');
+      await q16('delete from tickets where id = $1', [t16]);
+      await q16('alter table tickets enable trigger tickets_forbid_delete');
+      await q16('alter table order_items disable trigger order_items_forbid_delete');
+      await q16('delete from order_items where id = $1', [i16]);
+      await q16('alter table order_items enable trigger order_items_forbid_delete');
+      await q16('alter table orders disable trigger orders_forbid_delete');
+      await q16('delete from orders where id = $1', [o16]);
+      await q16('alter table orders enable trigger orders_forbid_delete');
+      await q16('alter table ticket_types disable trigger ticket_types_delete_only_unused');
+      await q16('delete from ticket_types where id = $1', [type16]);
+      await q16('alter table ticket_types enable trigger ticket_types_delete_only_unused');
+      await q16('delete from events where id = $1', [ev16]);
+      await q16('delete from users where id = any($1)', [[u16, u16b]]).catch(async () => {
+        await q16('alter table users disable trigger users_forbid_delete');
+        await q16('delete from users where id = any($1)', [[u16, u16b]]);
+        await q16('alter table users enable trigger users_forbid_delete');
+      });
 
       // 0015: só a coluna da miniatura da capa (e a regra dela); reverter a apaga, e o evento e a capa ficam.
       const ev15 = (
@@ -927,8 +1023,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0015 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0016 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag16);
       await rollbackLastMigration(db.url, tag15);
       await rollbackLastMigration(db.url, tag14);
       await rollbackLastMigration(db.url, tag13);
@@ -1005,7 +1102,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       r = await db.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'");
-      expect(r.rows[0].n).toBe(21); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013)
+      expect(r.rows[0].n).toBe(24); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013) + as três da 0016
     } finally {
       await db.drop();
     }

@@ -14,6 +14,15 @@ export function cpfFor(n) {
   return d.join('');
 }
 
+/** Aceite da Política de Cancelamento, Troca e Reembolso que o checkout exige (D-80 atualizada), com a versão vigente do servidor. */
+let policyCache;
+export async function policy() {
+  policyCache ??= fetch(`${BASE}/api/legal/versions`)
+    .then(r => r.json())
+    .then(v => ({ cancellationAccepted: true, cancellationVersion: v.cancellation ?? null }));
+  return policyCache;
+}
+
 export class Client {
   constructor(ip = nextIp()) { this.ip = ip; this.cookie = ''; this.csrf = ''; }
   async req(method, path, body, extra = {}) {

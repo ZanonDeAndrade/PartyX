@@ -94,6 +94,9 @@ async function order(c: Client, slug: string, items: [string, number][], coupon:
   const e = ev(slug);
   const r = must(
     await c.post('/api/orders', {
+      // Aceite da Política de Cancelamento, Troca e Reembolso (D-80 atualizada), com a versão vigente.
+      cancellationAccepted: true,
+      cancellationVersion: (await c.get('/api/legal/versions')).json.cancellation,
       eventSlug: slug,
       items: items.map(([type, quantity]) => ({ ticketTypeId: e.types[type], quantity })),
       couponCode: coupon,

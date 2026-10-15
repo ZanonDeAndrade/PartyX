@@ -6,6 +6,12 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 const SP = process.env.SP ?? '.';
 const BASE = process.env.BASE_URL ?? 'https://partyx-hml.web.app';
 const creds = JSON.parse(readFileSync(`${SP}/hml-creds.json`, 'utf8'));
+/** Aceite da Política de Cancelamento, Troca e Reembolso exigido no checkout (D-80 atualizada), com a versão vigente do servidor. */
+let policyCache;
+const policy = () =>
+  (policyCache ??= fetch(`${BASE}/api/legal/versions`)
+    .then(r => r.json())
+    .then(v => ({ cancellationAccepted: true, cancellationVersion: v.cancellation ?? null })));
 const STATE = `${SP}/hml-e2e-state.json`;
 const state = existsSync(STATE) ? JSON.parse(readFileSync(STATE, 'utf8')) : { timings: [], orders: {} };
 const save = () => writeFileSync(STATE, JSON.stringify(state, null, 1));
@@ -48,7 +54,7 @@ async function signup(label, n) {
   return { c, email };
 }
 async function order(c, label, qty) {
-  const r = await c.post('/api/orders', { eventSlug: creds.slug, items: [{ ticketTypeId: creds.pista, quantity: qty }] });
+  const r = await c.post('/api/orders', { ...(await policy()), eventSlug: creds.slug, items: [{ ticketTypeId: creds.pista, quantity: qty }] });
   step(`pedido ${label} (reserva + agenda a tarefa de +10 min no Cloud Tasks)`, r);
   if (r.status !== 201) throw new Error('pedido ' + r.status + JSON.stringify(r.json));
   const pay = await c.post(`/api/orders/${r.json.order.id}/payment`, { method: 'pix' });

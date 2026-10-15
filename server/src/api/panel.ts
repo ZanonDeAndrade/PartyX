@@ -14,6 +14,8 @@ import {
 } from '../panel/service';
 import { parseJson } from './validate';
 import { buyerDetail, listBuyers, revealBuyerCpf, ticketDetail } from '../panel/people';
+import { undoLastTransfer } from '../tickets/transfer';
+import { processSoon } from '../mail/outbox';
 
 const uuid = z.uuid();
 const orderStatus = z.enum([
@@ -122,6 +124,18 @@ export function panelRoutes(deps: AuthDeps) {
   app.post('/admin/tickets/:id/cancel', async c => {
     const body = await parseJson(c, cancelBody);
     return c.json(await cancelTickets(panel, actor(c), { ticketId: id(c.req.param('id'), 'Ingresso') }, body));
+  });
+  /**
+   * Desfaz a última transferência do ingresso (D-87, fraude comprovada): motivo obrigatório e confirmação, como o cancelamento. O
+   * ingresso volta para quem transferiu, com QR novo; os dois recebem e-mail.
+   */
+  app.post('/admin/tickets/:id/transfer/undo', async c => {
+    const body = await parseJson(c, cancelBody);
+    const ticketId = id(c.req.param('id'), 'Ingresso');
+    const done = await undoLastTransfer(deps, actor(c).id, ticketId, body);
+    await processSoon(deps, { userId: done.returnedTo });
+    await processSoon(deps, { userId: done.takenFrom });
+    return c.json(await ticketDetail(panel, ticketId));
   });
   app.post('/admin/orders/:id/cancel-tickets', async c => {
     const body = await parseJson(c, cancelBody);

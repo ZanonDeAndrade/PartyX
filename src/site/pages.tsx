@@ -463,7 +463,7 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
           ) : null}
           <p className="px-fine">
             Escolher a quantidade ainda não reserva nada. A reserva começa quando você for para o pagamento.{' '}
-            <Link to="/politica-de-cancelamento">Política de cancelamento</Link>
+            <Link to="/politica-de-cancelamento">Política de cancelamento, troca e reembolso</Link>
           </p>
           <div className="px-mobbar">
             <div>

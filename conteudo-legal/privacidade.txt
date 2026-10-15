@@ -14,7 +14,7 @@ Coletamos apenas o necessário para a sua conta, suas compras e a sua entrada no
 
 Cadastro: nome completo, data de nascimento, e-mail, CPF, telefone com DDD e senha. A senha é guardada apenas em forma cifrada irreversível (hash), e ninguém consegue lê-la.
 
-Aceite dos documentos: versão dos Termos de Uso e desta Política que você aceitou, data e hora, endereço IP e navegador.
+Aceite dos documentos: versão dos Termos de Uso e desta Política que você aceitou, data e hora, endereço IP e navegador. Em cada compra, também a versão da Política de Cancelamento, Troca e Reembolso aceita, com o pedido, data e hora, endereço IP e navegador.
 
 Compras: pedidos, tipos e quantidades de ingressos, valores, forma de pagamento, código de promoter informado, situação do pedido, datas e o motivo de recusa informado pelo Mercado Pago.
 
@@ -25,6 +25,8 @@ Notificações de pagamento: o conteúdo das confirmações enviadas pelo Mercad
 Menores de idade: o aceite do Termo de Ciência para Menores de Idade, com versão, data e hora, e o Termo de Autorização e Responsabilidade em papel entregue na portaria, com os dados do menor e do responsável.
 
 Ingressos: nome do titular, códigos, situação, datas de emissão e de cancelamento e o motivo do cancelamento.
+
+Transferências: conta de origem, conta de destino, ingresso, data e hora.
 
 Portaria: cada leitura de ingresso, com o resultado, a forma de validação (câmera ou busca manual), o horário e o validador.
 
@@ -65,6 +67,8 @@ Provedores de entrega do site, hoje Vercel e Firebase Hosting (Google): recebem 
 Resend, com envio pela Amazon: envio dos e-mails da conta e das compras.
 
 Zanon de Andrade Softwares: hospeda e mantém o sistema, como operadora.
+
+Transferência de ingresso: quem transfere vê só parte do nome de quem vai receber (o primeiro nome e as iniciais), para confirmar a conta de destino, e quem recebe vê da mesma forma o nome de quem transferiu.
 
 Dentro da PartyX, os dados são acessados apenas pela equipe autorizada, com permissões por função. Nas telas da equipe, nas planilhas e na lista impressa de contingência da portaria, o CPF aparece mascarado.
 

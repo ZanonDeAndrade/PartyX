@@ -127,7 +127,7 @@ describe.skipIf(!ADMIN_URL)('e-mails transacionais (integração)', () => {
     const buyer = await session(app, 'cliente', 'Marina Costa');
     const order = (
       await json(
-        await buyer.post('/orders', { eventSlug: slug, items: [{ ticketTypeId: typeId, quantity: opts.qty ?? 2 }] }),
+        await buyer.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: slug, items: [{ ticketTypeId: typeId, quantity: opts.qty ?? 2 }] }),
       )
     ).order as { id: string };
     await buyer.post(`/orders/${order.id}/payment`, { method: 'pix' });

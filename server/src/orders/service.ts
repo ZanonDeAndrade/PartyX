@@ -3,6 +3,7 @@ import type { Db } from '../db/client';
 import type { Tx } from '../db/audit';
 import {
   events,
+  cancellationAcceptances,
   minorTermAcceptances,
   orderItemLots,
   orderItems,
@@ -22,13 +23,14 @@ import {
   type TypeForPlan,
 } from '../domain/checkout';
 import { AppError } from '../domain/errors';
+import { transferredOutOfOrder } from '../tickets/service';
 import { DECLINE_REASONS, type DeclineReason } from '../domain/payment';
 import { isCouponCodeValid, normalizeCouponCode } from '../domain/events';
 import type { Config, SupportContact } from '../config';
 import { reservedByType } from '../events/service';
 import { previewTypes, saveLots, settleTypes } from '../events/lots';
 import type { Clock } from '../providers/clock';
-import { salesBlockers } from '../legal/documents';
+import { legalVersion, salesBlockers } from '../legal/documents';
 import { logger } from '../logger';
 import type { TaskQueue } from '../payments/taskQueue';
 import type { RequestMeta } from '../auth/types';
@@ -66,6 +68,9 @@ export interface CheckoutInput {
   /** Caixa do Termo de Ciência para Menores marcada pela pessoa (16 ou 17 anos na data do evento), e a versão que ela leu. */
   minorTermAccepted?: boolean;
   minorTermVersion?: string | null;
+  /** Caixa da Política de Cancelamento, Troca e Reembolso marcada pela pessoa, e a versão que ela leu (D-80 atualizada). */
+  cancellationAccepted?: boolean;
+  cancellationVersion?: string | null;
 }
 
 const FAILURE_TEXT: Record<ItemFailure['reason'], string> = {
@@ -229,6 +234,8 @@ export async function quote(deps: OrdersDeps, input: CheckoutInput, userId?: str
 }
 
 export interface OrderView {
+  /** Ingressos do pedido que o comprador transferiu (D-87), com o nome de quem recebeu mascarado. Só em `getOrder`. */
+  transferred?: { typeName: string; to: string; at: string }[];
   id: string;
   number: number;
   status: typeof orders.$inferSelect.status;
@@ -395,6 +402,29 @@ async function release(tx: Tx, orderId: string, now: Date) {
 }
 
 /**
+ * A pessoa marcou a caixa da Política de Cancelamento, Troca e Reembolso e leu a versão vigente (D-80 atualizada, 15/10/2026). Devolve
+ * a versão que vai para o aceite. Sem a Política publicada (produção), a venda já está fechada por `salesBlockers`.
+ */
+function assertCancellationAccepted(config: OrdersDeps['config'], input: CheckoutInput): string {
+  const version = legalVersion(config, 'cancelamento');
+  if (!version) throw new AppError(503, 'politica_indisponivel', 'A compra está indisponível no momento.');
+  if (input.cancellationAccepted !== true)
+    throw new AppError(422, 'dados_invalidos', 'Alguns campos precisam de ajuste.', [
+      {
+        campo: 'cancellationAccepted',
+        mensagem: 'Para continuar, leia e aceite a Política de Cancelamento, Troca e Reembolso.',
+      },
+    ]);
+  if (input.cancellationVersion !== version)
+    throw new AppError(
+      409,
+      'versao_desatualizada',
+      'A Política de Cancelamento, Troca e Reembolso foi atualizada. Leia e aceite novamente.',
+    );
+  return version;
+}
+
+/**
  * Cria o pedido e reserva o estoque (RF-28, RF-33, CA-15, CA-16).
  *
  * Uma transação, nesta ordem: (1) trava do comprador, para dois cliques seguidos virarem um pedido só;
@@ -411,6 +441,7 @@ export async function createOrder(
 ): Promise<OrderView> {
   assertSalesOpen(deps);
   shapeOrThrow(deps, input.items);
+  const policyVersion = assertCancellationAccepted(deps.config, input);
   const promoterId = await resolveCoupon(deps.db, input.couponCode);
   const now = deps.clock.now();
   const expiresAt = new Date(now.getTime() + deps.config.RESERVATION_MINUTES * 60_000);
@@ -495,6 +526,15 @@ export async function createOrder(
         updatedAt: now,
       })
       .returning({ id: orders.id });
+    // Aceite da Política de Cancelamento, Troca e Reembolso (D-80 atualizada): na mesma transação, ligado ao pedido.
+    await tx.insert(cancellationAcceptances).values({
+      userId,
+      orderId: order!.id,
+      policyVersion,
+      acceptedAt: now,
+      ip: meta.ip,
+      userAgent: meta.userAgent?.slice(0, 255) ?? null,
+    });
     if (buyer.minor) {
       // Aceite do termo de menor na mesma transação do pedido: existe se, e somente se, o pedido existe.
       await tx.insert(minorTermAcceptances).values({
@@ -560,7 +600,9 @@ export async function getOrder(deps: OrdersDeps, userId: string, orderId: string
     .limit(1);
   if (!own) throw new AppError(404, 'nao_encontrado', 'Pedido não encontrado.');
   await expireOverdue(deps, { orderId });
-  return view(deps.db, orderId, deps.clock.now(), deps.config.partyxSupport);
+  const order = await view(deps.db, orderId, deps.clock.now(), deps.config.partyxSupport);
+  // Ingressos que o comprador transferiu (D-87): a página mostra "Transferido para Maria S. O.", sem QR.
+  return { ...order, transferred: await transferredOutOfOrder(deps.db, userId, orderId) };
 }
 
 /** O comprador desiste antes de pagar: a reserva é liberada na hora. Repetir não faz mal. */

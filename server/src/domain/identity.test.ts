@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { isValidCpf, maskCpf, onlyDigits } from './cpf';
-import { hasFullName, isEmailFormat, isPhoneValid, normalizeEmail, normalizeName, normalizePhone } from './identity';
+import {
+  hasFullName,
+  isEmailFormat,
+  isPhoneValid,
+  maskName,
+  normalizeEmail,
+  normalizeName,
+  normalizePhone,
+} from './identity';
 import { hashToken, newToken, passwordProblem } from './password';
 
 describe('CPF', () => {
@@ -71,5 +79,15 @@ describe('senha e tokens', () => {
     expect(a.length).toBeGreaterThanOrEqual(43);
     expect(hashToken(a)).toMatch(/^[0-9a-f]{64}$/);
     expect(hashToken(a)).not.toContain(a);
+  });
+});
+
+describe('nome mascarado na transferência (D-87)', () => {
+  it('primeiro nome e as iniciais dos outros, sem partículas', () => {
+    expect(maskName('Maria da Silva Oliveira')).toBe('Maria S. O.');
+    expect(maskName('  joão   dos santos  ')).toBe('joão S.');
+    expect(maskName('Ana de Souza e Lima')).toBe('Ana S. L.');
+    expect(maskName('Érica Ávila')).toBe('Érica Á.');
+    expect(maskName('Cher')).toBe('Cher');
   });
 });

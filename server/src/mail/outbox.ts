@@ -4,7 +4,8 @@ import { and, eq, sql } from 'drizzle-orm';
 import type { Config } from '../config';
 import type { Db } from '../db/client';
 import type { Tx } from '../db/audit';
-import { emailLog, events, orders, ticketLots, ticketTypes, tickets, users } from '../db/schema';
+import { emailLog, events, orders, ticketLots, ticketTransfers, ticketTypes, tickets, users } from '../db/schema';
+import { maskName } from '../domain/identity';
 import { typeWithLotName } from '../events/lots';
 import { formatInEventZone, formatEventDateTime } from '../domain/time';
 import { logger } from '../logger';
@@ -15,6 +16,9 @@ import {
   composeCompra,
   composePagamentoSemEstoque,
   composeRecuperacao,
+  composeTransferenciaDesfeita,
+  composeTransferenciaEnviada,
+  composeTransferenciaRecebida,
   type Composed,
   type MailContext,
 } from './templates';
@@ -154,6 +158,54 @@ async function compose(
     };
     // Só o número do pedido vai para os metadados da mensagem (nada do comprador).
     return { ...composePagamentoSemEstoque(data, ctx), to: user.email, data: { orderNumber: data.orderNumber } };
+  }
+
+  if (
+    row.template === 'transferencia_enviada' ||
+    row.template === 'transferencia_recebida' ||
+    row.template === 'transferencia_desfeita'
+  ) {
+    // Chave `transferencia:<id>:<lado>` (tickets/transfer.ts): a mensagem é montada com o histórico, nunca com o QR ou o código.
+    const [, transferId, side] = row.idempotencyKey.split(':');
+    if (!transferId || !side) return { skip: 'sem_transferencia' };
+    const [t] = await deps.db
+      .select({
+        fromUserId: ticketTransfers.fromUserId,
+        toUserId: ticketTransfers.toUserId,
+        newShortCode: ticketTransfers.newShortCode,
+        createdAt: ticketTransfers.createdAt,
+        eventName: events.name,
+        startsAt: events.startsAt,
+        typeName: typeWithLotName,
+      })
+      .from(ticketTransfers)
+      .innerJoin(tickets, eq(tickets.id, ticketTransfers.ticketId))
+      .innerJoin(events, eq(events.id, ticketTransfers.eventId))
+      .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+      .leftJoin(ticketLots, eq(ticketLots.id, tickets.lotId))
+      .where(eq(ticketTransfers.id, transferId))
+      .limit(1);
+    if (!t) return { skip: 'sem_transferencia' };
+    // O outro lado: para quem transferiu (ou para quem recebeu de volta), quem recebeu; para os outros, quem transferiu.
+    const otherId = side === 'enviada' || side === 'saida' ? t.toUserId : t.fromUserId;
+    const [other] = await deps.db.select({ name: users.name }).from(users).where(eq(users.id, otherId)).limit(1);
+    const data = {
+      name,
+      other: other ? maskName(other.name) : 'outra conta',
+      eventName: t.eventName,
+      eventDate: formatInEventZone(t.startsAt, { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      eventTime: formatInEventZone(t.startsAt, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
+      typeName: t.typeName,
+      shortCode: t.newShortCode,
+      at: formatEventDateTime(t.createdAt).replace(' ', ' às '),
+    };
+    const composed =
+      row.template === 'transferencia_enviada'
+        ? composeTransferenciaEnviada(data, ctx)
+        : row.template === 'transferencia_recebida'
+          ? composeTransferenciaRecebida(data, ctx)
+          : composeTransferenciaDesfeita({ ...data, returned: side === 'volta' }, ctx);
+    return { ...composed, to: user.email, data: { name, eventName: data.eventName } };
   }
 
   // compra_confirmada

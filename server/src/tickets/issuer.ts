@@ -25,8 +25,9 @@ type OrderToIssue = {
  * Emite **um ingresso por unidade** (RF-38) dentro da transação em andamento, com QR distinto por unidade (CA-20).
  *
  * Idempotente: `(order_item_id, unit_index)` é único e o `INSERT` ignora o que já existe, então reprocessar a confirmação,
- * rodar de novo uma rotina ou emitir pela segunda vez nunca duplica. O nome do titular é o do comprador, em todas as unidades
- * (não há transferência de titularidade). O CPF **não** entra no ingresso (D-07): só com decisão expressa do cliente.
+ * rodar de novo uma rotina ou emitir pela segunda vez nunca duplica. Na emissão, o titular é o comprador, em todas as unidades;
+ * depois ele pode transferir cada ingresso (D-87, `transfer.ts`). O CPF **não** entra no ingresso (D-07): só com decisão expressa do
+ * cliente.
  */
 export async function issueForOrder(tx: Tx, qr: QrConfig, order: OrderToIssue): Promise<number> {
   const [buyer] = await tx.select({ name: users.name }).from(users).where(eq(users.id, order.userId)).limit(1);
@@ -71,6 +72,7 @@ export async function issueForOrder(tx: Tx, qr: QrConfig, order: OrderToIssue): 
         unitIndex: unit,
         lotId: lotOfUnit(item.orderItemId, unit),
         holderName: buyer.name,
+        holderUserId: order.userId,
         code,
         shortCode: newShortCode(),
         qrPayload: signQr(qr.keys, qr.currentVersion, order.eventId, code),

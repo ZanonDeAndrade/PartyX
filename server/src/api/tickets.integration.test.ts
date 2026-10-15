@@ -143,7 +143,7 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
 
   async function pay(s: Session, e: Awaited<ReturnType<typeof event>>, qty: number[] = [3]) {
     const items = qty.map((quantity, i) => ({ ticketTypeId: e.types[i]!, quantity }));
-    const order = (await json(await s.post('/orders', { eventSlug: e.slug, items }))).order as { id: string };
+    const order = (await json(await s.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items }))).order as { id: string };
     expect((await s.post(`/orders/${order.id}/payment`, { method: 'pix' })).status).toBe(201);
     const paymentId = (await sql('select gateway_payment_id from orders where id = $1', [order.id])).rows[0]
       .gateway_payment_id as string;
@@ -377,10 +377,13 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
           'event',
           'holderName',
           'id',
+          'minorTermPending',
           'orderId',
           'orderNumber',
+          'receivedFrom',
           'shortCode',
           'status',
+          'transferUntil',
           'typeName',
           'usedAt',
         ]);
@@ -596,6 +599,9 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
             shortCode: 'PX-ABCD-2345',
             status: 'valido',
             usedAt: null,
+            receivedFrom: null,
+            transferUntil: '2026-12-12T23:00:00.000Z',
+            minorTermPending: false,
             qrPayload: 'PX1.1.' + 'a'.repeat(32) + '.' + 'b'.repeat(24) + '.' + 'c'.repeat(22),
           },
         ],
@@ -688,8 +694,8 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
     });
   });
 
-  describe('sem transferência', () => {
-    it('não existe rota para trocar o titular de um ingresso', () => {
+  describe('rotas que mudam um ingresso (D-87)', () => {
+    it('fora do painel, só as da transferência e o aceite do Termo de Ciência de quem recebeu', () => {
       const writes = app.routes.filter(
         r =>
           r.path.startsWith('/api') &&
@@ -698,7 +704,11 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
           /ticket|ingresso/i.test(r.path) &&
           !r.path.startsWith('/api/admin'),
       );
-      expect(writes.map(r => `${r.method} ${r.path}`)).toEqual([]);
+      expect([...new Set(writes.map(r => `${r.method} ${r.path}`))].sort()).toEqual([
+        'POST /api/tickets/:id/termo-menor',
+        'POST /api/tickets/:id/transfer',
+        'POST /api/tickets/:id/transfer/preview',
+      ]);
     });
   });
 });

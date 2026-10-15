@@ -11,7 +11,7 @@ describe.skipIf(!ADMIN_URL)('conferência da restauração do backup (integraç�
   let testDb: Awaited<ReturnType<typeof createTestDatabase>>;
   const sql = (text: string, params: unknown[] = []) => testDb.pool.query(text, params);
   const config = loadConfig({ APP_ENV: 'local', PAYMENT_GATEWAY: 'none' });
-  const JOURNAL = 16; // migrações do repositório (0000 a 0015)
+  const JOURNAL = 17; // migrações do repositório (0000 a 0016)
   let n = 0;
 
   beforeAll(async () => {

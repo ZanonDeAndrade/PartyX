@@ -6,13 +6,15 @@ A Plataforma pertence a 58.471.403 BERNARDO PEIXOTO FORTES BITTENCOURT, empresá
 
 O sistema é hospedado e mantido pela Zanon de Andrade Softwares, CNPJ 57.971.378/0001-50, que presta serviço de tecnologia à PartyX. Ela não vende ingressos, não recebe pagamentos e não presta atendimento ao comprador.
 
-Ao criar uma conta, você declara que leu e aceita estes Termos e a Política de Privacidade. Se não concordar, não crie conta nem compre ingressos. Cada compra também segue a Política de Cancelamento e Reembolso e as regras informadas na página de cada evento.
+Ao criar uma conta, você declara que leu e aceita estes Termos e a Política de Privacidade. Se não concordar, não crie conta nem compre ingressos. Cada compra também segue a Política de Cancelamento, Troca e Reembolso e as regras informadas na página de cada evento.
 
 # 2. Definições
 
 Plataforma: o site partyx.com.br, com a vitrine de eventos, a área do cliente e o ingresso digital.
 
 Usuário ou comprador: a pessoa que cria uma conta na Plataforma.
+
+Titular: a pessoa em cuja conta o ingresso está. Na compra, é o comprador; depois de uma transferência, é quem recebeu o ingresso.
 
 Evento: a festa ou atividade organizada pela PartyX e divulgada na Plataforma.
 
@@ -70,7 +72,7 @@ Cobrança em duplicidade: se o mesmo pedido for cobrado mais de uma vez, a cobra
 
 Cada ingresso comprado gera um ingresso digital individual, com QR Code exclusivo e um código curto no formato PX-XXXX-XXXX. Os ingressos ficam em "Meus ingressos", na área logada, e podem ser exibidos em tela cheia ou baixados em PDF. O e-mail de confirmação traz apenas um link para essa área.
 
-Titularidade: todos os ingressos de um pedido são emitidos no nome do comprador. Não há transferência de titularidade nem troca de nome. O comprador pode adquirir ingressos para acompanhantes, dentro do limite por pedido, e responde pelo repasse e pelo uso desses ingressos.
+Titularidade: todos os ingressos de um pedido são emitidos no nome do comprador. O titular pode transferir o ingresso para outra pessoa que tenha conta na Plataforma, até 2 horas antes do início do Evento, conforme a Política de Cancelamento, Troca e Reembolso. Na transferência, o QR Code anterior é cancelado e um novo é gerado. O comprador pode adquirir ingressos para acompanhantes, dentro do limite por pedido, e responde pelo repasse e pelo uso desses ingressos.
 
 Guarda do QR Code: o QR Code funciona como chave de entrada, e cada ingresso permite uma única entrada. Qualquer cópia, como captura de tela ou impressão, é aceita na leitura: entra quem apresentar primeiro, e as apresentações seguintes são recusadas como "já utilizado". Guarde seus ingressos com cuidado e não os divulgue. A PartyX não responde pelo uso do ingresso por pessoas a quem o comprador tenha dado acesso ao QR Code ou ao código, nem por perda ou vazamento causados pelo comprador.
 
@@ -78,19 +80,19 @@ Validação: a entrada é validada pela equipe da PartyX, na portaria, pela leit
 
 Menores de 18 anos: em Eventos que permitem a entrada de menores, quem tiver 16 ou 17 anos na data do Evento precisa aceitar, na compra, o Termo de Ciência para Menores de Idade. Na portaria, o menor deve entregar o Termo de Autorização e Responsabilidade, disponível para download na Plataforma, preenchido e assinado pelo pai, pela mãe ou pelo responsável legal, junto com uma cópia do documento com foto do responsável, e apresentar o próprio documento original com foto. Com esses documentos, o menor pode entrar desacompanhado. Sem eles, a entrada é recusada. O termo fica retido na portaria. A mesma regra vale para acompanhantes de 16 ou 17 anos que usem ingressos comprados por outra pessoa. Menores de 16 anos não entram nos Eventos.
 
-Classificação etária e regras do Evento: a classificação etária aparece na página do Evento e no ingresso. A PartyX pode recusar a entrada de quem não atender à classificação etária ou à lei, ou de quem descumprir as regras de segurança, de conduta e do local informadas para o Evento. Nesses casos, aplica-se a Política de Cancelamento e Reembolso.
+Classificação etária e regras do Evento: a classificação etária aparece na página do Evento e no ingresso. A PartyX pode recusar a entrada de quem não atender à classificação etária ou à lei, ou de quem descumprir as regras de segurança, de conduta e do local informadas para o Evento. Nesses casos, aplica-se a Política de Cancelamento, Troca e Reembolso.
 
 Programação: atrações, horários e local são de responsabilidade da PartyX e podem mudar. As mudanças são informadas na página do Evento.
 
-# 6. Cancelamento e reembolso
+# 6. Cancelamento, troca e reembolso
 
-As regras de desistência, cancelamento e reembolso, inclusive para Evento adiado ou cancelado, constam da Política de Cancelamento e Reembolso. Ela será publicada na Plataforma antes do início das vendas e passará a fazer parte destes Termos.
+Não há cancelamento nem reembolso por desistência do comprador, em nenhum prazo. Em vez disso, o titular pode transferir o ingresso para outra pessoa, como explica a Política de Cancelamento, Troca e Reembolso, que faz parte destes Termos.
 
-Em qualquer caso, o reembolso, quando devido, é feito pela PartyX, pelo Mercado Pago, no mesmo meio de pagamento usado na compra.
+O reembolso só ocorre nos casos previstos nessa Política: Evento cancelado, adiado ou alterado pela PartyX, entrada recusada por erro da PartyX e cobranças indevidas. Quando devido, o reembolso é feito pela PartyX, pelo Mercado Pago, no mesmo meio de pagamento usado na compra, e vai para quem fez o pedido, mesmo que o ingresso tenha sido transferido.
 
 Ingresso cancelado ou estornado deixa de valer para entrada. Ingresso já utilizado não pode ser cancelado.
 
-Se o pagamento for estornado por inteiro, os ingressos do pedido são cancelados automaticamente. Se a compra for contestada junto à operadora do cartão, os ingressos do pedido também são cancelados.
+Se o pagamento for estornado por inteiro, os ingressos do pedido são cancelados automaticamente, inclusive os que já tiverem sido transferidos. Se a compra for contestada junto à operadora do cartão, os ingressos do pedido também são cancelados, inclusive os transferidos.
 
 Nada nestes Termos limita os direitos garantidos pelo Código de Defesa do Consumidor.
 

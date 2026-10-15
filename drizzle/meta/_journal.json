@@ -113,6 +113,13 @@
       "when": 1792068852507,
       "tag": "0015_capa_desfocada",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792095049450,
+      "tag": "0016_transferencia_e_aceite_da_politica",
+      "breakpoints": true
     }
   ]
 }

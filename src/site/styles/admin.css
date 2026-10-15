@@ -833,3 +833,9 @@ body.px-dark .px-preview-bar a {
   overflow-wrap: anywhere;
 }
 
+
+/* Etiqueta ao lado de um nome numa célula de tabela (ex.: "Transferido" na lista de ingressos do evento, D-87). */
+.px-badge-inline {
+  margin-left: var(--px-s-2);
+  vertical-align: middle;
+}

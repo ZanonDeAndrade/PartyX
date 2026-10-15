@@ -1,4 +1,4 @@
-import { Client, BASE, seed, cpfFor } from './lib.mjs';
+import { Client, BASE, seed, cpfFor, policy } from './lib.mjs';
 const out = []; const t = (name, ok, info = '') => { out.push({ name, ok: !!ok, info }); console.log(ok ? 'OK    ' : 'ACHADO', name, info); };
 const anon = new Client(); const H = (await anon.get('/')).headers;
 const A = (await anon.get('/api/public/events')).headers;
@@ -25,8 +25,8 @@ const bad = await anon.req('POST', '/api/auth/login', undefined, { 'content-type
 const big = await anon.post('/api/auth/login', { email: 'a'.repeat(2_000_000), password: 'x' }, { connection: 'close' }); t('corpo gigante é recusado (não 5xx)', big.status >= 400 && big.status < 500, big.status);
 // CSRF / origem
 const c = new Client(); await c.signup(900001);
-const evil = await c.post('/api/orders', { eventSlug: seed.slug, items: [{ ticketTypeId: seed.pista, quantity: 1 }] }, { origin: 'https://evil.example' }); t('POST com Origin de outro site é recusado (CSRF)', evil.status === 403, evil.status);
-const noCsrf = new Client(); noCsrf.cookie = c.cookie; const nc = await noCsrf.post('/api/orders', { eventSlug: seed.slug, items: [{ ticketTypeId: seed.pista, quantity: 1 }] }); t('POST com cookie mas sem token CSRF é recusado', nc.status === 403, nc.status);
+const evil = await c.post('/api/orders', { ...(await policy()), eventSlug: seed.slug, items: [{ ticketTypeId: seed.pista, quantity: 1 }] }, { origin: 'https://evil.example' }); t('POST com Origin de outro site é recusado (CSRF)', evil.status === 403, evil.status);
+const noCsrf = new Client(); noCsrf.cookie = c.cookie; const nc = await noCsrf.post('/api/orders', { ...(await policy()), eventSlug: seed.slug, items: [{ ticketTypeId: seed.pista, quantity: 1 }] }); t('POST com cookie mas sem token CSRF é recusado', nc.status === 403, nc.status);
 const cors = await anon.req('OPTIONS', '/api/orders', undefined, { origin: 'https://evil.example', 'access-control-request-method': 'POST' }); t('CORS não libera outro site', !cors.headers.get('access-control-allow-origin'), cors.headers.get('access-control-allow-origin') || 'sem cabeçalho');
 // Cookie
 const r2 = await new Client().post('/api/auth/login', { email: 'admin@partyx.test', password: 'festa2026' }); const ck = r2.headers.get('set-cookie') || '';

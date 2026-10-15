@@ -211,7 +211,7 @@ export function composeCompra(data: PurchaseData, ctx: MailContext): Composed {
         }
       : {}),
     footnote:
-      'O botão abre Meus ingressos; é preciso entrar na sua conta para ver os QR Codes. Cancelamentos e reembolsos seguem a Política de Cancelamento da PartyX.',
+      'O botão abre Meus ingressos; é preciso entrar na sua conta para ver os QR Codes. Cancelamentos, transferências e reembolsos seguem a Política de Cancelamento, Troca e Reembolso da PartyX.',
   };
   return {
     subject: subjectWith(ctx, `Compra confirmada · ${data.eventName} · Pedido ${data.orderNumber}`),
@@ -257,6 +257,102 @@ export function composePagamentoSemEstoque(data: PaidWithoutStockData, ctx: Mail
   };
   return {
     subject: subjectWith(ctx, `Pagamento recebido sem ingresso disponível · Pedido ${data.orderNumber}`),
+    text: text(l, ctx),
+    html: html(l, ctx),
+  };
+}
+
+/**
+ * Transferência de ingresso (D-87). Nunca leva QR, código nem PDF: só o evento, o código curto novo (que não é credencial) e o nome
+ * da outra pessoa mascarado ("Maria S. O.").
+ */
+export interface TransferData {
+  name: string;
+  /** O outro lado, mascarado. */
+  other: string;
+  eventName: string;
+  eventDate: string;
+  eventTime: string;
+  typeName: string;
+  shortCode: string;
+  at: string;
+}
+
+/** Para quem transferiu. */
+export function composeTransferenciaEnviada(data: TransferData, ctx: MailContext): Composed {
+  const l: Layout = {
+    preheader: `Seu ingresso de ${data.eventName} foi transferido para ${data.other}.`,
+    title: 'Ingresso transferido',
+    paragraphs: [
+      `Olá, ${data.name}.`,
+      `Você transferiu um ingresso de ${data.eventName} para ${data.other}. O ingresso saiu de Meus ingressos e o QR Code que você tinha deixou de valer, inclusive em capturas de tela, impressões e PDFs.`,
+    ],
+    details: [
+      { label: 'Evento', value: data.eventName },
+      { label: 'Data', value: `${data.eventDate} às ${data.eventTime}` },
+      { label: 'Ingresso', value: data.typeName },
+      { label: 'Transferido em', value: data.at },
+    ],
+    cta: { label: 'Abrir Meus ingressos', url: `${ctx.baseUrl}/meus-ingressos` },
+    footnote:
+      'Se você não fez esta transferência, troque sua senha e fale com o atendimento da PartyX o quanto antes. Transferências e reembolsos seguem a Política de Cancelamento, Troca e Reembolso.',
+  };
+  return {
+    subject: subjectWith(ctx, `Ingresso transferido · ${data.eventName}`),
+    text: text(l, ctx),
+    html: html(l, ctx),
+  };
+}
+
+/** Para quem recebeu. */
+export function composeTransferenciaRecebida(data: TransferData, ctx: MailContext): Composed {
+  const l: Layout = {
+    preheader: `${data.other} transferiu um ingresso de ${data.eventName} para você.`,
+    title: 'Você recebeu um ingresso',
+    paragraphs: [
+      `Olá, ${data.name}.`,
+      `${data.other} transferiu para a sua conta um ingresso de ${data.eventName}. Ele já está em Meus ingressos, com um QR Code novo, em seu nome.`,
+    ],
+    details: [
+      { label: 'Evento', value: data.eventName },
+      { label: 'Data', value: `${data.eventDate} às ${data.eventTime}` },
+      { label: 'Ingresso', value: data.typeName },
+      { label: 'Código', value: data.shortCode },
+      { label: 'Recebido em', value: data.at },
+    ],
+    cta: { label: 'Ver o ingresso', url: `${ctx.baseUrl}/meus-ingressos` },
+    footnote:
+      'É preciso entrar na sua conta para ver o QR Code. Se você comprou este ingresso de outra pessoa, a PartyX não participa da negociação. Transferências e reembolsos seguem a Política de Cancelamento, Troca e Reembolso.',
+  };
+  return {
+    subject: subjectWith(ctx, `Você recebeu um ingresso · ${data.eventName}`),
+    text: text(l, ctx),
+    html: html(l, ctx),
+  };
+}
+
+/** Desfeita pelo administrador (fraude): para os dois lados. `returned`: o ingresso voltou para esta pessoa. */
+export function composeTransferenciaDesfeita(data: TransferData & { returned: boolean }, ctx: MailContext): Composed {
+  const l: Layout = {
+    preheader: `A PartyX desfez uma transferência de ingresso de ${data.eventName}.`,
+    title: 'Transferência desfeita',
+    paragraphs: [
+      `Olá, ${data.name}.`,
+      data.returned
+        ? `A PartyX desfez a transferência do seu ingresso de ${data.eventName} para ${data.other}. O ingresso voltou para Meus ingressos, com um QR Code novo.`
+        : `A PartyX desfez a transferência que ${data.other} fez para você de um ingresso de ${data.eventName}. O ingresso saiu da sua conta e o QR Code deixou de valer.`,
+    ],
+    details: [
+      { label: 'Evento', value: data.eventName },
+      { label: 'Data', value: `${data.eventDate} às ${data.eventTime}` },
+      { label: 'Ingresso', value: data.typeName },
+      { label: 'Desfeita em', value: data.at },
+    ],
+    cta: { label: 'Abrir Meus ingressos', url: `${ctx.baseUrl}/meus-ingressos` },
+    footnote: 'Para entender o motivo, fale com o atendimento da PartyX.',
+  };
+  return {
+    subject: subjectWith(ctx, `Transferência desfeita · ${data.eventName}`),
     text: text(l, ctx),
     html: html(l, ctx),
   };

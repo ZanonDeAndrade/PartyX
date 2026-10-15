@@ -301,7 +301,7 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       type: 'Pista' | 'VIP' = 'Pista',
     ) {
       const buyer = await session('cliente');
-      const created = await buyer.post('/orders', {
+      const created = await buyer.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
         eventSlug: (await sql('select slug from events where id = $1', [e.id])).rows[0].slug,
         items: [{ ticketTypeId: e.types[type], quantity: qty }],
         couponCode: coupon,
@@ -554,7 +554,7 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const slug = (await sql('select slug from events where id = $1', [e.id])).rows[0].slug;
       const orderId = (
         await json(
-          await buyer.post('/orders', { eventSlug: slug, items: [{ ticketTypeId: e.types.Pista, quantity: 3 }] }),
+          await buyer.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: slug, items: [{ ticketTypeId: e.types.Pista, quantity: 3 }] }),
         )
       ).order.id as string;
       await buyer.post(`/orders/${orderId}/payment`, { method: 'pix' });

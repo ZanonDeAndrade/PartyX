@@ -37,14 +37,17 @@ describe('infra/env-check.py', () => {
 
   it('arquivo de produção do repositório: venda FECHADA, cadastro aberto com os textos, sem protótipo, sem lista de e-mail', () => {
     // Cadastro aberto por autorização de 14/10/2026 (docs/registros/autorizacao-cadastro-producao-2026-10-14.md), com Termos e
-    // Privacidade 1.0 publicados (D-84). A venda continua fechada.
+    // Privacidade publicados (D-84; 1.2 e a Política de Cancelamento, Troca e Reembolso 1.0 em 15/10/2026, D-87). A venda continua
+    // fechada.
     for (const [name, value] of [
       ['SALES_OPEN', 'false'],
       ['SIGNUP_OPEN', 'true'],
-      ['TERMS_VERSION', '1.1'],
-      ['TERMS_DATE', '2026-10-14'],
-      ['PRIVACY_VERSION', '1.1'],
-      ['PRIVACY_DATE', '2026-10-14'],
+      ['TERMS_VERSION', '1.2'],
+      ['TERMS_DATE', '2026-10-15'],
+      ['PRIVACY_VERSION', '1.2'],
+      ['PRIVACY_DATE', '2026-10-15'],
+      ['CANCELLATION_VERSION', '1.0'],
+      ['CANCELLATION_DATE', '2026-10-15'],
       ['MINOR_TERM_VERSION', '1.0'],
       ['MINOR_AUTHORIZATION_VERSION', '1.0'],
       ['RETENTION_SESSIONS_DAYS', '180'],

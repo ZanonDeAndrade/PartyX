@@ -209,7 +209,7 @@ describe.skipIf(!ADMIN_URL)('disputa de estoque e pagamento tardio (integração
   const orderOf = async (id: string) => (await sql('select status, paid_at from orders where id = $1', [id])).rows[0];
   const pending = async (s: Session, e: Awaited<ReturnType<typeof event>>, qty: number[]) =>
     track(
-      s.post('/orders', {
+      s.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
         eventSlug: e.slug,
         items: qty.map((quantity, i) => ({ ticketTypeId: e.types[i]!, quantity })).filter(i => i.quantity > 0),
       }),

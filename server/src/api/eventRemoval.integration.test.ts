@@ -101,7 +101,7 @@ describe.skipIf(!ADMIN_URL)('excluir e arquivar evento (integração)', () => {
   const imagesOf = (eventId: string) => [...storage.objects.keys()].filter(k => k.startsWith(`events/${eventId}/`));
   const exists = async (eventId: string) => (await sql('select 1 from events where id = $1', [eventId])).rowCount === 1;
   const buy = (b: Session, e: { slug: string; typeId: string }) =>
-    b.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.typeId, quantity: 1 }] });
+    b.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: e.typeId, quantity: 1 }] });
 
   beforeAll(async () => {
     testDb = await createTestDatabase(ADMIN_URL!);

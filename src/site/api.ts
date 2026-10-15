@@ -265,6 +265,8 @@ export interface OrderView {
   support?: { email: string | null; whatsapp: string | null } | null;
   /** Pagamento recusado: categoria para o texto ao comprador. */
   declineReason?: DeclineReason | null;
+  /** Ingressos do pedido que o comprador transferiu (D-87), com o nome de quem recebeu mascarado. */
+  transferred?: { typeName: string; to: string; at: string }[];
 }
 
 export type DeclineReason =
@@ -320,6 +322,12 @@ export interface TicketSummary {
   shortCode: string;
   status: 'valido' | 'utilizado' | 'cancelado';
   usedAt: string | null;
+  /** Recebido numa transferência (D-87): quem transferiu, mascarado ("Maria S. O."), e quando. */
+  receivedFrom: { name: string; at: string } | null;
+  /** Até quando pode ser transferido: 2 horas antes do início do evento. */
+  transferUntil: string;
+  /** Recebido com 16 ou 17 anos: o QR e o PDF esperam o aceite do Termo de Ciência. */
+  minorTermPending: boolean;
 }
 /** Detalhe: o conteúdo do QR só vem aqui, e nunca para ingresso cancelado. */
 export interface TicketDetail extends TicketSummary {
@@ -474,8 +482,11 @@ export interface AdminTicketRow {
   status: 'valido' | 'utilizado' | 'cancelado';
   typeName: string;
   holderName: string;
-  buyerEmail: string;
-  buyerCpf: string | null;
+  /** Conta do titular atual (D-87): depois de uma transferência, a de quem recebeu. */
+  holderEmail: string;
+  holderCpf: string | null;
+  /** O titular não é mais quem comprou. */
+  transferred: boolean;
   orderId: string;
   orderNumber: number;
   usedAt: string | null;
@@ -706,10 +717,25 @@ export interface AdminTicketDetail {
     event: { id: string; name: string; startsAt: string };
     order: { id: string; number: number; status: OrderStatus; paidAt: string | null };
     buyer: { id: string; name: string; email: string; cpf: string | null };
+    /** Conta do titular atual (D-87): a do comprador até a primeira transferência. */
+    holder: { id: string; name: string; email: string; cpf: string | null };
     entry: { at: string; validator: string | null } | null;
     cancellation: { at: string; reason: string | null; by: string | null } | null;
   };
   attempts: { at: string; result: string; method: string; validator: string }[];
+  /** Transferências, da mais nova para a mais antiga. `reverts`: desfeita pela equipe (com o motivo). */
+  transfers: {
+    id: string;
+    from: string;
+    to: string;
+    by: string;
+    byStaff: boolean;
+    reverts: string | null;
+    reason: string | null;
+    oldShortCode: string;
+    newShortCode: string;
+    at: string;
+  }[];
 }
 export interface TeamMember {
   id: string;
@@ -959,7 +985,8 @@ export const api = {
     items: CartItem[],
     couponCode: string | undefined,
     expectedTotalCents: number,
-    minorTerm?: { accepted: boolean; version: string | null },
+    minorTerm: { accepted: boolean; version: string | null } | undefined,
+    cancellation: { accepted: boolean; version: string | null },
   ) =>
     request<{ order: OrderView }>('POST', '/orders', {
       eventSlug,
@@ -967,6 +994,8 @@ export const api = {
       couponCode: couponCode || null,
       expectedTotalCents,
       ...(minorTerm ? { minorTermAccepted: minorTerm.accepted, minorTermVersion: minorTerm.version } : {}),
+      cancellationAccepted: cancellation.accepted,
+      cancellationVersion: cancellation.version,
     }).then(r => r.order),
   order: (id: string, signal?: AbortSignal) =>
     get<{ order: OrderView }>(`/orders/${encodeURIComponent(id)}`, signal).then(r => r.order),
@@ -982,6 +1011,24 @@ export const api = {
   tickets: (signal?: AbortSignal) => get<{ tickets: TicketSummary[] }>('/tickets', signal).then(r => r.tickets),
   ticket: (id: string, signal?: AbortSignal) =>
     get<{ ticket: TicketDetail }>(`/tickets/${encodeURIComponent(id)}`, signal).then(r => r.ticket),
+  /** Transferência (D-87): conferir o destino (só o nome mascarado) e transferir. */
+  transferPreview: (id: string, destination: string) =>
+    request<{ recipient: string; allowsMinors: boolean }>(
+      'POST',
+      `/tickets/${encodeURIComponent(id)}/transfer/preview`,
+      { destination },
+    ),
+  transfer: (id: string, destination: string) =>
+    request<{ transfer: { recipient: string; at: string } }>('POST', `/tickets/${encodeURIComponent(id)}/transfer`, {
+      destination,
+      confirm: true,
+    }).then(r => r.transfer),
+  /** Quem recebeu com 16 ou 17 anos aceita o Termo de Ciência; devolve o ingresso já com o QR. */
+  acceptTicketMinorTerm: (id: string, termVersion: string) =>
+    request<{ ticket: TicketDetail }>('POST', `/tickets/${encodeURIComponent(id)}/termo-menor`, {
+      accepted: true,
+      termVersion,
+    }).then(r => r.ticket),
   orders: (signal?: AbortSignal) => get<{ orders: OrderRow[] }>('/orders', signal).then(r => r.orders),
   gateEvents: (signal?: AbortSignal) => get<{ events: GateEvent[] }>('/gate/events', signal).then(r => r.events),
   gateCounter: (id: string, signal?: AbortSignal) =>
@@ -1100,6 +1147,12 @@ export const api = {
       request<{ mensagem: string }>('PATCH', `/admin/users/${encodeURIComponent(id)}/identity`, body),
     ticket: (id: string, signal?: AbortSignal) =>
       get<AdminTicketDetail>(`/admin/tickets/${encodeURIComponent(id)}`, signal),
+    /** Desfaz a última transferência (D-87, fraude comprovada): motivo obrigatório. Devolve o detalhe atualizado. */
+    undoTransfer: (id: string, reason: string) =>
+      request<AdminTicketDetail>('POST', `/admin/tickets/${encodeURIComponent(id)}/transfer/undo`, {
+        reason,
+        confirm: true,
+      }),
     team: (signal?: AbortSignal) => get<{ team: TeamMember[] }>('/admin/team', signal).then(r => r.team),
     createMember: (body: { name: string; email: string; phone: string | null; role: TeamMember['role'] }) =>
       request<{ member: TeamMember; temporaryPassword: string }>('POST', '/admin/team', body),
@@ -1163,6 +1216,8 @@ export type LegalKind =
 export const minorAuthorizationUrl = {
   order: (orderId: string) => `/api/orders/${encodeURIComponent(orderId)}/autorizacao-menor.pdf`,
   blank: (slug: string) => `/api/public/events/${encodeURIComponent(slug)}/autorizacao-menor.pdf`,
+  /** Ingresso recebido numa transferência (D-87): a autorização em nome de quem recebeu. */
+  ticket: (ticketId: string) => `/api/tickets/${encodeURIComponent(ticketId)}/autorizacao-menor.pdf`,
 };
 export interface LegalDocument {
   kind: LegalKind;
@@ -1180,6 +1235,9 @@ export interface LegalVersions {
   privacy: string;
   termsDate: string | null;
   privacyDate: string | null;
+  /** Política de Cancelamento, Troca e Reembolso: a versão que o checkout manda com o aceite. Nula: não publicada. */
+  cancellation?: string | null;
+  cancellationDate?: string | null;
   ready: boolean;
   provisional: boolean;
 }

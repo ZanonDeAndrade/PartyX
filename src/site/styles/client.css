@@ -587,3 +587,118 @@
   align-items: center;
   gap: var(--px-s-2);
 }
+
+/* Ingresso recebido com 16 ou 17 anos (D-87): o Termo de Ciência no lugar do QR até o aceite. */
+.px-tk-term {
+  display: grid;
+  gap: var(--px-s-3);
+  width: 100%;
+  text-align: left;
+}
+.px-tk-term h2 {
+  margin: 0;
+  font-size: var(--px-t-lg);
+}
+.px-tk-term > p {
+  margin: 0;
+  color: var(--px-text-2);
+}
+.px-tk-termtext {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--px-s-3) var(--px-s-4);
+  border: 1px solid var(--px-line);
+  border-radius: var(--px-r-sm);
+  background: var(--px-paper-2, var(--px-paper));
+  font-size: var(--px-t-sm);
+}
+.px-tk-termtext p {
+  margin: 0 0 var(--px-s-2);
+}
+.px-tk-termtext:focus-visible {
+  outline: 2px solid var(--px-violet-bright);
+  outline-offset: 2px;
+}
+.px-tk-term .px-btn {
+  justify-self: start;
+}
+
+/* Transferir ingresso (D-87): o ingresso, o destino, a conferência do nome mascarado e a confirmação. */
+.px-tf {
+  display: grid;
+  gap: var(--px-s-5);
+}
+.px-tf-skel {
+  height: 320px;
+  border-radius: var(--px-r-md);
+}
+.px-tf-ticket {
+  display: flex;
+  align-items: center;
+  gap: var(--px-s-4);
+  padding: var(--px-s-4);
+  border: 1px solid var(--px-line);
+  border-radius: var(--px-r-md);
+  background: var(--px-paper);
+  color: var(--px-text);
+}
+.px-tf-ticket > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.px-tf-ticket b {
+  font-size: var(--px-t-md);
+}
+.px-tf-ticket span,
+.px-tf-ticket small {
+  color: var(--px-text-2);
+}
+.px-tf-form,
+.px-tf-confirm,
+.px-tf-done {
+  display: grid;
+  gap: var(--px-s-4);
+}
+.px-tf-lead,
+.px-tf-done p {
+  margin: 0;
+  color: var(--px-text-2);
+  max-width: 60ch;
+}
+.px-tf-form .px-btn,
+.px-tf-done .px-btn {
+  justify-self: start;
+}
+.px-tf-who {
+  margin: 0;
+  font-size: var(--px-t-lg);
+}
+.px-tf-rules {
+  display: grid;
+  gap: var(--px-s-2);
+  margin: 0;
+  padding-left: var(--px-s-5);
+  color: var(--px-text-2);
+  max-width: 62ch;
+}
+.px-tf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--px-s-3);
+}
+
+/* Minha conta: data de nascimento que falta (conta antiga), com o próprio botão. */
+.px-birth-missing {
+  margin: var(--px-s-4) 0;
+}
+.px-birth-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--px-s-2);
+  align-items: center;
+}
+.px-birth-row input {
+  flex: 1 1 180px;
+  max-width: 240px;
+}

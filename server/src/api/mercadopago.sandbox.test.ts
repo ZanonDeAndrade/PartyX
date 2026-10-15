@@ -189,7 +189,7 @@ describe('Mercado Pago, ambiente de teste REAL: webhook, conciliação, estorno 
 
   type Buyer = Awaited<ReturnType<typeof person>>;
   async function newOrder(s: Buyer, e: { slug: string; type: string }, quantity: number) {
-    const res = await s.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: e.type, quantity }] });
+    const res = await s.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: e.type, quantity }] });
     expect(res.status).toBe(201);
     return ((await res.json()) as { order: { id: string } }).order.id;
   }

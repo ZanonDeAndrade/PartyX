@@ -108,11 +108,11 @@ describe('textos legais (RF-68)', () => {
     expect(salesBlockers(prod(base))).toEqual(['identidade visual sem aprovação escrita do cliente']);
     const { CANCELLATION_DATE: _sem, ...semData } = base;
     expect(salesBlockers(prod({ ...semData, VISUAL_APPROVED: 'true' }))).toEqual([
-      'data de vigência não informada: Política de Cancelamento',
+      'data de vigência não informada: Política de Cancelamento, Troca e Reembolso',
     ]);
     expect(salesBlockers(prod({ ...base, VISUAL_APPROVED: 'true' }))).toEqual([]);
     const semCancel = { ...base, LEGAL_CONTENT_DIR: dirWith({ ...FULL, cancelamento: '' }), VISUAL_APPROVED: 'true' };
-    expect(salesBlockers(prod(semCancel))).toEqual(['texto legal ausente: Política de Cancelamento']);
+    expect(salesBlockers(prod(semCancel))).toEqual(['texto legal ausente: Política de Cancelamento, Troca e Reembolso']);
   });
 
   it('produção não vende com SALES_OPEN=true enquanto houver pendência do cliente; com tudo pronto passa desta trava', async () => {
@@ -213,9 +213,9 @@ describe('textos legais (RF-68)', () => {
       });
       expect(signupBlockers(semCancelamento)).toEqual([]);
       expect(salesBlockers(semCancelamento)).toEqual([
-        'texto legal ausente: Política de Cancelamento',
-        'versão da Política de Cancelamento não informada',
-        'data de vigência não informada: Política de Cancelamento',
+        'texto legal ausente: Política de Cancelamento, Troca e Reembolso',
+        'versão da Política de Cancelamento, Troca e Reembolso não informada',
+        'data de vigência não informada: Política de Cancelamento, Troca e Reembolso',
       ]);
       expect(legalDocument(semCancelamento, 'cancelamento')).toMatchObject({ status: 'pendente', blocks: [] });
     });

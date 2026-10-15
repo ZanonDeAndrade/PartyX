@@ -14,6 +14,9 @@ const ticket = (
   shortCode: 'PX-ABCD-2345',
   status: 'valido',
   usedAt: null,
+  receivedFrom: null,
+  transferUntil: '2026-12-12T23:00:00.000Z',
+  minorTermPending: false,
   qrPayload: 'PX1.1.' + 'a'.repeat(32) + '.' + 'b'.repeat(24) + '.' + 'c'.repeat(22),
   ...over,
   event: {

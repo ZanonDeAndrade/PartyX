@@ -85,7 +85,7 @@ describe.skipIf(!ADMIN_URL)('pagamento: checkout e contrato do gateway (integra�
   /** Compra do cliente: cria o pedido pendente com reserva. */
   async function pendingOrder(s: Session, e: Awaited<ReturnType<typeof event>>, qty: [number, number?] = [2]) {
     const items = e.types.slice(0, qty.length).map((t, i) => ({ ticketTypeId: t, quantity: qty[i]! }));
-    const res = await s.post('/orders', { eventSlug: e.slug, items });
+    const res = await s.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items });
     expect(res.status).toBe(201);
     return (await json(res)).order as { id: string; totalCents: number; reservation: { expiresAt: string } };
   }
@@ -290,10 +290,15 @@ describe.skipIf(!ADMIN_URL)('pagamento: checkout e contrato do gateway (integra�
             !r.path.startsWith('/api/internal/'),
         )
         .map(r => `${r.method} ${r.path}`);
-      // Leituras (GET) de ingressos e pedidos são legítimas; nada que ESCREVA pode confirmar, aprovar ou emitir.
+      // Leituras (GET) de ingressos e pedidos são legítimas; nada que ESCREVA pode confirmar, aprovar ou emitir. A transferência
+      // (D-87) e o aceite do Termo de Ciência de quem recebeu mexem num ingresso já emitido e pago: não aprovam nem emitem nada.
+      const transfer = /^POST \/api\/tickets\/:id\/(transfer|transfer\/preview|termo-menor)$/;
       expect(
         paths.filter(
-          p => !p.startsWith('GET ') && /confirm|aprov|approve|paid|pago|issue|emit|ticket|webhook/i.test(p),
+          p =>
+            !p.startsWith('GET ') &&
+            !transfer.test(p) &&
+            /confirm|aprov|approve|paid|pago|issue|emit|ticket|webhook/i.test(p),
         ),
       ).toEqual([]);
     });

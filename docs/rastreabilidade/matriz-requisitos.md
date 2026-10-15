@@ -118,6 +118,24 @@ Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na pá
 | Regra no banco e reversão | `server/src/db/schema.integration.test.ts` (reversão da 0014 apaga só a coluna), `events.integration.test.ts` (CHECK recusa minúsculas, nome de cor, vazio e `;`) |
 | Sem regressão | `e2e:textos` (78), `e2e:cronometro` (7), `test:db` completo |
 
+### Transferência de ingresso e Política de Cancelamento, Troca e Reembolso 1.0 (15/10/2026)
+
+Pedido do responsável:
+- **D-87 (mudança de escopo):** transferência de ingresso entre contas, até 2 horas antes do evento, com QR novo, regras de idade do titular novo e desfazer pelo administrador em caso de fraude;
+- **D-88 (decisão da PartyX contra a recomendação):** Política de Cancelamento, Troca e Reembolso 1.0, sem reembolso por desistência;
+- **Textos:** Termos e Privacidade 1.2;
+- **D-80 atualizada:** aceite da Política gravado no checkout.
+
+Migração 0016. Registro: `docs/registros/transferencia-e-cancelamento-2026-10-15.md`. **Não publicado.**
+
+| Requisito ou critério | Evidência |
+|---|---|
+| Transferência (D-87): titular, códigos e QR novos, recusas, prazo, concorrência, desfazer, portaria e contingência pelo titular, anonimização e dados da pessoa | `server/src/api/transfer.integration.test.ts` (12 casos), `server/src/db/schema.integration.test.ts` (0016: titular pelo gatilho, histórico só de inclusão, reversão que recusa com transferência gravada) |
+| Reembolso de pedido com ingresso transferido continua do comprador; o transferido é cancelado | `server/src/api/reconcile.integration.test.ts` (estorno no webhook depois da transferência) |
+| RF-03 e D-80 (aceite da Política no checkout; novo aceite dos Termos 1.2) | `transfer.integration.test.ts` (422 sem a caixa, 409 com versão antiga, gravado com versão, data, IP, navegador e pedido; quem aceitou a 1.1 aceita de novo), `e2e/transferencia.spec.ts` ("Ir para o pagamento" só com a caixa), roteiro 11.2 marcando a caixa |
+| Telas (Meus ingressos dos dois lados, transferência, pedido, Termo de quem recebe com 17 anos, painel) | `e2e/transferencia.spec.ts` (6 casos, capturas a 360 e 1280 px) |
+| Textos (Política 1.0, Termos e Privacidade 1.2, contatos) | `conteudo-legal/`, `server/src/legal/documents.test.ts`, `server/src/ops/envCheck.test.ts` (versões e datas do arquivo de produção) |
+
 ### Seletor de cor embutido (15/10/2026)
 
 Pedido do responsável: no campo "Cor de destaque", seletor embutido (quadrado de saturação e brilho, barra de matiz, código com amostra redonda), cores prontas, "Voltar ao padrão", conta-gotas onde houver, toque e teclado com rótulos em português, prévia ao vivo e aviso de contraste mantido, no pacote do painel (`react-colorful` 5.8.1, site público sem mudança). Sem migração. Publicado em 15/10/2026 (`partyx-00028-vax`, `publicacao-producao-2026-10-15g.md`). Registro: `docs/registros/seletor-de-cor-2026-10-15.md`.

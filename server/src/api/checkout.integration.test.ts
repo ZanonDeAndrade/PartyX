@@ -50,7 +50,7 @@ describe.skipIf(!ADMIN_URL)('carrinho, reserva e estoque (integração)', () => 
     cookie = login.headers.get('set-cookie')!.split(';')[0]!;
     csrf = ((await (await raw('GET', '/auth/me')).json()) as { csrfToken: string }).csrfToken;
     const order = (slug: string, items: unknown[], extra: Record<string, unknown> = {}) =>
-      raw('POST', '/orders', { eventSlug: slug, items, ...extra });
+      raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: slug, items, ...extra });
     return {
       id: rows[0].id as string,
       raw,
@@ -311,7 +311,7 @@ describe.skipIf(!ADMIN_URL)('carrinho, reserva e estoque (integração)', () => 
     it('ignora preço, total e desconto enviados pelo navegador', async () => {
       const e = await event({ types: [{ price: 8000 }] });
       const a = await buyer();
-      const res = await a.raw('POST', '/orders', {
+      const res = await a.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
         eventSlug: e.slug,
         items: [{ ticketTypeId: e.types[0], quantity: 2, unitPriceCents: 1, priceCents: 1, price: 0.01 }],
         totalCents: 2,

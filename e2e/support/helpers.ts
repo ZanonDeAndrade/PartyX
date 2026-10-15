@@ -95,6 +95,13 @@ export async function chooseTickets(page: Page, base: string, slug: string, item
   await expect(page).toHaveURL(new RegExp(`/checkout/${slug}$`));
 }
 
+/** Caixa da Política de Cancelamento, Troca e Reembolso no checkout (D-80 atualizada): sem ela, "Ir para o pagamento" fica desabilitado. */
+export async function acceptPolicy(page: Page): Promise<void> {
+  const box = page.getByLabel('Li e aceito a Política de Cancelamento, Troca e Reembolso.');
+  await expect(box).toBeEnabled();
+  await box.check();
+}
+
 /** Checkout: revisão, código do promoter opcional e reserva. Devolve o id do pedido criado. */
 export async function reserve(page: Page, coupon?: string): Promise<string> {
   await expect(page.getByRole('heading', { name: 'Revise seu pedido' })).toBeVisible();
@@ -103,6 +110,7 @@ export async function reserve(page: Page, coupon?: string): Promise<string> {
     await page.getByRole('button', { name: 'Aplicar' }).click();
     await expect(page.getByText(`${coupon} aplicado. Total inalterado.`)).toBeVisible();
   }
+  await acceptPolicy(page);
   await page.getByRole('button', { name: 'Ir para o pagamento' }).first().click();
   await expect(page).toHaveURL(/\/pedido\/[0-9a-f-]{36}$/);
   return page.url().split('/pedido/')[1]!;

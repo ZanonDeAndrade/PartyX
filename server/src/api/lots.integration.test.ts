@@ -119,7 +119,7 @@ describe.skipIf(!ADMIN_URL)('lotes por tipo de ingresso (integração)', () => {
   }
   type Setup = Awaited<ReturnType<typeof setup>>;
   const buy = (b: Session, s: Setup, quantity: number) =>
-    b.post('/orders', { eventSlug: s.slug, items: [{ ticketTypeId: s.typeId, quantity }] });
+    b.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: s.slug, items: [{ ticketTypeId: s.typeId, quantity }] });
   const publicType = async (s: Setup) =>
     (await json(await app.request(`/api/public/events/${s.slug}`))).event.ticketTypes[0] as {
       priceCents: number | null;
@@ -444,7 +444,7 @@ describe.skipIf(!ADMIN_URL)('lotes por tipo de ingresso (integração)', () => {
       canBuy: true,
     });
     const b = await session();
-    const res = await b.post('/orders', { eventSlug: 'antigo', items: [{ ticketTypeId: type, quantity: 2 }] });
+    const res = await b.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: 'antigo', items: [{ ticketTypeId: type, quantity: 2 }] });
     expect(res.status).toBe(201);
     expect((await json(res)).order.totalCents).toBe(16000);
     const lots = await sql('select name, price_cents, quantity, status from ticket_lots where ticket_type_id = $1', [type]);

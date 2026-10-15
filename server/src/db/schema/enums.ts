@@ -39,6 +39,10 @@ export const emailTemplate = pgEnum('email_template', [
   'recuperacao_senha',
   'compra_confirmada',
   'pagamento_sem_estoque',
+  // Transferência de ingresso (D-87, 0016): para quem transferiu, para quem recebeu e, no desfazer pelo administrador, para os dois.
+  'transferencia_enviada',
+  'transferencia_recebida',
+  'transferencia_desfeita',
 ]);
 export const emailStatus = pgEnum('email_status', ['pendente', 'enviado', 'falhou']);
 

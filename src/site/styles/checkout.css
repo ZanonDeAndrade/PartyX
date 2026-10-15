@@ -738,3 +738,33 @@
   margin: 0;
   font-size: var(--px-t-sm);
 }
+
+/* Aceite da Política de Cancelamento, Troca e Reembolso (D-80 atualizada): a caixa antes de ir para o pagamento. */
+.px-ck-policy {
+  display: grid;
+  gap: var(--px-s-1);
+  margin: var(--px-s-5) 0 var(--px-s-4);
+}
+.px-ck-policy .px-hint {
+  max-width: 62ch;
+}
+
+/* Pedido pago: ingressos que o comprador transferiu (D-87), sem QR, com o nome de quem recebeu mascarado. */
+.px-ck-transferred {
+  display: grid;
+  gap: var(--px-s-2);
+  margin: 0 0 var(--px-s-5);
+  padding: 0;
+  list-style: none;
+}
+.px-ck-transferred li {
+  display: grid;
+  gap: 2px;
+  padding: var(--px-s-3) var(--px-s-4);
+  border: 1px dashed var(--px-line);
+  border-radius: var(--px-r-sm);
+  color: var(--px-text-2);
+}
+.px-ck-transferred small {
+  color: var(--px-text-3);
+}

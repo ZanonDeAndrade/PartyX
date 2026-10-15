@@ -19,7 +19,7 @@ import { loadCart, saveCart } from './cart';
 import { CardBrick } from './cardBrick';
 import { DateStub, ErrorBox, Layout, PartyxContact, usePageTitle } from './components';
 import { mmss, useCountdown } from './countdown';
-import { brl, dateParts, maskEmail, phoneBr, timeOf } from './format';
+import { brl, dateParts, dateShort, maskEmail, phoneBr, timeOf } from './format';
 import { IconCheck, IconCopy } from './icons';
 import { cascade } from './motion';
 import { Link, useRouter } from './router';
@@ -265,6 +265,15 @@ export function CheckoutPage({ slug }: { slug: string }) {
   // Regras de menores: caixa do Termo de Ciência (nunca pré-marcada) e o texto dele, quando a pessoa terá 16 ou 17 anos.
   const [minorAccepted, setMinorAccepted] = useState(false);
   const [minorTerm, setMinorTerm] = useState<LegalDocument | null>(null);
+  // Política de Cancelamento, Troca e Reembolso (D-80 atualizada): caixa nunca pré-marcada e a versão vigente, gravadas no pedido.
+  const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [policyVersion, setPolicyVersion] = useState<string | null>(null);
+  useEffect(() => {
+    api
+      .legal()
+      .then(v => setPolicyVersion(v.cancellation ?? null))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(
     async (code: string) => {
@@ -340,6 +349,7 @@ export function CheckoutPage({ slug }: { slug: string }) {
         applied,
         summary.totalCents,
         buyer?.minor ? { accepted: minorAccepted, version: buyer.minorTermVersion } : undefined,
+        { accepted: policyAccepted, version: policyVersion },
       );
       saveCart(null);
       go(`/pedido/${order.id}`);
@@ -349,6 +359,12 @@ export function CheckoutPage({ slug }: { slug: string }) {
         if (e.code === 'versao_desatualizada') {
           setMinorTerm(null);
           setMinorAccepted(false);
+          // A Política também pode ter mudado: lê a versão de novo e pede o aceite outra vez.
+          setPolicyAccepted(false);
+          void api
+            .legal()
+            .then(v => setPolicyVersion(v.cancellation ?? null))
+            .catch(() => {});
         }
         await load(applied);
       }
@@ -360,7 +376,7 @@ export function CheckoutPage({ slug }: { slug: string }) {
 
   const user = session.user;
   const refusal = summary?.buyer?.refusal ?? null;
-  const blocked = Boolean(refusal) || (isMinor && !minorAccepted);
+  const blocked = Boolean(refusal) || (isMinor && !minorAccepted) || !policyAccepted || !policyVersion;
   const goPay = (
     <button type="button" className="px-btn px-btn-pri px-btn-lg" disabled={!summary || busy || blocked} onClick={pay}>
       {busy ? 'Reservando…' : 'Ir para o pagamento'}
@@ -507,10 +523,30 @@ export function CheckoutPage({ slug }: { slug: string }) {
         )}
       </section>
 
-      <p className="px-fine px-fine-dark">
-        Antes de pagar, consulte a <Link to="/politica-de-cancelamento">Política de Cancelamento</Link>. Ao continuar,
-        reservamos seus ingressos por alguns minutos para você concluir o pagamento.
-      </p>
+      <section aria-label="Política de Cancelamento, Troca e Reembolso" className="px-ck-policy">
+        <div className="px-check">
+          <input
+            id="aceite-politica"
+            type="checkbox"
+            checked={policyAccepted}
+            disabled={!policyVersion}
+            onChange={e => setPolicyAccepted(e.target.checked)}
+            aria-describedby="aceite-politica-dica"
+          />
+          <label htmlFor="aceite-politica">
+            Li e aceito a{' '}
+            <Link to="/politica-de-cancelamento" target="_blank" rel="noopener">
+              Política de Cancelamento, Troca e Reembolso
+            </Link>
+            .
+          </label>
+        </div>
+        <small id="aceite-politica-dica" className="px-hint px-indent">
+          {policyVersion ? `Versão ${policyVersion}. ` : ''}Não há reembolso por desistência; você pode transferir o ingresso
+          até 2 horas antes do evento. Registramos a versão, a data, o IP e o pedido do aceite. Ao continuar, reservamos seus
+          ingressos por alguns minutos para você concluir o pagamento.
+        </small>
+      </section>
       <div className="px-ck-desk-cta">{goPay}</div>
     </CheckoutShell>
   );
@@ -1059,8 +1095,10 @@ export function OrderPage({ id }: { id: string }) {
       </section>
     );
   } else if (order.status === 'pago') {
+    // Ingressos que o comprador transferiu (D-87): saem da lista com QR e aparecem como "Transferido para Maria S. O.".
+    const transferred = order.transferred ?? [];
     body =
-      tickets.length === 0 ? (
+      tickets.length === 0 && transferred.length === 0 ? (
         <section className="px-ck-card px-result" aria-live="polite">
           <span className="px-done-icon px-result-icon px-tone-ok" aria-hidden="true">
             ✓
@@ -1080,11 +1118,20 @@ export function OrderPage({ id }: { id: string }) {
           </span>
           <span className="px-mono px-muted">Pedido PX-{order.number}</span>
           <h1>Compra confirmada</h1>
-          <p>
-            {units === 1 ? 'Seu ingresso' : `Seus ${units} ingressos`} para {order.event.name}{' '}
-            {units === 1 ? 'já está' : 'já estão'} em Meus ingressos, com um QR Code para cada ingresso. Enviamos a
-            confirmação para <b>{maskEmail(email)}</b>.
-          </p>
+          {transferred.length === 0 ? (
+            <p>
+              {units === 1 ? 'Seu ingresso' : `Seus ${units} ingressos`} para {order.event.name}{' '}
+              {units === 1 ? 'já está' : 'já estão'} em Meus ingressos, com um QR Code para cada ingresso. Enviamos a
+              confirmação para <b>{maskEmail(email)}</b>.
+            </p>
+          ) : (
+            <p>
+              {tickets.length === 0
+                ? `Você transferiu ${transferred.length === 1 ? 'o ingresso' : `os ${transferred.length} ingressos`} deste pedido.`
+                : `${tickets.length === 1 ? '1 ingresso continua' : `${tickets.length} ingressos continuam`} em Meus ingressos; ${transferred.length === 1 ? '1 foi transferido' : `${transferred.length} foram transferidos`}.`}{' '}
+              O pedido e o pagamento continuam no seu nome.
+            </p>
+          )}
           <ul className="px-ck-tickets" aria-label="Seus ingressos">
             {tickets.map((t, i) => (
               <WalletItem key={t.id} index={i}>
@@ -1100,13 +1147,27 @@ export function OrderPage({ id }: { id: string }) {
               </WalletItem>
             ))}
           </ul>
+          {transferred.length > 0 ? (
+            <ul className="px-ck-transferred" aria-label="Ingressos transferidos">
+              {transferred.map((t, i) => (
+                <li key={i}>
+                  <b>{t.typeName}</b>
+                  <small>
+                    Transferido para {t.to} em {dateShort(t.at)}, às {timeOf(t.at)}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <div className="px-done-actions">
             <Link to="/meus-ingressos" className="px-btn px-btn-pri px-btn-lg">
               Ver meus ingressos
             </Link>
-            <a className="px-btn px-btn-outline px-btn-lg" href={`/api/orders/${id}/tickets/pdf`}>
-              Baixar ingressos (PDF)
-            </a>
+            {tickets.length > 0 ? (
+              <a className="px-btn px-btn-outline px-btn-lg" href={`/api/orders/${id}/tickets/pdf`}>
+                Baixar ingressos (PDF)
+              </a>
+            ) : null}
           </div>
           {order.event.allowsMinors ? (
             <div className="px-ck-minor">

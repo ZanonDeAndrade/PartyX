@@ -1169,10 +1169,11 @@ export function TicketsPanel({ eventId }: { eventId: string }) {
                     <td>{t.typeName}</td>
                     <td>
                       {t.holderName}
+                      {t.transferred ? <span className="px-badge px-badge-neu px-badge-inline">Transferido</span> : null}
                       <br />
-                      <span className="px-muted">{t.buyerEmail}</span>
+                      <span className="px-muted">{t.holderEmail}</span>
                     </td>
-                    <td className="px-nowrap">{t.buyerCpf ?? 'Não informado'}</td>
+                    <td className="px-nowrap">{t.holderCpf ?? 'Não informado'}</td>
                     <td>
                       <Link to={`/admin/pedidos/${t.orderId}`} className="px-nowrap">PX-{t.orderNumber}</Link>
                     </td>

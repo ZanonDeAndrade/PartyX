@@ -143,8 +143,9 @@ export async function exportEventTickets(
       'Código',
       'Tipo',
       'Titular',
-      'CPF (mascarado)',
-      'E-mail do comprador',
+      'CPF do titular (mascarado)',
+      'E-mail do titular',
+      'Transferido',
       'Pedido',
       'Situação do ingresso',
       'Entrou em',
@@ -155,8 +156,9 @@ export async function exportEventTickets(
       t.shortCode,
       t.typeName,
       t.holderName,
-      t.buyerCpf ?? '',
-      t.buyerEmail,
+      t.holderCpf ?? '',
+      t.holderEmail,
+      t.transferred ? 'Sim' : 'Não',
       `PX-${t.orderNumber}`,
       TICKET_STATUS[t.status as keyof typeof TICKET_STATUS] ?? t.status,
       when(t.usedAt),
@@ -406,11 +408,13 @@ export async function loadContingency(deps: ExportDeps, eventId: string): Promis
   if ((count.rows[0]?.n ?? 0) > MAX_EXPORT_ROWS)
     throw new AppError(413, 'exportacao_grande', 'Evento grande demais para uma única lista.');
   const rows = await deps.db.execute<Record<string, unknown>>(sql`
-    select t.short_code, ty.name as type_name, t.holder_name, u.cpf, o.number, t.status::text as status, t.used_at, o.buyer_minor
+    select t.short_code, ty.name as type_name, t.holder_name, u.cpf, o.number, t.status::text as status, t.used_at,
+           coalesce(t.holder_minor, o.buyer_minor) as buyer_minor
       from tickets t
       join ticket_types ty on ty.id = t.ticket_type_id
       join orders o on o.id = t.order_id
-      join users u on u.id = o.user_id
+      -- Titular atual (D-87): nome, CPF e marca de menor de quem tem o ingresso agora, não de quem comprou.
+      join users u on u.id = t.holder_user_id
      where t.event_id = ${eventId}`);
   const all: ContingencyTicket[] = rows.rows.map(r => ({
     shortCode: r.short_code as string,

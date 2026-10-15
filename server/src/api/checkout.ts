@@ -17,6 +17,9 @@ const checkoutBody = z.object({
   expectedTotalCents: z.number().int().optional(),
   minorTermAccepted: z.boolean().optional(),
   minorTermVersion: z.string().max(40).nullable().optional(),
+  // Política de Cancelamento, Troca e Reembolso (D-80 atualizada): a caixa e a versão lida. O resumo (quote) ignora os dois.
+  cancellationAccepted: z.boolean().optional(),
+  cancellationVersion: z.string().max(40).nullable().optional(),
 });
 const paymentBody = z.discriminatedUnion('method', [
   z.object({ method: z.literal('pix') }),

@@ -271,6 +271,8 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
         privacy: '2026-10',
         termsDate: '2026-10-01',
         privacyDate: '2026-10-01',
+        cancellation: '2026-10',
+        cancellationDate: '2026-10-01',
         ready: true,
         provisional: false,
       });
@@ -319,6 +321,8 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
         privacy: 'ficticio-0',
         termsDate: null,
         privacyDate: null,
+        cancellation: 'ficticio-0',
+        cancellationDate: null,
         ready: true,
         provisional: true,
       });

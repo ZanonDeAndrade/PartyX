@@ -25,7 +25,7 @@ export type LegalKind = (typeof LEGAL_KINDS)[number];
 export const LEGAL_TITLES: Record<LegalKind, string> = {
   'termos-de-uso': 'Termos de Uso',
   privacidade: 'Política de Privacidade',
-  cancelamento: 'Política de Cancelamento',
+  cancelamento: 'Política de Cancelamento, Troca e Reembolso',
   'meia-entrada': 'Regras de meia-entrada',
   'termo-menor': 'Termo de Ciência para Menores de Idade',
   'autorizacao-menor': 'Termo de Autorização e Responsabilidade',
@@ -143,7 +143,7 @@ export function salesBlockers(config: LegalConfig & Pick<Config, 'visualApproved
   const out: string[] = [];
   if (!config.legal.ready) out.push('versões dos Termos e da Privacidade não informadas');
   for (const kind of REQUIRED) if (!hasFile(config, kind)) out.push(`texto legal ausente: ${LEGAL_TITLES[kind]}`);
-  if (!versionOf(config, 'cancelamento')) out.push('versão da Política de Cancelamento não informada');
+  if (!versionOf(config, 'cancelamento')) out.push('versão da Política de Cancelamento, Troca e Reembolso não informada');
   for (const kind of REQUIRED)
     if (!dateOf(config, kind)) out.push(`data de vigência não informada: ${LEGAL_TITLES[kind]}`);
   if (!config.visualApproved) out.push('identidade visual sem aprovação escrita do cliente');

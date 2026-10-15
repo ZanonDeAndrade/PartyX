@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   foreignKey,
@@ -195,8 +196,18 @@ export const tickets = pgTable(
     eventId: uuid('event_id').notNull(),
     /** Posição da unidade dentro do item (1 a quantidade). */
     unitIndex: smallint('unit_index').notNull(),
-    /** Nome do comprador, em todas as unidades. Não há transferência de titularidade. */
+    /** Nome do titular atual: o do comprador na emissão; numa transferência (D-87, 0016), o de quem recebeu. */
     holderName: text('holder_name').notNull(),
+    /**
+     * Conta do titular atual (D-87, 0016): o comprador na emissão (gatilho `tickets_holder_default`, também para o código anterior
+     * à 0016) e quem recebeu, depois de uma transferência. "Meus ingressos", a portaria e a contingência olham esta conta; o pedido,
+     * o pagamento e o reembolso continuam do comprador (`orders.user_id`).
+     */
+    holderUserId: uuid('holder_user_id')
+      .notNull()
+      .references(() => users.id),
+    /** Titular de 16 ou 17 anos na data do evento (D-87). Nulo: vale `orders.buyer_minor`, como antes das transferências. */
+    holderMinor: boolean('holder_minor'),
     /** Segredo aleatório de pelo menos 128 bits (22 caracteres base64url). Nunca exibir em listas. */
     code: text('code').notNull(),
     /** Código curto legível (PX-7K4M-2Q9D) para exibir e buscar na portaria. Não é credencial: validar exige o QR. */
@@ -224,6 +235,7 @@ export const tickets = pgTable(
     uniqueIndex('tickets_short_code_key').on(t.shortCode),
     uniqueIndex('tickets_item_unit_key').on(t.orderItemId, t.unitIndex),
     index('tickets_order_idx').on(t.orderId),
+    index('tickets_holder_idx').on(t.holderUserId, t.eventId),
     index('tickets_event_status_idx').on(t.eventId, t.status),
     index('tickets_type_idx').on(t.ticketTypeId),
     foreignKey({
@@ -270,5 +282,111 @@ export const minorTermAcceptances = pgTable(
     uniqueIndex('minor_term_acceptances_order_key').on(t.orderId),
     index('minor_term_acceptances_user_idx').on(t.userId),
     check('minor_term_acceptances_age', sql`${t.ageAtEvent} in (16, 17)`),
+  ],
+);
+
+/**
+ * Transferências de ingresso (D-87, 0016): cada troca de titular é uma linha, que nunca muda nem é apagada (gatilhos). Desfazer, pelo
+ * administrador em caso de fraude, é uma linha nova que aponta para a desfeita (`reverts_id`) e tem motivo. Guarda os códigos curtos
+ * (que não são credencial) e só o resumo SHA-256 do código antigo (hexadecimal), para a portaria reconhecer o QR antigo sem guardar o segredo.
+ */
+export const ticketTransfers = pgTable(
+  'ticket_transfers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => tickets.id),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => events.id),
+    fromUserId: uuid('from_user_id')
+      .notNull()
+      .references(() => users.id),
+    toUserId: uuid('to_user_id')
+      .notNull()
+      .references(() => users.id),
+    /** Quem fez: o titular, ou o administrador que desfez. */
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => users.id),
+    /** Preenchido só no desfazer: a transferência desfeita. */
+    revertsId: uuid('reverts_id').references((): AnyPgColumn => ticketTransfers.id),
+    /** Motivo do desfazer (obrigatório nele, 5 a 500 caracteres); nulo na transferência do titular. */
+    reason: text('reason'),
+    oldShortCode: varchar('old_short_code', { length: 12 }).notNull(),
+    newShortCode: varchar('new_short_code', { length: 12 }).notNull(),
+    /** SHA-256 do código antigo, em hexadecimal minúsculo. */
+    oldCodeSha256: varchar('old_code_sha256', { length: 64 }).notNull(),
+    createdAt: instant('created_at').notNull().defaultNow(),
+  },
+  t => [
+    index('ticket_transfers_ticket_idx').on(t.ticketId, t.createdAt),
+    index('ticket_transfers_to_idx').on(t.toUserId),
+    index('ticket_transfers_from_idx').on(t.fromUserId),
+    index('ticket_transfers_old_code_idx').on(t.oldCodeSha256),
+    uniqueIndex('ticket_transfers_reverts_key')
+      .on(t.revertsId)
+      .where(sql`${t.revertsId} is not null`),
+    check('ticket_transfers_other_account', sql`${t.fromUserId} <> ${t.toUserId}`),
+    check('ticket_transfers_reason_on_revert', sql`(${t.revertsId} is null) = (${t.reason} is null)`),
+    check(
+      'ticket_transfers_reason_length',
+      sql`${t.reason} is null or char_length(btrim(${t.reason})) between 5 and 500`,
+    ),
+    check('ticket_transfers_sha256', sql`${t.oldCodeSha256} ~ '^[0-9a-f]{64}$'`),
+  ],
+);
+
+/**
+ * Termo de Ciência aceito por quem recebeu, numa transferência, um ingresso com 16 ou 17 anos na data do evento (D-87, 0016). O de
+ * `minor_term_acceptances` é por pedido, de quem comprou. Um por transferência. Nunca apagado (prova); a anonimização limpa só o IP
+ * e o navegador.
+ */
+export const ticketMinorAcceptances = pgTable(
+  'ticket_minor_acceptances',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    ticketTransferId: uuid('ticket_transfer_id')
+      .notNull()
+      .references(() => ticketTransfers.id),
+    termVersion: text('term_version').notNull(),
+    ageAtEvent: smallint('age_at_event').notNull(),
+    acceptedAt: instant('accepted_at').notNull().defaultNow(),
+    ip: inet('ip'),
+    userAgent: text('user_agent'),
+  },
+  t => [
+    uniqueIndex('ticket_minor_acceptances_transfer_key').on(t.ticketTransferId),
+    index('ticket_minor_acceptances_user_idx').on(t.userId),
+    check('ticket_minor_acceptances_age', sql`${t.ageAtEvent} in (16, 17)`),
+  ],
+);
+
+/**
+ * Aceite da Política de Cancelamento, Troca e Reembolso no checkout (D-80 atualizada, 0016): versão, data, IP e navegador, ligado ao
+ * pedido. Um por pedido. Nunca apagado (prova); a anonimização limpa só o IP e o navegador.
+ */
+export const cancellationAcceptances = pgTable(
+  'cancellation_acceptances',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id),
+    policyVersion: text('policy_version').notNull(),
+    acceptedAt: instant('accepted_at').notNull().defaultNow(),
+    ip: inet('ip'),
+    userAgent: text('user_agent'),
+  },
+  t => [
+    uniqueIndex('cancellation_acceptances_order_key').on(t.orderId),
+    index('cancellation_acceptances_user_idx').on(t.userId),
   ],
 );

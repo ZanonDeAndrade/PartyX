@@ -1,8 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { Db } from '../db/client';
 import {
   auditLog,
+  cancellationAcceptances,
   consents,
   emailLog,
   events,
@@ -15,6 +17,8 @@ import {
   paymentEvents,
   sessions,
   ticketLots,
+  ticketMinorAcceptances,
+  ticketTransfers,
   ticketTypes,
   tickets,
   users,
@@ -23,6 +27,7 @@ import { typeWithLotName } from '../events/lots';
 import { writeAudit } from '../db/audit';
 import { onlyDigits } from '../domain/cpf';
 import { AppError } from '../domain/errors';
+import { maskName } from '../domain/identity';
 import type { PasswordHasher } from '../providers/passwordHasher';
 import type { Clock } from '../providers/clock';
 
@@ -125,6 +130,7 @@ export async function exportSubjectData(deps: PrivacyDeps, userId: string) {
           shortCode: tickets.shortCode,
           orderId: tickets.orderId,
           holderName: tickets.holderName,
+          holderUserId: tickets.holderUserId,
           status: tickets.status,
           usedAt: tickets.usedAt,
           type: ticketTypes.name,
@@ -146,6 +152,60 @@ export async function exportSubjectData(deps: PrivacyDeps, userId: string) {
     .from(minorTermAcceptances)
     .innerJoin(orders, eq(orders.id, minorTermAcceptances.orderId))
     .where(eq(minorTermAcceptances.userId, userId));
+  // Transferência (D-87): ingressos recebidos de pedidos de outras pessoas, as transferências feitas e recebidas (a outra pessoa
+  // mascarada) e os aceites novos da 0016.
+  const receivedRows = await deps.db
+    .select({
+      shortCode: tickets.shortCode,
+      holderName: tickets.holderName,
+      status: tickets.status,
+      usedAt: tickets.usedAt,
+      type: ticketTypes.name,
+      eventName: events.name,
+    })
+    .from(tickets)
+    .innerJoin(orders, eq(orders.id, tickets.orderId))
+    .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
+    .innerJoin(events, eq(events.id, tickets.eventId))
+    .where(and(eq(tickets.holderUserId, userId), ne(orders.userId, userId)));
+  const fromUser = alias(users, 'from_user');
+  const toUser = alias(users, 'to_user');
+  const transferRows = await deps.db
+    .select({
+      fromUserId: ticketTransfers.fromUserId,
+      fromName: fromUser.name,
+      toName: toUser.name,
+      revertsId: ticketTransfers.revertsId,
+      createdAt: ticketTransfers.createdAt,
+      eventName: events.name,
+    })
+    .from(ticketTransfers)
+    .innerJoin(fromUser, eq(fromUser.id, ticketTransfers.fromUserId))
+    .innerJoin(toUser, eq(toUser.id, ticketTransfers.toUserId))
+    .innerJoin(events, eq(events.id, ticketTransfers.eventId))
+    .where(or(eq(ticketTransfers.fromUserId, userId), eq(ticketTransfers.toUserId, userId)))
+    .orderBy(ticketTransfers.createdAt);
+  const cancellationRows = await deps.db
+    .select({
+      orderNumber: orders.number,
+      policyVersion: cancellationAcceptances.policyVersion,
+      acceptedAt: cancellationAcceptances.acceptedAt,
+      ip: cancellationAcceptances.ip,
+      userAgent: cancellationAcceptances.userAgent,
+    })
+    .from(cancellationAcceptances)
+    .innerJoin(orders, eq(orders.id, cancellationAcceptances.orderId))
+    .where(eq(cancellationAcceptances.userId, userId));
+  const transferMinorRows = await deps.db
+    .select({
+      termVersion: ticketMinorAcceptances.termVersion,
+      ageAtEvent: ticketMinorAcceptances.ageAtEvent,
+      acceptedAt: ticketMinorAcceptances.acceptedAt,
+      ip: ticketMinorAcceptances.ip,
+      userAgent: ticketMinorAcceptances.userAgent,
+    })
+    .from(ticketMinorAcceptances)
+    .where(eq(ticketMinorAcceptances.userId, userId));
   const mailRows = await deps.db
     .select({ template: emailLog.template, status: emailLog.status, sentAt: emailLog.sentAt })
     .from(emailLog)
@@ -185,13 +245,41 @@ export async function exportSubjectData(deps: PrivacyDeps, userId: string) {
         .map(i => ({ type: i.type, quantity: i.quantity, unitPriceCents: i.unit })),
       tickets: ticketRows
         .filter(t => t.orderId === o.id)
-        .map(t => ({
-          code: t.shortCode,
-          type: t.type,
-          holderName: t.holderName,
-          status: t.status,
-          usedAt: iso(t.usedAt),
-        })),
+        // Transferido (D-87): o nome de quem recebeu é dado de outra pessoa e não entra; o código curto também mudou.
+        .map(t =>
+          t.holderUserId === userId
+            ? { code: t.shortCode, type: t.type, holderName: t.holderName, status: t.status, usedAt: iso(t.usedAt) }
+            : { code: null, type: t.type, holderName: null, transferred: true, status: t.status, usedAt: iso(t.usedAt) },
+        ),
+    })),
+    receivedTickets: receivedRows.map(t => ({
+      code: t.shortCode,
+      type: t.type,
+      event: t.eventName,
+      holderName: t.holderName,
+      status: t.status,
+      usedAt: iso(t.usedAt),
+    })),
+    transfers: transferRows.map(t => ({
+      direction: t.fromUserId === userId ? 'enviada' : 'recebida',
+      other: maskName(t.fromUserId === userId ? t.toName : t.fromName),
+      event: t.eventName,
+      undoneByStaff: t.revertsId !== null,
+      at: t.createdAt.toISOString(),
+    })),
+    cancellationAcceptances: cancellationRows.map(a => ({
+      order: a.orderNumber,
+      policyVersion: a.policyVersion,
+      acceptedAt: a.acceptedAt.toISOString(),
+      ip: a.ip,
+      userAgent: a.userAgent,
+    })),
+    transferMinorAcceptances: transferMinorRows.map(a => ({
+      termVersion: a.termVersion,
+      ageAtEvent: a.ageAtEvent,
+      acceptedAt: a.acceptedAt.toISOString(),
+      ip: a.ip,
+      userAgent: a.userAgent,
     })),
     minorTermAcceptances: minorRows.map(m => ({
       order: m.orderNumber,
@@ -260,8 +348,8 @@ export async function anonymizeSubject(deps: PrivacyDeps, adminId: string, userI
       );
 
     const future = await tx.execute<{ n: number }>(sql`
-      select count(*)::int as n from tickets t join orders o on o.id = t.order_id join events e on e.id = t.event_id
-       where o.user_id = ${userId} and t.status = 'valido' and e.starts_at > ${now}`);
+      select count(*)::int as n from tickets t join events e on e.id = t.event_id
+       where t.holder_user_id = ${userId} and t.status = 'valido' and e.starts_at > ${now}`);
     const validFuture = future.rows[0]?.n ?? 0;
     if (validFuture > 0 && !input.acknowledgeValidTickets)
       throw new AppError(
@@ -288,14 +376,14 @@ export async function anonymizeSubject(deps: PrivacyDeps, adminId: string, userI
       })
       .where(eq(users.id, userId));
 
-    let ticketsAnonymized = 0;
+    // Só os ingressos que estão com a pessoa (D-87): o que ela comprou e transferiu tem o nome de quem recebeu, que fica.
+    const held = await tx
+      .update(tickets)
+      .set({ holderName: REMOVED_NAME })
+      .where(eq(tickets.holderUserId, userId))
+      .returning({ id: tickets.id });
+    const ticketsAnonymized = held.length;
     if (orderIds.length) {
-      const t = await tx
-        .update(tickets)
-        .set({ holderName: REMOVED_NAME })
-        .where(inArray(tickets.orderId, orderIds))
-        .returning({ id: tickets.id });
-      ticketsAnonymized = t.length;
       const evs = await tx.select().from(paymentEvents).where(inArray(paymentEvents.orderId, orderIds));
       for (const ev of evs)
         await tx
@@ -309,6 +397,15 @@ export async function anonymizeSubject(deps: PrivacyDeps, adminId: string, userI
       .update(minorTermAcceptances)
       .set({ ip: null, userAgent: null })
       .where(eq(minorTermAcceptances.userId, userId));
+    // Aceites da Política de Cancelamento e do Termo de Ciência de quem recebeu (0016): também ficam, sem o IP e o navegador.
+    await tx
+      .update(cancellationAcceptances)
+      .set({ ip: null, userAgent: null })
+      .where(eq(cancellationAcceptances.userId, userId));
+    await tx
+      .update(ticketMinorAcceptances)
+      .set({ ip: null, userAgent: null })
+      .where(eq(ticketMinorAcceptances.userId, userId));
     await tx.delete(sessions).where(eq(sessions.userId, userId));
     await tx.delete(passwordResets).where(eq(passwordResets.userId, userId));
     await tx.delete(loginAttempts).where(eq(loginAttempts.emailNormalized, oldEmail));

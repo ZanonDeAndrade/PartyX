@@ -901,7 +901,12 @@ export function AdminTicketPage({ id }: { id: string }) {
   const [version, setVersion] = useState(0);
   const [state, retry] = useFetch(s => api.admin.ticket(id, s), access === 'ok' ? `tk|${id}|${version}` : 'espera');
   const [cancelling, setCancelling] = useState(false);
+  const [undoing, setUndoing] = useState(false);
   const t = state.status === 'ok' ? state.data.ticket : null;
+  const transfers = state.status === 'ok' ? state.data.transfers : [];
+  // Transferência que ainda pode ser desfeita (D-87): a do titular que não foi desfeita (o servidor confere de novo).
+  const reverted = new Set(transfers.filter(x => x.reverts).map(x => x.reverts));
+  const undoable = transfers.find(x => !x.reverts && !reverted.has(x.id));
   return (
     <Gate access={access} active="ingressos">
       <p>
@@ -931,6 +936,11 @@ export function AdminTicketPage({ id }: { id: string }) {
             <div>
               <dt>Titular</dt>
               <dd>{t.holderName}</dd>
+              {t.holder.id !== t.buyer.id ? (
+                <dd className="px-facts-sub px-break">
+                  Recebeu por transferência · {t.holder.email} · CPF {t.holder.cpf ?? 'não informado'}
+                </dd>
+              ) : null}
             </div>
             <div>
               <dt>Comprador</dt>
@@ -963,8 +973,29 @@ export function AdminTicketPage({ id }: { id: string }) {
               <button type="button" className="px-btn px-btn-danger" onClick={() => setCancelling(true)}>
                 Cancelar ingresso
               </button>
+              {undoable ? (
+                <button type="button" className="px-btn" onClick={() => setUndoing(true)}>
+                  Desfazer última transferência
+                </button>
+              ) : null}
             </div>
           ) : null}
+          <h2 className="px-h3">Transferências</h2>
+          {transfers.length ? (
+            <ul className="px-trail">
+              {transfers.map(x => (
+                <li key={x.id}>
+                  {when(x.at)} · {x.from} para {x.to} ·{' '}
+                  <span className="px-mono">
+                    {x.oldShortCode} para {x.newShortCode}
+                  </span>
+                  {x.reverts ? ` · desfeita por ${x.by}. Motivo: ${x.reason}` : ''}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-muted">Este ingresso nunca foi transferido.</p>
+          )}
           <h2 className="px-h3">Tentativas na portaria</h2>
           {state.status === 'ok' && state.data.attempts.length ? (
             <ul className="px-trail">
@@ -979,6 +1010,19 @@ export function AdminTicketPage({ id }: { id: string }) {
           ) : (
             <p className="px-muted">Nenhuma leitura deste ingresso.</p>
           )}
+          {undoing && undoable ? (
+            <UndoTransferDialog
+              from={undoable.from}
+              to={undoable.to}
+              onCancel={() => setUndoing(false)}
+              onConfirm={async reason => {
+                await api.admin.undoTransfer(t.id, reason);
+                setUndoing(false);
+                toast(`Transferência desfeita. O ingresso voltou para ${undoable.from}, com QR novo.`);
+                setVersion(v => v + 1);
+              }}
+            />
+          ) : null}
           {cancelling ? (
             <CancelDialog
               title={`Cancelar o ingresso ${t.shortCode}?`}
@@ -994,6 +1038,93 @@ export function AdminTicketPage({ id }: { id: string }) {
         </>
       ) : null}
     </Gate>
+  );
+}
+
+/**
+ * Desfazer a última transferência (D-87): só em caso de fraude comprovada. Motivo obrigatório na trilha, confirmação, e o aviso de que
+ * o ingresso volta para quem transferiu com QR novo (o de quem recebeu deixa de valer).
+ */
+function UndoTransferDialog({
+  from,
+  to,
+  onCancel,
+  onConfirm,
+}: {
+  from: string;
+  to: string;
+  onCancel: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}) {
+  const [reason, setReason] = useState('');
+  const [ack, setAck] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const first = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    first.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await onConfirm(reason.trim());
+    } catch (err) {
+      setError(err instanceof ApiError ? (err.fields.reason ?? err.message) : 'Não foi possível desfazer.');
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="px-modal-bg" onClick={onCancel}>
+      <form
+        className="px-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="undo-title"
+        onSubmit={submit}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 id="undo-title" className="px-h3">
+          Desfazer a transferência de {from} para {to}?
+        </h2>
+        <p>
+          O ingresso volta para {from}, com QR Code e código novos. O QR de {to} deixa de valer. Os dois recebem e-mail.
+          Use só em caso de fraude comprovada.
+        </p>
+        <div className="px-field">
+          <label htmlFor="motivo-desfazer">Motivo (fica na trilha de auditoria)</label>
+          <textarea
+            id="motivo-desfazer"
+            ref={first}
+            rows={3}
+            maxLength={500}
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+          />
+        </div>
+        <div className="px-check">
+          <input id="ciente-fraude" type="checkbox" checked={ack} onChange={e => setAck(e.target.checked)} />
+          <label htmlFor="ciente-fraude">Confirmo que a fraude foi comprovada pela PartyX.</label>
+        </div>
+        {error ? (
+          <p className="px-notice px-notice-err" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="px-actions">
+          <button type="submit" className="px-btn px-btn-danger" disabled={busy || !ack || reason.trim().length < 5}>
+            {busy ? 'Desfazendo…' : 'Desfazer transferência'}
+          </button>
+          <button type="button" className="px-btn" onClick={onCancel} disabled={busy}>
+            Voltar
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

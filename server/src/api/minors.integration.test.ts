@@ -176,18 +176,18 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       const dezessete = await person('2009-06-01');
       const quote = await json(await dezessete.raw('POST', '/checkout/quote', { eventSlug: ev.slug, items: ev.items }));
       expect(quote.summary.buyer).toMatchObject({ age: 17, minor: false, refusal: { code: 'evento_para_maiores' } });
-      const recusa = await dezessete.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items });
+      const recusa = await dezessete.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items });
       expect(recusa.status).toBe(403);
       expect(await code(recusa)).toBe('evento_para_maiores');
       expect(await orders(dezessete.id)).toHaveLength(0);
 
       const vespera = await person('2008-12-13'); // faz 18 no dia seguinte ao evento
-      expect(await code(await vespera.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items }))).toBe(
+      expect(await code(await vespera.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items }))).toBe(
         'evento_para_maiores',
       );
 
       const aniversario = await person('2008-12-12'); // faz 18 no dia do evento
-      const ok = await aniversario.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items });
+      const ok = await aniversario.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items });
       expect(ok.status).toBe(201);
       expect((await json(ok)).order).toMatchObject({ buyerMinor: false, event: { allowsMinors: false } });
       expect((await orders(aniversario.id))[0]!.buyer_minor).toBe(false);
@@ -198,7 +198,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       const ev = await event({ allowsMinors: true });
       for (const birth of ['2011-06-01', '2010-12-13']) {
         const p = await person(birth);
-        const res = await p.raw('POST', '/orders', {
+        const res = await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
           eventSlug: ev.slug,
           items: ev.items,
           minorTermAccepted: true,
@@ -221,10 +221,10 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
         minorTermVersion: 'ficticio-0',
         refusal: null,
       });
-      const semAceite = await p.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items });
+      const semAceite = await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items });
       expect(semAceite.status).toBe(422);
       expect((await json(semAceite)).erro.detalhes[0].campo).toBe('minorTermAccepted');
-      const outraVersao = await p.raw('POST', '/orders', {
+      const outraVersao = await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
         eventSlug: ev.slug,
         items: ev.items,
         minorTermAccepted: true,
@@ -234,7 +234,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       expect(await code(outraVersao)).toBe('versao_desatualizada');
       expect(await orders(p.id)).toHaveLength(0);
 
-      const ok = await p.raw('POST', '/orders', {
+      const ok = await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
         eventSlug: ev.slug,
         items: ev.items,
         minorTermAccepted: true,
@@ -252,7 +252,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
     it('17 anos em evento com menores compra com o termo; 18 anos no mesmo evento compra sem termo', async () => {
       const ev = await event({ allowsMinors: true });
       const dezessete = await person('2009-06-01');
-      const ok = await dezessete.raw('POST', '/orders', {
+      const ok = await dezessete.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
         eventSlug: ev.slug,
         items: ev.items,
         minorTermAccepted: true,
@@ -262,7 +262,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       expect((await acceptances(dezessete.id))[0]).toMatchObject({ age_at_event: 17 });
 
       const adulto = await person('1990-01-01');
-      const adultoOk = await adulto.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items });
+      const adultoOk = await adulto.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items });
       expect(adultoOk.status).toBe(201);
       expect((await orders(adulto.id))[0]!.buyer_minor).toBe(false);
       expect(await acceptances(adulto.id)).toHaveLength(0);
@@ -278,7 +278,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
         birthDateMissing: true,
         refusal: { code: 'data_nascimento_obrigatoria' },
       });
-      const recusa = await p.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items });
+      const recusa = await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items });
       expect(recusa.status).toBe(409);
       expect(await code(recusa)).toBe('data_nascimento_obrigatoria');
 
@@ -294,7 +294,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       await p.raw('PATCH', '/me', { name: 'Pessoa Nova', phone: '(55) 99812-4470', birthDate: '2001-01-01' });
       expect((await sql('select birth_date::text as d from users where id = $1', [p.id])).rows[0].d).toBe('1995-01-01');
 
-      expect((await p.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items })).status).toBe(201);
+      expect((await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items })).status).toBe(201);
     });
   });
 
@@ -305,7 +305,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       const p = await person('1990-01-01', { target: v11, consent: '1.0' });
       expect(p.loginPendingConsent).toBe(true);
       expect((await json(await p.raw('GET', '/auth/me'))).pendingConsent).toBe(true);
-      const recusa = await p.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items });
+      const recusa = await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items });
       expect(recusa.status).toBe(409);
       expect(await code(recusa)).toBe('aceite_pendente');
 
@@ -336,7 +336,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
         { terms_version: '1.1', privacy_version: '1.1', ip: '203.0.113.7' },
       ]);
       expect((await json(await p.raw('GET', '/auth/me'))).pendingConsent).toBe(false);
-      expect((await p.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items })).status).toBe(201);
+      expect((await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items })).status).toBe(201);
     });
 
     it('a equipe nunca tem aceite pendente', async () => {
@@ -350,7 +350,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
     it('refaz o aviso de menor dos pedidos de eventos futuros, sem levar a data para a trilha', async () => {
       const ev = await event({ allowsMinors: true });
       const comprador = await person('1990-01-01');
-      expect((await comprador.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items })).status).toBe(201);
+      expect((await comprador.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items })).status).toBe(201);
       expect((await orders(comprador.id))[0]!.buyer_minor).toBe(false);
 
       const admin = await person(null, { role: 'administrador' });
@@ -452,7 +452,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       const p = await person('2010-12-12', { target: withText });
       const order = (
         await json(
-          await p.raw('POST', '/orders', {
+          await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
             eventSlug: ev.slug,
             items: ev.items,
             minorTermAccepted: true,
@@ -493,7 +493,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
     it('comprador adulto em evento com menores: campos do menor em branco; evento sem menores: não há autorização', async () => {
       const ev = await event({ allowsMinors: true });
       const adulto = await person('1990-01-01');
-      const order = (await json(await adulto.raw('POST', '/orders', { eventSlug: ev.slug, items: ev.items }))).order;
+      const order = (await json(await adulto.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: ev.slug, items: ev.items }))).order;
       const { text } = readPdf(
         await (await adulto.raw('GET', `/orders/${order.id}/autorizacao-menor.pdf`)).arrayBuffer(),
       );
@@ -502,7 +502,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
 
       const sem = await event();
       const p = await person('1990-01-01');
-      const o2 = (await json(await p.raw('POST', '/orders', { eventSlug: sem.slug, items: sem.items }))).order;
+      const o2 = (await json(await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: sem.slug, items: sem.items }))).order;
       const res = await p.raw('GET', `/orders/${o2.id}/autorizacao-menor.pdf`);
       expect(res.status).toBe(404);
       expect(await code(res)).toBe('evento_sem_menores');
@@ -540,7 +540,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
     /** Compra pela API (com o termo, se menor), aprova o pedido e emite os ingressos com o emissor de verdade. */
     async function paidTickets(birthDate: string, ev: Awaited<ReturnType<typeof event>>, quantity = 2) {
       const p = await person(birthDate);
-      const res = await p.raw('POST', '/orders', {
+      const res = await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
         eventSlug: ev.slug,
         items: [{ ticketTypeId: ev.items[0]!.ticketTypeId, quantity }],
         minorTermAccepted: true,
@@ -659,7 +659,7 @@ describe.skipIf(!ADMIN_URL)('menores de idade (integração)', () => {
       const p = await person('2009-06-01');
       const order = (
         await json(
-          await p.raw('POST', '/orders', {
+          await p.raw('POST', '/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
             eventSlug: ev.slug,
             items: ev.items,
             minorTermAccepted: true,

@@ -955,7 +955,7 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
 
       // Uma compradora já reservou antes do encerramento das vendas.
       const early = await session('cliente');
-      const reserved = await early.post('/orders', {
+      const reserved = await early.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
         eventSlug: e.slug,
         items: [{ ticketTypeId: open.id, quantity: 1 }],
       });
@@ -983,7 +983,7 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
 
       // Checkout recusa qualquer compra nova, com o motivo por tipo.
       const late = await session('cliente');
-      const refused = await late.post('/orders', {
+      const refused = await late.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0',
         eventSlug: e.slug,
         items: [{ ticketTypeId: open.id, quantity: 1 }],
       });
@@ -1029,7 +1029,7 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
         (await sql("select count(*)::int as n from audit_log where action = 'evento.encerrar_vendas'")).rows[0].n,
       ).toBe(1);
       await admin.patch(`/admin/ticket-types/${open.id}`, { salesEndAt: '2026-12-12T20:00:00-03:00' });
-      const again = await late.post('/orders', { eventSlug: e.slug, items: [{ ticketTypeId: open.id, quantity: 1 }] });
+      const again = await late.post('/orders', { cancellationAccepted: true, cancellationVersion: 'ficticio-0', eventSlug: e.slug, items: [{ ticketTypeId: open.id, quantity: 1 }] });
       expect(again.status).toBe(201);
     });
 
