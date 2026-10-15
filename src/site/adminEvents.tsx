@@ -14,6 +14,7 @@ import {
 import { AccentField } from './adminAccent';
 import { BuyersPanel, ContingencyPanel, Gate, LiveEntriesPanel, Loading, TicketsPanel, useAdmin } from './adminPages';
 import { normalizeHex } from './accent';
+import { ACCENT_FORMAT_ERROR } from './accentPresets';
 import { Layout, toast, usePageTitle } from './components';
 import {
   attractionsFromText,
@@ -1101,8 +1102,7 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
       e.countdownPhrase = `Use no máximo ${meta.limits.countdownPhraseMax} caracteres.`;
     else if (/[<>]/.test(phrase)) e.countdownPhrase = 'Use só texto, sem os sinais < e >.';
     // Cor de destaque: só #RRGGBB (o servidor confere de novo e grava em maiúsculas).
-    if (form.accentColor.trim() && !normalizeHex(form.accentColor))
-      e.accentColor = 'Use uma cor no formato #RRGGBB (por exemplo, #7C3AED).';
+    if (form.accentColor.trim() && !normalizeHex(form.accentColor)) e.accentColor = ACCENT_FORMAT_ERROR;
     return e;
   };
 

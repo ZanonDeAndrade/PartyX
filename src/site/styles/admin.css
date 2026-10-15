@@ -639,25 +639,122 @@ body.px-dark .px-preview-bar a {
   gap: var(--px-s-3);
   min-width: 0;
 }
-.px-accent-pick {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--px-s-3);
+/* Seletor embutido: cartão com o quadrado de saturação e brilho, a barra de matiz logo abaixo, o código com a amostra redonda (e o
+   conta-gotas onde houver), as cores prontas e "Voltar ao padrão". O quadrado e a barra são da `react-colorful`, que põe o próprio
+   CSS no fim do <head>: as regras abaixo têm duas classes para vencer as dela. */
+.px-color {
+  container-type: inline-size;
+  display: grid;
+  gap: var(--px-s-4);
+  max-width: 360px;
+  padding: var(--px-s-3);
+  border: 1px solid var(--px-line);
+  border-radius: var(--px-r-md);
+  background: var(--px-paper);
+  box-shadow: var(--px-sh-1), var(--px-sh-2);
 }
-.px-accent-pick .px-field {
+.px-color-area .react-colorful {
+  width: 100%;
+  height: auto;
+  gap: 6px;
+}
+.px-color-area .react-colorful__saturation {
+  flex: none;
+  aspect-ratio: 16 / 10;
+  border-bottom: 0;
+  border-radius: var(--px-r-sm);
+}
+/* Barra de 16 px desenhada, mas 28 px de área para o dedo (o gradiente fica só no conteúdo). */
+.px-color-area .react-colorful__hue {
+  flex: none;
+  height: 28px;
+  padding-block: 6px;
+  background-clip: content-box;
+  border-radius: var(--px-r-pill);
+}
+.px-color-area .react-colorful__pointer {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+  box-shadow:
+    0 1px 4px rgb(11 11 16 / 0.35),
+    0 0 0 1px rgb(11 11 16 / 0.12);
+}
+.px-color-code-row {
+  display: flex;
+  align-items: center;
+  gap: var(--px-s-2);
+}
+.px-color-dot {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(11 11 16 / 0.18);
+}
+.px-color-code-row input {
   flex: 1 1 auto;
   min-width: 0;
-  max-width: 220px;
 }
-.px-accent-swatch {
+.px-color-drop {
   flex: none;
-  width: 72px;
-  height: 72px;
-  padding: 4px;
-  border: 1px solid var(--px-line);
-  border-radius: var(--px-r-sm);
-  background: var(--px-paper);
+  width: 48px;
+  min-height: 48px;
+  padding: 0;
+}
+.px-color-presets {
+  display: grid;
+  gap: var(--px-s-2);
+}
+.px-color-label {
+  font-size: var(--px-t-sm);
+  font-weight: 650;
+  color: var(--px-text-2);
+}
+.px-color-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 40px);
+  justify-content: space-between;
+  row-gap: var(--px-s-2);
+}
+@container (min-width: 320px) {
+  .px-color-swatches {
+    grid-template-columns: repeat(8, 32px);
+  }
+}
+.px-color-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgb(11 11 16 / 0.18);
   cursor: pointer;
+}
+/* Painel sem movimento ao passar o mouse: só um anel claro. Só com mouse: no toque o "hover" ficaria preso na última tocada. */
+@media (hover: hover) {
+  .px-color-swatch:hover:not(:disabled) {
+    box-shadow:
+      inset 0 0 0 1px rgb(11 11 16 / 0.18),
+      0 0 0 2px var(--px-paper),
+      0 0 0 4px var(--px-text-3);
+  }
+}
+/* Escolhida: anel escuro afastado por um anel do fundo do cartão. */
+.px-color-swatch[aria-pressed='true'],
+.px-color-swatch[aria-pressed='true']:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 1px rgb(11 11 16 / 0.18),
+    0 0 0 2px var(--px-paper),
+    0 0 0 4px var(--px-text);
+}
+.px-color-swatch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.px-color-reset {
+  justify-self: start;
 }
 .px-accent-controls > p {
   margin: 0;
@@ -677,6 +774,11 @@ body.px-dark .px-preview-bar a {
   overflow: hidden;
   border: 1px solid var(--px-line);
   background: var(--px-ink);
+}
+/* A prévia acompanha o arrasto sem atraso: sem as transições de cor dos botões e links. */
+.px-accent-preview,
+.px-accent-preview * {
+  transition: none !important;
 }
 .px-accent-dark {
   display: flex;

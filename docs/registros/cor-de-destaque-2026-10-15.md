@@ -1,5 +1,7 @@
 # Cor de destaque por evento (15/10/2026)
 
+> Atualização de 15/10/2026: o seletor do sistema do campo foi trocado por um seletor embutido (quadrado, barra de matiz, código com amostra, cores prontas e conta-gotas). Ver `seletor-de-cor-2026-10-15.md`. O código digitado errado agora mostra o erro enquanto digita, não mais ao sair do campo.
+
 Pedido do responsável (Arthur), nesta data: campo "Cor de destaque" no cadastro do evento (seletor RGB e hexadecimal, prévia, "Voltar ao padrão" e, opcional, "Sugerir pela imagem de capa"), aplicado só na página do evento; texto preto ou branco pelo contraste WCAG (mínimo 4,5:1); variações de passar o mouse, desabilitado e fundo suave; só `#RRGGBB`, validado no servidor, aplicado por variável CSS, com a mesma CSP; migração só de expansão; testes e capturas a 360 e 1280 px com verde, amarelo, vermelho e o padrão. Regras do pedido: plano e migração antes, testes, commits locais, OK antes de publicar.
 
 Respostas do responsável às perguntas do plano: na vitrine, **só o bloco da data** do card; sugestão **pela capa salva** (com capa nova ainda não salva, o painel pede para salvar antes).

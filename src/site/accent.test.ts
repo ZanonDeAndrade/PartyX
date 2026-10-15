@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { accentPalette, accentVars, contrast, luminance, normalizeHex, parseHex, stubVars, TEXT_MIN } from './accent';
+import { ACCENT_DEFAULT, accentPalette, accentVars, contrast, luminance, normalizeHex, parseHex, stubVars, TEXT_MIN } from './accent';
+import { ACCENT_PRESETS } from './accentPresets';
+import { hueName } from './adminColorPicker';
 
 const INK = '#0B0B10';
 const WHITE = '#FFFFFF';
@@ -81,5 +83,49 @@ describe('cor de destaque: paleta com contraste conferido', () => {
     expect(vars['--px-violet']).toBe('#15803D');
     for (const value of Object.values(vars)) expect(value).toMatch(/^(#[0-9A-F]{6}|rgb\(\d+ \d+ \d+ \/ 0\.\d+\))$/);
     expect(stubVars(accentPalette('#FACC15')!)).toEqual({ '--px-violet': '#FACC15', '--px-on-accent': INK });
+  });
+
+  it('cores prontas do painel: o roxo primeiro (padrão), oito cores distintas em #RRGGBB, texto legível sem ajuste de tom', () => {
+    expect(ACCENT_PRESETS[0]).toEqual({ name: 'Roxo da PartyX (padrão)', hex: ACCENT_DEFAULT });
+    expect(ACCENT_PRESETS.map(p => p.name)).toEqual([
+      'Roxo da PartyX (padrão)',
+      'Verde neon',
+      'Vermelho',
+      'Laranja',
+      'Rosa',
+      'Azul',
+      'Amarelo',
+      'Ciano',
+    ]);
+    expect(new Set(ACCENT_PRESETS.map(p => p.hex)).size).toBe(ACCENT_PRESETS.length);
+    for (const { name, hex } of ACCENT_PRESETS) {
+      expect(normalizeHex(hex), name).toBe(hex);
+      const p = accentPalette(hex)!;
+      expect(p.fill, `${name}: sem ajuste de tom`).toBe(hex);
+      expect(p.fillContrast, `${name}: texto sobre a cor`).toBeGreaterThanOrEqual(TEXT_MIN);
+    }
+  });
+
+  it('nome da faixa de matiz para o leitor de tela', () => {
+    expect([0, 30, 55, 120, 185, 230, 263, 331, 359, 360, -10].map(hueName)).toEqual([
+      'vermelho',
+      'laranja',
+      'amarelo',
+      'verde',
+      'ciano',
+      'azul',
+      'roxo',
+      'rosa',
+      'vermelho',
+      'vermelho',
+      'vermelho',
+    ]);
+    for (const { name, hex } of ACCENT_PRESETS.slice(1)) {
+      const [r, g, b] = parseHex(hex)!.map(c => c / 255) as [number, number, number];
+      const max = Math.max(r, g, b);
+      const d = max - Math.min(r, g, b);
+      const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      expect(hueName(h * 60), name).toBe(name.toLowerCase().replace(' neon', ''));
+    }
   });
 });

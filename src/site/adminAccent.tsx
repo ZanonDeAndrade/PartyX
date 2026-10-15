@@ -1,11 +1,30 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { ACCENT_DEFAULT, accentPalette, accentVars, contrast, normalizeHex, parseHex } from './accent';
+import { ACCENT_FORMAT_ERROR, ACCENT_PRESETS } from './accentPresets';
+import ColorArea from './adminColorPicker';
 import { api, ApiError, type AdminEvent } from './api';
+import { Svg, type IconProps } from './icons';
+
+/** Conta-gotas (só aqui: fica no arquivo do painel, fora do JavaScript do site). */
+const IconPipette = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M15 4l5 5-3 3-5-5z" />
+    <path d="M13 9 6 16v2h2l7-7" />
+    <path d="M6 18l-2 2" />
+  </Svg>
+);
+
+/** Conta-gotas do navegador (EyeDropper API: Chrome e Edge no computador). Onde não existe, o botão não aparece. */
+type EyeDropperCtor = new () => { open(): Promise<{ sRGBHex: string }> };
+const eyeDropper = (): EyeDropperCtor | undefined =>
+  typeof window === 'undefined' ? undefined : (window as unknown as { EyeDropper?: EyeDropperCtor }).EyeDropper;
 
 /**
- * Campo "Cor de destaque" do evento (0014): seletor do sistema (RGB e hexadecimal), campo hexadecimal, volta ao padrão, sugestão
- * pela capa salva e a pré-visualização com os mesmos componentes da página (bloco da data, linha de "Quando", link e o quadro de
- * ingressos com "Continuar"). A regra que vale é a do servidor (`#RRGGBB`); aqui a tela só orienta.
+ * Campo "Cor de destaque" do evento (0014): seletor embutido (quadrado de saturação e brilho, barra de matiz, código com a amostra
+ * redonda e conta-gotas onde houver), cores prontas, volta ao padrão, sugestão pela capa salva e a pré-visualização com os mesmos
+ * componentes da página (bloco da data, linha de "Quando", link e o quadro de ingressos com "Continuar"). Enquanto arrasta, só este
+ * campo redesenha (a cor fica em `live`); ao soltar, a cor vai para o formulário. A regra que vale é a do servidor (`#RRGGBB`); aqui
+ * a tela só orienta.
  */
 export function AccentField({
   value,
@@ -26,13 +45,45 @@ export function AccentField({
   storageAvailable: boolean;
   busy: boolean;
 }) {
-  const valid = normalizeHex(value);
-  const palette = useMemo(() => accentPalette(valid ?? ACCENT_DEFAULT)!, [valid]);
-  const custom = valid !== null;
+  // Cor do arrasto em andamento (só este campo redesenha); ao soltar, vai para o formulário e volta a nulo.
+  const [live, setLive] = useState<string | null>(null);
+  const text = live ?? value;
+  const empty = text.trim() === '';
+  const valid = empty ? null : normalizeHex(text);
+  const invalid = !empty && valid === null;
+  // Código que não tem como virar #RRGGBB (letra fora de 0-9 e A-F, # no meio, ou 6 dígitos sem formar uma cor): o erro aparece
+  // enquanto digita. Só incompleto ("#7C3"), o erro espera o "Salvar". Nunca na saída do campo: o erro surgindo ali empurrava o
+  // botão "Salvar" no meio do clique, e o clique se perdia.
+  const hopeless = invalid && (/[^#0-9a-f]/i.test(text.trim()) || /.#/.test(text.trim()) || text.trim().replace(/^#/, '').length >= 6);
+  // Enquanto o código digitado está incompleto, o seletor e a prévia ficam na última cor válida.
+  const [lastValid, setLastValid] = useState(valid ?? ACCENT_DEFAULT);
+  const color = empty ? ACCENT_DEFAULT : (valid ?? lastValid);
+  if (color !== lastValid) setLastValid(color);
+  const palette = useMemo(() => accentPalette(color)!, [color]);
+  const custom = !empty;
   const [said, setSaid] = useState('');
   const [suggesting, setSuggesting] = useState(false);
+  const [canDrop] = useState(() => eyeDropper() !== undefined);
   const rgb = parseHex(palette.base)!;
   const savedCover = Boolean(event?.bannerUrl) && !bannerRemoved;
+  const shownError = error || (hopeless ? ACCENT_FORMAT_ERROR : '');
+
+  /** Cor escolhida por botão (pronta, conta-gotas, sugestão, padrão): direto para o formulário. */
+  const choose = (next: string) => {
+    setLive(null);
+    onChange(next);
+  };
+
+  const drop = async () => {
+    const Ctor = eyeDropper();
+    if (!Ctor) return;
+    try {
+      const hex = normalizeHex((await new Ctor().open()).sRGBHex);
+      if (hex) choose(hex);
+    } catch {
+      // Esc ou clique fora: nada muda.
+    }
+  };
 
   const suggest = async () => {
     if (newFilePending) {
@@ -43,10 +94,10 @@ export function AccentField({
     setSuggesting(true);
     setSaid('');
     try {
-      const { color } = await api.admin.accentSuggestion(event.id);
-      if (color) {
-        onChange(color);
-        setSaid(`Cor sugerida pela capa: ${color}. Salve para aplicar na página.`);
+      const { color: suggested } = await api.admin.accentSuggestion(event.id);
+      if (suggested) {
+        choose(suggested);
+        setSaid(`Cor sugerida pela capa: ${suggested}. Salve para aplicar na página.`);
       } else setSaid('A capa não tem uma cor viva para sugerir (só preto, branco ou cinza). Escolha no seletor.');
     } catch (err) {
       setSaid(err instanceof ApiError ? err.message : 'Não foi possível sugerir a cor agora. Tente de novo.');
@@ -69,49 +120,88 @@ export function AccentField({
       </small>
       <div className="px-accent-grid">
         <div className="px-accent-controls">
-          <div className="px-accent-pick">
-            <input
-              type="color"
-              className="px-accent-swatch"
-              aria-label="Escolher a cor no seletor"
-              value={palette.base.toLowerCase()}
-              onChange={e => onChange(e.target.value.toUpperCase())}
+          <div className="px-color" role="group" aria-label="Seletor de cor">
+            <ColorArea
+              color={color}
+              onChange={setLive}
+              onChangeEnd={hex => {
+                setLive(null);
+                onChange(hex);
+              }}
             />
-            <div className="px-field">
-              <label htmlFor="ev-accentColor">Hexadecimal</label>
-              <input
-                id="ev-accentColor"
-                className="px-mono"
-                value={value}
-                placeholder={ACCENT_DEFAULT}
-                maxLength={7}
-                spellCheck={false}
-                autoComplete="off"
-                autoCapitalize="characters"
-                onChange={e => onChange(e.target.value)}
-                onBlur={() => {
-                  if (valid && valid !== value) onChange(valid);
-                }}
-                aria-invalid={error ? true : undefined}
-                aria-describedby={error ? 'ev-accentColor-erro ev-accentColor-dica' : 'ev-accentColor-dica'}
-              />
-              {error ? (
+            <div className="px-field px-color-code">
+              <label htmlFor="ev-accentColor">Código da cor</label>
+              <div className="px-color-code-row">
+                <span className="px-color-dot" style={{ background: color }} aria-hidden="true" />
+                <input
+                  id="ev-accentColor"
+                  className="px-mono"
+                  value={text}
+                  placeholder={ACCENT_DEFAULT}
+                  maxLength={7}
+                  spellCheck={false}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  onChange={e => onChange(e.target.value)}
+                  onBlur={() => {
+                    if (valid && valid !== value) onChange(valid);
+                  }}
+                  aria-invalid={shownError ? true : undefined}
+                  aria-describedby={shownError ? 'ev-accentColor-erro ev-accentColor-dica' : 'ev-accentColor-dica'}
+                />
+                {canDrop ? (
+                  <button
+                    type="button"
+                    className="px-btn px-color-drop"
+                    aria-label="Pegar uma cor da tela"
+                    title="Pegar uma cor da tela"
+                    disabled={busy}
+                    onClick={drop}
+                  >
+                    <IconPipette />
+                  </button>
+                ) : null}
+              </div>
+              {shownError ? (
                 <small id="ev-accentColor-erro" className="px-error" role="alert">
-                  {error}
+                  {shownError}
                 </small>
               ) : null}
               <small id="ev-accentColor-dica" className="px-hint">
-                {custom
+                {custom && !invalid
                   ? `RGB ${rgb.join(', ')}. Texto ${textName} sobre a cor: ${ratio(palette.fillContrast)}.`
-                  : `Em branco: o roxo da PartyX (${ACCENT_DEFAULT}). Formato #RRGGBB.`}
+                  : `Em branco: o roxo da PartyX (${ACCENT_DEFAULT}). Formato #RRGGBB, com ou sem o #.`}
               </small>
             </div>
-          </div>
-          <div className="px-actions">
-            <button type="button" className="px-btn" disabled={busy || value === ''} onClick={() => onChange('')}>
+            <div className="px-color-presets" role="group" aria-labelledby="ev-accent-prontas">
+              <span id="ev-accent-prontas" className="px-color-label">
+                Cores prontas
+              </span>
+              <div className="px-color-swatches">
+                {ACCENT_PRESETS.map(p => {
+                  const isDefault = p.hex === ACCENT_DEFAULT;
+                  return (
+                    <button
+                      key={p.hex}
+                      type="button"
+                      className="px-color-swatch"
+                      style={{ '--swatch': p.hex } as CSSProperties}
+                      aria-label={p.name}
+                      title={p.name}
+                      aria-pressed={isDefault ? empty || valid === p.hex : valid === p.hex}
+                      disabled={busy}
+                      onClick={() => choose(isDefault ? '' : p.hex)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+            <button type="button" className="px-btn px-color-reset" disabled={busy || text === ''} onClick={() => choose('')}>
               Voltar ao padrão
             </button>
-            {storageAvailable ? (
+          </div>
+          {storageAvailable ? (
+            <div className="px-actions">
               <button
                 type="button"
                 className="px-btn"
@@ -121,8 +211,8 @@ export function AccentField({
               >
                 {suggesting ? 'Lendo a capa…' : 'Sugerir pela imagem de capa'}
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
           <p id="ev-accent-sugestao" className="px-small px-muted" role="status" aria-live="polite">
             {said ||
               (storageAvailable && !newFilePending && !savedCover
@@ -133,7 +223,7 @@ export function AccentField({
             <div className="px-notice px-notice-warn" role="status">
               <b>Contraste insuficiente</b>
               <span>{palette.notes[0]}</span>
-              <button type="button" className="px-btn px-self-start" disabled={busy} onClick={() => onChange(palette.fill)}>
+              <button type="button" className="px-btn px-self-start" disabled={busy} onClick={() => choose(palette.fill)}>
                 Usar {palette.fill} no campo
               </button>
             </div>

@@ -4,9 +4,10 @@
  */
 import type { SVGProps } from 'react';
 
-type IconProps = SVGProps<SVGSVGElement> & { size?: number };
+export type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
-function Svg({ size = 20, children, ...rest }: IconProps) {
+/** Moldura comum; ícones usados só no painel podem ficar no próprio arquivo do painel (fora do JavaScript do site). */
+export function Svg({ size = 20, children, ...rest }: IconProps) {
   return (
     <svg
       width={size}

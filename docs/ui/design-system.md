@@ -184,12 +184,15 @@ Transitions.
 | Tabela que vira cartões abaixo de 640 px, esqueleto de tabela | painel, relatórios | `adminPages.tsx`, `styles/base.css` |
 | `Roll` (número que rola), `useReveal` (entrada ao aparecer na tela), `cascade` (posição na cascata) | vitrine, evento, compra | `motion.tsx` |
 | Ícones | ações nomeadas | `icons.tsx` |
+| Seletor de cor (`px-color`: quadrado de saturação e brilho, barra de matiz, código com amostra redonda, conta-gotas onde houver, cores prontas; `react-colorful` 5.8.1) | painel, cor de destaque do evento | `adminAccent.tsx`, `adminColorPicker.tsx`, `accentPresets.ts`, `styles/admin.css` |
 
 ## Áreas e pacotes
 
 Cada área tem JavaScript e CSS próprios, carregados sob demanda (`React.lazy`): vitrine e acesso no pacote principal;
-compra (`areas/checkout.tsx`), cliente (`areas/client.tsx`), painel (`areas/admin.tsx`) e portaria (`areas/gate.tsx`, com o
-leitor jsQR). Tamanhos em `comparativo.md` e no relatório final.
+compra (`areas/checkout.tsx`), cliente (`areas/client.tsx`), painel (`areas/admin.tsx`, com o seletor de cor `react-colorful`) e
+portaria (`areas/gate.tsx`, com o leitor jsQR). Tamanhos em `comparativo.md` e no relatório final. O seletor de cor fica no
+pacote do painel, não num arquivo só do formulário: a biblioteca importa o React como padrão e, separada, levava o React do pacote
+principal para um arquivo comum (o site público cresceria 0,66 kB comprimidos).
 
 ## Pendências de marca
 

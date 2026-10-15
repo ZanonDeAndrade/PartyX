@@ -1,7 +1,8 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import pg from 'pg';
+import { accentPalette } from '../src/site/accent';
 import { TEXTOS_DIR } from './support/textos-longos-setup';
 
 /**
@@ -42,8 +43,13 @@ async function event(slug: string, accent: string | null): Promise<string> {
   return id;
 }
 
-async function context(browser: Browser, width: number, admin = false): Promise<BrowserContext> {
-  const ctx = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+async function context(browser: Browser, width: number, admin = false, touch = false): Promise<BrowserContext> {
+  // `touch`: celular com toque e tela de densidade 2 (o seletor de cor arrastado com o dedo).
+  const ctx = await browser.newContext({
+    viewport: { width, height: 900 },
+    reducedMotion: 'reduce',
+    ...(touch ? { hasTouch: true, isMobile: true, deviceScaleFactor: 2 } : {}),
+  });
   await ctx.addInitScript(() => sessionStorage.setItem('partyx_intro_seen', '1'));
   if (admin) {
     const page = await ctx.newPage();
@@ -189,64 +195,299 @@ test('vitrine: só o bloco da data do card leva a cor; o resto do card e o cabe�
   await ctx.close();
 });
 
-test('painel: seletor, hexadecimal, prévia, aviso de contraste, voltar ao padrão e erro de formato', async ({ browser }) => {
+/** Toque enviado pelo protocolo do Chromium (dedo de verdade: passa pelos gestos de rolagem do navegador). */
+type Touch = 'touchStart' | 'touchMove' | 'touchEnd';
+const FORMAT_ERROR = 'Use uma cor no formato #RRGGBB (por exemplo, #7C3AED).';
+const HEX = /^#[0-9A-F]{6}$/;
+
+/** Abre a edição do evento no painel; devolve o campo, a prévia (bloco da data) e os controles do seletor. */
+async function openField(page: Page, id: string) {
+  await page.goto(`${R.base}/admin/eventos/${id}/editar`, { waitUntil: 'networkidle' });
+  const field = page.locator('.px-accent-edit');
+  await expect(field.locator('legend')).toHaveText('Cor de destaque');
+  return {
+    field,
+    input: page.locator('#ev-accentColor'),
+    preview: field.locator('.px-accent-preview .px-stub'),
+    square: page.getByRole('slider', { name: 'Saturação e brilho' }),
+    hue: page.getByRole('slider', { name: 'Matiz' }),
+  };
+}
+
+const bg = (l: Locator) => l.evaluate(el => getComputedStyle(el).backgroundColor);
+/** Fundo que a prévia e a página usam para a cor: a própria ou, na faixa sem contraste, o tom ajustado (`accent.ts`). */
+const fillOf = (hex: string) => hexToRgb(accentPalette(hex)!.fill);
+/** No meio do arrasto (antes de soltar): o código é #RRGGBB e a prévia já está nessa cor. Lidos juntos, no mesmo instante. */
+const liveMatch = async (page: Page) => {
+  const [code, fill] = await page.evaluate(
+    ([i, p]) => [(document.querySelector(i) as HTMLInputElement).value, getComputedStyle(document.querySelector(p)!).backgroundColor],
+    ['#ev-accentColor', '.px-accent-edit .px-accent-preview .px-stub'] as const,
+  );
+  return HEX.test(code) && fill === fillOf(code);
+};
+
+/** Rola até o cartão do seletor ficar logo abaixo do cabeçalho fixo do painel (toques usam coordenadas da tela). */
+const bringPicker = (page: Page) =>
+  page.evaluate(() => {
+    const card = document.querySelector('.px-color')!;
+    window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 84);
+  });
+
+/**
+ * Fotografa o campo inteiro (seletor e prévia), recortado da página toda: assim o cabeçalho fixo do painel fica no topo da página e
+ * não por cima do campo. Mantém a rolagem em que estava.
+ */
+async function shot(page: Page, field: Locator, name: string, width: number) {
+  if (width >= 960) await page.mouse.move(0, 0);
+  const y = await page.evaluate(() => window.scrollY);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const box = (await field.boundingBox())!;
+  await page.screenshot({ path: path.join(IMG, `${name}-${width}.png`), fullPage: true, clip: box });
+  await page.evaluate(top => window.scrollTo(0, top), y);
+}
+
+test('painel: seletor embutido com quadrado, barra de matiz, código, cores prontas e voltar ao padrão', async ({ browser }) => {
   const id = await event('cor-painel', null);
   for (const width of [360, 1280]) {
-    const ctx = await context(browser, width, true);
+    const touch = width < 600;
+    const ctx = await context(browser, width, true, touch);
     const page = await ctx.newPage();
-    await page.goto(`${R.base}/admin/eventos/${id}/editar`, { waitUntil: 'networkidle' });
-    const field = page.locator('.px-accent-edit');
-    await expect(field.locator('legend')).toHaveText('Cor de destaque');
-    const preview = field.locator('.px-accent-preview .px-stub');
-    expect(await preview.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(PURPLE);
+    const { field, input, preview, square, hue } = await openField(page, id);
+
+    // Sem cor própria: campo vazio, o roxo no seletor e na prévia, o roxo marcado nas cores prontas.
+    await expect(input).toHaveValue('');
+    expect(await bg(preview)).toBe(PURPLE);
+    await expect(page.getByRole('button', { name: 'Roxo da PartyX (padrão)' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('button', { name: 'Voltar ao padrão' })).toBeDisabled();
+    await expect(hue).toHaveAttribute('aria-valuetext', /^\d+ graus, roxo$/);
+    await expect(square).toHaveAttribute('aria-valuetext', /^Saturação \d+%, brilho \d+%$/);
     // Sem capa salva: a sugestão fica desabilitada, com a orientação.
     await expect(page.getByRole('button', { name: 'Sugerir pela imagem de capa' })).toBeDisabled();
     await expect(field).toContainText('salve o evento com uma imagem de capa');
+    await shot(page, field, 'painel-seletor-padrao', width);
 
-    // Amarelo pelo seletor do sistema: texto escuro, borda no botão, avisos dos tons.
-    await field.locator('input[type=color]').fill('#facc15');
-    await expect(page.locator('#ev-accentColor')).toHaveValue('#FACC15');
-    expect(await preview.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(250, 204, 21)');
-    expect(await preview.evaluate(el => getComputedStyle(el).color)).toBe('rgb(11, 11, 16)');
-    await expect(field).toContainText('Texto preto sobre a cor');
-    await expect(field).toContainText('borda mais escura');
-    await field.screenshot({ path: path.join(IMG, `painel-amarelo-${width}.png`) });
+    // Cor pronta: o código, a prévia e a marcação acompanham.
+    await page.getByRole('button', { name: 'Rosa' }).click();
+    await expect(input).toHaveValue('#FF2E93');
+    expect(await bg(preview)).toBe('rgb(255, 46, 147)');
+    await expect(page.getByRole('button', { name: 'Rosa' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Roxo da PartyX (padrão)' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(hue).toHaveAttribute('aria-valuetext', '331 graus, rosa');
 
-    // Cinza da faixa sem contraste: aviso e o botão que troca pelo tom ajustado.
-    await page.fill('#ev-accentColor', '#787878');
+    // Arrastar no quadrado: o código e a prévia mudam AO VIVO, antes de soltar; ao soltar, a cor fica.
+    await bringPicker(page);
+    const box = (await square.boundingBox())!;
+    const at = (fx: number, fy: number) => ({ x: box.x + box.width * fx, y: box.y + box.height * fy });
+    if (touch) {
+      // Dedo de verdade (CDP): o arrasto não pode rolar a página junto.
+      const cdp = await ctx.newCDPSession(page);
+      const finger = (type: Touch, p?: { x: number; y: number }) =>
+        cdp.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ x: p.x, y: p.y }] : [] });
+      const scrollBefore = await page.evaluate(() => window.scrollY);
+      await finger('touchStart', at(0.9, 0.1));
+      for (let i = 1; i <= 8; i++) await finger('touchMove', at(0.9 - i * 0.08, 0.1 + i * 0.08));
+      await expect(input).not.toHaveValue('#FF2E93');
+      await expect.poll(() => liveMatch(page)).toBe(true);
+      await finger('touchEnd');
+      expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+      // Controle: o mesmo gesto fora do seletor (no rótulo "Cores prontas") rola a página, então o teste enxerga rolagem.
+      const lb = (await page.locator('#ev-accent-prontas').boundingBox())!;
+      await finger('touchStart', { x: lb.x + 10, y: lb.y + 8 });
+      for (let i = 1; i <= 8; i++) await finger('touchMove', { x: lb.x + 10, y: lb.y + 8 - i * 30 });
+      await finger('touchEnd');
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(scrollBefore);
+      await bringPicker(page);
+    } else {
+      await page.mouse.move(at(0.9, 0.1).x, at(0.9, 0.1).y);
+      await page.mouse.down();
+      await page.mouse.move(at(0.25, 0.35).x, at(0.25, 0.35).y, { steps: 6 });
+      await expect(input).not.toHaveValue('#FF2E93');
+      await expect.poll(() => liveMatch(page)).toBe(true);
+      const mid = await input.inputValue();
+      await page.mouse.move(at(0.6, 0.5).x, at(0.6, 0.5).y, { steps: 4 });
+      await expect(input).not.toHaveValue(mid);
+      await page.mouse.up();
+    }
+    const dragged = await input.inputValue();
+    expect(dragged).toMatch(HEX);
+    expect(await bg(preview)).toBe(fillOf(dragged));
+    await expect(page.getByRole('button', { name: 'Rosa' })).toHaveAttribute('aria-pressed', 'false');
+
+    // Arrastar (ou tocar) na barra de matiz, a um terço: verde.
+    await bringPicker(page);
+    const hb = (await hue.boundingBox())!;
+    if (touch) await page.touchscreen.tap(hb.x + hb.width / 3, hb.y + hb.height / 2);
+    else await page.mouse.click(hb.x + hb.width / 3, hb.y + hb.height / 2);
+    await expect(hue).toHaveAttribute('aria-valuetext', /^1[12]\d graus, verde$/);
+    const green = await input.inputValue();
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(green.slice(i, i + 2), 16)) as [number, number, number];
+    expect(g).toBeGreaterThan(r);
+    expect(g).toBeGreaterThan(b);
+    await shot(page, field, 'painel-seletor-arrastado', width);
+
+    // Teclado: setas movem o seletor (5% no quadrado, 18 graus na barra); a cor vai para o campo ao soltar a tecla.
+    await square.focus();
+    const sat = Number(/Saturação (\d+)%/.exec((await square.getAttribute('aria-valuetext'))!)![1]);
+    const before = await input.inputValue();
+    await page.keyboard.press('ArrowLeft');
+    await expect(square).toHaveAttribute('aria-valuetext', new RegExp(`^Saturação ${Math.max(0, sat - 5)}%`));
+    await expect(input).not.toHaveValue(before);
+    await hue.focus();
+    const deg = Number(await hue.getAttribute('aria-valuenow'));
+    await page.keyboard.press('ArrowRight');
+    await expect(hue).toHaveAttribute('aria-valuenow', String(Math.min(360, deg + 18)));
+
+    // Código digitado sem # e em minúsculas: o seletor acompanha enquanto digita; ao sair, fica #RRGGBB maiúsculo.
+    await input.fill('3b5bff');
+    await expect(hue).toHaveAttribute('aria-valuetext', '230 graus, azul');
+    expect(await bg(preview)).toBe('rgb(59, 91, 255)');
+    await expect(page.getByRole('button', { name: 'Azul' })).toHaveAttribute('aria-pressed', 'true');
+    await input.blur();
+    await expect(input).toHaveValue('#3B5BFF');
+
+    // Só incompleto: nenhum erro, nem ao sair do campo (o erro espera o "Salvar").
+    await input.fill('#3B5');
+    await input.blur();
+    await expect(page.locator('#ev-accentColor-erro')).toHaveCount(0);
+    // Código que não tem como ser uma cor: erro já enquanto digita; o seletor e a prévia ficam na última cor válida.
+    await input.fill('#12G');
+    await expect(page.locator('#ev-accentColor-erro')).toHaveText(FORMAT_ERROR);
+    await expect(input).toHaveAttribute('aria-invalid', 'true');
+    await expect(hue).toHaveAttribute('aria-valuetext', '230 graus, azul');
+    expect(await bg(preview)).toBe('rgb(59, 91, 255)');
+    await shot(page, field, 'painel-seletor-invalido', width);
+    await input.fill('#FF6B00');
+    await expect(page.locator('#ev-accentColor-erro')).toHaveCount(0);
+
+    // Cinza da faixa sem contraste: o aviso continua valendo, com o botão que troca pelo tom ajustado.
+    await input.fill('#787878');
     await expect(field.locator('.px-notice-warn')).toContainText('Contraste insuficiente');
     await field.getByRole('button', { name: /^Usar #[0-9A-F]{6} no campo$/ }).click();
-    await expect(page.locator('#ev-accentColor')).not.toHaveValue('#787878');
+    await expect(input).not.toHaveValue('#787878');
     await expect(field.locator('.px-notice-warn')).toHaveCount(0);
 
-    // Verde digitado sem # e em minúsculas: normaliza ao sair do campo.
-    await page.fill('#ev-accentColor', '15803d');
-    await page.locator('#ev-accentColor').blur();
-    await expect(page.locator('#ev-accentColor')).toHaveValue('#15803D');
-    expect(await preview.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(21, 128, 61)');
-    await field.screenshot({ path: path.join(IMG, `painel-verde-${width}.png`) });
-
+    // Voltar ao padrão: campo vazio, roxo no seletor, na prévia e nas cores prontas.
     await page.getByRole('button', { name: 'Voltar ao padrão' }).click();
-    await expect(page.locator('#ev-accentColor')).toHaveValue('');
-    expect(await preview.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(PURPLE);
+    await expect(input).toHaveValue('');
+    expect(await bg(preview)).toBe(PURPLE);
+    await expect(hue).toHaveAttribute('aria-valuetext', /^\d+ graus, roxo$/);
+    await expect(page.getByRole('button', { name: 'Roxo da PartyX (padrão)' })).toHaveAttribute('aria-pressed', 'true');
+    // A cor pronta do roxo também grava vazio.
+    await page.getByRole('button', { name: 'Amarelo' }).click();
+    await page.getByRole('button', { name: 'Roxo da PartyX (padrão)' }).click();
+    await expect(input).toHaveValue('');
+
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    const card = (await page.locator('.px-color').boundingBox())!;
+    expect(card.x).toBeGreaterThanOrEqual(0);
+    expect(card.x + card.width).toBeLessThanOrEqual(width);
     await ctx.close();
   }
+});
 
-  // Formato errado não é enviado; a cor válida é salva e chega à página pública.
-  const ctx = await context(browser, 1280, true);
-  const page = await ctx.newPage();
-  await page.goto(`${R.base}/admin/eventos/${id}/editar`, { waitUntil: 'networkidle' });
-  await page.fill('#ev-accentColor', 'vermelho');
-  await page.getByRole('button', { name: 'Salvar alterações' }).click();
-  await expect(page.locator('#ev-accentColor-erro')).toHaveText('Use uma cor no formato #RRGGBB (por exemplo, #7C3AED).');
-  await expect(page.locator('#ev-accentColor')).toBeFocused();
-  await page.fill('#ev-accentColor', '#DC2626');
-  await page.getByRole('button', { name: 'Salvar alterações' }).click();
-  await expect(page.locator('.px-toast, [role=status]').filter({ hasText: 'Alterações salvas.' }).first()).toBeVisible();
-  expect((await db.query('select accent_color from events where id = $1', [id])).rows[0].accent_color).toBe('#DC2626');
-  await page.goto(`${R.base}/eventos/cor-painel`, { waitUntil: 'networkidle' });
-  expect(await css(page, '.px-event-head .px-stub', 'background-color')).toBe('rgb(220, 38, 38)');
+test('painel: conta-gotas só onde o navegador tem (EyeDropper)', async ({ browser }) => {
+  const id = await event('cor-conta-gotas', null);
+  // Sem a API (Firefox, Safari, celular): o botão não aparece.
+  let ctx = await context(browser, 1280, true);
+  await ctx.addInitScript(() => {
+    delete (window as unknown as { EyeDropper?: unknown }).EyeDropper;
+  });
+  let page = await ctx.newPage();
+  let { input } = await openField(page, id);
+  await expect(page.getByRole('button', { name: 'Pegar uma cor da tela' })).toHaveCount(0);
   await ctx.close();
+
+  // Com a API: o botão aparece e a cor pega da tela vai para o campo em #RRGGBB maiúsculo; cancelar (Esc) não muda nada.
+  ctx = await context(browser, 1280, true);
+  await ctx.addInitScript(() => {
+    let calls = 0;
+    (window as unknown as { EyeDropper: unknown }).EyeDropper = class {
+      open() {
+        calls += 1;
+        return calls === 1
+          ? Promise.resolve({ sRGBHex: '#00e5ff' })
+          : Promise.reject(new DOMException('The user canceled the selection.', 'AbortError'));
+      }
+    };
+  });
+  page = await ctx.newPage();
+  ({ input } = await openField(page, id));
+  const drop = page.getByRole('button', { name: 'Pegar uma cor da tela' });
+  await drop.click();
+  await expect(input).toHaveValue('#00E5FF');
+  await expect(page.getByRole('button', { name: 'Ciano' })).toHaveAttribute('aria-pressed', 'true');
+  await drop.click();
+  await page.waitForTimeout(200);
+  await expect(input).toHaveValue('#00E5FF');
+  await ctx.close();
+});
+
+test('painel: código inválido não salva; a cor salva em #RRGGBB maiúsculo volta ao reabrir e chega à página', async ({
+  browser,
+}) => {
+  const id = await event('cor-salvar', null);
+  for (const width of [1280, 360]) {
+    const touch = width < 600;
+    const ctx = await context(browser, width, true, touch);
+    const page = await ctx.newPage();
+    const first = await openField(page, id);
+    const save = page.getByRole('button', { name: 'Salvar alterações' });
+    const saved = page.locator('.px-toast, [role=status]').filter({ hasText: 'Alterações salvas.' }).first();
+    const stored = async () => (await db.query('select accent_color from events where id = $1', [id])).rows[0].accent_color;
+
+    // Formato errado: o erro já aparece ao digitar; "Salvar" não envia e volta o foco ao campo.
+    const before = await stored();
+    const formatError = page.locator('#ev-accentColor-erro');
+    await first.input.fill('vermelho');
+    await expect(formatError).toHaveText(FORMAT_ERROR);
+    await save.click();
+    await expect(formatError).toHaveText(FORMAT_ERROR);
+    await expect(first.input).toBeFocused();
+    expect(await stored()).toBe(before);
+    // Só incompleto: sem erro até o "Salvar", que também não envia.
+    await first.input.fill('#7C3');
+    await expect(formatError).toHaveCount(0);
+    await save.click();
+    await expect(formatError).toHaveText(FORMAT_ERROR);
+    await expect(first.input).toBeFocused();
+    expect(await stored()).toBe(before);
+
+    let chosen: string;
+    if (!touch) {
+      // Digitado em minúsculas, sem #: grava maiúsculo.
+      await first.input.fill('ff6b00');
+      chosen = '#FF6B00';
+    } else {
+      // No celular: cor escolhida arrastando com o dedo.
+      await first.input.fill('');
+      await bringPicker(page);
+      const box = (await first.square.boundingBox())!;
+      const cdp = await ctx.newCDPSession(page);
+      const finger = (type: Touch, x?: number, y?: number) =>
+        cdp.send('Input.dispatchTouchEvent', { type, touchPoints: x === undefined ? [] : [{ x, y: y! }] });
+      await finger('touchStart', box.x + box.width * 0.8, box.y + box.height * 0.2);
+      await finger('touchMove', box.x + box.width * 0.85, box.y + box.height * 0.15);
+      await finger('touchEnd');
+      await expect(first.input).toHaveValue(HEX);
+      chosen = await first.input.inputValue();
+    }
+    await save.click();
+    await expect(saved).toBeVisible();
+    expect(await stored()).toBe(chosen);
+
+    // Reabrir: o campo, o seletor e a prévia mostram a cor salva.
+    const again = await openField(page, id);
+    await expect(again.input).toHaveValue(chosen);
+    expect(await bg(again.preview)).toBe(fillOf(chosen));
+    if (!touch) {
+      await expect(again.hue).toHaveAttribute('aria-valuetext', '25 graus, laranja');
+      await expect(page.getByRole('button', { name: 'Laranja' })).toHaveAttribute('aria-pressed', 'true');
+    }
+    await shot(page, again.field, 'painel-seletor-reaberto', width);
+
+    // Na página pública, a cor salva.
+    await page.goto(`${R.base}/eventos/cor-salvar`, { waitUntil: 'networkidle' });
+    expect(await css(page, '.px-event-head .px-stub', 'background-color')).toBe(fillOf(chosen));
+    await ctx.close();
+  }
 });

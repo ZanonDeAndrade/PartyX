@@ -118,6 +118,16 @@ Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na pá
 | Regra no banco e reversão | `server/src/db/schema.integration.test.ts` (reversão da 0014 apaga só a coluna), `events.integration.test.ts` (CHECK recusa minúsculas, nome de cor, vazio e `;`) |
 | Sem regressão | `e2e:textos` (78), `e2e:cronometro` (7), `test:db` completo |
 
+### Seletor de cor embutido (15/10/2026)
+
+Pedido do responsável: no campo "Cor de destaque", seletor embutido (quadrado de saturação e brilho, barra de matiz, código com amostra redonda), cores prontas, "Voltar ao padrão", conta-gotas onde houver, toque e teclado com rótulos em português, prévia ao vivo e aviso de contraste mantido, no pacote do painel (`react-colorful` 5.8.1, site público sem mudança). Sem migração. Registro: `docs/registros/seletor-de-cor-2026-10-15.md`.
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-11 (painel: cor do evento) | `e2e/cor-destaque.spec.ts` (8 casos: arrastar com mouse e com o dedo, prévia ao vivo antes de soltar, toque sem rolar a página, barra de matiz, setas, código com e sem `#` e minúsculas, incompleto e inválido, cores prontas, voltar ao padrão, conta-gotas só com a API, salvar e reabrir com a cor salva, página pública), capturas a 360 e 1280 px |
+| Contraste das cores prontas | `src/site/accent.test.ts` (todas legíveis sem ajuste de tom; nome da faixa de matiz para o leitor de tela) |
+| Site público e painel sem regressão | `test:db` (1.092 + 4), `e2e:transicoes` (12), `e2e:textos` (78), `e2e:cronometro` (7), `e2e:responsivo` (597), roteiro 11.2 fictício (20); JavaScript do site 96,21 para 96,25 kB comprimidos, CSS do site igual |
+
 ### Transições do site (15/10/2026)
 
 Pedido do responsável: padrão único de entrada (desfoque, esmaecer e subida curta, em cascata), capa desfocada que fica nítida na página do evento, cronômetro com troca suave, vitrine ao aparecer na tela, passar o mouse em 150 ms, troca de página com View Transitions e alternativa, painel só com esmaecer, portaria sem entradas, menos movimento, sem animação contínua, nada segurando "Continuar" ou o pagamento, LCP, CLS e TBT medidos antes e depois. Migração `0015_capa_desfocada`. Publicado em 15/10/2026 (`partyx-00024-kuy`, `publicacao-producao-2026-10-15e.md`). Registro: `docs/registros/transicoes-2026-10-15.md`.
