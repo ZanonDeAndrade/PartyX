@@ -108,7 +108,7 @@ Pedido do responsável, fora do escopo original (§16 exclui a virada automátic
 
 ### Cor de destaque por evento (15/10/2026)
 
-Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na página do evento (bloco da data, cronômetro, linhas de Quando, Onde e Classificação, aviso de menores, links, "Continuar" e foco) e no bloco da data do card da vitrine; cabeçalho, menu, "Painel" e rodapé com as cores da PartyX; texto preto ou branco com 4,5:1; só `#RRGGBB`, validado no servidor; CSP igual. Não publicado. Registro: `docs/registros/cor-de-destaque-2026-10-15.md`.
+Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na página do evento (bloco da data, cronômetro, linhas de Quando, Onde e Classificação, aviso de menores, links, "Continuar" e foco) e no bloco da data do card da vitrine; cabeçalho, menu, "Painel" e rodapé com as cores da PartyX; texto preto ou branco com 4,5:1; só `#RRGGBB`, validado no servidor; CSP igual. Publicado em 15/10/2026 (`partyx-00022-jez`, `publicacao-producao-2026-10-15d.md`). Registro: `docs/registros/cor-de-destaque-2026-10-15.md`.
 
 | Requisito ou critério | Evidência |
 |---|---|

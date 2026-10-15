@@ -26,6 +26,8 @@ Sem mudança na Vercel, nas rotinas (a rotina diária passa a acertar as viradas
 
 ## Voltar atrás
 
+> Atualização de 15/10/2026 12:34 UTC: a `partyx-00022-jez` (cor de destaque, migração 0014) substituiu a `00020-kug`. A referência de retorno atual está em `publicacao-producao-2026-10-15d.md`.
+
 - **Referência de retorno a partir daqui: `partyx-00020-kug`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00018-guj ./infra/producao/deploy.sh rollback`.
 - A `00018-guj` funciona com o banco já migrado: não lê lotes e vende pelo preço do tipo, que a versão nova mantém igual ao do lote à venda. Enquanto ela estiver no ar, não há virada nem divisão por lote, e as vendas dela não somam no vendido de cada lote (o teto do tipo continua valendo). Reverter a 0013 só com um lote por tipo (a reversão recusa).
 

@@ -38,4 +38,4 @@ Respostas do responsável às perguntas do plano: na vitrine, **só o bloco da d
 
 ## Publicação
 
-Não publicado. Com o OK do responsável: `release-2026-10-15d`, com a migração 0014, pelo fluxo de sempre (build, backup, migrate, candidata, virar, bateria). A revisão no ar (`partyx-00020-kug`) funciona com o banco já migrado, porque a 0014 só acrescenta uma coluna que ela não lê; ela é a referência de retorno.
+Publicado em 15/10/2026 12:34 UTC com o OK do responsável: `release-2026-10-15d`, revisão `partyx-00022-jez`, migração 0014. Registro: `publicacao-producao-2026-10-15d.md`; retorno para a `partyx-00020-kug`, que convive com a 0014.

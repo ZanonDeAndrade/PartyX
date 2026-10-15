@@ -472,3 +472,11 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00020-kug`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00018-guj ./infra/producao/deploy.sh rollback`. A `00018-guj` convive com a 0013 (vende pelo preço do tipo, sem virada de lote).
 
+> Atualização de 15/10/2026 12:34 UTC: a `partyx-00022-jez` (seção 22) substituiu a `00020-kug`.
+
+## 22. Décima publicação: cor de destaque por evento (15/10/2026)
+
+**Publicado:** revisão `partyx-00022-jez` (tag `release-2026-10-15d`, commit `3936840`), 100% desde 15/10 12:34 UTC, com a migração `0014_cor_de_destaque` (aplicada às 12:32, depois do backup sob demanda `partyx-backup-fvmcc`). Mesma configuração. Registro: `docs/registros/publicacao-producao-2026-10-15d.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00022-jez`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00020-kug ./infra/producao/deploy.sh rollback`. A `00020-kug` convive com a 0014 (todos os eventos voltam ao roxo).
+
