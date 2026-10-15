@@ -5,6 +5,7 @@ import {
   uploadBanner,
   type AdminEvent,
   type AdminTicketType,
+  type EventRemovalCheck,
   type EventsMeta,
   type EventStatus,
   type FieldProblem,
@@ -442,6 +443,301 @@ function ReopenDialog({ event, onCancel, onDone }: { event: AdminEvent; onCancel
   );
 }
 
+// ---------- excluir, arquivar e desarquivar (pedido de 15/10/2026) ----------
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+/** Mesma normalização do servidor (`normalizeName`): espaços nas pontas e repetidos não contam. */
+const sameName = (a: string, b: string) => {
+  const norm = (s: string) => s.normalize('NFC').trim().replace(/\s+/g, ' ');
+  return norm(a) === norm(b);
+};
+
+/** O que impede a exclusão, só os números acima de zero. */
+function UsageList({ usage }: { usage: EventRemovalCheck['usage'] }) {
+  const items = [
+    usage.orders ? `${plural(usage.orders, 'pedido', 'pedidos')} (em qualquer situação, inclusive pendente ou expirado)` : '',
+    usage.tickets ? plural(usage.tickets, 'ingresso emitido', 'ingressos emitidos') : '',
+    usage.checkins ? plural(usage.checkins, 'leitura na portaria', 'leituras na portaria') : '',
+    usage.minorAcceptances ? plural(usage.minorAcceptances, 'aceite do termo de menor', 'aceites do termo de menor') : '',
+  ].filter(Boolean);
+  return (
+    <ul className="px-effects">
+      {items.map(t => (
+        <li key={t}>{t}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** O que arquivar faz: o mesmo texto no diálogo de exclusão recusada e no de arquivar direto. */
+function ArchiveEffects() {
+  return (
+    <ul className="px-effects">
+      <li>Sai da página inicial, da busca e do link público: quem abrir o link vê "evento não encontrado".</li>
+      <li>Para de vender: ninguém faz compra nova.</li>
+      <li>Sai da lista de eventos do painel. Para ver, escolha "Arquivados" em Situação.</li>
+      <li>
+        Pedidos, ingressos, relatórios e exportações continuam como estão, e a portaria continua validando os ingressos.
+      </li>
+      <li>Dá para desfazer com "Desarquivar".</li>
+    </ul>
+  );
+}
+
+/**
+ * Excluir evento. Pergunta ao servidor se pode: sem pedido (em qualquer situação), ingresso, leitura de portaria nem aceite de termo de
+ * menor, exclui de vez, com o nome do evento digitado como confirmação; com qualquer um deles, explica o motivo e oferece arquivar.
+ * O servidor confere tudo de novo dentro da transação da exclusão: se um pedido entrar no meio, recusa e o diálogo passa a oferecer
+ * arquivar. Só administrador (rotas sob /admin).
+ */
+function RemoveEventDialog({
+  event,
+  onCancel,
+  onDone,
+}: {
+  event: AdminEvent;
+  onCancel: () => void;
+  onDone: (result: 'excluido' | 'arquivado') => void;
+}) {
+  const [check, retry] = useFetch(s => api.admin.eventRemoval(event.id, s), `remover|${event.id}`);
+  const [archiveInstead, setArchiveInstead] = useState(false);
+  /** Recusado na hora de excluir (um pedido entrou no meio): o que o servidor contou. */
+  const [raced, setRaced] = useState<EventRemovalCheck['usage'] | null>(null);
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !busy && onCancel();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel, busy]);
+  const data = check.status === 'ok' ? check.data : null;
+  const usage = raced ?? data?.usage ?? null;
+  const deletable = data !== null && raced === null && data.deletable;
+  const mode = !data ? 'carregando' : deletable && !archiveInstead ? 'excluir' : data.archived ? 'ja-arquivado' : 'arquivar';
+  // Foco no primeiro controle útil de cada etapa (campo do nome, botão de arquivar ou voltar).
+  useEffect(() => {
+    box.current?.querySelector<HTMLElement>('input, .px-actions button:last-child')?.focus();
+  }, [mode]);
+
+  const remove = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!sameName(typed, event.name)) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await api.admin.deleteEvent(event.id, typed);
+      toast(
+        res.imagesPending
+          ? `"${event.name}" foi excluído. As imagens não saíram do armazenamento agora; o erro ficou registrado para o suporte técnico.`
+          : `"${event.name}" foi excluído.`,
+      );
+      onDone('excluido');
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'evento_com_registros') {
+        setRaced(err.details as EventRemovalCheck['usage']);
+      } else {
+        setError(err instanceof ApiError ? (err.fields.confirmName ?? err.message) : 'Não foi possível excluir.');
+      }
+      setBusy(false);
+    }
+  };
+  const archive = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.admin.archiveEvent(event.id);
+      toast(`"${event.name}" foi arquivado. Para ver, escolha "Arquivados" em Situação.`);
+      onDone('arquivado');
+    } catch (err) {
+      setError(errorText(err, 'Não foi possível arquivar.'));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="px-modal-bg" onClick={() => !busy && onCancel()}>
+      <div
+        ref={box}
+        className="px-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="remover-titulo"
+        aria-describedby="remover-corpo"
+        onClick={e => e.stopPropagation()}
+      >
+        {mode === 'carregando' ? (
+          <>
+            <h2 id="remover-titulo" className="px-h3">
+              Excluir "{event.name}"?
+            </h2>
+            <div id="remover-corpo">
+              {check.status === 'error' ? (
+                <p className="px-notice px-notice-err" role="alert">
+                  {check.code === 404 ? 'Este evento não existe mais.' : 'Não foi possível conferir o evento.'}{' '}
+                  <button type="button" className="px-btn" onClick={retry}>
+                    Tentar de novo
+                  </button>
+                </p>
+              ) : (
+                <p aria-busy="true">Conferindo pedidos, ingressos e leituras na portaria…</p>
+              )}
+            </div>
+            <div className="px-actions">
+              <button type="button" className="px-btn" onClick={onCancel}>
+                Voltar
+              </button>
+            </div>
+          </>
+        ) : mode === 'excluir' ? (
+          <form onSubmit={remove}>
+            <h2 id="remover-titulo" className="px-h3">
+              Excluir "{event.name}" de vez?
+            </h2>
+            <div id="remover-corpo">
+              <p>
+                <b>A exclusão é definitiva: não dá para desfazer.</b>
+              </p>
+              <ul className="px-effects">
+                <li>
+                  O evento e {plural(data!.ticketTypes, 'tipo de ingresso', 'tipos de ingresso')} saem do sistema.
+                </li>
+                {data!.hasBanner ? <li>O banner e as versões dele são apagados do armazenamento de imagens.</li> : null}
+                <li>
+                  O link <span className="px-mono px-break">/eventos/{event.slug}</span> deixa de funcionar.
+                </li>
+                <li>A trilha de auditoria guarda quem excluiu, quando, o id e o nome do evento.</li>
+              </ul>
+              <p className="px-small px-muted">
+                Só é possível porque o evento não tem pedidos, ingressos, leituras na portaria nem aceites do termo de
+                menor.
+              </p>
+            </div>
+            <div className="px-field">
+              <label htmlFor="remover-nome">
+                Para confirmar, digite o nome do evento: <b className="px-break">{event.name}</b>
+              </label>
+              <input
+                id="remover-nome"
+                autoComplete="off"
+                spellCheck={false}
+                value={typed}
+                onChange={e => setTyped(e.target.value)}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'remover-erro' : undefined}
+              />
+              {error ? (
+                <small id="remover-erro" className="px-error" role="alert">
+                  {error}
+                </small>
+              ) : null}
+            </div>
+            <div className="px-actions">
+              <button type="button" className="px-btn" onClick={onCancel} disabled={busy}>
+                Voltar
+              </button>
+              <button type="submit" className="px-btn px-btn-danger" disabled={busy || !sameName(typed, event.name)}>
+                {busy ? 'Excluindo…' : 'Excluir evento'}
+              </button>
+            </div>
+            {!data!.archived ? (
+              <p className="px-small">
+                Prefere só tirar do ar, sem apagar?{' '}
+                <button type="button" className="px-btn" onClick={() => setArchiveInstead(true)} disabled={busy}>
+                  Arquivar em vez de excluir
+                </button>
+              </p>
+            ) : null}
+          </form>
+        ) : (
+          <>
+            <h2 id="remover-titulo" className="px-h3">
+              {usage && (usage.orders || usage.tickets || usage.checkins || usage.minorAcceptances)
+                ? `"${event.name}" não pode ser excluído`
+                : `Arquivar "${event.name}"?`}
+            </h2>
+            <div id="remover-corpo">
+              {usage && (usage.orders || usage.tickets || usage.checkins || usage.minorAcceptances) ? (
+                <>
+                  <p>
+                    {raced ? 'Um registro entrou enquanto você confirmava. ' : ''}O evento tem registros que precisam ficar
+                    no histórico:
+                  </p>
+                  <UsageList usage={usage} />
+                </>
+              ) : null}
+              {mode === 'ja-arquivado' ? (
+                <p>Ele já está arquivado. Para devolver ao site, use "Desarquivar".</p>
+              ) : (
+                <>
+                  <p>
+                    <b>Você pode arquivar:</b>
+                  </p>
+                  <ArchiveEffects />
+                </>
+              )}
+            </div>
+            {error ? (
+              <div className="px-notice px-notice-err" role="alert">
+                {error}
+              </div>
+            ) : null}
+            <div className="px-actions">
+              <button type="button" className="px-btn" onClick={onCancel} disabled={busy}>
+                Voltar
+              </button>
+              {mode === 'arquivar' ? (
+                <button type="button" className="px-btn px-btn-pri" onClick={archive} disabled={busy}>
+                  {busy ? 'Arquivando…' : 'Arquivar evento'}
+                </button>
+              ) : null}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Desarquivar: volta para a lista do painel e, se estiver publicado, para o site e para a venda, no período de cada tipo. */
+function UnarchiveDialog({ event, onCancel, onDone }: { event: AdminEvent; onCancel: () => void; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const confirm = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.admin.unarchiveEvent(event.id);
+      toast(`"${event.name}" foi desarquivado.`);
+      onDone();
+    } catch (err) {
+      setError(errorText(err, 'Não foi possível desarquivar.'));
+      setBusy(false);
+    }
+  };
+  return (
+    <ConfirmDialog
+      title={`Desarquivar "${event.name}"?`}
+      confirmLabel="Desarquivar"
+      busy={busy}
+      error={error || null}
+      onConfirm={confirm}
+      onCancel={onCancel}
+    >
+      <p>Volta para a lista de eventos do painel.</p>
+      <p>
+        {event.status === 'publicado'
+          ? 'Como está publicado, volta para a página inicial, para a busca e para o link próprio, e as vendas seguem o período de cada tipo de ingresso.'
+          : event.status === 'rascunho'
+            ? 'Continua em rascunho: fora do site até ser publicado.'
+            : 'Continua encerrado: a página pelo link volta a ficar acessível, sem venda.'}
+      </p>
+      <p className="px-small px-muted">O destaque na página inicial não volta sozinho.</p>
+    </ConfirmDialog>
+  );
+}
+
 // ---------- ADM02: lista de eventos ----------
 
 export function AdminEventsPage() {
@@ -450,14 +746,27 @@ export function AdminEventsPage() {
   const [version, setVersion] = useState(0);
   const [state, retry] = useFetch(s => api.admin.events(s), access === 'ok' ? `events|${version}` : 'espera');
   const [q, setQ] = useState('');
-  const [status, setStatus] = useState<'' | EventStatus>('');
+  // A lista padrão deixa os arquivados de fora; "Arquivados" mostra só eles, em qualquer situação.
+  const [status, setStatus] = useState<'' | EventStatus | 'arquivados'>('');
   const [meta] = useFetch(s => api.admin.eventsMeta(s), access === 'ok' ? 'meta' : 'espera');
   const [target, setTarget] = useState<{ event: AdminEvent; action: StatusAction } | null>(null);
   const [reopening, setReopening] = useState<AdminEvent | null>(null);
+  const [removing, setRemoving] = useState<AdminEvent | null>(null);
+  const [unarchiving, setUnarchiving] = useState<AdminEvent | null>(null);
   const all = state.status === 'ok' ? state.data : [];
+  const archivedCount = all.filter(e => e.archivedAt).length;
+  const pool = useMemo(
+    () => (status === 'arquivados' ? all.filter(e => e.archivedAt) : all.filter(e => !e.archivedAt)),
+    [all, status],
+  );
   const rows = useMemo(
-    () => all.filter(e => (!status || e.status === status) && (!q.trim() || fold(e.name).includes(fold(q.trim())))),
-    [all, q, status],
+    () =>
+      pool.filter(
+        e =>
+          (!status || status === 'arquivados' || e.status === status) &&
+          (!q.trim() || fold(e.name).includes(fold(q.trim()))),
+      ),
+    [pool, q, status],
   );
   return (
     <Gate access={access} active="eventos">
@@ -474,11 +783,16 @@ export function AdminEventsPage() {
         </div>
         <div className="px-field">
           <label htmlFor="ev-st">Situação</label>
-          <select id="ev-st" value={status} onChange={e => setStatus(e.target.value as '' | EventStatus)}>
+          <select
+            id="ev-st"
+            value={status}
+            onChange={e => setStatus(e.target.value as '' | EventStatus | 'arquivados')}
+          >
             <option value="">Todas</option>
             <option value="rascunho">Rascunho</option>
             <option value="publicado">Publicado</option>
             <option value="encerrado">Encerrado</option>
+            <option value="arquivados">Arquivados</option>
           </select>
         </div>
       </form>
@@ -486,9 +800,14 @@ export function AdminEventsPage() {
       {state.status === 'ok' ? (
         <>
           <p className="px-count" role="status" aria-live="polite">
-            {rows.length === all.length
-              ? `${all.length} evento${all.length === 1 ? '' : 's'}`
-              : `${rows.length} de ${all.length} eventos`}
+            {status === 'arquivados'
+              ? plural(rows.length, 'evento arquivado', 'eventos arquivados')
+              : rows.length === pool.length
+                ? plural(pool.length, 'evento', 'eventos')
+                : `${rows.length} de ${pool.length} eventos`}
+            {status !== 'arquivados' && archivedCount > 0
+              ? ` · ${plural(archivedCount, 'arquivado fora da lista', 'arquivados fora da lista')} (Situação: Arquivados)`
+              : ''}
           </p>
           {all.length === 0 ? (
             <div className="px-box">
@@ -513,6 +832,7 @@ export function AdminEventsPage() {
                   </div>
                   <div className="px-adm-card-status">
                     <EventStatusBadge status={e.status} />
+                    {e.archivedAt ? <span className="px-badge px-badge-dark">Arquivado</span> : null}
                     {e.isFeatured ? <span className="px-badge px-badge-info">Destaque</span> : null}
                   </div>
                   <div className="px-adm-actions" aria-label={`Ações de ${e.name}`} role="group">
@@ -524,7 +844,11 @@ export function AdminEventsPage() {
                     <Link to={`/admin/eventos/${e.id}?aba=tipos`} className="px-btn">
                       Ingressos
                     </Link>
-                    {e.status === 'rascunho' ? (
+                    {e.archivedAt ? (
+                      <button type="button" className="px-btn" onClick={() => setUnarchiving(e)}>
+                        Desarquivar
+                      </button>
+                    ) : e.status === 'rascunho' ? (
                       <>
                         <Link to={`/admin/eventos/${e.id}/previa`} className="px-btn">
                           Pré-visualizar
@@ -542,7 +866,7 @@ export function AdminEventsPage() {
                         Ver página pública
                       </a>
                     )}
-                    {e.status === 'publicado' ? (
+                    {e.status === 'publicado' && !e.archivedAt ? (
                       <>
                         <button
                           type="button"
@@ -560,11 +884,14 @@ export function AdminEventsPage() {
                         </button>
                       </>
                     ) : null}
-                    {e.status === 'encerrado' ? (
+                    {e.status === 'encerrado' && !e.archivedAt ? (
                       <button type="button" className="px-btn" onClick={() => setReopening(e)}>
                         Reabrir evento
                       </button>
                     ) : null}
+                    <button type="button" className="px-btn px-btn-danger-line" onClick={() => setRemoving(e)}>
+                      Excluir
+                    </button>
                   </div>
                 </li>
               ))}
@@ -590,6 +917,26 @@ export function AdminEventsPage() {
           onCancel={() => setReopening(null)}
           onDone={() => {
             setReopening(null);
+            setVersion(v => v + 1);
+          }}
+        />
+      ) : null}
+      {removing ? (
+        <RemoveEventDialog
+          event={removing}
+          onCancel={() => setRemoving(null)}
+          onDone={() => {
+            setRemoving(null);
+            setVersion(v => v + 1);
+          }}
+        />
+      ) : null}
+      {unarchiving ? (
+        <UnarchiveDialog
+          event={unarchiving}
+          onCancel={() => setUnarchiving(null)}
+          onDone={() => {
+            setUnarchiving(null);
             setVersion(v => v + 1);
           }}
         />
@@ -1185,7 +1532,7 @@ const TABS: [Tab, string][] = [
 
 export function AdminEventPage({ id }: { id: string }) {
   const access = useAdmin(`/admin/eventos/${id}`);
-  const { loc } = useRouter();
+  const { loc, go } = useRouter();
   const initial = new URLSearchParams(loc.search).get('aba') as Tab | null;
   const [tab, setTab] = useState<Tab>(initial && TABS.some(([t]) => t === initial) ? initial : 'informacoes');
   const [version, setVersion] = useState(0);
@@ -1193,6 +1540,8 @@ export function AdminEventPage({ id }: { id: string }) {
   const [meta] = useFetch(s => api.admin.eventsMeta(s), access === 'ok' ? 'meta' : 'espera');
   const [target, setTarget] = useState<StatusAction | null>(null);
   const [reopening, setReopening] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [unarchiving, setUnarchiving] = useState(false);
   const data = state.status === 'ok' ? state.data : null;
   const ev = data?.event;
   usePageTitle(ev ? `${ev.name} · PartyX` : 'Evento · PartyX');
@@ -1211,7 +1560,13 @@ export function AdminEventPage({ id }: { id: string }) {
             <div>
               <h1 className="px-h1">{ev.name}</h1>
               <p className="px-muted">
-                <EventStatusBadge status={ev.status} /> {dateShort(ev.startsAt)} · {timeOf(ev.startsAt)} · {ev.venue}
+                <EventStatusBadge status={ev.status} />{' '}
+                {ev.archivedAt ? (
+                  <>
+                    <span className="px-badge px-badge-dark">Arquivado</span>{' '}
+                  </>
+                ) : null}
+                {dateShort(ev.startsAt)} · {timeOf(ev.startsAt)} · {ev.venue}
               </p>
             </div>
           </div>
@@ -1221,7 +1576,16 @@ export function AdminEventPage({ id }: { id: string }) {
                 Editar informações
               </Link>
             ) : null}
-            {ev.status === 'rascunho' ? (
+            {ev.archivedAt ? (
+              <>
+                <Link to={`/admin/eventos/${ev.id}/previa`} className="px-btn">
+                  Pré-visualizar
+                </Link>
+                <button type="button" className="px-btn px-btn-pri" onClick={() => setUnarchiving(true)}>
+                  Desarquivar
+                </button>
+              </>
+            ) : ev.status === 'rascunho' ? (
               <>
                 <Link to={`/admin/eventos/${ev.id}/previa`} className="px-btn">
                   Pré-visualizar
@@ -1235,7 +1599,7 @@ export function AdminEventPage({ id }: { id: string }) {
                 Ver página pública
               </a>
             )}
-            {ev.status === 'publicado' ? (
+            {ev.status === 'publicado' && !ev.archivedAt ? (
               <>
                 <button type="button" className="px-btn" onClick={() => setTarget('vendas')}>
                   Encerrar vendas agora
@@ -1245,12 +1609,21 @@ export function AdminEventPage({ id }: { id: string }) {
                 </button>
               </>
             ) : null}
-            {ev.status === 'encerrado' ? (
+            {ev.status === 'encerrado' && !ev.archivedAt ? (
               <button type="button" className="px-btn" onClick={() => setReopening(true)}>
                 Reabrir evento
               </button>
             ) : null}
+            <button type="button" className="px-btn px-btn-danger-line" onClick={() => setRemoving(true)}>
+              Excluir
+            </button>
           </div>
+          {ev.archivedAt ? (
+            <p className="px-notice px-notice-neu" role="note">
+              Arquivado em {whenText(ev.archivedAt)}: fora da página inicial, da busca e do link público, sem compra nova.
+              Pedidos, ingressos, portaria, relatórios e exportações continuam como estão.
+            </p>
+          ) : null}
           {ev.status === 'rascunho' ? (
             <p className="px-notice px-notice-info" role="note">
               Rascunho: o evento não aparece no site. Para publicar, é preciso data futura e ao menos um tipo de
@@ -1301,6 +1674,27 @@ export function AdminEventPage({ id }: { id: string }) {
               onCancel={() => setReopening(false)}
               onDone={() => {
                 setReopening(false);
+                setVersion(v => v + 1);
+              }}
+            />
+          ) : null}
+          {removing ? (
+            <RemoveEventDialog
+              event={ev}
+              onCancel={() => setRemoving(false)}
+              onDone={result => {
+                setRemoving(false);
+                if (result === 'excluido') go('/admin/eventos', { force: true });
+                else setVersion(v => v + 1);
+              }}
+            />
+          ) : null}
+          {unarchiving ? (
+            <UnarchiveDialog
+              event={ev}
+              onCancel={() => setUnarchiving(false)}
+              onDone={() => {
+                setUnarchiving(false);
                 setVersion(v => v + 1);
               }}
             />

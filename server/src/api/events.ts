@@ -11,18 +11,22 @@ import {
   createEvent,
   createPromoter,
   createTicketType,
+  deleteEvent,
   eventExists,
   getEvent,
   listEvents,
   listPromoters,
   publishEvent,
+  removalCheck,
   reopenEvent,
+  setEventArchived,
   stopSalesNow,
   setEventBanner,
   updateEvent,
   updatePromoter,
   updateTicketType,
 } from '../events/service';
+import { logger } from '../logger';
 import {
   BANNER_MAX_BYTES,
   BANNER_MAX_WIDTH,
@@ -162,6 +166,37 @@ export function eventsRoutes(deps: AuthDeps) {
   /** Encerrar vendas agora: ninguém mais compra; o evento continua publicado e a portaria continua funcionando. */
   app.post('/admin/events/:id/stop-sales', async c =>
     c.json(await stopSalesNow(evDeps, actor(c), uuid(c.req.param('id'), 'Evento'))),
+  );
+
+  // ----- excluir e arquivar -----
+  /** O evento pode ser apagado (sem pedido, ingresso, leitura nem aceite) ou só arquivado? Para o diálogo; a exclusão confere de novo. */
+  app.get('/admin/events/:id/removal', async c => c.json(await removalCheck(evDeps, uuid(c.req.param('id'), 'Evento'))));
+  /**
+   * Exclusão de vez, com o nome do evento digitado como confirmação. Depois do banco, as imagens saem do armazenamento: se isso
+   * falhar, o evento já foi apagado (registrado na trilha) e as imagens ficam órfãs; o erro vai para o log e a resposta avisa.
+   */
+  app.post('/admin/events/:id/delete', async c => {
+    const id = uuid(c.req.param('id'), 'Evento');
+    const body = await parseJson(c, z.object({ confirmName: text }));
+    const deleted = await deleteEvent(evDeps, actor(c), id, body.confirmName);
+    let imagesRemoved: number | null = null;
+    if (deps.banners) {
+      try {
+        imagesRemoved = await deps.banners.removeEventImages(id);
+      } catch (error) {
+        logger.error('evento excluído, mas as imagens dele não saíram do armazenamento', {
+          eventId: id,
+          erro: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return c.json({ deleted, imagesRemoved, imagesPending: deps.banners !== undefined && imagesRemoved === null });
+  });
+  app.post('/admin/events/:id/archive', async c =>
+    c.json({ event: await setEventArchived(evDeps, actor(c), uuid(c.req.param('id'), 'Evento'), true) }),
+  );
+  app.post('/admin/events/:id/unarchive', async c =>
+    c.json({ event: await setEventArchived(evDeps, actor(c), uuid(c.req.param('id'), 'Evento'), false) }),
   );
 
   // ----- banner (RF-13) -----

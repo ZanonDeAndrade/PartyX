@@ -14,6 +14,7 @@
 #   virar        passa 100% do tráfego para a candidata, mantém a anterior e imprime o comando de rollback
 #   deploy       atalho: conferir + build + migração + candidata (sem tráfego); a virada é sempre o comando `virar`
 #   hosting      publica o firebase.json (rewrites para o Cloud Run) no Firebase Hosting
+#   banners-iam  papel só para listar e apagar imagens no bucket dos banners (exclusão de evento sem uso, 15/10/2026). Idempotente
 #   evento-on    min-instances=1: instância sempre quente (use ANTES do evento)
 #   evento-off   min-instances=0: volta a escalar a zero (use DEPOIS do evento)
 #   rollback     volta para a revisão anterior (ou REVISAO=<nome>)
@@ -70,6 +71,16 @@ exists() { "$@" >/dev/null 2>&1; }
 run_url() { echo "https://${SERVICE}-$(g projects describe "$PROJECT" --format='value(projectNumber)').${REGION}.run.app"; }
 public_host() { node -e 'process.stdout.write(new URL(process.argv[1]).host)' "$PUBLIC_BASE_URL"; }
 
+# Exclusão de evento sem uso (15/10/2026): o runtime apaga a pasta de imagens do evento no bucket dos banners, com todas as versões
+# (o bucket tem versionamento). Papel próprio, só com listar e apagar objetos, ligado SÓ a este bucket; criar continua pelo objectCreator.
+cmd_banners_iam() {
+  local role="partyxBannerCleanup"
+  exists g iam roles describe "$role" || g iam roles create "$role" --title="PartyX: apagar imagens de evento excluido" \
+    --description="Listar e apagar objetos; ligado so ao bucket dos banners" --permissions=storage.objects.list,storage.objects.delete --stage=GA >/dev/null
+  gcloud storage buckets add-iam-policy-binding "gs://$BANNERS" --member="serviceAccount:$(sa $APP_SA)" --role="projects/$PROJECT/roles/$role" >/dev/null
+  echo "ok: $(sa $APP_SA) lista e apaga objetos em gs://$BANNERS (papel $role)"
+}
+
 cmd_setup() {
   : "${BILLING_ACCOUNT:?informe BILLING_ACCOUNT}"
   if [ "${CREATE_PROJECT:-0}" = "1" ]; then
@@ -116,6 +127,7 @@ cmd_setup() {
   gcloud storage buckets update "gs://$BACKUPS" --lifecycle-file="${TMPDIR:-/tmp}/partyx-prod-lifecycle.json"
   gcloud storage buckets add-iam-policy-binding "gs://$BANNERS" --member=allUsers --role=roles/storage.objectViewer >/dev/null
   gcloud storage buckets add-iam-policy-binding "gs://$BANNERS" --member="serviceAccount:$(sa $APP_SA)" --role=roles/storage.objectCreator >/dev/null
+  cmd_banners_iam
   gcloud storage buckets add-iam-policy-binding "gs://$BACKUPS" --member="serviceAccount:$(sa $APP_SA)" --role=roles/storage.objectCreator >/dev/null
 
   echo "== Segredos (poucos; versões antigas devem ser destruídas: versão ativa conta no custo)"
@@ -512,7 +524,7 @@ cmd_status() {
 cmd_alertas() { : "${NOTIFY_EMAIL:?informe NOTIFY_EMAIL}"; PROJECT="$PROJECT" SERVICE="$SERVICE" NOTIFY_EMAIL="$NOTIFY_EMAIL" ./infra/operacao/alerts.sh; }
 
 case "${1:-}" in
-  setup) cmd_setup ;; roles) cmd_roles ;; backup) cmd_backup ;; varredura) cmd_varredura ;; migrate) cmd_migrate ;; deploy) cmd_deploy ;; hosting) cmd_hosting ;;
+  setup) cmd_setup ;; banners-iam) cmd_banners_iam ;; roles) cmd_roles ;; backup) cmd_backup ;; varredura) cmd_varredura ;; migrate) cmd_migrate ;; deploy) cmd_deploy ;; hosting) cmd_hosting ;;
   conferir) cmd_conferir ;; build) cmd_build ;; candidata) cmd_candidata ;; virar) cmd_virar ;;
   evento-on) cmd_evento_on ;; evento-off) cmd_evento_off ;; rollback) cmd_rollback ;; status) cmd_status ;; alertas) cmd_alertas ;;
   manutencao) cmd_manutencao "${2:-}" ;;

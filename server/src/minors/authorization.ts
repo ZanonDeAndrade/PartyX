@@ -82,8 +82,12 @@ export async function orderAuthorizationPdf(deps: AuthorizationDeps, userId: str
   return { bytes: await render(deps, event, minor), slug: event.slug };
 }
 
-/** Autorização em branco do evento (página do evento), para acompanhantes de 16 ou 17 anos. Pública: não leva dado pessoal. */
+/**
+ * Autorização em branco do evento (página do evento), para acompanhantes de 16 ou 17 anos. Pública: não leva dado pessoal. Evento
+ * arquivado não tem página pública, então também não tem o PDF em branco (o do pedido de quem já comprou continua).
+ */
 export async function blankAuthorizationPdf(deps: AuthorizationDeps, slug: string) {
   const [event] = await deps.db.select().from(events).where(eq(events.slug, slug)).limit(1);
+  if (event?.archivedAt) throw new AppError(404, 'nao_encontrado', 'Evento não encontrado.');
   return { bytes: await render(deps, assertAvailable(deps, event), null), slug };
 }

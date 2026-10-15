@@ -68,6 +68,10 @@ describe.skipIf(!ADMIN_URL)('papel da aplicação e migração 0002 (integraçã
     expect(await can('UPDATE', 'orders')).toBe(true);
     expect(await can('DELETE', 'orders')).toBe(false);
     expect(await can('DELETE', 'tickets')).toBe(false);
+    expect(await can('DELETE', 'checkins')).toBe(false);
+    // Só evento e tipo SEM uso (0011): o gatilho `events_delete_only_unused` e as chaves estrangeiras recusam o resto.
+    expect(await can('DELETE', 'events')).toBe(true);
+    expect(await can('DELETE', 'ticket_types')).toBe(true);
     expect(await can('UPDATE', 'audit_log')).toBe(false);
     expect(await can('DELETE', 'sessions')).toBe(true); // só dados temporários
     expect(await can('SELECT', 'job_leases')).toBe(true);

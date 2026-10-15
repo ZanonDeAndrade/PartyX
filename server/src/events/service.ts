@@ -66,6 +66,7 @@ const eventSnapshot = (e: EventRow) => ({
   status: e.status,
   isFeatured: e.isFeatured,
   closedAt: e.closedAt?.toISOString() ?? null,
+  archivedAt: e.archivedAt?.toISOString() ?? null,
 });
 
 export interface EventInput {
@@ -443,6 +444,135 @@ export async function stopSalesNow(deps: EventsDeps, actor: Actor, id: string) {
       });
     }
     return { event, typesClosed: changes.length };
+  });
+}
+
+// ---------- excluir e arquivar (pedido de 15/10/2026) ----------
+
+/** O que impede apagar um evento. Ingresso e aceite de termo de menor só existem com pedido, mas são contados para a mensagem. */
+export interface EventUsage {
+  orders: number;
+  tickets: number;
+  checkins: number;
+  minorAcceptances: number;
+}
+const inUse = (u: EventUsage) => u.orders + u.tickets + u.checkins + u.minorAcceptances > 0;
+
+async function usageOf(db: Db | Tx, id: string): Promise<EventUsage> {
+  const rows = await db.execute<{ orders: number; tickets: number; checkins: number; minor_acceptances: number }>(sql`
+    select (select count(*) from orders where event_id = ${id})::int as orders,
+           (select count(*) from tickets where event_id = ${id})::int as tickets,
+           (select count(*) from checkins where event_id = ${id})::int as checkins,
+           (select count(*) from minor_term_acceptances m join orders o on o.id = m.order_id where o.event_id = ${id})::int
+             as minor_acceptances`);
+  const r = rows.rows[0]!;
+  return { orders: r.orders, tickets: r.tickets, checkins: r.checkins, minorAcceptances: r.minor_acceptances };
+}
+
+/** Para o diálogo do painel: o evento pode ser apagado, ou só arquivado? A decisão final é de `deleteEvent`, dentro da transação. */
+export async function removalCheck(deps: EventsDeps, id: string) {
+  const [event] = await deps.db
+    .select({ name: events.name, bannerUrl: events.bannerUrl, archivedAt: events.archivedAt })
+    .from(events)
+    .where(eq(events.id, id))
+    .limit(1);
+  if (!event) throw notFound('Evento');
+  const usage = await usageOf(deps.db, id);
+  const [types] = await deps.db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(ticketTypes)
+    .where(eq(ticketTypes.eventId, id));
+  return {
+    deletable: !inUse(usage),
+    usage,
+    ticketTypes: types?.n ?? 0,
+    hasBanner: event.bannerUrl !== null,
+    archived: event.archivedAt !== null,
+  };
+}
+
+/**
+ * Apaga de vez o evento SEM uso (nenhum pedido, em qualquer situação, nenhum ingresso, nenhuma leitura de portaria e nenhum aceite
+ * de termo de menor), com os tipos de ingresso dele. As imagens saem do armazenamento depois, pela rota. A conferência é feita aqui
+ * dentro, com as travas: um pedido que esteja entrando termina antes (e a exclusão é recusada) ou espera e não acha mais os tipos.
+ * O banco confere de novo (gatilho `events_delete_only_unused` e chaves estrangeiras). Na trilha: quem, quando, id e nome, sem
+ * dado de comprador (não há comprador num evento sem pedido).
+ */
+export async function deleteEvent(deps: EventsDeps, actor: Actor, id: string, confirmName: string) {
+  const now = deps.clock.now();
+  return deps.db.transaction(async tx => {
+    // Mesma ordem de trava do checkout (tipos por id; o pedido novo, ao gravar, trava o evento pela chave estrangeira).
+    await tx
+      .select({ id: ticketTypes.id })
+      .from(ticketTypes)
+      .where(eq(ticketTypes.eventId, id))
+      .orderBy(asc(ticketTypes.id))
+      .for('update');
+    const event = await lockEvent(tx, id);
+    const usage = await usageOf(tx, id);
+    if (inUse(usage)) {
+      throw new AppError(
+        409,
+        'evento_com_registros',
+        'Este evento tem pedidos, ingressos ou leituras na portaria e não pode ser excluído. Você pode arquivá-lo.',
+        usage,
+      );
+    }
+    if (normalizeName(confirmName) !== normalizeName(event.name)) {
+      throw invalid([{ campo: 'confirmName', mensagem: 'Digite o nome do evento exatamente como aparece para confirmar.' }]);
+    }
+    const types = await tx
+      .delete(ticketTypes)
+      .where(eq(ticketTypes.eventId, id))
+      .returning({ id: ticketTypes.id, name: ticketTypes.name });
+    await tx.delete(events).where(eq(events.id, id));
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: 'evento.excluir',
+      entity: 'event',
+      entityId: id,
+      before: {
+        id,
+        name: event.name,
+        slug: event.slug,
+        status: event.status,
+        startsAt: event.startsAt.toISOString(),
+        archivedAt: event.archivedAt?.toISOString() ?? null,
+        ticketTypes: types.map(t => ({ id: t.id, name: t.name })),
+        bannerUrl: event.bannerUrl,
+      },
+      after: null,
+      reason: 'Evento sem pedidos, ingressos, leituras de portaria e aceites de termo de menor, excluído pelo painel.',
+      at: now,
+    });
+    return { id, name: event.name, ticketTypes: types.length };
+  });
+}
+
+/**
+ * Arquivar (some da vitrine, da busca, do link público e da lista padrão do painel; sem compra nova) ou desarquivar. Não mexe no
+ * estado nem nos tipos: ao desarquivar, o evento volta como estava. Pedidos, ingressos, portaria, relatórios e exportações não mudam.
+ */
+export async function setEventArchived(deps: EventsDeps, actor: Actor, id: string, archived: boolean) {
+  const now = deps.clock.now();
+  return deps.db.transaction(async tx => {
+    const before = await lockEvent(tx, id);
+    if ((before.archivedAt !== null) === archived) return before;
+    const [after] = await tx
+      .update(events)
+      .set({ archivedAt: archived ? now : null, ...(archived ? { isFeatured: false } : {}), updatedAt: now })
+      .where(eq(events.id, id))
+      .returning();
+    await writeAudit(tx, {
+      actorId: actor.id,
+      action: archived ? 'evento.arquivar' : 'evento.desarquivar',
+      entity: 'event',
+      entityId: id,
+      before: { id, name: before.name, archivedAt: before.archivedAt?.toISOString() ?? null, isFeatured: before.isFeatured },
+      after: { id, name: after!.name, archivedAt: after!.archivedAt?.toISOString() ?? null, isFeatured: after!.isFeatured },
+      at: now,
+    });
+    return after!;
   });
 }
 

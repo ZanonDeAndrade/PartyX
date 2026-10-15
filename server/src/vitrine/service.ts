@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { events, ticketTypes } from '../db/schema';
 import { availableQuantity, salesState } from '../domain/events';
@@ -120,13 +120,13 @@ function card(e: EventRow, types: ReturnType<typeof inputOf>[], now: Date): Publ
 }
 const strip = ({ _sale, ...rest }: ReturnType<typeof card>): PublicEventCard => rest;
 
-/** Eventos publicados e ainda dentro da janela de exibição, do mais próximo ao mais distante. */
+/** Eventos publicados, não arquivados e ainda dentro da janela de exibição, do mais próximo ao mais distante. */
 async function visibleRows(deps: VitrineDeps) {
   const since = new Date(deps.clock.now().getTime() - VISIBLE_AFTER_START_MS);
   return deps.db
     .select()
     .from(events)
-    .where(and(eq(events.status, 'publicado'), gt(events.startsAt, since)))
+    .where(and(eq(events.status, 'publicado'), isNull(events.archivedAt), gt(events.startsAt, since)))
     .orderBy(asc(events.startsAt), asc(events.id));
 }
 
@@ -175,10 +175,13 @@ export async function search(deps: VitrineDeps, input: SearchInput) {
   return { events: items, filtering };
 }
 
-/** Página do evento pelo endereço (RF-23, RF-24, RF-25, RF-27). Rascunho não existe para o público; encerrado continua acessível. */
+/**
+ * Página do evento pelo endereço (RF-23, RF-24, RF-25, RF-27). Rascunho e arquivado não existem para o público (404, sem nada do evento
+ * na prévia das redes sociais); encerrado continua acessível.
+ */
 export async function bySlug(deps: VitrineDeps, slug: string): Promise<PublicEventDetail> {
   const [row] = await deps.db.select().from(events).where(eq(events.slug, slug)).limit(1);
-  if (!row || row.status === 'rascunho') throw new AppError(404, 'nao_encontrado', 'Evento não encontrado.');
+  if (!row || row.status === 'rascunho' || row.archivedAt) throw new AppError(404, 'nao_encontrado', 'Evento não encontrado.');
   return detail(deps, row, false);
 }
 

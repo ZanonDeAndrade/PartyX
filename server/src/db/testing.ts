@@ -31,6 +31,14 @@ export async function createTestDatabase(adminUrl: string, options: { migrate?: 
       await pool.end();
       const cleanup = new pg.Client({ connectionString: adminUrl });
       await cleanup.connect();
+      // `pool.end()` volta antes de o servidor fechar as sessões. Com `force` na hora, uma sessão ainda fechando era derrubada e o
+      // cliente recebia "terminating connection" (57P01) fora de qualquer teste: erro sem tratamento, e a bateria saía com falha.
+      // Espera as sessões do pool sumirem (até 2 s); `force` fica só para sobra de verdade.
+      for (let i = 0; i < 100; i++) {
+        const { rows } = await cleanup.query('select count(*)::int as n from pg_stat_activity where datname = $1', [name]);
+        if (rows[0].n === 0) break;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
       await cleanup.query(`drop database if exists ${name} with (force)`);
       await cleanup.end();
     },

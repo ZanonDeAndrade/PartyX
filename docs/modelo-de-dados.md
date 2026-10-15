@@ -11,7 +11,7 @@ Atualizado em 01/10/2026 (Prompt 03). Código em `server/src/db/schema/`; migra�
 | `users` | Todos os logins | E-mail minúsculo e único. CPF só dígitos, único, obrigatório para cliente. `must_change_password` cobre o primeiro acesso (ADM22). |
 | `password_resets` | Recuperação de senha | Guarda só o hash do token. Uso único e validade de 1 hora. |
 | `consents` | Aceite de Termos e Privacidade | Versão, data, IP e navegador. |
-| `events` | Eventos | Nunca apagados. `slug` único e em minúsculas. |
+| `events` | Eventos | Só o evento **sem uso** (nenhum pedido, em qualquer situação, e nenhuma leitura de portaria) pode ser apagado, com os tipos dele (0011); o evento com uso é arquivado (`archived_at`). `slug` único e em minúsculas. |
 | `ticket_types` | Pista, VIP, Camarote... | Preço maior que zero, `quantity_sold` entre 0 e o total, janela de vendas válida. |
 | `promoters` | Promoters | Código único, maiúsculo, de 3 a 20 caracteres. Sem comissão. |
 | `reservations` | Reserva temporária | Uma por tipo em cada pedido. Não é venda. |
@@ -39,7 +39,7 @@ Nenhuma tabela de idempotência ou outbox separada foi criada: a idempotência d
 | Webhook forjado é registrado, não processado, e não ocupa o id de um evento real | `signature_valid` e check de nunca processar | CA-P4 |
 | Só uma leitura vence | Índice único parcial `checkins (ticket_id) where result = 'valido'` | CA-25 |
 | `paid_at` original nunca muda | Trigger `orders_paid_at_immutable` | Cl. 6.3, CA-29 |
-| Histórico não se apaga | Trigger `forbid_delete` em pedidos, itens, ingressos, entradas, webhooks, eventos, tipos, usuários e promoters | Seção 6.2 |
+| Histórico não se apaga | Trigger `forbid_delete` em pedidos, itens, ingressos, entradas, webhooks, usuários e promoters. Eventos e tipos: `events_delete_only_unused` e `ticket_types_delete_only_unused` (0011) recusam a exclusão quando o evento tem pedido ou leitura de portaria; as chaves estrangeiras recusam o resto | Seção 6.2; exclusão de evento sem uso de 15/10/2026 |
 | Auditoria não se altera | Triggers em `audit_log` | RF-62 |
 | Item de pedido e ingresso sempre do mesmo evento | Chaves estrangeiras compostas com `event_id` | RF-14 |
 | Dois promoters não repetem código | Índice único | CA-10 |
@@ -103,6 +103,7 @@ Cada arquivo de teste cria um banco novo, aplica as migrações e o remove no fi
 | `users.birth_date` | Data de nascimento (AAAA-MM-DD) | Anulável (contas antigas); não antes de 1900. O mínimo de 16 anos é da aplicação |
 | `events.ends_at`, `allows_minors`, `judicial_authorization` | Fim, "permite menores de 16 e 17" e o número da autorização judicial (**sem uso desde a 0010**, 14/10/2026: a coluna ficou só para não apagar dado) | Fim depois do início; permitir menores exige fim (`events_minors_need_end`; até a 0009, também a autorização) |
 | `orders.buyer_minor` | Comprador com 16 ou 17 anos na data do evento (retrato da compra) | Padrão `false`; refeito se a PartyX corrigir a data |
+| `events.archived_at` (0011, 15/10/2026) | Evento arquivado pelo administrador: fora da vitrine, da busca, do link público e da lista padrão do painel, sem compra nova; histórico, portaria, relatórios e exportações continuam | Anulável (nulo = não arquivado). A reversão recusa se houver evento arquivado. O `partyx_app` tem DELETE em `events` e `ticket_types` desde a 0011, contido pelos gatilhos acima |
 | `minor_term_acceptances` | Aceite do Termo de Ciência: pedido, versão, idade, data, IP, navegador | Um por pedido; idade 16 ou 17; sem DELETE (prova) |
 | `checkins.minor_authorization_received` | Escolha do validador num pedido de comprador menor: `true` (menor com a autorização) ou `false` (18+) | Só em entrada válida |
 

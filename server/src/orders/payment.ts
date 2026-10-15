@@ -1,5 +1,5 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { orders, reservations, users } from '../db/schema';
+import { events, orders, reservations, users } from '../db/schema';
 import { AppError } from '../domain/errors';
 import { looksLikeCardNumber, type DeclineReason, type GatewayStatus, type PaymentMethod } from '../domain/payment';
 import { logger } from '../logger';
@@ -125,9 +125,10 @@ function present(
 
 async function loadOwn(deps: PaymentDeps, userId: string, orderId: string) {
   const [row] = await deps.db
-    .select({ order: orders, name: users.name, email: users.email, cpf: users.cpf })
+    .select({ order: orders, name: users.name, email: users.email, cpf: users.cpf, eventArchivedAt: events.archivedAt })
     .from(orders)
     .innerJoin(users, eq(users.id, orders.userId))
+    .innerJoin(events, eq(events.id, orders.eventId))
     .where(and(eq(orders.id, orderId), eq(orders.userId, userId)))
     .limit(1);
   if (!row) throw new AppError(404, 'nao_encontrado', 'Pedido não encontrado.');
@@ -176,12 +177,16 @@ export async function startPayment(
   const now = deps.clock.now();
   await loadOwn(deps, userId, orderId);
   await expireOverdue(deps, { orderId });
-  const { order, name, email, cpf } = await loadOwn(deps, userId, orderId);
+  const { order, name, email, cpf, eventArchivedAt } = await loadOwn(deps, userId, orderId);
 
   if (order.status !== 'pendente') {
     throw new AppError(409, 'pedido_nao_pendente', 'Este pedido não está mais aguardando pagamento.', {
       status: order.status,
     });
+  }
+  // Evento arquivado: nenhuma cobrança nova. Quem já tinha começado a pagar (forma escolhida) segue com a mesma cobrança.
+  if (eventArchivedAt && !order.paymentMethod) {
+    throw new AppError(409, 'evento_indisponivel', 'Este evento não está disponível para compra.');
   }
   if (order.paymentMethod && order.paymentMethod !== input.method) {
     // Trocar de forma exigiria cancelar a cobrança no gateway; fica para quando o gateway for escolhido (D-36).

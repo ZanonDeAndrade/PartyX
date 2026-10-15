@@ -314,6 +314,24 @@ a.px-adm-card-title:hover {
   font-size: var(--px-t-sm);
   color: var(--px-text-2);
 }
+/* O que uma ação faz (excluir ou arquivar evento): itens com marcador e espaço entre eles, para cada efeito ser lido sozinho. */
+.px-effects {
+  margin: 0;
+  padding-left: 1.25em;
+  display: grid;
+  gap: var(--px-s-2);
+  font-size: var(--px-t-sm);
+  color: var(--px-text-2);
+}
+.px-effects li::marker {
+  color: var(--px-text-3);
+}
+/* Formulário dentro do diálogo: o mesmo espaçamento do próprio diálogo entre título, texto, campo e botões. */
+.px-modal > form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-3);
+}
 .px-bars {
   list-style: none;
   padding: 0;

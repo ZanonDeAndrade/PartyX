@@ -523,10 +523,21 @@ export interface AdminEventRow {
   allowsMinors: boolean;
   /** Quando foi encerrado (nulo se não encerrado, ou encerrado por versão anterior: vale `updatedAt`). */
   closedAt: string | null;
+  /** Arquivado: fora da vitrine, da busca, do link público e da lista padrão do painel, sem compra nova. Nulo: não arquivado. */
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
 export type AdminEvent = AdminEventRow;
+
+/** O que impede apagar o evento (`GET /admin/events/:id/removal`). Qualquer número acima de zero: só arquivar. */
+export interface EventRemovalCheck {
+  deletable: boolean;
+  usage: { orders: number; tickets: number; checkins: number; minorAcceptances: number };
+  ticketTypes: number;
+  hasBanner: boolean;
+  archived: boolean;
+}
 
 /** Tipo de ingresso no painel: vendidos (pagos) separados de reservados (temporários, de quem está pagando). */
 export interface AdminTicketType {
@@ -919,6 +930,18 @@ export const api = {
       request<{ event: AdminEvent; typesClosed: number }>('POST', `/admin/events/${encodeURIComponent(id)}/stop-sales`),
     removeBanner: (id: string) =>
       request<{ event: AdminEvent }>('DELETE', `/admin/events/${encodeURIComponent(id)}/banner`),
+    eventRemoval: (id: string, signal?: AbortSignal) =>
+      get<EventRemovalCheck>(`/admin/events/${encodeURIComponent(id)}/removal`, signal),
+    deleteEvent: (id: string, confirmName: string) =>
+      request<{
+        deleted: { id: string; name: string; ticketTypes: number };
+        imagesRemoved: number | null;
+        imagesPending: boolean;
+      }>('POST', `/admin/events/${encodeURIComponent(id)}/delete`, { confirmName }),
+    archiveEvent: (id: string) =>
+      request<{ event: AdminEvent }>('POST', `/admin/events/${encodeURIComponent(id)}/archive`),
+    unarchiveEvent: (id: string) =>
+      request<{ event: AdminEvent }>('POST', `/admin/events/${encodeURIComponent(id)}/unarchive`),
     createTicketType: (eventId: string, body: TicketTypeBody) =>
       request<{ ticketType: AdminTicketType }>(
         'POST',

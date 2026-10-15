@@ -326,6 +326,14 @@ body.px-dark .px-fine {
   --btn-bg: var(--px-err-fg);
   --btn-line: var(--px-err-fg);
 }
+/* Ação destrutiva que só abre a confirmação (excluir evento): contorno vermelho; o vermelho cheio fica para o botão final. */
+.px-btn-danger-line {
+  --btn-fg: var(--px-err-fg);
+  --btn-line: var(--px-err-solid);
+}
+.px-btn-danger-line:hover {
+  --btn-bg: var(--px-err-bg);
+}
 .px-btn-lg {
   min-height: 52px;
   padding: 0 var(--px-s-6);

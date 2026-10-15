@@ -14,7 +14,11 @@ import {
 import { createdAt, instant, updatedAt } from './columns';
 import { eventStatus } from './enums';
 
-/** Eventos. Nunca apagados: o ciclo é rascunho, publicado e encerrado. */
+/**
+ * Eventos. O ciclo é rascunho, publicado e encerrado. Só o evento SEM uso (nenhum pedido, em qualquer situação, e nenhuma leitura de
+ * portaria) pode ser apagado, junto com os tipos dele (0011; o gatilho `events_delete_only_unused` e as chaves estrangeiras conferem
+ * de novo). O evento com uso é arquivado (`archived_at`), nunca apagado.
+ */
 export const events = pgTable(
   'events',
   {
@@ -60,6 +64,11 @@ export const events = pgTable(
      * versão anterior do código, quando então vale `updated_at`, porque evento encerrado não aceita mais alteração).
      */
     closedAt: instant('closed_at'),
+    /**
+     * Arquivado pelo administrador (0011): some da vitrine, da busca, do link público e da lista padrão do painel, e não aceita compra
+     * nova. Pedidos, ingressos, portaria, relatórios e exportações continuam como estão. Nulo: não arquivado. Pode ser desfeito.
+     */
+    archivedAt: instant('archived_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

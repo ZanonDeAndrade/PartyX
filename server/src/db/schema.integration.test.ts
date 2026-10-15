@@ -150,7 +150,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(11);
+      expect(r.rows[0].n).toBe(12);
     });
   });
 
@@ -215,9 +215,26 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       await violates(add('A'.repeat(21)), PG.check);
     });
 
-    it('evento não pode ser apagado fisicamente', async () => {
-      const ev = await event();
-      await violates(q('delete from events where id = $1', [ev]), PG.integrity);
+    it('evento e tipo só saem do banco sem uso: com pedido (em qualquer situação) ou leitura de portaria, recusa (0011)', async () => {
+      const restrict = '23001';
+      const free = await event();
+      await ticketType(free);
+      await violates(q('delete from events where id = $1', [free]), PG.fk); // o tipo ainda aponta para ele: sai primeiro
+      await q('delete from ticket_types where event_id = $1', [free]);
+      await q('delete from events where id = $1', [free]);
+
+      const withOrder = await event();
+      const type = await ticketType(withOrder);
+      await order(await user(), withOrder, { status: 'expirado' });
+      await violates(q('delete from ticket_types where id = $1', [type]), restrict);
+      await violates(q('delete from events where id = $1', [withOrder]), restrict);
+
+      const withCheckin = await event();
+      await q("insert into checkins (event_id, validator_id, result, method) values ($1, $2, 'invalido', 'manual')", [
+        withCheckin,
+        await staff(),
+      ]);
+      await violates(q('delete from events where id = $1', [withCheckin]), restrict);
     });
 
     it('updated_at é atualizado pelo banco', async () => {
@@ -635,6 +652,34 @@ describe.skipIf(!ADMIN_URL)('papel da aplicação (partyx_app)', () => {
       await violates(app.query("update audit_log set reason = 'x'"), '42501'); // auditoria só recebe inclusão
       await app.query("insert into login_attempts (email_normalized, succeeded) values ('a@b.com', false)");
       await app.query("delete from login_attempts where email_normalized = 'a@b.com'"); // dados temporários podem ser limpos
+      // Evento sem uso sai com os tipos (0011); com pedido, o banco recusa, mesmo para a aplicação.
+      const ev = async (slug: string) =>
+        (
+          await app.query(
+            "insert into events (slug,name,starts_at,venue,address,description,age_rating) values ($1,'E',now()+interval '9 days','L','A','D','Livre') returning id",
+            [slug],
+          )
+        ).rows[0].id as string;
+      const typeOf = (id: string) =>
+        app.query(
+          "insert into ticket_types (event_id,name,price_cents,quantity_total,sales_start_at,sales_end_at) values ($1,'Pista',100,10,now(),now()+interval '1 day')",
+          [id],
+        );
+      const free = await ev('sem-uso');
+      await typeOf(free);
+      await app.query('delete from ticket_types where event_id = $1', [free]);
+      await app.query('delete from events where id = $1', [free]);
+      const used = await ev('com-pedido');
+      await typeOf(used);
+      const buyer = (
+        await app.query(
+          "insert into users (name,email,cpf,password_hash,role) values ('Ana Souza','ana-app@partyx.test','52998224725','x','cliente') returning id",
+        )
+      ).rows[0].id;
+      await app.query('insert into orders (user_id,event_id,total_cents) values ($1,$2,100)', [buyer, used]);
+      await violates(app.query('delete from ticket_types where event_id = $1', [used]), '23001');
+      await violates(app.query('delete from events where id = $1', [used]), '23001');
+      await violates(app.query('delete from orders where event_id = $1', [used]), '42501'); // histórico continua sem DELETE
     } finally {
       await app.end();
       await db.drop();
@@ -658,12 +703,42 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag8 = '0008_recusa_do_pagamento';
       const tag9 = '0009_menores_de_idade';
       const tag10 = '0010_sem_autorizacao_judicial';
+      const tag11 = '0011_excluir_e_arquivar_evento';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag6)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag7)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag8)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag9)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag10)).rejects.toThrow(/não é a última/);
+
+      // 0011: recusa enquanto houver evento arquivado (voltaria para a vitrine); sem ele, apaga a coluna e volta a recusar QUALQUER
+      // exclusão de evento e de tipo (gatilhos da 0001).
+      const q11 = db.pool.query.bind(db.pool);
+      const ev11 = (
+        await q11(
+          "insert into events (slug,name,starts_at,venue,address,description,age_rating,archived_at) values ('ev-11','E',now()+interval '9 days','L','A','D','16 anos',now()) returning id",
+        )
+      ).rows[0].id;
+      await q11(
+        "insert into ticket_types (event_id,name,price_cents,quantity_total,sales_start_at,sales_end_at) values ($1,'Pista',100,10,now(),now()+interval '1 day')",
+        [ev11],
+      );
+      await expect(rollbackLastMigration(db.url, tag11)).rejects.toThrow(/arquivados/);
+      await q11("update events set archived_at = null where slug = 'ev-11'");
+      await rollbackLastMigration(db.url, tag11);
+      const archivedColumn = (
+        await q11("select count(*)::int as n from information_schema.columns where table_name = 'events' and column_name = 'archived_at'")
+      ).rows[0].n;
+      expect(archivedColumn).toBe(0);
+      await expect(q11('delete from ticket_types where event_id = $1', [ev11])).rejects.toMatchObject({ code: '23000' });
+      await expect(q11('delete from events where id = $1', [ev11])).rejects.toMatchObject({ code: '23000' });
+      await q11('alter table ticket_types disable trigger ticket_types_forbid_delete');
+      await q11('delete from ticket_types where event_id = $1', [ev11]);
+      await q11('alter table ticket_types enable trigger ticket_types_forbid_delete');
+      await q11('alter table events disable trigger events_forbid_delete');
+      await q11('delete from events where id = $1', [ev11]);
+      await q11('alter table events enable trigger events_forbid_delete');
 
       // 0010: recusa enquanto houver evento com menores sem o número (a regra antiga não aceitaria); sem ele, volta a exigir.
       const q10 = db.pool.query.bind(db.pool);
@@ -770,8 +845,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0010 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0011 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag11);
       await rollbackLastMigration(db.url, tag10);
       await rollbackLastMigration(db.url, tag9);
       await rollbackLastMigration(db.url, tag8);

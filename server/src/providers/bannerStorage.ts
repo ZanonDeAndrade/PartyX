@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Storage } from '@google-cloud/storage';
 import type { Config } from '../config';
@@ -10,11 +10,22 @@ import type { Config } from '../config';
 export interface BannerStorage {
   /** Grava (idempotente: mesmo nome, mesmo conteúdo) e devolve a URL pública. */
   put(name: string, data: Buffer, contentType: string): Promise<string>;
+  /**
+   * Apaga todas as imagens de um evento excluído (a pasta dele, de `eventImagePrefix`): banner atual, versões menores, imagem de
+   * pré-visualização e banners antigos. Devolve quantos arquivos saíram.
+   */
+  removeEventImages(eventId: string): Promise<number>;
 }
 
 /** Nome seguro de objeto: pastas e arquivo em letras minúsculas, números, hífen e ponto. Recusa `..` e barras duplas. */
 export function assertSafeObjectName(name: string) {
   if (!/^[a-z0-9-]+(\/[a-z0-9-]+)*\.[a-z0-9]{2,5}$/.test(name)) throw new Error('nome de objeto inválido');
+}
+
+/** Pasta das imagens de um evento (`events/<id>/`, onde a rota do banner grava). Só aceita um id de evento (uuid). */
+export function eventImagePrefix(eventId: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(eventId)) throw new Error('id de evento inválido');
+  return `events/${eventId}/`;
 }
 
 export function gcsBannerStorage(bucket: string, publicBaseUrl?: string): BannerStorage {
@@ -38,6 +49,13 @@ export function gcsBannerStorage(bucket: string, publicBaseUrl?: string): Banner
         });
       return `${base}/${name}`;
     },
+    // Exige listar e apagar objetos no bucket dos banners (papel próprio da conta do serviço, `deploy.sh banners-iam`). O bucket tem
+    // versionamento: apagar só a versão atual deixaria as antigas guardadas, então sai cada versão (cada `generation`) da pasta.
+    async removeEventImages(eventId) {
+      const [files] = await client.bucket(bucket).getFiles({ prefix: eventImagePrefix(eventId), versions: true });
+      for (const file of files) await file.delete({ ignoreNotFound: true });
+      return new Set(files.map(f => f.name)).size;
+    },
   };
 }
 
@@ -54,6 +72,12 @@ export function localBannerStorage(
       await writeFile(file, data);
       return `${publicBaseUrl.replace(/\/$/, '')}/api/media/${name}`;
     },
+    async removeEventImages(eventId) {
+      const folder = path.join(dir, eventImagePrefix(eventId));
+      const files = await readdir(folder).catch(() => [] as string[]);
+      await rm(folder, { recursive: true, force: true });
+      return files.length;
+    },
     read(name) {
       assertSafeObjectName(name);
       return readFile(path.join(dir, name));
@@ -68,6 +92,12 @@ export class MemoryBannerStorage implements BannerStorage {
     assertSafeObjectName(name);
     this.objects.set(name, { data, contentType });
     return `https://banners.exemplo.test/${name}`;
+  }
+  async removeEventImages(eventId: string) {
+    const prefix = eventImagePrefix(eventId);
+    const names = [...this.objects.keys()].filter(n => n.startsWith(prefix));
+    for (const n of names) this.objects.delete(n);
+    return names.length;
   }
 }
 

@@ -122,7 +122,8 @@ function shapeOrThrow(deps: OrdersDeps, items: RequestedItem[]) {
 
 async function loadEvent(db: Db | Tx, slug: string) {
   const [event] = await db.select().from(events).where(eq(events.slug, slug)).limit(1);
-  if (!event || event.status !== 'publicado') {
+  // Arquivado: sem compra nova, mesmo publicado (o arquivamento tira o evento do site).
+  if (!event || event.status !== 'publicado' || event.archivedAt) {
     throw new AppError(409, 'evento_indisponivel', 'Este evento não está disponível para compra.');
   }
   return event;
@@ -137,6 +138,9 @@ async function loadTypes(tx: Db | Tx, eventId: string, ids: string[], lock: bool
     .orderBy(asc(ticketTypes.id));
   const rows = await (lock ? query.for('update') : query);
   if (rows.length !== new Set(ids).size) {
+    // O evento foi excluído enquanto este pedido esperava a trava dos tipos (a exclusão só alcança evento sem pedido).
+    const [still] = await tx.select({ id: events.id }).from(events).where(eq(events.id, eventId)).limit(1);
+    if (!still) throw new AppError(409, 'evento_indisponivel', 'Este evento não está disponível para compra.');
     // Id que não existe ou é de outro evento: nunca se descobre qual.
     throw invalid('items', 'Algum ingresso escolhido não pertence a este evento.');
   }
