@@ -132,7 +132,7 @@ Pedido do responsável: padrão único de entrada (desfoque, esmaecer e subida c
 
 ### Transições suaves, segunda versão (15/10/2026)
 
-Pedido do responsável: as transições ainda estavam bruscas. Curva `cubic-bezier(0.16, 1, 0.3, 1)`, 720 ms, subida de 8 px, desfoque de 4 px só em texto, cascata com sobreposição (100 ms); capa sem desfoque animado (troca de 700 ms e zoom de 1,04 para 1 em 1200 ms); cartão para evento com elementos compartilhados e pré-carregamento; fundo escuro desde o primeiro quadro; esqueletos do mesmo tamanho com troca cruzada; fontes de reserva com as mesmas medidas; menos movimento com esmaecer simples. Sem migração. Registro: `docs/registros/transicoes-suaves-2026-10-15.md`.
+Pedido do responsável: as transições ainda estavam bruscas. Curva `cubic-bezier(0.16, 1, 0.3, 1)`, 720 ms, subida de 8 px, desfoque de 4 px só em texto, cascata com sobreposição (100 ms); capa sem desfoque animado (troca de 700 ms e zoom de 1,04 para 1 em 1200 ms); cartão para evento com elementos compartilhados e pré-carregamento; fundo escuro desde o primeiro quadro; esqueletos do mesmo tamanho com troca cruzada; fontes de reserva com as mesmas medidas; menos movimento com esmaecer simples. Sem migração. Publicado em 15/10/2026 (`partyx-00026-rim`, `publicacao-producao-2026-10-15f.md`). Registro: `docs/registros/transicoes-suaves-2026-10-15.md`.
 
 | Requisito ou critério | Evidência |
 |---|---|

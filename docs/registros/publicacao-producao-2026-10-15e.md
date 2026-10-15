@@ -1,5 +1,7 @@
 # Publicação em produção: transições do site e capa desfocada (15/10/2026)
 
+> Atualização de 15/10/2026 17:40 UTC: a `partyx-00026-rim` (`release-2026-10-15f`, transições mais suaves, `publicacao-producao-2026-10-15f.md`) substituiu a `00024-kuy`, que fica como retorno. Esta versão tinha perdido o degradê escuro da base da capa; a nova o devolve.
+
 Pedido do responsável (Arthur): transições suaves no site (`transicoes-2026-10-15.md`), "fluxo de sempre, com meu OK antes da virada". O fluxo foi até a candidata, com a migração já aplicada; o OK da virada veio às 14:40 UTC: "coloque em produção".
 
 | Campo | Registro |

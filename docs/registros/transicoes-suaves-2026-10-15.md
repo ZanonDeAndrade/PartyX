@@ -64,4 +64,6 @@ Fluidez, intervalo entre quadros (requestAnimationFrame) com CPU 4x mais lenta, 
 
 ## Publicação
 
-Não publicado. Aguardando o OK do responsável. Sem migração: o fluxo é build, backup, candidata e virada; retorno para a `partyx-00024-kuy`.
+Publicado em 15/10/2026 17:40 UTC, com o OK do responsável ("pode comitar e fazer deploy"): `release-2026-10-15f`, revisão `partyx-00026-rim`, sem migração. Registro: `publicacao-producao-2026-10-15f.md`; retorno para a `partyx-00024-kuy`.
+
+Conferido no ar, a 360 e 1280 px: capa nítida com o degradê, View Transition do cartão para o evento, nada sobrando depois da entrada, sem rolagem lateral; com "reduzir movimento", só opacidade. Detalhe: nesse modo, o esqueleto, quando aparece, ainda esmaece por cima do conteúdo em 420 ms (só opacidade, sem movimento); o resto usa 250 ms.

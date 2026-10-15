@@ -488,3 +488,11 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00024-kuy`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00022-jez ./infra/producao/deploy.sh rollback`. A `00022-jez` convive com a 0015 (volta o movimento anterior).
 
+> Atualização de 15/10/2026 17:40 UTC: a `partyx-00026-rim` (seção 24) substituiu a `00024-kuy`.
+
+## 24. Décima segunda publicação: transições mais suaves (15/10/2026)
+
+**Publicado:** revisão `partyx-00026-rim` (tag `release-2026-10-15f`, commit `915f6c6`), 100% desde 15/10 17:40 UTC, sem migração (backup sob demanda `partyx-backup-9l292` antes da candidata). Mesma configuração. Devolve o degradê da base da capa, perdido na `00024-kuy`. Registro: `docs/registros/publicacao-producao-2026-10-15f.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00026-rim`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00024-kuy ./infra/producao/deploy.sh rollback`. A `00024-kuy` usa o mesmo banco (volta a primeira versão das transições, sem o degradê da capa).
+
