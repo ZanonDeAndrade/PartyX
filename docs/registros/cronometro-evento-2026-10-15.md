@@ -7,6 +7,7 @@
 > - **Cronômetro:** os estados não mudam (contagem, "Acontecendo agora" e sumir depois do fim).
 > - **Banco:** a coluna `events.countdown_phrase` e a regra `events_countdown_phrase_format` **ficam sem uso**, sem migração agora. Remover numa limpeza futura (anotado em `docs/modelo-de-dados.md`).
 > - **Verificação:** `e2e/cronometro.spec.ts` confere, a 360 e 1280 px, nome curto e longo (duas linhas), roxo e vermelho, o centro do nome no centro do bloco (até 1,5 px de diferença) e o mesmo espaço até o cronômetro.
+> - **Publicado** em 15/10/2026 23:42 UTC: `release-2026-10-15i`, revisão `partyx-00032-bag` (`publicacao-producao-2026-10-15i.md`).
 
 Pedido do responsável (Arthur), nesta data: cronômetro até a data e o horário de início no topo da página do evento, no estilo do bloco da data ("17 OUT"); estados antes, durante e depois; "Mostrar cronômetro" e "Frase do cronômetro" no painel; hora do servidor para quem está com o relógio errado; pausa com a aba escondida; sem anunciar os segundos; movimento reduzido respeitado; testes; publicar em produção quando pronto. As outras melhorias citadas (texto longo, excluir evento, autorização judicial, cabeçalho do PDF) já estavam no ar (`release-2026-10-14e`, `-14f` e `-15`).
 

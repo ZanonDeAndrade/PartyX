@@ -518,3 +518,11 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 - A `00028-vax` convive com a 0016, mas é segura **só antes da primeira transferência**: ela mostra o ingresso pelo pedido.
 - Voltar também volta os Termos e a Privacidade 1.1 e tira a Política do ar.
 
+> Atualização de 15/10/2026 23:42 UTC: a `partyx-00032-bag` (seção 27) substituiu a `00030-jos`.
+
+## 27. Décima quinta publicação: página do evento sem a frase acima do título (15/10/2026)
+
+**Publicado:** revisão `partyx-00032-bag` (tag `release-2026-10-15i`, commit `f194c7f`), 100% desde 15/10 23:42 UTC, sem migração (backup sob demanda `partyx-backup-tdp59` antes da candidata). Sai "Falta pouco para" da página e o campo da frase do painel; o título fica centrado no bloco da data. A coluna `events.countdown_phrase` fica sem uso até uma limpeza futura. Registro: `docs/registros/publicacao-producao-2026-10-15i.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00032-bag`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00030-jos ./infra/producao/deploy.sh rollback`. A `00030-jos` usa o mesmo banco (volta a frase padrão acima do título).
+

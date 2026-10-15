@@ -1,5 +1,7 @@
 # Publicação em produção: transferência de ingresso e textos novos (15/10/2026)
 
+> Atualização de 15/10/2026 23:42 UTC: a `partyx-00032-bag` (`release-2026-10-15i`, página do evento sem a frase acima do título, `publicacao-producao-2026-10-15i.md`) substituiu a `00030-jos`, que fica como retorno.
+
 Pedido do responsável (Arthur): transferência de ingresso (D-87), Política de Cancelamento, Troca e Reembolso 1.0, Termos e Privacidade 1.2 e aceite da Política no checkout (`transferencia-e-cancelamento-2026-10-15.md`), com a regra "pare antes da virada e me mostre os três textos como aparecem na candidata, para eu confirmar o OK do Bernardo".
 
 - **OK para a nuvem:** por volta das 21:14 UTC: "ok, coloque em prod". O fluxo foi até a candidata e parou antes da virada.
