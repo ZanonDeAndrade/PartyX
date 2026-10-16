@@ -53,4 +53,4 @@ Capturas a 360 e 1280 px (vitrine sem formulário, lupa aberta, com e sem result
 
 ## Publicação
 
-Não publicado. Entra na próxima publicação da fila, junto com a saída da meia-entrada, com o OK do responsável antes da virada.
+Publicado em 16/10/2026 00:57 UTC (15/10 à noite em São Paulo), junto com a saída da meia-entrada, com o OK do responsável: `release-2026-10-15j`, revisão `partyx-00034-hug` (`publicacao-producao-2026-10-15j.md`). Conferido pelo domínio a 360 e 1280 px (vitrine sem formulário, busca pela lupa e pelo campo, com e sem resultado).

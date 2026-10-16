@@ -50,4 +50,4 @@ Pedido do responsável (Arthur), em 15/10/2026 à noite: remover o documento "Re
 
 ## Publicação
 
-Não publicado. Entra na próxima publicação da fila, com o OK do responsável antes da virada.
+Publicado em 16/10/2026 00:57 UTC (15/10 à noite em São Paulo), com o OK do responsável: `release-2026-10-15j`, revisão `partyx-00034-hug` (`publicacao-producao-2026-10-15j.md`). Conferido pelo domínio: 301 para `/termos-de-uso` e 404 na API.

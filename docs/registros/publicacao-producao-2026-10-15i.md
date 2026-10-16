@@ -1,5 +1,7 @@
 # Publicação em produção: página do evento sem a frase acima do título (15/10/2026)
 
+> Atualização de 16/10/2026 00:57 UTC: a `partyx-00034-hug` (`release-2026-10-15j`, sem meia-entrada e busca só no cabeçalho, `publicacao-producao-2026-10-15j.md`) substituiu a `00032-bag`, que fica como retorno.
+
 Pedido do responsável (Arthur): tirar a frase acima do título ("Falta pouco para") da página do evento e da prévia do painel, tirar o campo "Frase do cronômetro" do cadastro e da edição, e centrar o título no bloco da data. Registro do ajuste: atualização no topo de `cronometro-evento-2026-10-15.md`. Publicação autorizada no próprio pedido: "Ao terminar, coloque em produção já. Não precisa do meu OK para essa publicação, pois é um ajuste pequeno".
 
 | Campo | Registro |

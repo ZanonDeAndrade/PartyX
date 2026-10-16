@@ -526,3 +526,10 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00032-bag`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00030-jos ./infra/producao/deploy.sh rollback`. A `00030-jos` usa o mesmo banco (volta a frase padrão acima do título).
 
+> Atualização de 16/10/2026 00:57 UTC: a `partyx-00034-hug` (seção 28) substituiu a `00032-bag`.
+
+## 28. Décima sexta publicação: sem meia-entrada e busca só no cabeçalho (15/10/2026)
+
+**Publicado:** revisão `partyx-00034-hug` (tag `release-2026-10-15j`, commit `8486ce6`), 100% desde 16/10 00:57 UTC, sem migração (backup sob demanda `partyx-backup-7mhfb` antes da candidata). O documento de meia-entrada sai do site (`/meia-entrada` com 301 para `/termos-de-uso`, D-06) e a vitrine fica só com a busca do cabeçalho, por nome (D-89, desvio do RF-22 na parte da data). Bateria HTTPS com 28 itens. Registro: `docs/registros/publicacao-producao-2026-10-15j.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00034-hug`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00032-bag ./infra/producao/deploy.sh rollback`. A `00032-bag` usa o mesmo banco (volta a página de meia-entrada e o formulário com a data).

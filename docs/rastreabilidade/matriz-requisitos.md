@@ -121,7 +121,7 @@ Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na pá
 
 ### Busca só no cabeçalho (16/10/2026)
 
-Pedido do responsável: a vitrine (e o início) sem o formulário "Nome do evento", "Data" e "Buscar"; a única busca é a do cabeçalho, por nome, e no celular a lupa abre o campo. Links antigos com `?date=` abrem a lista e a data é ignorada. **Desvio do RF-22 na parte da data** (D-89, aprovação da PartyX a registrar). Registro: `docs/registros/busca-so-no-cabecalho-2026-10-16.md`. **Não publicado.**
+Pedido do responsável: a vitrine (e o início) sem o formulário "Nome do evento", "Data" e "Buscar"; a única busca é a do cabeçalho, por nome, e no celular a lupa abre o campo. Links antigos com `?date=` abrem a lista e a data é ignorada. **Desvio do RF-22 na parte da data** (D-89, aprovação da PartyX a registrar). Registro: `docs/registros/busca-so-no-cabecalho-2026-10-16.md`. Publicado em 16/10/2026 (`partyx-00034-hug`, `publicacao-producao-2026-10-15j.md`).
 
 | Requisito ou critério | Evidência |
 |---|---|
@@ -129,7 +129,7 @@ Pedido do responsável: a vitrine (e o início) sem o formulário "Nome do event
 
 ### Sem meia-entrada (16/10/2026)
 
-Pedido do responsável: não haverá meia-entrada (D-06 decidida). O documento "Regras de meia-entrada" saiu do menu de Documentos e da página do evento; `/meia-entrada` vai para `/termos-de-uso` com 301; o servidor não tem mais esse documento. A frase dos Termos de Uso fica. Registro: `docs/registros/sem-meia-entrada-2026-10-16.md`. **Não publicado.**
+Pedido do responsável: não haverá meia-entrada (D-06 decidida). O documento "Regras de meia-entrada" saiu do menu de Documentos e da página do evento; `/meia-entrada` vai para `/termos-de-uso` com 301; o servidor não tem mais esse documento. A frase dos Termos de Uso fica. Registro: `docs/registros/sem-meia-entrada-2026-10-16.md`. Publicado em 16/10/2026 (`partyx-00034-hug`, `publicacao-producao-2026-10-15j.md`).
 
 | Requisito ou critério | Evidência |
 |---|---|
