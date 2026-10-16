@@ -533,3 +533,11 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 **Publicado:** revisão `partyx-00034-hug` (tag `release-2026-10-15j`, commit `8486ce6`), 100% desde 16/10 00:57 UTC, sem migração (backup sob demanda `partyx-backup-7mhfb` antes da candidata). O documento de meia-entrada sai do site (`/meia-entrada` com 301 para `/termos-de-uso`, D-06) e a vitrine fica só com a busca do cabeçalho, por nome (D-89, desvio do RF-22 na parte da data). Bateria HTTPS com 28 itens. Registro: `docs/registros/publicacao-producao-2026-10-15j.md`.
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00034-hug`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00032-bag ./infra/producao/deploy.sh rollback`. A `00032-bag` usa o mesmo banco (volta a página de meia-entrada e o formulário com a data).
+
+> Atualização de 16/10/2026 03:30 UTC: a `partyx-00037-zap` (seção 29) substituiu a `00034-hug`.
+
+## 29. Décima sétima publicação: campos de data no celular e painel sem meia-entrada (16/10/2026)
+
+**Publicado:** revisão `partyx-00037-zap` (tag `release-2026-10-16b`, commit `d9fc445`), 100% desde 16/10 03:30 UTC, sem migração (backup sob demanda `partyx-backup-5lw6t` antes da candidata). Campos de data e hora sem aparência nativa em todo o site (no iPhone passavam da borda e ficavam com o texto centrado), "R$" do valor sem quebrar, botão da capa com 44 px e textos de ajuda do painel sem meia-entrada. A candidata da `release-2026-10-16` (`partyx-00036-buy`) foi substituída antes da virada e nunca recebeu tráfego. A primeira tentativa de candidata recusou por falha momentânea de conexão desta máquina com o Neon (conferida só lendo; a repetição passou). Registro: `docs/registros/publicacao-producao-2026-10-16.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00037-zap`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00034-hug ./infra/producao/deploy.sh rollback`. A `00034-hug` usa o mesmo banco.

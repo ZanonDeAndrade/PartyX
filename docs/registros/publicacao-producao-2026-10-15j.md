@@ -1,5 +1,7 @@
 # Publicação em produção: sem meia-entrada e busca só no cabeçalho (15/10/2026)
 
+> Atualização de 16/10/2026 03:30 UTC: a `partyx-00037-zap` (`release-2026-10-16b`, campos de data no celular e painel sem meia-entrada, `publicacao-producao-2026-10-16.md`) substituiu a `00034-hug`, que fica como retorno.
+
 Pedido do responsável (Arthur): "coloque em produção essas últimas atualizações", que valeu como o OK da virada. Entram as duas mudanças prontas no local:
 
 - **Sem meia-entrada** (`e3b4fe6`, D-06): o documento sai do menu de Documentos e da página do evento; `/meia-entrada` vai para `/termos-de-uso` com 301; a API do documento dá 404. Registro: `sem-meia-entrada-2026-10-16.md`.

@@ -58,4 +58,6 @@ Capturas do formulário de evento inteiro, antes e depois, nos dois motores, e d
 
 ## Publicação
 
-Não publicado. Entra na próxima publicação da fila, com o OK do responsável antes da virada.
+Publicado em 16/10/2026 03:30 UTC, com o OK do responsável ("coloque em produção"), junto com os textos do painel sem meia-entrada: `release-2026-10-16b`, revisão `partyx-00037-zap` (`publicacao-producao-2026-10-16.md`). Conferido pela candidata e pelo domínio na data de nascimento do cadastro, nos dois motores. Falta a conferência num iPhone de verdade (cadastro e edição de evento).
+
+Depois do registro acima, o caso `cadastro` do e2e foi corrigido: apontava para `/cadastro`, que não tem campo de data; agora abre `/criar-conta`, preenche a data de nascimento e mede o alinhamento (commit `d9fc445`).
