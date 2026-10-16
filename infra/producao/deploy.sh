@@ -339,7 +339,7 @@ cmd_build() {
         || { echo "Recuso: $f difere da tag $RELEASE ou não está nela. Faça commit e uma tag nova." >&2; exit 1; }
     done
   fi
-  for k in termos-de-uso privacidade cancelamento meia-entrada termo-menor autorizacao-menor; do
+  for k in termos-de-uso privacidade cancelamento termo-menor autorizacao-menor; do
     [ ! -s "$tmp/conteudo-legal/$k.txt" ] || echo "   texto legal $k.txt (da tag): sha256 $(sha256sum < "$tmp/conteudo-legal/$k.txt" | cut -c1-16)"
   done
   echo "== build de $RELEASE -> $image (Cloud Build, manual: só roda quando você chama)"

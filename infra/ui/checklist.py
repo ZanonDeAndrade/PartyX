@@ -12,7 +12,7 @@ after = [row for f in sorted((UI / 'depois').glob('manifest*.json')) for row in 
 
 NAMES = {
     'P01': 'Página inicial', 'P02': 'Listagem e busca', 'P03': 'Página do evento', 'P04': 'Termos de Uso',
-    'P05': 'Privacidade', 'P06': 'Cancelamento e meia-entrada', 'P07': 'Não encontrada',
+    'P05': 'Privacidade', 'P06': 'Cancelamento, troca e reembolso', 'P07': 'Não encontrada',
     'A01': 'Login', 'A02': 'Cadastro', 'A03': 'Recuperar senha', 'A04': 'Confirmação da solicitação',
     'A05': 'Nova senha', 'A06': 'Senha alterada',
     'C01': 'Seleção de ingressos', 'C02': 'Revisão do pedido', 'C03': 'Forma de pagamento', 'C04': 'Pix',

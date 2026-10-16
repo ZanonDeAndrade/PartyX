@@ -1205,7 +1205,7 @@ export const api = {
 };
 
 export type LegalKind =
-  'termos-de-uso' | 'privacidade' | 'cancelamento' | 'meia-entrada' | 'termo-menor' | 'autorizacao-menor';
+  'termos-de-uso' | 'privacidade' | 'cancelamento' | 'termo-menor' | 'autorizacao-menor';
 
 /** Endereços dos PDFs da autorização de menor (o navegador baixa direto; o do pedido exige a sessão). */
 export const minorAuthorizationUrl = {

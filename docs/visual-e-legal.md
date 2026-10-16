@@ -10,7 +10,9 @@ Implementado em 04/10/2026 (Prompt 19): RF-65, RF-66 (provisório), RF-67 (provi
 - Alvos de toque do cabeçalho e dos links do rodapé com 44 px de altura; verificação automática de `lang`, um único `h1`, `main`, imagens com `alt`, campos com rótulo e controles com nome acessível em 9 telas: sem pendências.
 - QR legível: o QR do ingresso é desenhado em vetor, com margem e tela cheia (Prompt 13); a leitura foi testada com `jsQR` em tamanhos reduzidos e por câmera simulada na portaria (Prompt 15).
 
-## Textos legais (RF-68, D-11) e meia-entrada (D-06)
+## Textos legais (RF-68, D-11)
+
+> Atualização de 16/10/2026: não há meia-entrada (D-06). O documento de regras e a página `/meia-entrada` saíram do site; a página antiga vai para `/termos-de-uso` com 301 (`sem-meia-entrada-2026-10-16.md`). As menções abaixo à meia-entrada são históricas.
 
 A PartyX fornece os textos; **a CONTRATADA não os redige**. Páginas: `/termos-de-uso`, `/privacidade`, `/politica-de-cancelamento`, `/meia-entrada`. Rodapé (todas as páginas) e checkout trazem os links; o evento com tipo de ingresso cujo nome contém "meia" mostra o link das regras.
 

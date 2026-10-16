@@ -126,7 +126,6 @@ const SCREENS: Screen[] = [
   { id: 'P04', route: '/termos-de-uso', state: 'termos' },
   { id: 'P05', route: '/privacidade', state: 'privacidade' },
   { id: 'P06', route: '/politica-de-cancelamento', state: 'cancelamento' },
-  { id: 'P06', route: '/meia-entrada', state: 'meia-entrada' },
   { id: 'P07', route: '/pagina-que-nao-existe', state: 'pagina inexistente' },
   { id: 'P07', route: '/eventos/evento-que-nao-existe', state: 'evento inexistente' },
   // ----- acesso -----

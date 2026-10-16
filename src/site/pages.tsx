@@ -755,11 +755,6 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
                     </span>
                   </div>
                 ) : null}
-                {event.ticketTypes.some(t => /meia/i.test(t.name)) ? (
-                  <p className="px-fine">
-                    Ingresso de meia-entrada: <Link to="/meia-entrada">veja as regras e os documentos exigidos</Link>.
-                  </p>
-                ) : null}
               </>
             }
           />

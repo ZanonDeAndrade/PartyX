@@ -59,9 +59,19 @@ const LEGAL_PATHS = new Set([
   '/termos-de-uso',
   '/privacidade',
   '/politica-de-cancelamento',
-  '/meia-entrada',
   '/termo-menor',
 ]);
+
+/**
+ * Não há meia-entrada (16/10/2026): a página antiga de regras mostra os Termos de Uso, que dizem isso, e troca o endereço. Num acesso
+ * direto, o servidor já responde 301 para /termos-de-uso; isto cobre um link antigo seguido dentro do site.
+ */
+function OldHalfPricePage() {
+  useEffect(() => {
+    window.history.replaceState(null, '', '/termos-de-uso');
+  }, []);
+  return <LegalPage kind="termos-de-uso" />;
+}
 
 function Routes() {
   const { loc } = useRouter();
@@ -114,7 +124,7 @@ function Routes() {
   if (loc.path === '/termos-de-uso') return <LegalPage kind="termos-de-uso" />;
   if (loc.path === '/privacidade') return <LegalPage kind="privacidade" />;
   if (loc.path === '/politica-de-cancelamento') return <LegalPage kind="cancelamento" />;
-  if (loc.path === '/meia-entrada') return <LegalPage kind="meia-entrada" />;
+  if (loc.path === '/meia-entrada') return <OldHalfPricePage />;
   if (loc.path === '/termo-menor') return <LegalPage kind="termo-menor" />;
   const m = /^\/eventos\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(loc.path);
   if (m) return <EventPage key={m[1]} slug={m[1]!} />;

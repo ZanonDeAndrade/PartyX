@@ -30,7 +30,7 @@ export function publicRoutes(deps: VitrineDeps & { config: Config }) {
       partyx: deps.config.partyx,
     }),
   );
-  /** Textos legais e regras de meia-entrada (RF-68). Texto simples em blocos; o front nunca o trata como HTML. */
+  /** Textos legais (RF-68). Texto simples em blocos; o front nunca o trata como HTML. */
   app.get('/public/legal/:kind', c => {
     const kind = c.req.param('kind');
     if (!isLegalKind(kind)) throw new AppError(404, 'nao_encontrado', 'Documento não encontrado.');

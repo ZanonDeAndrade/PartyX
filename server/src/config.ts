@@ -91,7 +91,7 @@ const schema = z
      * `PUBLIC_HOST_CHECK=true` liga a mesma regra para o teste rápido pelo Hosting provar que o cabeçalho chega. Exige `PUBLIC_BASE_URL`.
      */
     PUBLIC_HOST_CHECK: z.enum(['true', 'false']).optional(),
-    /** Pasta com os textos legais fornecidos pela PartyX (`termos-de-uso.txt`, `privacidade.txt`, `cancelamento.txt`, `meia-entrada.txt`). Fora do Git. */
+    /** Pasta com os textos legais fornecidos pela PartyX (`termos-de-uso.txt`, `privacidade.txt`, `cancelamento.txt`, `termo-menor.txt`, `autorizacao-menor.txt`). Fora do Git. */
     LEGAL_CONTENT_DIR: z.string().min(1).optional(),
     /** `true` só depois da aprovação escrita da proposta visual pelo cliente (CA-33, D-10). Sem ela, o tema segue provisório e a venda real em produção fica bloqueada. */
     VISUAL_APPROVED: z.enum(['true', 'false']).optional(),

@@ -201,7 +201,6 @@ SCREENS = [
     ('P04', '/termos-de-uso', 'texto nao fornecido', None, None, None),
     ('P05', '/privacidade', 'texto nao fornecido', None, None, None),
     ('P06', '/politica-de-cancelamento', 'texto nao fornecido', None, None, None),
-    ('P06', '/meia-entrada', 'meia-entrada', None, None, None),
     ('P07', '/pagina-que-nao-existe', 'pagina inexistente', None, None, None),
     ('P07', '/eventos/evento-que-nao-existe', 'evento inexistente', None, None, None),
     # ----- acesso -----

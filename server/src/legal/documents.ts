@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import type { Config } from '../config';
 
 /**
- * Textos legais e regras de meia-entrada (RF-68, D-06, D-11). **A PartyX (controladora) fornece os textos; a CONTRATADA não
+ * Textos legais (RF-68, D-11). Não há meia-entrada (D-06: a PartyX não vende meia-entrada, como dizem os Termos de Uso; o documento
+ * de regras saiu em 16/10/2026). **A PartyX (controladora) fornece os textos; a CONTRATADA não
  * redige obrigações legais em nome dela.** Os textos ficam em arquivos de uma pasta (`LEGAL_CONTENT_DIR`), um por documento,
  * em texto simples, fora do Git e fora do código. Parágrafos separados por linha em branco; uma linha que começa com `# ` é
  * título de seção. O texto nunca é tratado como HTML.
@@ -16,7 +17,6 @@ export const LEGAL_KINDS = [
   'termos-de-uso',
   'privacidade',
   'cancelamento',
-  'meia-entrada',
   'termo-menor',
   'autorizacao-menor',
 ] as const;
@@ -26,12 +26,11 @@ export const LEGAL_TITLES: Record<LegalKind, string> = {
   'termos-de-uso': 'Termos de Uso',
   privacidade: 'Política de Privacidade',
   cancelamento: 'Política de Cancelamento, Troca e Reembolso',
-  'meia-entrada': 'Regras de meia-entrada',
   'termo-menor': 'Termo de Ciência para Menores de Idade',
   'autorizacao-menor': 'Termo de Autorização e Responsabilidade',
 };
 
-/** Obrigatórios para vender de verdade. A meia-entrada só se aplica se o cliente oferecer esse tipo de ingresso (D-06). */
+/** Obrigatórios para vender de verdade. */
 const REQUIRED: LegalKind[] = ['termos-de-uso', 'privacidade', 'cancelamento'];
 /**
  * Obrigatórios para abrir o cadastro: os dois que a pessoa aceita no cadastro (RF-03). A Política de Cancelamento é exigida só para

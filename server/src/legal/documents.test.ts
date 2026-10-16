@@ -42,13 +42,13 @@ const FULL = {
 
 describe('textos legais (RF-68)', () => {
   it('só aceita os documentos conhecidos: nenhum caminho de arquivo passa', () => {
-    for (const bad of ['..', '../etc/passwd', 'termos-de-uso.txt', 'TERMOS-DE-USO', '', '%2e%2e'])
+    // `meia-entrada` deixou de existir em 16/10/2026: não há meia-entrada (D-06).
+    for (const bad of ['..', '../etc/passwd', 'termos-de-uso.txt', 'TERMOS-DE-USO', '', '%2e%2e', 'meia-entrada'])
       expect([bad, isLegalKind(bad)]).toEqual([bad, false]);
     for (const ok of [
       'termos-de-uso',
       'privacidade',
       'cancelamento',
-      'meia-entrada',
       'termo-menor',
       'autorizacao-menor',
     ])

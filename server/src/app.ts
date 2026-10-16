@@ -213,6 +213,11 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
 
   app.use('*', serveStatic({ root: path.relative(process.cwd(), dist) || '.' }));
 
+  // Não há meia-entrada (16/10/2026): a página antiga de regras leva aos Termos de Uso, que dizem isso, para links antigos não darem
+  // erro. Permanente (301).
+  app.get('/meia-entrada', c => c.redirect('/termos-de-uso', 301));
+  app.get('/meia-entrada/', c => c.redirect('/termos-de-uso', 301));
+
   const baseUrl = (requestUrl: string) => config.PUBLIC_BASE_URL ?? new URL(requestUrl).origin;
 
   // Open Graph (RF-26, CA-13): o WhatsApp não executa JavaScript, então o servidor injeta título, descrição e imagem no HTML.

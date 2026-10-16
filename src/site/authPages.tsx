@@ -576,7 +576,6 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
     { to: '/termos-de-uso', label: 'Termos de Uso', kind: 'termos-de-uso' },
     { to: '/privacidade', label: 'Política de Privacidade', kind: 'privacidade' },
     { to: '/politica-de-cancelamento', label: 'Cancelamento, troca e reembolso', kind: 'cancelamento' },
-    { to: '/meia-entrada', label: 'Meia-entrada', kind: 'meia-entrada' },
     { to: '/termo-menor', label: 'Termo para menores', kind: 'termo-menor' },
   ];
   return (

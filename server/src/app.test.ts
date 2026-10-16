@@ -75,6 +75,17 @@ describe('front-end estático', () => {
     expect(await res.text()).toContain('<div id="root">');
   });
 
+  it('a página antiga de meia-entrada leva aos Termos de Uso com 301 (não há meia-entrada desde 16/10/2026)', async () => {
+    const config = loadConfig({ WEB_DIST_DIR: distWithIndex() });
+    const app = createApp({ config, clock });
+    for (const p of ['/meia-entrada', '/meia-entrada/']) {
+      const res = await app.request(p);
+      expect(res.status, p).toBe(301);
+      expect(res.headers.get('location'), p).toBe('/termos-de-uso');
+    }
+    expect((await app.request('/api/public/legal/meia-entrada')).status).toBe(404);
+  });
+
   it('explica quando o front-end não foi compilado', async () => {
     const config = loadConfig({ WEB_DIST_DIR: path.join(tmpdir(), 'partyx-nao-existe') });
     const res = await createApp({ config, clock }).request('/');

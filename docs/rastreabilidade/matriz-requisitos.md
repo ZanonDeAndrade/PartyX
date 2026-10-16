@@ -119,6 +119,14 @@ Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na pá
 | Regra no banco e reversão | `server/src/db/schema.integration.test.ts` (reversão da 0014 apaga só a coluna), `events.integration.test.ts` (CHECK recusa minúsculas, nome de cor, vazio e `;`) |
 | Sem regressão | `e2e:textos` (78), `e2e:cronometro` (7), `test:db` completo |
 
+### Sem meia-entrada (16/10/2026)
+
+Pedido do responsável: não haverá meia-entrada (D-06 decidida). O documento "Regras de meia-entrada" saiu do menu de Documentos e da página do evento; `/meia-entrada` vai para `/termos-de-uso` com 301; o servidor não tem mais esse documento. A frase dos Termos de Uso fica. Registro: `docs/registros/sem-meia-entrada-2026-10-16.md`. **Não publicado.**
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-68 (documentos legais) sem a meia-entrada | `server/src/app.test.ts` (301 e 404 na API), `server/src/legal/documents.test.ts`, `e2e/documentos.spec.ts` (menu e rodapé a 360 e 1280 px, página do evento, troca de endereço) |
+
 ### Transferência de ingresso e Política de Cancelamento, Troca e Reembolso 1.0 (15/10/2026)
 
 Pedido do responsável:
