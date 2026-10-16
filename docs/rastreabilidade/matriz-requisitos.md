@@ -119,6 +119,14 @@ Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na pá
 | Regra no banco e reversão | `server/src/db/schema.integration.test.ts` (reversão da 0014 apaga só a coluna), `events.integration.test.ts` (CHECK recusa minúsculas, nome de cor, vazio e `;`) |
 | Sem regressão | `e2e:textos` (78), `e2e:cronometro` (7), `test:db` completo |
 
+### Campos de data e hora no celular (16/10/2026)
+
+Pedido do responsável: no iPhone, os campos de data e hora do evento passavam da borda direita e ficavam com o texto centrado. Correção em todo o site (aparência nativa fora, largura da caixa, texto à esquerda, altura e fonte dos campos de texto, ícone onde o aparelho não mostra) e revisão dos formulários do painel no celular, que achou mais dois defeitos: o "R$" do campo de valor partido em duas linhas e o botão da capa pequeno para o toque. Registro: `docs/registros/campos-de-data-no-celular-2026-10-16.md`. **Não publicado.**
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-65, CA-32 e CA-14 (celular sem rolagem lateral, campos dentro da tela) | `e2e/painel-celular.spec.ts` (WebKit com viewport de iPhone 390 x 844 e as regras de data do iOS; Chrome de Android 360 x 800; 31 telas e estados do painel e do site, 62 casos: rolagem, campos e tabelas dentro da tela, palavra curta partida, texto da data à esquerda medido nos pixels, ícone longe da borda, altura e fonte dos campos de data, botão da capa com 44 px) |
+
 ### Busca só no cabeçalho (16/10/2026)
 
 Pedido do responsável: a vitrine (e o início) sem o formulário "Nome do evento", "Data" e "Buscar"; a única busca é a do cabeçalho, por nome, e no celular a lupa abre o campo. Links antigos com `?date=` abrem a lista e a data é ignorada. **Desvio do RF-22 na parte da data** (D-89, aprovação da PartyX a registrar). Registro: `docs/registros/busca-so-no-cabecalho-2026-10-16.md`. Publicado em 16/10/2026 (`partyx-00034-hug`, `publicacao-producao-2026-10-15j.md`).

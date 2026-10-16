@@ -435,6 +435,29 @@ a.px-adm-card-title:hover {
   min-height: var(--px-touch);
   padding: var(--px-s-2) 0;
   max-width: 100%;
+  color: var(--px-text-3);
+  font-size: var(--px-t-sm);
+}
+/* O botão do navegador era pequeno para o toque (cerca de 20 px de altura no celular): fica com a cara e a altura dos botões. */
+.px-banner-edit input[type='file']::file-selector-button {
+  min-height: var(--px-touch);
+  margin-right: var(--px-s-3);
+  padding: 0 var(--px-s-4);
+  border: 1px solid #c9c9d6;
+  border-radius: var(--px-r-sm);
+  background: var(--px-paper);
+  color: var(--px-text);
+  font: inherit;
+  font-size: var(--px-t-md);
+  font-weight: 700;
+  cursor: pointer;
+}
+.px-banner-edit input[type='file']:not(:disabled)::file-selector-button:hover {
+  border-color: var(--px-text-2);
+}
+.px-banner-edit input[type='file']:disabled::file-selector-button {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .px-progress {
   display: flex;
