@@ -2155,7 +2155,7 @@ function TicketTypeDialog({
           id="tt-name"
           label="Nome"
           error={errors.name}
-          hint="Ex.: Pista, Camarote, Meia-entrada. Para vender em lotes, salve o tipo e crie os lotes dentro dele."
+          hint="Ex.: Pista, Camarote, VIP. Para vender em lotes, salve o tipo e crie os lotes dentro dele."
         >
           <input
             id="tt-name"
@@ -2264,8 +2264,7 @@ function TicketTypeDialog({
         </div>
         <p className="px-small px-muted">
           Horários de Brasília. O limite de {meta.maxTicketsPerOrder} ingressos por compra vale para o pedido inteiro,
-          somando os tipos, e é configurado no servidor (MAX_TICKETS_PER_ORDER), não por tipo. Tipos de meia-entrada
-          podem existir: o documento é conferido na portaria, sem envio de comprovante.
+          somando os tipos, e é configurado no servidor (MAX_TICKETS_PER_ORDER), não por tipo.
         </p>
         <div className="px-actions">
           <button type="button" className="px-btn" onClick={cancel} disabled={busy}>

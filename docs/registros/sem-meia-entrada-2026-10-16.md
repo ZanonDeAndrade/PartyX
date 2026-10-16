@@ -18,11 +18,7 @@ Pedido do responsável (Arthur), em 15/10/2026 à noite: remover o documento "Re
 ## O que sobrou com "meia" no repositório (de propósito)
 
 - **Termos de Uso** (`conteudo-legal/termos-de-uso.txt`): a frase que diz que não há meia-entrada.
-- **Painel, dois textos de ajuda** do formulário de tipo de ingresso (`src/site/adminEvents.tsx`), mostrados ao responsável antes de remover:
-  - o exemplo do campo Nome ("Ex.: Pista, Camarote, Meia-entrada");
-  - "Tipos de meia-entrada podem existir: o documento é conferido na portaria, sem envio de comprovante".
-
-  Não há tipo, campo nem regra de meia-entrada no painel.
+- ~~Painel, dois textos de ajuda do formulário de tipo de ingresso~~: **removidos em 16/10/2026** a pedido do responsável ("não haverá meia-entrada"). O exemplo do campo Nome passou a "Ex.: Pista, Camarote, VIP" e saiu a frase "Tipos de meia-entrada podem existir: o documento é conferido na portaria, sem envio de comprovante". Publicado na `release-2026-10-16b`. Não há tipo, campo nem regra de meia-entrada no painel.
 - **Dados fictícios de teste** com tipos chamados "Meia-entrada Pista" ou "MeiaEntradaEstudante": `infra/ui/seed-ui.mts`, `infra/ui/flows-ui.mts`, `e2e/support/seed-textos-longos.mts`, testes do PDF, da contingência e do e-mail. São só nomes (texto longo para testar quebra de linha); não dependem de nenhuma regra.
 - **Protótipo e documentação de referência** (`src/logic`, `src/docs`, `src/data/seed.ts`, `reference/`, `docs/fontes/`, `docs/ui/`, `docs/AUDITORIA_PartyX.md`): histórico do projeto, fora do site em produção.
 - **"Meia-noite", "meia-lua" e "renomeia"**: palavras que não têm relação com meia-entrada.

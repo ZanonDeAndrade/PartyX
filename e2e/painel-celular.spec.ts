@@ -147,7 +147,7 @@ const SCREENS: Screen[] = [
   { id: 'pedido', path: `/admin/pedidos/${R.orderId}` },
   { id: 'ingresso', path: `/admin/ingressos/${R.ticketId}` },
   // Site: datas de nascimento.
-  { id: 'cadastro', path: '/cadastro', who: undefined },
+  { id: 'cadastro', path: '/criar-conta', who: undefined },
   { id: 'minha-conta', path: '/minha-conta', who: 'buyer' },
 ];
 
@@ -155,9 +155,11 @@ for (const s of SCREENS)
   test(s.id, async ({ page }, info) => {
     const errors: string[] = [];
     page.on('pageerror', e => errors.push(e.message));
-    if (s.who !== undefined || !s.path.startsWith('/cadastro')) await login(page, s.who ?? 'admin', s.path);
+    if (s.who !== undefined || !s.path.startsWith('/criar-conta')) await login(page, s.who ?? 'admin', s.path);
     await page.goto(R.base + s.path, { waitUntil: 'networkidle' });
     for (const step of s.open ?? []) await step(page);
+    // O cadastro tem a data de nascimento: preenchida, o alinhamento do texto também é medido.
+    if (s.id === 'cadastro') await page.locator('input[type=date]').fill('2000-05-17');
     await page.waitForTimeout(300);
     if (s.shot) {
       const dialog = page.getByRole('dialog');
