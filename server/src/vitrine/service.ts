@@ -5,7 +5,6 @@ import { availableQuantity, salesState, type SalesState } from '../domain/events
 import { lastUnits, lotSalesState, typeLotsView, type Lot, type TypeLotsView } from '../domain/lots';
 import { previewTypes } from '../events/lots';
 import { AppError } from '../domain/errors';
-import { dateKeyInEventZone } from '../domain/time';
 import {
   countdownLiveUntil,
   eventSale,
@@ -211,12 +210,11 @@ export async function home(deps: VitrineDeps) {
 
 export interface SearchInput {
   q?: string;
-  /** AAAA-MM-DD, no fuso do evento. */
-  date?: string;
 }
 
 /**
- * Listagem e busca (RF-21, RF-22, CA-12). A busca ignora acento e maiúsculas e acha por parte do nome.
+ * Listagem e busca por nome (RF-21, RF-22, CA-12), a busca do cabeçalho. Ignora acento e maiúsculas e acha por parte do nome. A busca
+ * por data saiu em 16/10/2026 (a vitrine ficou só com a busca do cabeçalho); um `date` vindo de link antigo é ignorado pela rota.
  * Sem filtro, só entram eventos com venda em andamento ou por começar; com filtro, entram também os esgotados e encerrados as vendas,
  * para quem procura um evento específico encontrar a página dele.
  */
@@ -226,17 +224,11 @@ export async function search(deps: VitrineDeps, input: SearchInput) {
     throw new AppError(422, 'dados_invalidos', 'A busca é longa demais.', [
       { campo: 'q', mensagem: 'Use até 100 caracteres.' },
     ]);
-  if (input.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
-    throw new AppError(422, 'dados_invalidos', 'Data inválida.', [
-      { campo: 'date', mensagem: 'Use o formato AAAA-MM-DD.' },
-    ]);
-  }
-  const filtering = Boolean(q || input.date);
+  const filtering = Boolean(q);
   const rows = await visibleRows(deps);
   const { now, byEvent } = await load(deps, rows);
   const items = rows
     .filter(e => !q || searchKey(e.name).includes(q))
-    .filter(e => !input.date || dateKeyInEventZone(e.startsAt) === input.date)
     .map(e => card(e, byEvent.get(e.id) ?? [], now))
     .filter(c => filtering || c._sale.kind !== 'closed')
     .map(strip);

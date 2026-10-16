@@ -148,7 +148,7 @@ for (const width of WIDTHS)
       if (s.gateSearch) {
         await page.getByRole('tab', { name: 'Busca manual' }).click();
         await page.fill('#busca', 'Ana');
-        await page.getByRole('button', { name: 'Buscar' }).click();
+        await page.getByRole('button', { name: 'Buscar', exact: true }).click();
         await page.waitForSelector('.px-hit');
       }
       await page.waitForTimeout(500);

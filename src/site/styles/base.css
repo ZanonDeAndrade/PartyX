@@ -1244,34 +1244,6 @@ body.px-dark .px-skel-text::after {
     grid-column: auto !important;
   }
 }
-.px-chips {
-  list-style: none;
-  padding: 0;
-  margin: var(--px-s-3) 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--px-s-2);
-  align-items: center;
-}
-.px-chips-label {
-  font-size: var(--px-t-sm);
-  color: var(--px-on-ink-2);
-}
-.px-chips button {
-  min-height: 36px;
-  padding: 0 var(--px-s-3);
-  border-radius: var(--px-r-pill);
-  border: 1px solid var(--px-ink-line);
-  background: var(--px-ink-2);
-  color: var(--px-on-ink);
-  font: inherit;
-  font-size: var(--px-t-sm);
-  font-weight: 650;
-  cursor: pointer;
-}
-.px-chips button:hover {
-  border-color: var(--px-lilac);
-}
 .px-pager {
   display: flex;
   gap: var(--px-s-3);

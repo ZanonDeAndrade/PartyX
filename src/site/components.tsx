@@ -108,6 +108,10 @@ export function Header() {
   const { go, loc } = useRouter();
   const [menu, setMenu] = useState(false);
   const [q, setQ] = useState('');
+  // Busca do cabeçalho (a única do site desde 16/10/2026). No celular ela fica atrás da lupa, que abre o campo por cima da linha.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const searchBtn = useRef<HTMLButtonElement>(null);
   const menuBtn = useRef<HTMLButtonElement>(null);
   const user = session.status === 'user' ? session.user : null;
   const staff = user && user.role !== 'cliente';
@@ -117,8 +121,23 @@ export function Header() {
   };
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    go(searchPath(q.trim(), ''));
+    setSearchOpen(false);
+    searchInput.current?.blur();
+    go(searchPath(q));
   };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    searchBtn.current?.focus();
+  };
+  // O campo mostra o termo da lista filtrada (e esvazia fora dela ou depois de "Limpar busca").
+  const urlTerm = loc.path === '/eventos' ? (new URLSearchParams(loc.search).get('q') ?? '') : '';
+  useEffect(() => {
+    setQ(urlTerm);
+    setSearchOpen(false);
+  }, [urlTerm, loc.path]);
+  useEffect(() => {
+    if (searchOpen) searchInput.current?.focus();
+  }, [searchOpen]);
   // Na tela de compra o cabeçalho encolhe: nada compete com o pagamento.
   const checkout = loc.path.startsWith('/checkout/') || loc.path.startsWith('/pedido/');
   return (
@@ -143,21 +162,46 @@ export function Header() {
                   Eventos
                 </Link>
               </nav>
-              <form className="px-hsearch" role="search" onSubmit={submit}>
+              <form
+                id="px-hsearch"
+                className={`px-hsearch${searchOpen ? ' px-hsearch-open' : ''}`}
+                role="search"
+                onSubmit={submit}
+                onKeyDown={e => {
+                  if (e.key === 'Escape' && searchOpen) closeSearch();
+                }}
+                onBlur={e => {
+                  // Tocar fora do campo aberto no celular fecha a busca.
+                  if (searchOpen && !e.currentTarget.contains(e.relatedTarget)) setSearchOpen(false);
+                }}
+              >
                 <IconSearch size={18} />
                 <input
+                  ref={searchInput}
                   type="search"
                   aria-label="Buscar evento"
                   placeholder="Buscar evento por nome"
                   value={q}
                   maxLength={100}
+                  enterKeyHint="search"
                   onChange={e => setQ(e.target.value)}
                 />
+                <button type="button" className="px-hsearch-close px-only-mob" aria-label="Fechar a busca" onClick={closeSearch}>
+                  <IconClose size={20} />
+                </button>
               </form>
               <div className="px-header-end">
-                <Link to="/eventos" className="px-icon-btn px-only-mob" aria-label="Buscar eventos">
+                <button
+                  ref={searchBtn}
+                  type="button"
+                  className="px-icon-btn px-only-mob"
+                  aria-label="Buscar eventos"
+                  aria-expanded={searchOpen}
+                  aria-controls="px-hsearch"
+                  onClick={() => setSearchOpen(true)}
+                >
                   <IconSearch />
-                </Link>
+                </button>
                 {session.status === 'anon' ? (
                   <Link to="/entrar" className="px-enter">
                     Entrar
@@ -633,57 +677,6 @@ export function ErrorBox({ onRetry }: { onRetry: () => void }) {
         Tentar de novo
       </button>
     </div>
-  );
-}
-
-/** Formulário de busca por nome ou data (RF-22). Vai para /eventos com a busca na URL. */
-export function SearchForm({
-  q,
-  date,
-  onSubmit,
-  idPrefix,
-}: {
-  q: string;
-  date: string;
-  onSubmit: (q: string, date: string) => void;
-  idPrefix: string;
-}) {
-  const [name, setName] = useState(q);
-  const [day, setDay] = useState(date);
-  useEffect(() => {
-    setName(q);
-    setDay(date);
-  }, [q, date]);
-  return (
-    <form
-      className="px-search"
-      role="search"
-      aria-label="Buscar eventos"
-      onSubmit={e => {
-        e.preventDefault();
-        onSubmit(name, day);
-      }}
-    >
-      <div className="px-field">
-        <label htmlFor={`${idPrefix}-q`}>Nome do evento</label>
-        <input
-          id={`${idPrefix}-q`}
-          type="search"
-          value={name}
-          maxLength={100}
-          autoComplete="off"
-          placeholder="Ex.: Neon"
-          onChange={e => setName(e.target.value)}
-        />
-      </div>
-      <div className="px-field">
-        <label htmlFor={`${idPrefix}-d`}>Data</label>
-        <input id={`${idPrefix}-d`} type="date" value={day} onChange={e => setDay(e.target.value)} />
-      </div>
-      <button type="submit" className="px-btn px-btn-light">
-        Buscar
-      </button>
-    </form>
   );
 }
 

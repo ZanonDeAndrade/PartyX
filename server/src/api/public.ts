@@ -38,7 +38,8 @@ export function publicRoutes(deps: VitrineDeps & { config: Config }) {
   });
   app.get('/public/home', async c => c.json(await home(deps)));
 
-  const searchQuery = z.object({ q: z.string().max(400).optional(), date: z.string().max(20).optional() });
+  // Só o nome (a busca do cabeçalho). Outros parâmetros, como o `date` de links antigos, são descartados.
+  const searchQuery = z.object({ q: z.string().max(400).optional() });
   app.get('/public/events', async c => {
     const parsed = searchQuery.safeParse(c.req.query());
     if (!parsed.success) throw new AppError(422, 'dados_invalidos', 'Busca inválida.');

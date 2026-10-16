@@ -32,13 +32,10 @@ export const dateParts = (iso: string): { day: string; month: string; weekday: s
   };
 };
 
-/** Início de uma query string da busca, sempre com os valores codificados. */
-export function searchPath(q: string, date: string): string {
-  const params = new URLSearchParams();
-  if (q.trim()) params.set('q', q.trim());
-  if (date) params.set('date', date);
-  const s = params.toString();
-  return s ? `/eventos?${s}` : '/eventos';
+/** Endereço da busca do cabeçalho (só por nome, desde 16/10/2026), com o texto codificado. */
+export function searchPath(q: string): string {
+  const term = q.trim();
+  return term ? `/eventos?${new URLSearchParams({ q: term })}` : '/eventos';
 }
 
 export const eventPath = (slug: string): string => `/eventos/${slug}`;

@@ -934,13 +934,9 @@ export const api = {
   legalDocument: async (kind: LegalKind, signal?: AbortSignal) =>
     (await get<{ document: LegalDocument }>(`/public/legal/${kind}`, signal)).document,
   home: (signal?: AbortSignal) => get<{ featured: EventCard[]; upcoming: EventCard[] }>('/public/home', signal),
-  events: (q: string, date: string, signal?: AbortSignal) => {
-    const params = new URLSearchParams();
-    if (q) params.set('q', q);
-    if (date) params.set('date', date);
-    const s = params.toString();
-    return get<{ events: EventCard[]; filtering: boolean }>(`/public/events${s ? `?${s}` : ''}`, signal);
-  },
+  /** Vitrine, filtrada pelo nome quando há busca (a do cabeçalho). */
+  events: (q: string, signal?: AbortSignal) =>
+    get<{ events: EventCard[]; filtering: boolean }>(`/public/events${q ? `?${new URLSearchParams({ q })}` : ''}`, signal),
   event: (slug: string, signal?: AbortSignal) =>
     withClock(async () => (await get<{ event: EventDetail }>(`/public/events/${encodeURIComponent(slug)}`, signal)).event),
 

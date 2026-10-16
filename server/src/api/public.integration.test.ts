@@ -210,13 +210,11 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
       expect(await names('?q=acustic')).toEqual(['Show Acústico']);
       expect(await names('?q=nada')).toEqual([]);
     });
-    it('acha por data no fuso do evento (23:30 em Brasília ainda é o dia 12)', async () => {
-      expect(await names('?date=2026-12-12')).toEqual(['Festa Neon Verão', 'Baile do Zé Pelintra']);
-      expect(await names('?date=2026-12-13')).toEqual([]);
-    });
-    it('combina nome e data', async () => {
-      expect(await names('?q=baile&date=2026-12-12')).toEqual(['Baile do Zé Pelintra']);
-      expect(await names('?q=baile&date=2026-12-20')).toEqual([]);
+    it('a data de links antigos é ignorada (16/10/2026, só a busca por nome do cabeçalho): o nome continua filtrando', async () => {
+      const all = (await names('')).sort();
+      expect((await names('?date=2026-12-12')).sort()).toEqual(all);
+      expect((await names('?date=12/12/2026')).sort()).toEqual(all); // nem formato inválido dá erro
+      expect(await names('?q=baile&date=2026-12-20')).toEqual(['Baile do Zé Pelintra']);
     });
     it('sem filtro lista tudo; com filtro mostra também esgotado e vendas encerradas', async () => {
       await event({ name: 'Festa Esgotada', types: [{ sold: 100 }] });
@@ -230,9 +228,8 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
       expect(await names('?q=encerrada')).toEqual(['Festa Encerrada']);
       expect((await json(await get('/api/public/events?q=esgotada'))).events[0].sale.kind).toBe('out');
     });
-    it('recusa busca longa e data inválida; trata % e _ como texto comum', async () => {
+    it('recusa busca longa; trata % e _ como texto comum', async () => {
       expect((await get(`/api/public/events?q=${'a'.repeat(120)}`)).status).toBe(422);
-      expect((await get('/api/public/events?date=12/12/2026')).status).toBe(422);
       expect(await names('?q=%25')).toEqual([]);
       expect(await names("?q='%3B%20drop%20table%20events%3B--")).toEqual([]);
       expect((await sql('select count(*)::int as n from events')).rows[0].n).toBe(3);

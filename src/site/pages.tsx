@@ -13,13 +13,12 @@ import {
   EventCardView,
   Layout,
   PartyxContact,
-  SearchForm,
   SkeletonSwap,
   usePageTitle,
 } from './components';
 import { stateAnnouncement, type CountdownView } from './eventCountdown';
 import { EventCountdown, readCountdown } from './eventCountdownView';
-import { brl, dateLong, dateParts, searchPath, shareLinks, timeOf } from './format';
+import { brl, dateLong, dateParts, shareLinks, timeOf } from './format';
 import { IconCheck, IconClose, IconLink, IconShare } from './icons';
 import { cascade, Roll } from './motion';
 import { eventLinkProps, pendingEvent, prefetchedEvent } from './prefetch';
@@ -107,10 +106,6 @@ export function HomePage() {
       ) : null}
 
       <div className="px-wrap">
-        <div className="px-searchbar">
-          <SearchForm idPrefix="home" q="" date="" onSubmit={(q, d) => go(searchPath(q, d))} />
-        </div>
-
         <section aria-labelledby="proximos" className="px-section">
           <div className="px-section-head">
             <h2 id="proximos" className="px-h2">
@@ -145,66 +140,38 @@ export function HomePage() {
   );
 }
 
-/** Valida `AAAA-MM-DD` para não mandar lixo da URL à API. */
-const validDate = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
-
+/**
+ * Lista de eventos (P02). Sem formulário de busca desde 16/10/2026: a busca é a do cabeçalho, que traz `?q=`. Com busca, o aviso
+ * "Resultados para" e "Limpar busca"; sem resultado, a mensagem com o termo e o link para todos. Links antigos com `?date=` abrem a
+ * lista (a data é ignorada) e o nome continua filtrando.
+ */
 export function EventsPage() {
   usePageTitle('Eventos · PartyX');
-  const { loc, go } = useRouter();
-  const params = new URLSearchParams(loc.search);
-  const q = (params.get('q') ?? '').slice(0, 100);
-  const date = validDate(params.get('date'));
-  const [state, retry] = useFetch(s => api.events(q, date, s), `${q}|${date}`);
-  const filtering = Boolean(q || date);
+  const { loc } = useRouter();
+  const q = (new URLSearchParams(loc.search).get('q') ?? '').trim().slice(0, 100);
+  const [state, retry] = useFetch(s => api.events(q, s), q);
   const events = state.status === 'ok' ? state.data.events : [];
 
   const count =
     state.status === 'loading'
       ? 'Buscando eventos…'
-      : state.status === 'ok'
-        ? events.length === 0
-          ? ''
-          : `${events.length} ${events.length === 1 ? 'evento encontrado' : 'eventos encontrados'}`
+      : state.status === 'ok' && events.length > 0
+        ? `${events.length} ${events.length === 1 ? 'evento' : 'eventos'}`
         : '';
 
   return (
     <Layout dark>
       <div className="px-wrap px-events-page">
         <h1 className="px-h1 px-page-title">Eventos</h1>
-        <SearchForm idPrefix="lista" q={q} date={date} onSubmit={(nq, nd) => go(searchPath(nq, nd))} />
-        {filtering ? (
-          <ul className="px-chips" aria-label="Filtros aplicados">
-            <li className="px-chips-label" aria-hidden="true">
-              Filtros:
-            </li>
-            {q ? (
-              <li>
-                <button
-                  type="button"
-                  onClick={() => go(searchPath('', date))}
-                  aria-label={`Remover filtro de nome: ${q}`}
-                >
-                  Nome: {q} <span aria-hidden="true">×</span>
-                </button>
-              </li>
-            ) : null}
-            {date ? (
-              <li>
-                <button
-                  type="button"
-                  onClick={() => go(searchPath(q, ''))}
-                  aria-label={`Remover filtro de data: ${date.split('-').reverse().join('/')}`}
-                >
-                  Data: {date.split('-').reverse().join('/')} <span aria-hidden="true">×</span>
-                </button>
-              </li>
-            ) : null}
-            <li>
-              <Link to="/eventos" className="px-textlink px-textlink-sm">
-                Limpar filtros
-              </Link>
-            </li>
-          </ul>
+        {q ? (
+          <div className="px-search-note">
+            <p>
+              Resultados para <b>“{q}”</b>
+            </p>
+            <Link to="/eventos" className="px-textlink px-textlink-sm">
+              Limpar busca
+            </Link>
+          </div>
         ) : null}
 
         <p className="px-count" role="status" aria-live="polite">
@@ -214,15 +181,15 @@ export function EventsPage() {
         {state.status === 'error' ? <ErrorBox onRetry={retry} /> : null}
         {state.status === 'ok' && events.length === 0 ? (
           <div className="px-box">
-            <h2>{filtering ? 'Nenhum evento encontrado' : 'Nenhuma venda aberta agora'}</h2>
+            <h2>{q ? `Nenhum evento encontrado para “${q}”` : 'Nenhuma venda aberta agora'}</h2>
             <p>
-              {filtering
-                ? 'Nenhum evento à venda combina com essa busca. Tente parte do nome ou outra data.'
+              {q
+                ? 'Confira o nome ou busque por uma parte dele.'
                 : 'Quando a PartyX abrir as vendas de um novo evento, ele aparece aqui primeiro.'}
             </p>
-            {filtering ? (
+            {q ? (
               <Link to="/eventos" className="px-btn">
-                Limpar filtros
+                Ver todos os eventos
               </Link>
             ) : null}
           </div>

@@ -34,9 +34,10 @@ describe('formatação da vitrine', () => {
     expect(phoneBr(null)).toBe('');
   });
   it('monta a busca só com o que foi preenchido e codifica o texto', () => {
-    expect(searchPath('', '')).toBe('/eventos');
-    expect(searchPath(' festa neon ', '2026-12-12')).toBe('/eventos?q=festa+neon&date=2026-12-12');
-    expect(searchPath('a&b=c', '')).toBe('/eventos?q=a%26b%3Dc');
+    expect(searchPath('')).toBe('/eventos');
+    expect(searchPath('   ')).toBe('/eventos');
+    expect(searchPath(' festa neon ')).toBe('/eventos?q=festa+neon');
+    expect(searchPath('a&b=c')).toBe('/eventos?q=a%26b%3Dc');
     expect(eventPath('noite-neon')).toBe('/eventos/noite-neon');
   });
   it('links de compartilhamento codificam o endereço e o título', () => {

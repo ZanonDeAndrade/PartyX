@@ -16,7 +16,7 @@ Implementado em 01/10/2026 (Prompt 08): RF-20 a RF-27 e CA-12 a CA-14. É a prim
 | Rota | O que devolve |
 |---|---|
 | `/api/public/home` | `featured` (destaques à venda) e `upcoming` (próximos eventos) |
-| `/api/public/events?q=&date=` | Lista com busca por parte do nome e/ou data (`AAAA-MM-DD`, fuso do evento) |
+| `/api/public/events?q=` | Lista com busca por parte do nome. Desde 16/10/2026 sem busca por data (D-89): um `date` de link antigo é ignorado |
 | `/api/public/events/:slug` | Evento completo com tipos, preços, estado e texto de cada um |
 | `/api/public/site` | Ambiente e `provisionalTheme` (a faixa amarela de tema provisório) |
 
@@ -25,7 +25,7 @@ Implementado em 01/10/2026 (Prompt 08): RF-20 a RF-27 e CA-12 a CA-14. É a prim
 - **Rascunho não existe para o público:** some das listas, e a página dá 404. **Encerrado** sai das listas, mas a página continua acessível, sem venda.
 - **Janela de exibição:** evento publicado fica na vitrine até **8 horas depois do início** (regra do protótipo; D-31). Encerrar é manual.
 - **Sem filtro**, a lista traz eventos à venda, por começar, esgotados e indisponíveis por reserva; **vendas encerradas** só aparecem na busca. A página inicial mostra só o que tem venda em andamento ou por começar.
-- **Busca (CA-12):** ignora acento e maiúsculas e acha por parte do nome. A data é comparada no fuso de Brasília (23h30 em Brasília ainda é o dia). `%`, `_` e aspas são texto comum (a busca é feita em memória, sem montar SQL).
+- **Busca (CA-12):** só pelo nome, a busca do cabeçalho (D-89, 16/10/2026). Ignora acento e maiúsculas e acha por parte do nome. `%`, `_` e aspas são texto comum (a busca é feita em memória, sem montar SQL).
 - **Estado do evento:** à venda (com "a partir de" o menor preço entre os tipos à venda), vendas a partir de dd/mm, esgotado, indisponível no momento (só reservas em andamento), vendas encerradas, evento encerrado.
 - **Estoque exato nunca é público.** Só o estado de cada tipo e se pode ser comprado (`canBuy`). Disponibilidade em cache não substitui a conferência do checkout (Prompt 09).
 
@@ -42,7 +42,7 @@ O WhatsApp não executa JavaScript. Em `/eventos/:slug` o servidor lê o `index.
 
 ## Páginas
 
-Início (destaque, busca, próximos), lista com busca e filtros removíveis (a busca fica na URL), página do evento (banner, data, horário, local, classificação, descrição, atrações, tipos com preço, compartilhar por WhatsApp, Facebook, X, copiar e compartilhar do aparelho), 404. Estados de carregamento, vazio e erro com "tentar de novo".
+Início (destaque, próximos), lista de eventos (a busca fica na URL; com busca, "Resultados para" e "Limpar busca"; sem resultado, "Nenhum evento encontrado para" e "Ver todos os eventos"). Desde 16/10/2026 a única busca é a do cabeçalho; no celular, a lupa abre o campo por cima da linha do cabeçalho (fecha no X, no Esc ou ao tocar fora). Também: página do evento (banner, data, horário, local, classificação, descrição, atrações, tipos com preço, compartilhar por WhatsApp, Facebook, X, copiar e compartilhar do aparelho), 404. Estados de carregamento, vazio e erro com "tentar de novo".
 
 Acessibilidade: link "ir para o conteúdo", marcos (`header`, `nav`, `main`), `label` em todos os campos, resultado da busca anunciado (`aria-live`), estado sempre em texto (nunca só cor), foco visível, alvos de toque de 44 px, campos de 16 px (sem zoom no iPhone), `prefers-reduced-motion`.
 

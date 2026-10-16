@@ -14,6 +14,7 @@
   view-transition-name: px-header;
 }
 .px-header-in {
+  position: relative;
   height: 64px;
   display: flex;
   align-items: center;
@@ -75,7 +76,12 @@
 }
 .px-hsearch:focus-within {
   border-color: var(--px-lilac);
+  box-shadow: 0 0 0 1px var(--px-lilac);
   color: var(--px-on-ink);
+}
+/* O foco aparece no contorno do campo inteiro (acima), não num segundo anel em volta do texto. */
+body.px-site .px-hsearch input:focus-visible {
+  outline: none;
 }
 .px-hsearch input {
   flex: 1;
@@ -90,6 +96,44 @@
 }
 .px-hsearch input::placeholder {
   color: var(--px-on-ink-3);
+}
+.px-hsearch-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--px-r-sm);
+  background: none;
+  color: var(--px-on-ink-2);
+  cursor: pointer;
+}
+.px-hsearch-close:hover {
+  color: var(--px-on-ink);
+}
+@media (max-width: 767.98px) {
+  /* No celular a lupa abre a busca por cima da linha do cabeçalho; a sombra da cor do fundo cobre o logo e os ícones por baixo. */
+  .px-hsearch-open {
+    display: flex;
+    position: absolute;
+    inset: 11px var(--px-gutter);
+    max-width: none;
+    height: auto;
+    padding-right: 0;
+    z-index: 1;
+    box-shadow: 0 0 0 11px var(--px-ink);
+    animation: px-fade-in var(--px-dur-2) var(--px-ease-out);
+  }
+  .px-hsearch-open:focus-within {
+    box-shadow:
+      0 0 0 1px var(--px-lilac),
+      0 0 0 11px var(--px-ink);
+  }
+  .px-hsearch-open input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+  }
 }
 .px-header-end {
   margin-left: auto;
@@ -172,7 +216,7 @@ a.px-avatar:hover {
   }
 }
 @media (min-width: 768px) {
-  /* Do tablet em diante a busca fica no cabeçalho (no celular, o ícone leva à lista de eventos). */
+  /* Do tablet em diante a busca fica sempre à vista no cabeçalho (no celular, atrás da lupa). */
   .px-hsearch {
     display: flex;
     max-width: 280px;
@@ -480,48 +524,7 @@ body.px-dark .px-footer {
   }
 }
 
-/* Busca e seção */
-.px-searchbar {
-  position: relative;
-  margin: var(--px-s-2) 0 0;
-}
-.px-search {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--px-s-3);
-  align-items: end;
-  margin: var(--px-s-4) 0 0;
-}
-.px-search > .px-field:first-child {
-  grid-column: 1 / -1;
-}
-@media (min-width: 640px) {
-  .px-search {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
-  }
-  .px-search > .px-field:first-child {
-    grid-column: auto;
-  }
-}
-body.px-dark .px-search .px-field > label {
-  color: var(--px-on-ink-2);
-  font-size: var(--px-t-sm);
-}
-body.px-dark .px-search input {
-  background: var(--px-ink-2) !important;
-  border-color: var(--px-ink-line) !important;
-  color: var(--px-on-ink) !important;
-  color-scheme: dark;
-}
-body.px-dark .px-search input:focus-visible {
-  border-color: var(--px-lilac) !important;
-}
-body.px-dark .px-search input::placeholder {
-  color: var(--px-on-ink-3);
-}
-.px-search .px-btn {
-  min-height: 48px;
-}
+/* Seção */
 .px-section {
   margin-top: var(--px-s-9);
 }
@@ -549,6 +552,28 @@ body.px-dark .px-textlink {
 .px-page-title {
   font-size: var(--px-d-lg);
   margin-top: var(--px-s-8);
+}
+/* Aviso da busca do cabeçalho na lista: "Resultados para" e "Limpar busca" na mesma linha (quebra no celular estreito). A contagem
+   vem logo abaixo, mais perto. */
+.px-search-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--px-s-1) var(--px-s-4);
+  margin-top: var(--px-s-3);
+  color: var(--px-on-ink-2);
+  font-size: var(--px-t-md);
+}
+.px-search-note p {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.px-search-note b {
+  color: var(--px-on-ink);
+}
+.px-search-note + .px-count {
+  margin-top: var(--px-s-2);
 }
 .px-count {
   min-height: 1.5em;
