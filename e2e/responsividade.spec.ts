@@ -442,11 +442,7 @@ async function newContext(browser: Browser, width: number, who?: keyof typeof LO
   });
   if (!intro)
     await ctx.addInitScript(() => {
-      try {
-        sessionStorage.setItem('partyx_intro_seen', '1');
-      } catch {
-        // sem armazenamento: a abertura aparece, sem efeito na medida
-      }
+      (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
     });
   if (who) await apiLogin(ctx.request, BASE, ...LOGINS[who]!);
   return ctx;

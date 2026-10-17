@@ -146,7 +146,7 @@ e índices.
 
 | Onde | O que se move | Por quê |
 | --- | --- | --- |
-| Abrir o site | Fundo preto desde o primeiro quadro na vitrine (`public/intro/gate.js`); texto do destaque esmaece 600 ms só por CSS (o React continua do mesmo ponto); cartões em cascata | Nada pisca e nada espera o JavaScript |
+| Abrir o site | Fundo preto desde o primeiro quadro na vitrine (`public/intro/abertura.js`); texto do destaque esmaece 600 ms só por CSS (o React continua do mesmo ponto); cartões em cascata | Nada pisca e nada espera o JavaScript |
 | Evento | Capa: miniatura de 48 px (já desfocada no servidor) troca pela nítida em 700 ms e a capa assenta de 1,04 para 1 em 1200 ms; data e título, cronômetro e Quando, Onde e Classificação entram em cascata com sobreposição (1120 ms no total) | O momento de abertura da página, um só |
 | Cartão para evento | Pré-carrega no toque, foco ou mouse; View Transition: capa, título e data compartilhados (600 ms), cabeçalho do evento por cima da capa, o resto em troca cruzada de 450 ms; a página não repete a cascata. Sem suporte: esmaecer de 350 ms | O evento escolhido "vira" a página, já com o conteúdo |
 | Esqueletos | Mesmas classes e medidas do conteúdo; quando o conteúdo chega, o esqueleto esmaece por cima (420 ms) | Sem pulo nem piscada |

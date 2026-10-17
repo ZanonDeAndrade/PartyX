@@ -78,7 +78,7 @@ function detect() {
     return (
       box.getBoundingClientRect().width <= 2 ||
       (!!head && head.getBoundingClientRect().width <= 2) ||
-      !!box.closest('.px-sr, [aria-hidden="true"], .px-intro, svg')
+      !!box.closest('.px-sr, [aria-hidden="true"], .px-abertura, svg')
     );
   };
   const issues: string[] = [];
@@ -114,6 +114,10 @@ async function contextFor(browser: Browser, width: number, who?: keyof typeof LO
   const key = `${width}|${who ?? ''}`;
   if (contexts.has(key)) return contexts.get(key)!;
   const ctx = await browser.newContext({ viewport: { width, height: 800 }, reducedMotion: 'reduce' });
+  // Sem a abertura (aviso só de teste): ela toca em toda carga de página, inclusive com "reduzir movimento" (o logo parado).
+  await ctx.addInitScript(() => {
+    (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
+  });
   if (who) {
     const p = await ctx.newPage();
     await p.goto(R.base + '/entrar', { waitUntil: 'networkidle' });

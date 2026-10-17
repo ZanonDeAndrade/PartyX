@@ -105,7 +105,9 @@ async function session(browser: Browser, width: number, email: string) {
     reducedMotion: 'reduce',
     ...(width < 600 ? { hasTouch: true, isMobile: true, deviceScaleFactor: 2 } : {}),
   });
-  await ctx.addInitScript(() => sessionStorage.setItem('partyx_intro_seen', '1'));
+  await ctx.addInitScript(() => {
+    (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
+  });
   const page = await ctx.newPage();
   await page.goto(`${R.base}/entrar`, { waitUntil: 'networkidle' });
   await page.fill('#email', email);

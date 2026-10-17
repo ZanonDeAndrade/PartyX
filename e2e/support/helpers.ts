@@ -26,14 +26,13 @@ export function cpfFor(n: number): string {
 }
 export const formatCpf = (c: string) => `${c.slice(0, 3)}.${c.slice(3, 6)}.${c.slice(6, 9)}-${c.slice(9)}`;
 
-/** Sem a abertura em vídeo e com a seleção de ingresso limpa: cada contexto começa como um visitante novo. */
+/**
+ * Sem a abertura (aviso só de teste, lido por public/intro/abertura.js antes do carregamento) e com a seleção de ingresso limpa:
+ * cada contexto começa como um visitante novo.
+ */
 export async function prepareContext(ctx: BrowserContext) {
   await ctx.addInitScript(() => {
-    try {
-      sessionStorage.setItem('partyx_intro_seen', '1');
-    } catch {
-      // armazenamento bloqueado: a abertura só aparece, sem efeito no teste
-    }
+    (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
   });
 }
 

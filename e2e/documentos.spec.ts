@@ -18,7 +18,9 @@ for (const width of [360, 1280]) {
       reducedMotion: 'reduce',
       ...(width < 600 ? { deviceScaleFactor: 2 } : {}),
     });
-    await ctx.addInitScript(() => sessionStorage.setItem('partyx_intro_seen', '1'));
+    await ctx.addInitScript(() => {
+      (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
+    });
     const page = await ctx.newPage();
     await page.goto(`${R.base}/termos-de-uso`, { waitUntil: 'networkidle' });
     const docs = page.locator('.px-legal-page nav, .px-legal-page [aria-label*="ocumentos"]').first();
@@ -51,7 +53,9 @@ test('página antiga: 301 do servidor para /termos-de-uso e, dentro do site, os 
   expect((await request.get(`${R.base}/api/public/legal/meia-entrada`)).status()).toBe(404);
 
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
-  await ctx.addInitScript(() => sessionStorage.setItem('partyx_intro_seen', '1'));
+  await ctx.addInitScript(() => {
+    (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
+  });
   const page = await ctx.newPage();
   await page.goto(`${R.base}/meia-entrada`, { waitUntil: 'networkidle' });
   await expect(page).toHaveURL(`${R.base}/termos-de-uso`);

@@ -16,7 +16,6 @@ import {
 } from './authPages';
 import { SessionProvider, useSession } from './session';
 import { EventPage, EventsPage, HomePage, NotFoundPage } from './pages';
-import { IntroSplash } from './IntroSplash';
 import { Router, useRouter } from './router';
 
 // Cada área tem o próprio pacote (JavaScript e CSS), carregado só quando alguém entra nela. A vitrine e o acesso vão no
@@ -83,7 +82,7 @@ function Routes() {
   // Termos ou Privacidade atualizados: o comprador aceita as versões novas antes de continuar (no login ou no checkout).
   const where = area(loc.path);
   // Área no <html> (antes da pintura): o movimento muda por área (base.css). Painel só esmaece; portaria não anima entradas. A marca
-  // da vitrine (fundo preto desde o primeiro quadro, posta por public/intro/gate.js) acompanha a página: sai nas páginas claras.
+  // da vitrine (fundo preto desde o primeiro quadro, posta por public/intro/abertura.js) acompanha a página: sai nas páginas claras.
   const vitrine = loc.path === '/' || loc.path === '/eventos' || /^\/eventos\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(loc.path);
   useLayoutEffect(() => {
     document.documentElement.dataset.area = where ?? 'site';
@@ -148,8 +147,6 @@ export function SiteApp() {
           <ToastHost />
         </MaintenanceGate>
       </SessionProvider>
-      {/* Depois das rotas: a página já está montada por baixo quando a abertura aparece. */}
-      <IntroSplash />
     </Router>
   );
 }

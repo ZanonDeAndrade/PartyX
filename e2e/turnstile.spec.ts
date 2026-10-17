@@ -13,7 +13,9 @@ const CF = 'https://challenges.cloudflare.com/**';
 const FALHA = /Não foi possível confirmar que você não é um robô/;
 
 async function skipIntro(page: Page) {
-  await page.addInitScript(() => sessionStorage.setItem('partyx_intro_seen', '1'));
+  await page.addInitScript(() => {
+    (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
+  });
 }
 
 for (const [rota, botao] of [

@@ -32,6 +32,9 @@ real, sem WebKit nesta medição; ver "Não verificado").
 | Abertura em vídeo fora da vitrine (pedido) | não aparece |
 | View Transitions na navegação | 0 iniciadas |
 
+Desde 16/10/2026 a abertura segue regras novas (`../registros/abertura-sempre-2026-10-16.md`): com "reduzir movimento" ela aparece
+como o logo parado com um fade curto, e continua sem aparecer no pagamento. `infra/ui/checks.py` foi ajustado para isso.
+
 Além disso, os tokens de duração vão a zero (desde 15/10/2026 sem a `motion`: tudo é CSS) e o CSS global já desliga animações e
 transições nessa preferência.
 

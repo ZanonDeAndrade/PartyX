@@ -87,7 +87,7 @@ async function context(
     ...(o.video ? { recordVideo: { dir: VIDEO, size: { width, height: 800 } } } : null),
   });
   await ctx.addInitScript(() => {
-    sessionStorage.setItem('partyx_intro_seen', '1');
+    (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
     // Momento em que o conteúdo de verdade da página do evento entra no DOM (o esqueleto usa <p class="px-event-name">), e se o
     // esqueleto chegou a aparecer.
     const w = window as Window & { __headAt?: number; __skeleton?: boolean };

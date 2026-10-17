@@ -29,6 +29,10 @@ const IOS_UA = `@layer simulacao-ios {
   input::-webkit-date-and-time-value { margin: 0; text-align: center; inline-size: 100%; }
 }`;
 test.beforeEach(async ({ page, browserName }) => {
+  // Sem a abertura (aviso só de teste): ela toca em toda carga de página fora das rotas de tarefa (aqui, a minha conta do site).
+  await page.addInitScript(() => {
+    (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
+  });
   if (browserName !== 'webkit') return;
   await page.addInitScript(css => {
     const add = () => {

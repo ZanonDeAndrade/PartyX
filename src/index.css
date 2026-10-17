@@ -16,10 +16,10 @@ body {
   height: 100%;
 }
 
-/* Abertura em vídeo e vitrine (public/intro/gate.js marca antes da primeira pintura): o fundo já nasce preto, sem piscar claro
+/* Abertura e vitrine (public/intro/abertura.js marca antes da primeira pintura): o fundo já nasce preto, sem piscar claro
    antes do JavaScript carregar. A marca da vitrine sai quando o site vai para uma página clara (SiteApp.tsx). */
-html[data-px-intro],
-html[data-px-intro] body,
+html[data-px-abertura],
+html[data-px-abertura] body,
 html[data-px-vitrine],
 html[data-px-vitrine] body {
   background: #0b0b10;

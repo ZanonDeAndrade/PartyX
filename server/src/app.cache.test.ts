@@ -21,7 +21,6 @@ function appWithDist() {
   writeFileSync(path.join(dist, 'brand', 'partyx-logo-email.png'), Buffer.alloc(64, 3));
   mkdirSync(path.join(dist, 'intro'));
   writeFileSync(path.join(dist, 'intro', 'partyx-intro.mp4'), Buffer.alloc(4096, 1));
-  writeFileSync(path.join(dist, 'intro', 'partyx-intro.webm'), Buffer.alloc(4096, 2));
   const config = loadConfig({ APP_ENV: 'local', WEB_DIST_DIR: dist, PAYMENT_GATEWAY: 'none' });
   return createApp({
     config,
@@ -69,10 +68,7 @@ describe('política de cache', () => {
   });
 
   it('vídeo da abertura: tipo certo, aceita Range (Safari do iPhone) e o pedaço também tem prazo curto', async () => {
-    for (const [file, type] of [
-      ['/intro/partyx-intro.mp4', 'video/mp4'],
-      ['/intro/partyx-intro.webm', 'video/webm'],
-    ] as const) {
+    for (const [file, type] of [['/intro/partyx-intro.mp4', 'video/mp4']] as const) {
       const full = await app.request(file);
       expect(full.status, file).toBe(200);
       expect(full.headers.get('content-type'), file).toBe(type);

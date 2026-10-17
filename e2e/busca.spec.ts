@@ -18,7 +18,9 @@ async function open(browser: Browser, width: number): Promise<Page> {
     reducedMotion: 'reduce',
     ...(width < 600 ? { deviceScaleFactor: 2 } : {}),
   });
-  await ctx.addInitScript(() => sessionStorage.setItem('partyx_intro_seen', '1'));
+  await ctx.addInitScript(() => {
+    (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
+  });
   return ctx.newPage();
 }
 const noSideScroll = (page: Page) =>

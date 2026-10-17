@@ -59,8 +59,10 @@ async function open(
     viewport: { width: o.width ?? 360, height: 800 },
     reducedMotion: o.motion ?? 'reduce',
   });
-  // A abertura em vídeo só toca na primeira página da sessão: aqui, já vista.
-  await ctx.addInitScript(() => sessionStorage.setItem('partyx_intro_seen', '1'));
+  // Sem a abertura (aviso só de teste): ela toca em toda carga de página.
+  await ctx.addInitScript(() => {
+    (window as unknown as { __partyxSemAbertura?: boolean }).__partyxSemAbertura = true;
+  });
   if (o.offsetMs)
     // Relógio do aparelho errado: Date (e Date.now) adiantado ou atrasado, desde antes de a página carregar.
     await ctx.addInitScript(offset => {

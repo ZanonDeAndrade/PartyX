@@ -28,7 +28,7 @@ ROUTES = [
     ('admin', '/admin/relatorios/vendas'), ('admin', '/admin/relatorios/taxa-mensal'), ('admin', '/admin/equipe'),
     ('validador', '/portaria'), ('validador', f"/portaria/{EV['noite-roxa-warehouse']}"),
 ]
-NO_INTRO = "try { sessionStorage.setItem('partyx_intro_seen', '1') } catch (e) {}"
+NO_INTRO = 'window.__partyxSemAbertura = true'  # aviso só de teste, lido por public/intro/abertura.js
 problems: list[str] = []
 
 
@@ -64,17 +64,17 @@ with sync_playwright() as pw:
         print(f'{status:8} 360px {route[:70]:70} rolagem lateral={over}px animações={running}')
         ctx.close()
 
-    # Abertura em vídeo: aparece na vitrine sem a preferência; nunca com ela nem fora da vitrine.
-    for reduced, route, expect in [(False, '/', True), (True, '/', False), (False, f"/pedido/{S['orderPaid']}", False)]:
+    # Abertura: aparece em toda carga fora das rotas de tarefa; com "reduzir movimento", o logo parado. Nunca no pagamento.
+    for reduced, route, expect in [(False, '/', 'video'), (True, '/', 'parado'), (False, f"/pedido/{S['orderPaid']}", None)]:
         ctx = ctx_for(b, 'marina' if route.startswith('/pedido') else None, reduced, intro=True)
         page = ctx.new_page()
         page.goto(BASE + route)
         page.wait_for_timeout(700)
-        shown = page.locator('.px-intro').count() > 0
-        ok = shown == expect
+        shown = page.evaluate("document.documentElement.getAttribute('data-px-abertura')")
+        ok = shown == expect or (expect == 'video' and shown == 'css')  # sem vídeo no navegador do teste: o plano B em CSS
         if not ok:
             problems.append(f'abertura em {route} com reduzir movimento={reduced}: {shown}')
-        print(f"{'ok' if ok else 'PROBLEMA':8} abertura em {route} (reduzir movimento={reduced}): {'aparece' if shown else 'não aparece'}")
+        print(f"{'ok' if ok else 'PROBLEMA':8} abertura em {route} (reduzir movimento={reduced}): {shown or 'não aparece'}")
         ctx.close()
 
     # View Transitions: com "reduzir movimento", a navegação interna não inicia transição.

@@ -119,6 +119,15 @@ Pedido do responsável: cor escolhida no cadastro do evento, aplicada só na pá
 | Regra no banco e reversão | `server/src/db/schema.integration.test.ts` (reversão da 0014 apaga só a coluna), `events.integration.test.ts` (CHECK recusa minúsculas, nome de cor, vazio e `;`) |
 | Sem regressão | `e2e:textos` (78), `e2e:cronometro` (7), `test:db` completo |
 
+### Abertura em toda carga de página (16/10/2026)
+
+Pedido do responsável: a abertura (logo PartyX em vídeo) aparece sempre que a pessoa abre o site, na volta pelo Voltar e na volta para a aba depois de 1 minuto fora; sem marca de "já viu"; nunca nas rotas de tarefa (painel, portaria, compra, pagamento, ingressos, meus ingressos, autorização de menor, entrar, criar conta, primeiro acesso e senha); plano B em CSS quando o vídeo não toca; no máximo 4 s com o fade; toque em qualquer lugar pula. Só o MP4 quadrado (sai o WebM). Registro: `docs/registros/abertura-sempre-2026-10-16.md`. Ainda não publicado.
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-66 (identidade visual: abertura com o logotipo), RF-65 e CA-32 (celular e desempenho: a página carrega por baixo, sem rolagem lateral) | `e2e/abertura.spec.ts` (15 testes em computador, Chrome do Android e WebKit com viewport de iPhone, 45 casos: primeira carga com a camada no HTML e marcada antes do corpo, página montada por baixo, recarregar, nova aba e links de fora, Voltar com recarga e restaurado do cache, volta para a aba com 59 e 60 s, aba aberta em segundo plano, cada rota de tarefa sem abertura e sem baixar o vídeo, `play()` recusado, vídeo que não começa em 1 s, vídeo atrasado que termina inteiro, economia de dados, "reduzir movimento", toque e clique sem abrir o link de baixo, teclado); `server/src/app.cache.test.ts` (MP4 com tipo, `Range` e cache) |
+| Sem regressão | `test:db` (1.107 + 4), `e2e:painel-celular` (62), `e2e:textos` (78), `e2e:responsivo` (593), `e2e:transicoes` (12), roteiro 11.2 fictício (20) e os demais no registro |
+
 ### Campos de data e hora no celular (16/10/2026)
 
 Pedido do responsável: no iPhone, os campos de data e hora do evento passavam da borda direita e ficavam com o texto centrado. Correção em todo o site (aparência nativa fora, largura da caixa, texto à esquerda, altura e fonte dos campos de texto, ícone onde o aparelho não mostra) e revisão dos formulários do painel no celular, que achou mais dois defeitos: o "R$" do campo de valor partido em duas linhas e o botão da capa pequeno para o toque. Registro: `docs/registros/campos-de-data-no-celular-2026-10-16.md`. Publicado em 16/10/2026 (`partyx-00037-zap`, `publicacao-producao-2026-10-16.md`), junto com os textos do painel sem meia-entrada.
