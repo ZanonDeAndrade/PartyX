@@ -1,4 +1,4 @@
-/* ---------- abertura (public/intro/abertura.js) ----------
+/* ---------- abertura (src/intro/abertura.js) ----------
    A camada está no index.html e só aparece com <html data-px-abertura>, posto antes da primeira pintura. Os modos: "video" (MP4),
    "css" (logo em SVG animado: plano B quando o vídeo não toca e com economia de dados) e "parado" (com "reduzir movimento"). As cores
    são as da marca, com o fundo igual ao preto do vídeo (#0B0B10). Fica fora do pacote do site para valer em qualquer rota. */

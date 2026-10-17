@@ -19,8 +19,7 @@ function appWithDist() {
   writeFileSync(path.join(dist, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
   mkdirSync(path.join(dist, 'brand'));
   writeFileSync(path.join(dist, 'brand', 'partyx-logo-email.png'), Buffer.alloc(64, 3));
-  mkdirSync(path.join(dist, 'intro'));
-  writeFileSync(path.join(dist, 'intro', 'partyx-intro.mp4'), Buffer.alloc(4096, 1));
+  writeFileSync(path.join(dist, 'assets', 'partyx-intro-AbC123.mp4'), Buffer.alloc(4096, 1));
   const config = loadConfig({ APP_ENV: 'local', WEB_DIST_DIR: dist, PAYMENT_GATEWAY: 'none' });
   return createApp({
     config,
@@ -67,18 +66,17 @@ describe('política de cache', () => {
     expect(await cc('/favicon.svg')).toBe('public, max-age=3600');
   });
 
-  it('vídeo da abertura: tipo certo, aceita Range (Safari do iPhone) e o pedaço também tem prazo curto', async () => {
-    for (const [file, type] of [['/intro/partyx-intro.mp4', 'video/mp4']] as const) {
-      const full = await app.request(file);
-      expect(full.status, file).toBe(200);
-      expect(full.headers.get('content-type'), file).toBe(type);
-      expect(full.headers.get('cache-control'), file).toBe('public, max-age=3600');
-      const part = await app.request(file, { headers: { Range: 'bytes=0-1' } });
-      expect(part.status, file).toBe(206);
-      expect(part.headers.get('content-range'), file).toBe('bytes 0-1/4096');
-      expect(part.headers.get('accept-ranges'), file).toBe('bytes');
-      expect(part.headers.get('cache-control'), file).toBe('public, max-age=3600');
-    }
+  it('vídeo da abertura (nome com hash em /assets): tipo certo, aceita Range (Safari do iPhone) e o pedaço também é imutável', async () => {
+    const file = '/assets/partyx-intro-AbC123.mp4';
+    const full = await app.request(file);
+    expect(full.status).toBe(200);
+    expect(full.headers.get('content-type')).toBe('video/mp4');
+    expect(full.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    const part = await app.request(file, { headers: { Range: 'bytes=0-1' } });
+    expect(part.status).toBe(206);
+    expect(part.headers.get('content-range')).toBe('bytes 0-1/4096');
+    expect(part.headers.get('accept-ranges')).toBe('bytes');
+    expect(part.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
   });
 
   it('só a logo da marca pode ser carregada de outra origem (e-mails); o resto continua same-origin', async () => {
@@ -86,7 +84,7 @@ describe('política de cache', () => {
     expect(logo.status).toBe(200);
     expect(logo.headers.get('content-type')).toBe('image/png');
     expect(logo.headers.get('cross-origin-resource-policy')).toBe('cross-origin');
-    for (const p of ['/', '/favicon.svg', '/intro/partyx-intro.mp4', '/assets/index-AbC123.js', '/api/health'])
+    for (const p of ['/', '/favicon.svg', '/assets/partyx-intro-AbC123.mp4', '/assets/index-AbC123.js', '/api/health'])
       expect((await app.request(p)).headers.get('cross-origin-resource-policy'), p).toBe('same-origin');
   });
 

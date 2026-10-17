@@ -27,7 +27,7 @@ export function cpfFor(n: number): string {
 export const formatCpf = (c: string) => `${c.slice(0, 3)}.${c.slice(3, 6)}.${c.slice(6, 9)}-${c.slice(9)}`;
 
 /**
- * Sem a abertura (aviso só de teste, lido por public/intro/abertura.js antes do carregamento) e com a seleção de ingresso limpa:
+ * Sem a abertura (aviso só de teste, lido por src/intro/abertura.js antes do carregamento) e com a seleção de ingresso limpa:
  * cada contexto começa como um visitante novo.
  */
 export async function prepareContext(ctx: BrowserContext) {

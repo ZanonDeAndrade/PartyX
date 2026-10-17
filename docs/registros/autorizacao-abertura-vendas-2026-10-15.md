@@ -16,3 +16,5 @@ Registro pedido pelo responsável (Arthur), nesta data, ao pedir a abertura das 
 Nas conferências de 16/10/2026, 00:10 UTC (21:10 de 15/10 em São Paulo), a abertura **ficou parada**: o segredo `smtp-url` não tem nenhuma versão. Sem SMTP, nenhum e-mail sai, nem a confirmação da compra. A regra do pedido é "sem isso, não abrimos". O resultado completo das conferências está no relatório da sessão e entra no registro da publicação, quando houver.
 
 O checklist de abertura (`checklist-abertura-de-vendas.md`) continua valendo, item por item.
+
+**Atualização de 17/10/2026:** o `smtp-url` ganhou a versão 1 (chave só de envio, restrita a `partyx.com.br`), e o e-mail de teste pela candidata `partyx-00039-faz` chegou na caixa de entrada com SPF, DKIM e DMARC em PASS (checklist 2.4 a 2.6). O SMTP passa a valer para o público na virada de uma revisão que monte o segredo. Os 15 e-mails de cadastro que falharam desde 14/10 ficam como estão, sem reenvio (decisão do responsável).

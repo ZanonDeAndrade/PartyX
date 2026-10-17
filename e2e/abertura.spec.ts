@@ -4,10 +4,11 @@ import { expect, test, type Page } from '@playwright/test';
 import { TEXTOS_DIR } from './support/textos-longos-setup';
 
 /**
- * Abertura (public/intro/abertura.js, 16/10/2026): toca em toda carga de página fora das rotas de tarefa, na volta pelo Voltar e na
+ * Abertura (src/intro/abertura.js, 16/10/2026; prazos desde a camada e nomes com hash em 17/10/2026): toca em toda carga de página fora das rotas de tarefa, na volta pelo Voltar e na
  * volta para a aba depois de 1 minuto fora; cai no logo animado em CSS quando o vídeo não toca; some em até 4 s com o fade; um toque
  * pula sem passar para a página. O registro (`__ab`) é montado antes de qualquer script da página: cada mudança de
- * `<html data-px-abertura>` com a hora (performance.now, a mesma origem do limite) e quando o vídeo começou e terminou.
+ * `<html data-px-abertura>` com a hora (performance.now), o primeiro quadro desenhado (de onde contam o 1 s e os 4 s) e quando o
+ * vídeo começou e terminou.
  *
  * O bfcache de verdade não acontece no Chromium nem no WebKit do Playwright (o Voltar recarrega a página); a volta restaurada do cache
  * é conferida com a mesma sequência de eventos do navegador (pagehide, aba escondida e visível, pageshow com persisted).
@@ -21,8 +22,8 @@ const R = JSON.parse(readFileSync(path.join(TEXTOS_DIR, 'state.json'), 'utf8')) 
 const IMG = path.join(TEXTOS_DIR, '..', 'abertura', 'img');
 const LIMITE = 4000;
 const FOLGA = 250; // atraso dos timers do navegador
-const VIDEO = '**/intro/partyx-intro.mp4';
-// Igual à regra de public/intro/abertura.js: confere que a volta à aba aconteceu numa rota de tarefa (sem redirecionamento do site).
+const VIDEO = '**/assets/partyx-intro-*.mp4';
+// Igual à regra de src/intro/abertura.js: confere que a volta à aba aconteceu numa rota de tarefa (sem redirecionamento do site).
 const TAREFA =
   /^\/(?:(?:admin|portaria|checkout|pedido|ingressos|autorizacao-menor)(?:\/|$)|(?:meus-ingressos|entrar|criar-conta|primeiro-acesso|recuperar-senha|redefinir-senha)\/?$)/;
 let slug = '';
@@ -35,9 +36,11 @@ const paginaDoEvento = () => (test.info().project.name === 'iphone-webkit' ? '/e
 
 interface Registro {
   modos: { t: number; v: string | null }[];
+  pintura: number | null;
   playing: number | null;
   ended: number | null;
   marcaComBody: boolean | null;
+  marcaParede: number | null; // Date.now() da primeira marca (o performance.now do WebKit começa na resposta, não no clique)
   pageshow: boolean[];
 }
 type W = Window & { __ab: Registro };
@@ -53,12 +56,16 @@ test.beforeAll(async ({ request }) => {
 test.beforeEach(async ({ context }) => {
   await context.addInitScript(() => {
     const w = window as unknown as W;
-    w.__ab = { modos: [], playing: null, ended: null, marcaComBody: null, pageshow: [] };
+    w.__ab = { modos: [], pintura: null, playing: null, ended: null, marcaComBody: null, marcaParede: null, pageshow: [] };
+    requestAnimationFrame(() => (w.__ab.pintura = performance.now()));
     new MutationObserver(() => {
       const v = document.documentElement.getAttribute('data-px-abertura');
       const last = w.__ab.modos[w.__ab.modos.length - 1];
       if (last ? last.v !== v : v !== null) w.__ab.modos.push({ t: performance.now(), v });
-      if (v && w.__ab.marcaComBody === null) w.__ab.marcaComBody = !!document.body;
+      if (v && w.__ab.marcaComBody === null) {
+        w.__ab.marcaComBody = !!document.body;
+        w.__ab.marcaParede = Date.now();
+      }
     }).observe(document, { attributes: true, subtree: true, attributeFilter: ['data-px-abertura'] });
     document.addEventListener('playing', () => (w.__ab.playing ??= performance.now()), true);
     document.addEventListener('ended', () => (w.__ab.ended = performance.now()), true);
@@ -72,11 +79,12 @@ const agora = (page: Page) => page.evaluate(() => performance.now());
 const shot = (page: Page, name: string) =>
   page.screenshot({ path: path.join(IMG, `${test.info().project.name}-${name}.png`), animations: 'allow' });
 
-/** Espera a camada sair e devolve o registro, com a hora em que ela saiu. */
+/** Espera a camada sair e devolve o registro, com a hora em que ela saiu e quanto ficou na tela desde o primeiro quadro. */
 async function fim(page: Page) {
   await page.waitForFunction(() => !document.documentElement.hasAttribute('data-px-abertura'), null, { timeout: 8000 });
   const r = await reg(page);
-  return { ...r, saiu: r.modos[r.modos.length - 1]!.t };
+  const saiu = r.modos[r.modos.length - 1]!.t;
+  return { ...r, saiu, naTela: saiu - (r.pintura ?? 0) };
 }
 /** Pula a abertura (Esc) e espera a camada sair. */
 async function pular(page: Page) {
@@ -102,7 +110,7 @@ async function foraDaAba(page: Page, ms: number) {
 function pedidosDoVideo(page: Page) {
   const urls: string[] = [];
   page.on('request', r => {
-    if (r.url().includes('/intro/partyx-intro.mp4')) urls.push(r.url());
+    if (/\/assets\/partyx-intro-\w+\.mp4/.test(r.url())) urls.push(r.url());
   });
   return urls;
 }
@@ -111,9 +119,10 @@ test('primeira carga: a camada vem no HTML, é marcada antes do corpo e o vídeo
   const raw = await (await request.get(`${R.base}/`)).text();
   expect(raw).toContain('id="px-abertura"');
   expect(raw).toMatch(/<video[^>]*class="px-abertura-video"(?![^>]*\ssrc=)[^>]*>/);
-  expect(raw.indexOf('<script src="/intro/abertura.js">')).toBeGreaterThan(0);
-  expect(raw.indexOf('<script src="/intro/abertura.js">')).toBeLessThan(raw.indexOf('<link rel="stylesheet"'));
-  expect(raw.indexOf('<script src="/intro/abertura.js">')).toBeLessThan(raw.indexOf('</head>'));
+  const tag = raw.search(/<script src="\/assets\/abertura-\w+\.js">/);
+  expect(tag, 'script com hash no nome').toBeGreaterThan(0);
+  expect(tag).toBeLessThan(raw.indexOf('<link rel="stylesheet"'));
+  expect(tag).toBeLessThan(raw.indexOf('</head>'));
 
   const videos = pedidosDoVideo(page);
   await page.goto(`${R.base}/`);
@@ -123,13 +132,43 @@ test('primeira carga: a camada vem no HTML, é marcada antes do corpo e o vídeo
   const r = await fim(page);
   expect(r.marcaComBody, 'a marca vem antes do <body>: nada da página aparece antes da camada').toBe(false);
   expect(r.modos.map(m => m.v)).toEqual(['video', null]);
-  expect(r.playing!).toBeLessThan(1000);
+  expect(r.playing! - r.pintura!).toBeLessThan(1000);
   expect(r.ended, 'o vídeo chegou ao fim').not.toBeNull();
-  expect(r.saiu).toBeLessThanOrEqual(LIMITE + FOLGA);
+  expect(r.naTela).toBeLessThanOrEqual(LIMITE + FOLGA);
   expect(videos.length).toBeGreaterThan(0);
   await expect(page.locator('#px-abertura')).toBeHidden();
   expect(await page.evaluate(() => document.getElementById('root')!.inert)).toBe(false);
   expect(await page.locator('.px-abertura-video').getAttribute('src'), 'o vídeo solta o arquivo ao sair').toBeNull();
+});
+
+test('script e vídeo da abertura com hash no nome e cache de 1 ano, imutável (o vídeo também em pedaços)', async ({ request }) => {
+  const raw = await (await request.get(`${R.base}/`)).text();
+  const script = /<script src="(\/assets\/abertura-\w+\.js)">/.exec(raw)![1]!;
+  const js = await request.get(R.base + script);
+  expect(js.status()).toBe(200);
+  expect(js.headers()['cache-control']).toBe('public, max-age=31536000, immutable');
+  const body = await js.text();
+  expect(body, 'sem o endereço de desenvolvimento').not.toContain('/src/intro/');
+  const video = /'(\/assets\/partyx-intro-\w+\.mp4)'/.exec(body)![1]!;
+  const parte = await request.get(R.base + video, { headers: { Range: 'bytes=0-99' } });
+  expect(parte.status()).toBe(206);
+  expect(parte.headers()['content-type']).toBe('video/mp4');
+  expect(parte.headers()['cache-control']).toBe('public, max-age=31536000, immutable');
+  expect((await request.get(`${R.base}/intro/partyx-intro.mp4`)).headers()['content-type'], 'o endereço antigo saiu').not.toBe('video/mp4');
+});
+
+test('HTML que chega depois de 3 s: a abertura aparece inteira, com o prazo contado de quando ela aparece', async ({ page }) => {
+  await page.route(`${R.base}/`, async route => {
+    await new Promise(res => setTimeout(res, 3000));
+    await route.continue();
+  });
+  const antes = Date.now();
+  await page.goto(`${R.base}/`);
+  const r = await fim(page);
+  expect(r.marcaParede! - antes, 'a camada só aparece depois de 3 s').toBeGreaterThan(3000);
+  expect(r.modos.map(m => m.v)).toEqual(['video', null]);
+  expect(r.ended, 'o vídeo chegou ao fim').not.toBeNull();
+  expect(r.naTela).toBeLessThanOrEqual(LIMITE + FOLGA);
 });
 
 test('a página carrega normalmente por baixo enquanto a abertura está na tela', async ({ page }) => {
@@ -327,7 +366,7 @@ test('play() recusado: o logo em SVG com a animação em CSS, sem pular a abertu
   await page.waitForTimeout(1000);
   await shot(page, 'css-fim');
   const r = await fim(page);
-  expect(r.saiu).toBeLessThanOrEqual(LIMITE + FOLGA);
+  expect(r.naTela).toBeLessThanOrEqual(LIMITE + FOLGA);
   expect(r.saiu - r.modos[1]!.t, 'animação de cerca de 1,5 s, o logo parado um instante e o fade').toBeGreaterThan(1500);
 });
 
@@ -340,10 +379,10 @@ test('vídeo que não começa em 1 s: cai na animação em CSS', async ({ page }
   await expect.poll(() => marca(page), { timeout: 3000 }).toBe('css');
   const r = await fim(page);
   expect(r.modos.map(m => m.v)).toEqual(['video', 'css', null]);
-  expect(r.modos[1]!.t).toBeGreaterThanOrEqual(950);
-  expect(r.modos[1]!.t).toBeLessThan(1000 + FOLGA);
+  expect(r.modos[1]!.t - r.pintura!, 'troca 1 s depois de a camada aparecer').toBeGreaterThanOrEqual(950);
+  expect(r.modos[1]!.t - r.pintura!).toBeLessThan(1000 + FOLGA);
   expect(r.playing).toBeNull();
-  expect(r.saiu).toBeLessThanOrEqual(LIMITE + FOLGA);
+  expect(r.naTela).toBeLessThanOrEqual(LIMITE + FOLGA);
 });
 
 test('vídeo com meio segundo de atraso: ainda termina inteiro dentro dos 4 s', async ({ page }) => {
@@ -356,7 +395,7 @@ test('vídeo com meio segundo de atraso: ainda termina inteiro dentro dos 4 s', 
   expect(r.modos.map(m => m.v)).toEqual(['video', null]);
   expect(r.playing!).toBeGreaterThan(500);
   expect(r.ended, 'o vídeo chegou ao fim').not.toBeNull();
-  expect(r.saiu).toBeLessThanOrEqual(LIMITE + FOLGA);
+  expect(r.naTela).toBeLessThanOrEqual(LIMITE + FOLGA);
 });
 
 test('economia de dados: direto para a animação em CSS, sem baixar o vídeo', async ({ page, context }) => {
@@ -367,7 +406,7 @@ test('economia de dados: direto para a animação em CSS, sem baixar o vídeo', 
   await page.goto(`${R.base}/`);
   const r = await fim(page);
   expect(r.modos.map(m => m.v)).toEqual(['css', null]);
-  expect(r.saiu).toBeLessThanOrEqual(LIMITE + FOLGA);
+  expect(r.naTela).toBeLessThanOrEqual(LIMITE + FOLGA);
   expect(videos).toEqual([]);
 });
 
@@ -391,7 +430,7 @@ test('reduzir movimento: o logo parado com um fade curto, sem baixar o vídeo', 
   await shot(page, 'parado');
   const r = await fim(page);
   expect(r.modos.map(m => m.v)).toEqual(['parado', null]);
-  expect(r.saiu).toBeLessThan(2500);
+  expect(r.naTela, 'cerca de 1,2 s parado e o fade').toBeLessThan(1200 + 300 + FOLGA);
   expect(videos).toEqual([]);
 });
 

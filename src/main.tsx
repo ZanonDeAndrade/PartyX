@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import './index.css';
-// Camada da abertura (index.html e public/intro/abertura.js): no CSS de entrada, para valer desde o primeiro quadro em qualquer rota.
+// Camada da abertura (index.html e src/intro/abertura.js): no CSS de entrada, para valer desde o primeiro quadro em qualquer rota.
 import './site/styles/abertura.css';
 import { SiteApp } from './site/SiteApp';
 

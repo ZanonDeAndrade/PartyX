@@ -49,7 +49,7 @@ Não era o formato: o site servia MP4 H.264 (1080 x 1080, 80 KB, faststart) e We
 | Arquivo | Mudança |
 |---|---|
 | `index.html` | Camada `#px-abertura` no HTML inicial: vídeo sem endereço (`muted`, `playsinline`, `autoplay`, `preload="auto"`, poster preto de 1 pixel em `data:`), logo em SVG (X e PARTY separados, para a animação) e "Pular". Script `/intro/abertura.js` no `<head>` |
-| `public/intro/abertura.js` (novo) | Decide e controla a abertura, sem React. Nome novo porque o estático fica 1 hora em cache nos aparelhos. Qualquer erro inesperado tira a camada |
+| `public/intro/abertura.js` (novo; em 17/10/2026 passou para `src/intro/`, ver o ajuste abaixo) | Decide e controla a abertura, sem React. Nome novo porque o estático ficava 1 hora em cache nos aparelhos. Qualquer erro inesperado tira a camada |
 | `src/site/styles/abertura.css` (novo) | Estilos da camada e das animações, no CSS de entrada (`src/main.tsx`) |
 | `src/index.css` | Fundo preto desde o primeiro quadro com a marca nova (`data-px-abertura`) |
 | Removidos | `public/intro/gate.js`, `public/intro/partyx-intro.webm`, `public/intro/partyx-intro-poster.jpg`, `src/site/IntroSplash.tsx` e o CSS `.px-intro*` de `public.css` |
@@ -108,3 +108,23 @@ O logo em SVG foi vetorizado do original (`assets-originais/IMG_3404.PNG`) com p
 | Roteiro de compra, gateway fictício | 20 (1 pulado, como antes) |
 
 Capturas a 360, 390 e 1280 px (vídeo, plano B em CSS no meio e no fim, logo parado): página privada https://claude.ai/artifact/QcHK25s8tsa7YtztGkKzfL.
+
+## Ajuste de 17/10/2026: prazos desde a camada e arquivos com hash
+
+**O que a candidata mostrou.** A `release-2026-10-16c` foi montada como candidata sem tráfego (`partyx-00039-faz`, 17/10/2026 00:30 UTC, com o SMTP). Conferida pela internet, a abertura apareceu, mas o vídeo não tocou em nenhum dos três aparelhos: o 1 s para o vídeo começar contava desde o clique, e o HTML chega de 0,4 a 1,2 s depois dele (pelo domínio; o vídeo leva mais 1,1 a 1,2 s para baixar). Nos testes locais o servidor responde em milissegundos, por isso não apareceu antes. Medido no navegador local, sem mexer na candidata, trocando só o script: contando do clique, o vídeo tocou em 2 de 8 primeiras visitas (numa delas a abertura nem apareceu, porque o HTML chegou depois de 2,5 s); contando de quando a camada aparece, em 6 de 8, sempre com no máximo 4 s na tela. Um vídeo a 30 fps ficaria com 61 a 71 KB (contra 80 KB): não compensa.
+
+**Decisão do responsável:** contar o 1 s e os 4 s desde que a camada aparece; vídeo e script com nome com hash, cache longo e imutável, guardados na Vercel, para quem volta ao site já ter o vídeo no aparelho. A `00039-faz` não será virada.
+
+**O que mudou:**
+
+| Arquivo | Mudança |
+|---|---|
+| `src/intro/abertura.js` (antes `public/intro/`) | Os prazos (1 s para o vídeo começar, 4 s na tela, a animação em CSS e o logo parado) contam do primeiro quadro desenhado com a camada (`requestAnimationFrame`; o CSS do site segura a pintura até chegar). O vídeo continua começando a baixar assim que o HTML chega. Saiu a regra que pulava a abertura quando o HTML chegava depois de 2,5 s. Se a página nunca pintar, a camada sai em 15 s |
+| `vite.config.ts` (plugin `px-intro-assets`) | No build, copia o script (sem as linhas de comentário, 7,4 KB; 2,5 KB comprimido) e o vídeo para `/assets` com hash do conteúdo no nome, troca o endereço do vídeo no script e aponta o `index.html` para ele. No desenvolvimento, o Vite serve os dois direto de `src/intro` |
+| `src/intro/partyx-intro.mp4` (antes `public/intro/`) | O mesmo arquivo, sem mudança |
+| Cache | `/assets/*`: 1 ano, imutável (o servidor já fazia, também nos pedaços do vídeo), e a Vercel guarda esses arquivos (`infra/vercel/vercel.json`, sem mudança; conferido pelo domínio: os `/assets` atuais dão `x-vercel-cache: HIT`, e o vídeo antigo em `/intro` dava `MISS` com 1 hora de cache) |
+| Testes | `e2e/abertura.spec.ts` mede os prazos a partir do primeiro quadro e ganha dois testes (HTML que chega depois de 3 s: a abertura aparece inteira; script e vídeo com hash, cache imutável e 206 no vídeo, endereço antigo fora); `server/src/app.cache.test.ts` confere o vídeo em `/assets` com cache imutável e Range |
+
+**E-mails de cadastro parados desde 14/10 (15 em `falhou`):** ficam como estão, por decisão do responsável. Conferido no código que nenhuma rotina os envia depois da virada: o envio (na hora, pelas novas tentativas do Cloud Tasks e pela varredura diária) só pega e-mails `pendente`; uma tarefa antiga que chegue para um e-mail em `falhou` responde "já resolvido"; reabrir só existe em `POST /api/admin/emails/:id/retry`, à mão, e nenhuma tela do painel chama essa rota; o e-mail de cadastro tem chave única por pessoa e nunca é gerado de novo. A fila do Cloud Tasks (`partyx-conciliacao`) estava vazia em 17/10/2026.
+
+**Bateria (local, 17/10/2026):** lint 0 erros (27 avisos antigos), tipos e build ok, `test:db` 1.107 + 4, abertura 51 (17 testes x 3 aparelhos), painel no celular 62, busca 4, textos longos 78, documentos 3, transições 12, cronômetro 8, cor 8, transferência 6, Turnstile 6, responsivo 593, roteiro de compra com gateway fictício 20 (1 pulado, como antes).

@@ -7,8 +7,9 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0B0B10" />
-    <!-- Abertura: decide antes da primeira pintura se ela toca (ver o próprio arquivo). Precisa ficar antes do <body>. -->
-    <script src="/intro/abertura.js"></script>
+    <!-- Abertura: decide antes da primeira pintura se ela toca (ver o próprio arquivo). Precisa ficar antes do <body>. No build, o
+         script e o vídeo saem em /assets com hash no nome (plugin px-intro-assets do vite.config.ts). -->
+    <script src="/src/intro/abertura.js"></script>
     <!--og:start-->
     <title>PartyX · Ingressos</title>
     <meta name="description" content="Compre ingressos para os próximos eventos da PartyX, com Pix ou cartão." />
@@ -21,7 +22,7 @@
     <!--og:end-->
   </head>
   <body>
-    <!-- Camada da abertura, já no HTML: aparece só quando intro/abertura.js marca <html data-px-abertura>. O vídeo nasce sem endereço
+    <!-- Camada da abertura, já no HTML: aparece só quando src/intro/abertura.js marca <html data-px-abertura>. O vídeo nasce sem endereço
          (nada é baixado nas rotas sem abertura nem com economia de dados); o logo em SVG é o plano B, animado só por CSS. -->
     <div id="px-abertura" class="px-abertura" role="dialog" aria-modal="true" aria-label="Abertura PartyX">
       <video

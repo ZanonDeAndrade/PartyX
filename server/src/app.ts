@@ -170,8 +170,9 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
   // Front-end (build do Vite). Em desenvolvimento o Vite serve as páginas e faz proxy de /api para cá.
   const dist = path.resolve(config.WEB_DIST_DIR);
   // Cache dos estáticos. Arquivos com hash no nome (Vite, pasta /assets) nunca mudam: 1 ano e imutável. O `index.html` (e o
-  // HTML das rotas do app) é sempre revalidado, para um deploy novo valer na hora. O resto (ícones, logo, vídeo da abertura)
-  // tem prazo curto. O vídeo chega em pedaços (206, Range: o Safari do iPhone só toca assim) e recebe a mesma regra.
+  // HTML das rotas do app) é sempre revalidado, para um deploy novo valer na hora. O resto (ícones, logo) tem prazo curto. O vídeo
+  // e o script da abertura também têm hash no nome (vite.config.ts); o vídeo chega em pedaços (206, Range: o Safari do iPhone só
+  // toca assim) e os pedaços recebem a mesma regra.
   // É um middleware que roda depois da resposta pronta: o `onFound` do serveStatic roda tarde demais para mudar cabeçalho.
   app.use('*', async (c, next) => {
     await next();

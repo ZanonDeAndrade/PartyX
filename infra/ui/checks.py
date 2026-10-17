@@ -28,7 +28,7 @@ ROUTES = [
     ('admin', '/admin/relatorios/vendas'), ('admin', '/admin/relatorios/taxa-mensal'), ('admin', '/admin/equipe'),
     ('validador', '/portaria'), ('validador', f"/portaria/{EV['noite-roxa-warehouse']}"),
 ]
-NO_INTRO = 'window.__partyxSemAbertura = true'  # aviso só de teste, lido por public/intro/abertura.js
+NO_INTRO = 'window.__partyxSemAbertura = true'  # aviso só de teste, lido por src/intro/abertura.js
 problems: list[str] = []
 
 

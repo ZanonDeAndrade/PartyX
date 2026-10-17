@@ -16,7 +16,7 @@ body {
   height: 100%;
 }
 
-/* Abertura e vitrine (public/intro/abertura.js marca antes da primeira pintura): o fundo já nasce preto, sem piscar claro
+/* Abertura e vitrine (src/intro/abertura.js marca antes da primeira pintura): o fundo já nasce preto, sem piscar claro
    antes do JavaScript carregar. A marca da vitrine sai quando o site vai para uma página clara (SiteApp.tsx). */
 html[data-px-abertura],
 html[data-px-abertura] body,
