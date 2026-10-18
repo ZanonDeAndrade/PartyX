@@ -108,15 +108,21 @@ Primeiro administrador: `npm run admin:bootstrap` (ver `docs/autenticacao.md`).
 - **Novo deploy:** `./infra/producao/deploy.sh deploy` (exige as travas `BACKUP_DONE` e `NO_FICTITIOUS_DATA`). O `index.html` é sempre revalidado, então a versão nova vale na hora.
 - **Migrações:** rodam no deploy, num Cloud Run Job com a conexão **direta**, antes de a nova revisão receber tráfego, **nunca no boot**. Só se desfazem restaurando backup ou por SQL revisado (`drizzle/rollback/`; `npm run db:rollback` é bloqueado em produção de propósito).
 - **Rollback do código:** `./infra/producao/deploy.sh rollback` (revisão anterior) ou `REVISAO=<nome> ./infra/producao/deploy.sh rollback`. São mantidas as 3 últimas imagens. Antes, leia a migração da revisão: não verifiquei se o código antigo roda com o esquema novo.
-- `./infra/producao/deploy.sh status` mostra revisão, min/max, fila, varredura e avisa se `min-instances` ficou ligado.
+- `./infra/producao/deploy.sh status` mostra revisão, instância mínima (do serviço e da revisão), máximo, fila e rotinas, e avisa se alguma instância mínima ficou ligada.
 
 ## 7. Dias de evento
 
 ```bash
-./infra/producao/deploy.sh evento-on     # min-instances=1, antes do evento (sem cold start)
-./infra/producao/deploy.sh evento-off    # min-instances=0, depois
+CLOUDSDK_CORE_PROJECT=partyx-producao PROJECT=partyx-producao ./infra/producao/deploy.sh evento-on    # --min=1 no serviço
+CLOUDSDK_CORE_PROJECT=partyx-producao PROJECT=partyx-producao ./infra/producao/deploy.sh evento-off   # --min=default
 ```
-Instância parada cobra CPU e memória em tarifa reduzida: cerca de **US$ 0,014 por hora** nos preços do Tier 1 que consegui confirmar; São Paulo é Tier 2 (um pouco mais). Esquecer ligado o mês inteiro custaria cerca de US$ 10. O `status` avisa.
+A instância mínima é do **serviço** (`gcloud run services update partyx --min=1`, anotação `run.googleapis.com/minScale`): vale para a revisão que recebe o tráfego, **sem criar revisão nova**, e continua valendo nas viradas seguintes. Até 18/10/2026 o script usava `--min-instances`, que é da revisão: criava uma revisão nova, e ela ficava com 0% porque o tráfego fica preso à revisão virada (o site do público continuava dormindo). Teste: `server/src/ops/deployEvento.test.ts` (com um `gcloud` falso).
+
+**Quando ligar** (checklists em `docs/registros/checklist-abertura-de-vendas.md`): no dia da abertura das vendas, desligando 3 dias depois; no dia do evento, desligando no dia seguinte.
+
+**Custo** (catálogo do Cloud Billing em 18/10/2026, São Paulo, Tier 2, cobrança por requisição): a instância parada paga R$ 0,000020758 por vCPU-segundo e o mesmo por GiB-segundo. Com 1 vCPU e 512 MiB: cerca de **R$ 0,11 por hora, R$ 2,69 por dia**; esquecida ligada o mês inteiro, cerca de **R$ 81**, acima do orçamento de R$ 30. Quando ela atende pedidos, paga a tarifa normal, como já acontece sem a instância mínima. O `status` avisa se ficou ligada. Parte da demora do primeiro acesso vem do Neon acordando (seção 13), que a instância mínima sozinha pode não evitar.
+
+**Nos outros dias o servidor já fica acordado** (conferido em 18/10/2026): a verificação de saúde `partyx-saude-dominio` chama `/api/health/ready` pelo domínio a cada 5 minutos, de 3 regiões (um pedido a cada 2 a 2,5 minutos), e desde 16/10 a revisão no ar só reiniciou uma vez fora das publicações. Como essa rota consulta o banco, ela também mantém o Neon acordado (o Neon dorme depois de 5 minutos sem uso). Um job do Cloud Scheduler a cada 5 minutos seria redundante: não está criado.
 
 ## 8. Estimativa de custo mensal
 
@@ -125,7 +131,7 @@ Instância parada cobra CPU e memória em tarifa reduzida: cerca de **US$ 0,014 
 | Item | Franquia / preço (fonte oficial) | No seu volume |
 |---|---|---|
 | Cloud Run | 2 mi requisições, 180 mil vCPU-s e 360 mil GiB-s grátis por mês; desconto calculado no Tier 1 e agregado **por conta de faturamento** | cerca de 55 mil requisições e 11 mil vCPU-s: **US$ 0** |
-| `evento-on` | idle US$ 0,0000025 por vCPU-s e por GiB-s (Tier 1) | 8 h/mês: cerca de **US$ 0,11** |
+| `evento-on` | parada: R$ 0,000020758 por vCPU-s e por GiB-s (Tier 2, catálogo de 18/10/2026) | 4 dias por abertura de vendas e 2 por evento: cerca de **R$ 16** |
 | Cloud Tasks | 1 milhão de operações grátis; depois US$ 0,40 por milhão | alguns milhares: **US$ 0** |
 | Cloud Scheduler | 3 jobs grátis **por conta de faturamento** (compartilhado com seus outros projetos); depois US$ 0,10/job | 2 jobs (backup 03:00 e rotina diária 04:00): **US$ 0** se a conta não estiver cheia |
 | Secret Manager | 6 versões ativas grátis; extras cerca de US$ 0,06/mês cada; 10 mil acessos grátis | 6 a 8 versões: **US$ 0 a 0,12** |

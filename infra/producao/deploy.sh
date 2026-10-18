@@ -15,8 +15,8 @@
 #   deploy       atalho: conferir + build + migração + candidata (sem tráfego); a virada é sempre o comando `virar`
 #   hosting      publica o firebase.json (rewrites para o Cloud Run) no Firebase Hosting
 #   banners-iam  papel só para listar e apagar imagens no bucket dos banners (exclusão de evento sem uso, 15/10/2026). Idempotente
-#   evento-on    min-instances=1: instância sempre quente (use ANTES do evento)
-#   evento-off   min-instances=0: volta a escalar a zero (use DEPOIS do evento)
+#   evento-on    1 instância mínima NO SERVIÇO (--min=1), sem revisão nova: servidor sempre acordado (abertura das vendas e evento)
+#   evento-off   tira a instância mínima do serviço (--min=default): volta a escalar a zero
 #   rollback     volta para a revisão anterior (ou REVISAO=<nome>)
 #   manutencao   on|off: liga ou desliga a página de manutenção (G06) sem build, só trocando a variável (nova revisão)
 #   status       mostra o que está no ar, a configuração e avisos de custo
@@ -473,15 +473,19 @@ cmd_hosting() {
 }
 
 # --- Dias de evento: instância sempre quente. LEMBRE de desligar depois. ---
+# Instância mínima NO SERVIÇO (--min; anotação run.googleapis.com/minScale nos metadados do serviço): vale para a revisão que recebe
+# o tráfego, sem criar revisão nova, e continua valendo nas viradas seguintes. Até 18/10/2026 usava --min-instances, que é da revisão:
+# criava uma revisão nova, e ela ficava com 0% porque o tráfego fica preso à revisão virada (o site do público seguia dormindo).
 cmd_evento_on() {
-  g run services update "$SERVICE" --region="$REGION" --min-instances=1 --quiet
-  echo "EVENTO ON: min-instances=1 (sem cold start). Custo da instância parada: CPU+memória em tarifa reduzida, cerca de US\$ 0,014/hora"
-  echo "no preço do Tier 1 (São Paulo é Tier 2, um pouco mais: confira cloud.google.com/run/pricing). Esquecido ligado o mês todo seria ~US\$ 10."
-  echo "=> Depois do evento: ./infra/producao/deploy.sh evento-off"
+  g run services update "$SERVICE" --region="$REGION" --min=1 --quiet
+  echo "EVENTO ON: 1 instância mínima no serviço (servidor sempre acordado), sem revisão nova."
+  echo "Custo da instância parada (catálogo do Cloud Billing em 18/10/2026, São Paulo, Tier 2, 1 vCPU e 512 MiB): cerca de R\$ 0,11 por hora,"
+  echo "R\$ 2,69 por dia; esquecida ligada o mês inteiro, cerca de R\$ 81 (o orçamento do projeto é de R\$ $BUDGET_BRL)."
+  echo "=> Desligar: ./infra/producao/deploy.sh evento-off"
 }
 cmd_evento_off() {
-  g run services update "$SERVICE" --region="$REGION" --min-instances=0 --quiet
-  echo "EVENTO OFF: min-instances=0 (escala a zero, sem custo parado)."
+  g run services update "$SERVICE" --region="$REGION" --min=default --quiet
+  echo "EVENTO OFF: sem instância mínima no serviço (escala a zero, sem custo parado)."
 }
 
 # --- Manutenção (G06): o site inteiro mostra a página de indisponibilidade com o contato da PartyX. Webhook e rotinas seguem no ar. ---
@@ -514,9 +518,12 @@ cmd_rollback() {
 
 cmd_status() {
   g run services describe "$SERVICE" --region="$REGION" \
-    --format='table[box](status.url:label=URL,status.traffic[0].revisionName:label=REVISAO,spec.template.metadata.annotations["autoscaling.knative.dev/minScale"]:label=MIN,spec.template.metadata.annotations["autoscaling.knative.dev/maxScale"]:label=MAX)'
-  local min; min="$(g run services describe "$SERVICE" --region="$REGION" --format='value(spec.template.metadata.annotations["autoscaling.knative.dev/minScale"])')"
-  [ -z "$min" ] || [ "$min" = "0" ] || echo "ATENÇÃO: min-instances=$min (instância sempre ligada, gera custo). Se o evento acabou: evento-off"
+    --format='table[box](status.url:label=URL,status.traffic[0].revisionName:label=REVISAO,metadata.annotations["run.googleapis.com/minScale"]:label=MIN_SERVICO,spec.template.metadata.annotations["autoscaling.knative.dev/minScale"]:label=MIN_REVISAO,spec.template.metadata.annotations["autoscaling.knative.dev/maxScale"]:label=MAX)'
+  local min_svc min_rev
+  min_svc="$(g run services describe "$SERVICE" --region="$REGION" --format='value(metadata.annotations["run.googleapis.com/minScale"])')"
+  min_rev="$(g run services describe "$SERVICE" --region="$REGION" --format='value(spec.template.metadata.annotations["autoscaling.knative.dev/minScale"])')"
+  [ -z "$min_svc" ] || [ "$min_svc" = "0" ] || echo "ATENÇÃO: instância mínima no serviço = $min_svc (sempre ligada, gera custo). Se a janela acabou: evento-off"
+  [ -z "$min_rev" ] || [ "$min_rev" = "0" ] || echo "ATENÇÃO: instância mínima na revisão = $min_rev (do --min-instances antigo; o evento-off não tira: publique sem MIN_INSTANCES)"
   g tasks queues describe "$QUEUE" --location="$REGION" --format='value(name,state)' || true
   g scheduler jobs list --location="$REGION" --format='table(name.basename(),schedule,state)' || true
 }
