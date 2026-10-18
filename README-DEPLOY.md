@@ -185,7 +185,7 @@ Mesmo no pior caso para todos os pedidos: 1.000 pedidos = 22 mil operações; 10
 | **Cadastros** novos, no total | **1000 por hora** (`GLOBAL_SIGNUPS_PER_HOUR`) | Confere **antes** e só conta **depois** de criar a conta. Tentativa inválida (CPF repetido, senha fraca, sem aceite) **não** gasta o limite |
 | **Pedidos de recuperação** de senha, no total | **60 por hora** (`GLOBAL_RECOVERIES_PER_HOUR`) | Conta cada pedido aceito, de forma atômica (uma trava por tipo no banco), com o mesmo 202 exista a conta ou não |
 | **Por conta**, na recuperação (já existia) | 3 por hora | Dentro do global; vale com IP forjado |
-| Por IP (camada rápida) | cadastro 100/h (`SIGNUPS_PER_IP_PER_HOUR`), recuperação 20/h por instância | Compartilhar NAT ainda pode concentrar usuários; acompanhar os 429 em uma abertura |
+| Por IP (camada rápida) | cadastro 100/h no código (`SIGNUPS_PER_IP_PER_HOUR`; em produção 50/h desde 18/10/2026, antes 10/h), recuperação 20/h por instância | Compartilhar NAT ainda pode concentrar usuários; acompanhar os 429 em uma abertura |
 | Portaria, todas as instâncias | 3000 leituras/min e 400 buscas/min (`GATE_SCANS_PER_MINUTE`, `GATE_SEARCHES_PER_MINUTE`) | Contador atômico no banco por minuto fixo; memória por validador filtra primeiro |
 
 Janela deslizante de 60 minutos feita de baldes de 10 minutos (tabela `global_limit_counters`, migração `0004`; na prática 50 a 60 minutos). Atingido o limite: **429 `limite_global`** e **um alerta `limite_global_atingido` por balde**, por tipo (não um por requisição), no canal de e-mail existente (`alerts.sh` cria a política). Provado: 60 pedidos simultâneos com limite 10 passam exatamente 10; IPs todos diferentes não furam; lixo não bloqueia cadastro legítimo.

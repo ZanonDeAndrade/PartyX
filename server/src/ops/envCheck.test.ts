@@ -35,12 +35,13 @@ describe('infra/env-check.py', () => {
     expect(check(hml, 'homologacao', ['EMAIL_FROM']).status).toBe(0);
   });
 
-  it('arquivo de produção do repositório: venda FECHADA, cadastro aberto com os textos, sem protótipo, sem lista de e-mail', () => {
+  it('arquivo de produção do repositório: venda ABERTA com o visual aprovado, cadastro aberto com os textos, sem protótipo, sem lista de e-mail', () => {
     // Cadastro aberto por autorização de 14/10/2026 (docs/registros/autorizacao-cadastro-producao-2026-10-14.md), com Termos e
-    // Privacidade publicados (D-84; 1.2 e a Política de Cancelamento, Troca e Reembolso 1.0 em 15/10/2026, D-87). A venda continua
-    // fechada.
+    // Privacidade publicados (D-84; 1.2 e a Política de Cancelamento, Troca e Reembolso 1.0 em 15/10/2026, D-87). Venda aberta na
+    // release-2026-10-18 (autorizacao-abertura-vendas-2026-10-15.md), com o visual aprovado por escrito em 18/10/2026 (CA-33).
     for (const [name, value] of [
-      ['SALES_OPEN', 'false'],
+      ['SALES_OPEN', 'true'],
+      ['VISUAL_APPROVED', 'true'],
       ['SIGNUP_OPEN', 'true'],
       ['TERMS_VERSION', '1.2'],
       ['TERMS_DATE', '2026-10-15'],
@@ -59,14 +60,14 @@ describe('infra/env-check.py', () => {
       ['GATE_CLOSED_WINDOW_BEFORE_HOURS', '12'],
       ['GATE_CLOSED_WINDOW_AFTER_HOURS', '24'],
       ['GLOBAL_SIGNUPS_PER_HOUR', '1000'],
-      ['SIGNUPS_PER_IP_PER_HOUR', '10'],
+      ['SIGNUPS_PER_IP_PER_HOUR', '50'],
     ])
       expect(prod, name).toMatch(new RegExp(`^${name}: "${value}"$`, 'm'));
     expect(prod).not.toMatch(/^(ENABLE_PROTOTYPE|EMAIL_ALLOWLIST|PUBLIC_HOST_CHECK):/m);
     const ok = check(withAccount, 'producao');
     expect(ok.err).toBe('');
     expect(ok.status).toBe(0);
-    expect(ok.out).toContain("ENVF_SALES_OPEN=false");
+    expect(ok.out).toContain("ENVF_SALES_OPEN=true");
     expect(ok.out).toContain("ENVF_SIGNUP_OPEN=true");
   });
 
