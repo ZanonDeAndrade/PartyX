@@ -108,6 +108,12 @@ Primeiro administrador: `npm run admin:bootstrap` (ver `docs/autenticacao.md`).
 - **Novo deploy:** `./infra/producao/deploy.sh deploy` (exige as travas `BACKUP_DONE` e `NO_FICTITIOUS_DATA`). O `index.html` é sempre revalidado, então a versão nova vale na hora.
 - **Migrações:** rodam no deploy, num Cloud Run Job com a conexão **direta**, antes de a nova revisão receber tráfego, **nunca no boot**. Só se desfazem restaurando backup ou por SQL revisado (`drizzle/rollback/`; `npm run db:rollback` é bloqueado em produção de propósito).
 - **Rollback do código:** `./infra/producao/deploy.sh rollback` (revisão anterior) ou `REVISAO=<nome> ./infra/producao/deploy.sh rollback`. São mantidas as 3 últimas imagens. Antes, leia a migração da revisão: não verifiquei se o código antigo roda com o esquema novo.
+- **Rollback para uma revisão sem a correção do pool** (commit `184da3c`; a `partyx-00040-dow` e todas as anteriores): **antes** do rollback, se a verificação de saúde já estiver em `/api/health`, volte-a para `/api/health/ready`, para o Neon não dormir. Sem a correção, uma conexão parada que o Neon encerra ao dormir derruba o processo (`docs/registros/neon-dormindo-2026-10-18.md`):
+  ```bash
+  CLOUDSDK_CORE_PROJECT=partyx-producao gcloud monitoring uptime update partyx-saude-dominio-0ER-9xn7ICU \
+    --path=/api/health/ready --matcher-content='"database":"ok"' --matcher-type=contains-string
+  ```
+  Enquanto a verificação estiver em `/api/health/ready` (o caso até a primeira compra depois da release com a correção), o rollback não precisa desse passo.
 - `./infra/producao/deploy.sh status` mostra revisão, instância mínima (do serviço e da revisão), máximo, fila e rotinas, e avisa se alguma instância mínima ficou ligada.
 
 ## 7. Dias de evento
@@ -124,7 +130,7 @@ A instância mínima é do **serviço** (`gcloud run services update partyx --mi
 
 **Nos outros dias o servidor já fica acordado** (conferido em 18/10/2026): a verificação de saúde `partyx-saude-dominio` chama `/api/health/ready` pelo domínio a cada 5 minutos, de 3 regiões (um pedido a cada 2 a 2,5 minutos), e desde 16/10 a revisão no ar só reiniciou uma vez fora das publicações. Como essa rota consulta o banco, ela também mantém o Neon acordado (o Neon dorme depois de 5 minutos sem uso). Um job do Cloud Scheduler a cada 5 minutos seria redundante: não está criado.
 
-**Decidido em 18/10/2026, ainda não aplicado:** a verificação passa para `/api/health` (sem banco), para o Neon voltar a dormir, e entra um alerta de 5xx no mesmo canal de e-mail; sem job a cada 6 horas. Antes, precisa ir ao ar a correção do pool (ouvinte do evento `error`: sem ele, uma conexão parada encerrada pelo Neon derruba o processo). Conferência, comandos e roteiro do teste: `docs/registros/neon-dormindo-2026-10-18.md`.
+**Decidido em 18/10/2026:** a verificação passa para `/api/health` (sem banco), para o Neon voltar a dormir, **só depois** que a release com a correção do pool (commit `184da3c`; ouvinte do evento `error`: sem ele, uma conexão parada encerrada pelo Neon derruba o processo) estiver no ar e a primeira compra tiver dado certo; sem job a cada 6 horas. O alerta de 5xx, no mesmo canal de e-mail, foi criado em 18/10/2026 21:42 UTC (política "PartyX: respostas 5xx (partyx)"). Rollback para revisão sem a correção: seção 6. Conferência, comandos e roteiro do teste: `docs/registros/neon-dormindo-2026-10-18.md`.
 
 ## 8. Estimativa de custo mensal
 

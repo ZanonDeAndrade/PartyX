@@ -7,7 +7,12 @@ Decisões do responsável (Arthur), 18/10/2026:
 - **Item 4:** teste real depois de pelo menos 10 minutos sem uso (roteiro abaixo).
 - **Recusado:** job do Cloud Scheduler a cada 6 horas.
 
-**Estado em 18/10/2026, 21:30 UTC: nada aplicado.** A conferência achou uma falta (ponto 1); a correção está pronta, sem commit e sem publicação, aguardando o OK do responsável.
+**Estado em 18/10/2026, 21:45 UTC:**
+
+- Correção do pool aprovada pelo responsável e no commit local `184da3c`; vai ao ar na release que abre as vendas (uma candidata só).
+- **Item 3 aplicado** (OK do responsável ao comando abaixo): política `projects/partyx-producao/alertPolicies/6717708805677157372`, criada às 21:42:56 UTC e conferida com `describe` (ligada, canal `14538766248334527110`, filtro, maior que 0 em 5 minutos, fechamento em 24 h). Produção passa a ter 17 políticas.
+- **Itens 2 e 4: só depois** que a release com a correção estiver no ar e a primeira compra tiver dado certo (decisão do responsável). Nessa hora, mostrar o comando do item 2 de novo e esperar o OK.
+- Rollback para uma revisão sem a correção (a `partyx-00040-dow` e anteriores): se a verificação já estiver em `/api/health`, ela volta para `/api/health/ready` **antes** (README-DEPLOY, seção 6; `docs/operacao/runbooks/rollback.md`).
 
 ## Por que o caminho nunca rodou em produção
 
@@ -53,9 +58,9 @@ pool.on('error', error => {
 | `npm run test:db` (banco de teste configurado) | 73 arquivos, 1113 testes, e 1 arquivo, 4 testes; nenhum pulado |
 | `npm run build` | sem erros |
 
-Para valer em produção, a correção precisa de uma publicação nova (`deploy.sh`), com o OK do responsável. **O item 2 só é aplicado depois dela.**
+Para valer em produção, a correção precisa de uma publicação nova (`deploy.sh`), com o OK do responsável. **O item 2 só é aplicado depois dela e da primeira compra que der certo.**
 
-## Item 2: comando (aprovado; aplicar só depois da correção no ar)
+## Item 2: comando (aprovado; aplicar só depois da correção no ar e da primeira compra)
 
 ```bash
 gcloud monitoring uptime update partyx-saude-dominio-0ER-9xn7ICU --project=partyx-producao \
@@ -69,7 +74,7 @@ gcloud alpha monitoring policies update projects/partyx-producao/alertPolicies/1
 
 O que muda: a verificação deixa de testar o banco. Uma falha do banco passa a aparecer pelo alerta de 5xx (quando alguém usa o site), pelo backup das 03:00 (alertas `backup_falhou` e "backup ausente") e pela rotina diária das 04:00. Sem visitas de madrugada, um banco fora do ar só é notado no backup.
 
-## Item 3: comando (aprovado; aguardando o OK do comando final)
+## Item 3: comando (aplicado em 18/10/2026 21:42 UTC)
 
 Canal: `projects/partyx-producao/notificationChannels/14538766248334527110` ("PartyX operação", o mesmo das outras 16 políticas). Abre um incidente quando o serviço `partyx` (todas as revisões) responde qualquer 5xx numa janela de 5 minutos; fecha sozinho em 24 h.
 
@@ -90,7 +95,7 @@ gcloud alpha monitoring policies create --project=partyx-producao --policy-from-
 
 Conferido só lendo (API do Cloud Monitoring, mesmo filtro e mesma agregação, 11 a 18/10/2026): o alerta teria aberto **uma vez**, em 14/10 15:15 UTC (um 503 da `partyx-00003-xeq`, durante uma publicação). Limites: conta só o que chega ao Cloud Run (um erro da própria Vercel fica com a verificação de saúde); uma candidata que responda 5xx numa publicação também dispara.
 
-## Item 4: teste real (depois dos itens 2 e 3)
+## Item 4: teste real (depois do item 2)
 
 1. **Banco dormindo de fato:** pelo menos 10 minutos sem uso; a API do Neon mostra o compute `ep-wispy-band-b6v5koh6` com `current_state: idle` e `suspended_at` preenchido; os logs de requisição do Cloud Run nos 10 minutos anteriores só têm `/api/health`.
 2. **Página do evento pelo domínio:** `curl` em `https://partyx.com.br/eventos/teste01-2` (o HTML passa pela Vercel sem cache e consulta o banco), anotando código, tempo até o primeiro byte e tempo total; logo depois, a mesma página e `/api/public/events/teste01-2`, para comparar com o banco acordado.
@@ -98,4 +103,4 @@ Conferido só lendo (API do Cloud Monitoring, mesmo filtro e mesma agregação, 
 4. **Logs desde o início do teste:** severidade WARNING ou maior, contagem de 5xx, avisos "conexão parada com o banco encerrada" e o novo `started_at` do compute no Neon.
 5. Resultado registrado neste arquivo.
 
-**Resultado: pendente** (depende da correção publicada e do item 2).
+**Resultado: pendente** (depende da correção publicada, da primeira compra e do item 2).
