@@ -118,11 +118,13 @@ CLOUDSDK_CORE_PROJECT=partyx-producao PROJECT=partyx-producao ./infra/producao/d
 ```
 A instância mínima é do **serviço** (`gcloud run services update partyx --min=1`, anotação `run.googleapis.com/minScale`): vale para a revisão que recebe o tráfego, **sem criar revisão nova**, e continua valendo nas viradas seguintes. Até 18/10/2026 o script usava `--min-instances`, que é da revisão: criava uma revisão nova, e ela ficava com 0% porque o tráfego fica preso à revisão virada (o site do público continuava dormindo). Teste: `server/src/ops/deployEvento.test.ts` (com um `gcloud` falso).
 
-**Quando ligar** (checklists em `docs/registros/checklist-abertura-de-vendas.md`): no dia da abertura das vendas, desligando 3 dias depois; no dia do evento, desligando no dia seguinte.
+**Quando ligar:** no dia do evento, desligando no dia seguinte (`docs/operacao/runbooks/portaria.md`). Na abertura das vendas **não** se liga (decisão do responsável, 18/10/2026): a verificação de saúde já mantém o servidor acordado (`docs/registros/checklist-abertura-de-vendas.md`, item 5.6).
 
 **Custo** (catálogo do Cloud Billing em 18/10/2026, São Paulo, Tier 2, cobrança por requisição): a instância parada paga R$ 0,000020758 por vCPU-segundo e o mesmo por GiB-segundo. Com 1 vCPU e 512 MiB: cerca de **R$ 0,11 por hora, R$ 2,69 por dia**; esquecida ligada o mês inteiro, cerca de **R$ 81**, acima do orçamento de R$ 30. Quando ela atende pedidos, paga a tarifa normal, como já acontece sem a instância mínima. O `status` avisa se ficou ligada. Parte da demora do primeiro acesso vem do Neon acordando (seção 13), que a instância mínima sozinha pode não evitar.
 
 **Nos outros dias o servidor já fica acordado** (conferido em 18/10/2026): a verificação de saúde `partyx-saude-dominio` chama `/api/health/ready` pelo domínio a cada 5 minutos, de 3 regiões (um pedido a cada 2 a 2,5 minutos), e desde 16/10 a revisão no ar só reiniciou uma vez fora das publicações. Como essa rota consulta o banco, ela também mantém o Neon acordado (o Neon dorme depois de 5 minutos sem uso). Um job do Cloud Scheduler a cada 5 minutos seria redundante: não está criado.
+
+**Decidido em 18/10/2026, ainda não aplicado:** a verificação passa para `/api/health` (sem banco), para o Neon voltar a dormir, e entra um alerta de 5xx no mesmo canal de e-mail; sem job a cada 6 horas. Antes, precisa ir ao ar a correção do pool (ouvinte do evento `error`: sem ele, uma conexão parada encerrada pelo Neon derruba o processo). Conferência, comandos e roteiro do teste: `docs/registros/neon-dormindo-2026-10-18.md`.
 
 ## 8. Estimativa de custo mensal
 
@@ -131,7 +133,7 @@ A instância mínima é do **serviço** (`gcloud run services update partyx --mi
 | Item | Franquia / preço (fonte oficial) | No seu volume |
 |---|---|---|
 | Cloud Run | 2 mi requisições, 180 mil vCPU-s e 360 mil GiB-s grátis por mês; desconto calculado no Tier 1 e agregado **por conta de faturamento** | cerca de 55 mil requisições e 11 mil vCPU-s: **US$ 0** |
-| `evento-on` | parada: R$ 0,000020758 por vCPU-s e por GiB-s (Tier 2, catálogo de 18/10/2026) | 4 dias por abertura de vendas e 2 por evento: cerca de **R$ 16** |
+| `evento-on` | parada: R$ 0,000020758 por vCPU-s e por GiB-s (Tier 2, catálogo de 18/10/2026) | do dia do evento ao dia seguinte (até 2 dias): até cerca de **R$ 5,40** por evento |
 | Cloud Tasks | 1 milhão de operações grátis; depois US$ 0,40 por milhão | alguns milhares: **US$ 0** |
 | Cloud Scheduler | 3 jobs grátis **por conta de faturamento** (compartilhado com seus outros projetos); depois US$ 0,10/job | 2 jobs (backup 03:00 e rotina diária 04:00): **US$ 0** se a conta não estiver cheia |
 | Secret Manager | 6 versões ativas grátis; extras cerca de US$ 0,06/mês cada; 10 mil acessos grátis | 6 a 8 versões: **US$ 0 a 0,12** |

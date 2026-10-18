@@ -65,4 +65,4 @@ Feita pelo Bernardo, com o cadastro e a venda abertos só pelo tempo do teste, e
 | 5.3 | Rollback pronto, com a revisão anterior anotada | Comando registrado | | |
 | 5.4 | Comunicação escrita à PartyX com a data e a hora da abertura | Mensagem enviada pelo responsável | | |
 | 5.5 | Registro da abertura em `docs/registros/` | Arquivo novo | | |
-| 5.6 | Instância mínima ligada **no dia em que abrir as vendas** e desligada **3 dias depois**, para o servidor não estar parado no pico de compras (cerca de R$ 2,69 por dia; README-DEPLOY, seção 7) | Ligar: `CLOUDSDK_CORE_PROJECT=partyx-producao PROJECT=partyx-producao ./infra/producao/deploy.sh evento-on`; desligar: o mesmo com `evento-off`; `deploy.sh status` mostra `MIN_SERVICO` 1 e, depois, vazio | | |
+| 5.6 | Instância mínima **não** é ligada na abertura das vendas (decisão do responsável, 18/10/2026): a verificação de saúde `partyx-saude-dominio` chama o site a cada 5 minutos, de 3 regiões, e mantém o servidor acordado. Se um dia precisar: README-DEPLOY, seção 7 (`deploy.sh evento-on`/`evento-off`) | `deploy.sh status`: `MIN_SERVICO` vazio | Não se aplica | Arthur (decisão) |
