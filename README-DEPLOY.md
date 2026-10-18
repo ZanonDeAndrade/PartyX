@@ -541,3 +541,10 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 **Publicado:** revisão `partyx-00037-zap` (tag `release-2026-10-16b`, commit `d9fc445`), 100% desde 16/10 03:30 UTC, sem migração (backup sob demanda `partyx-backup-5lw6t` antes da candidata). Campos de data e hora sem aparência nativa em todo o site (no iPhone passavam da borda e ficavam com o texto centrado), "R$" do valor sem quebrar, botão da capa com 44 px e textos de ajuda do painel sem meia-entrada. A candidata da `release-2026-10-16` (`partyx-00036-buy`) foi substituída antes da virada e nunca recebeu tráfego. A primeira tentativa de candidata recusou por falha momentânea de conexão desta máquina com o Neon (conferida só lendo; a repetição passou). Registro: `docs/registros/publicacao-producao-2026-10-16.md`.
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00037-zap`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00034-hug ./infra/producao/deploy.sh rollback`. A `00034-hug` usa o mesmo banco.
+
+## 30. Décima oitava publicação: abertura em toda carga de página e e-mail ligado (18/10/2026)
+
+**Publicado:** revisão `partyx-00040-dow` (tag `release-2026-10-16d`, commit `9a1cd31`), 100% desde 18/10 20:20 UTC, sem migração (backup sob demanda `partyx-backup-jsg9j` antes da candidata). A abertura aparece em toda carga de página, na volta pelo Voltar e na volta para a aba depois de 1 minuto, nunca nas rotas de tarefa, com plano B em CSS e no máximo 4 s contados desde que a camada aparece; o script e o vídeo saem em `/assets` com hash no nome (cache imutável, guardados na Vercel). A revisão monta o `smtp-url` (Resend, chave só de envio): o e-mail está ligado. A candidata da `release-2026-10-16c` (`partyx-00039-faz`, 17/10) serviu ao e-mail de teste e não foi virada. Registro: `docs/registros/publicacao-producao-2026-10-18.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00040-dow`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00037-zap ./infra/producao/deploy.sh rollback`. A `00037-zap` usa o mesmo banco, mas sem o SMTP.
+

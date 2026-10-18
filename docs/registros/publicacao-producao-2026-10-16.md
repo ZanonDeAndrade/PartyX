@@ -1,5 +1,7 @@
 # Publicação em produção: campos de data no celular e painel sem meia-entrada (16/10/2026)
 
+> Atualização de 18/10/2026 20:20 UTC: a `partyx-00040-dow` (`release-2026-10-16d`, abertura em toda carga de página e e-mail ligado, `publicacao-producao-2026-10-18.md`) substituiu a `00037-zap`, que fica como retorno.
+
 Pedido do responsável (Arthur): "coloque em produção e faça commit no git", depois da correção dos campos de data e hora no celular (`campos-de-data-no-celular-2026-10-16.md`). Durante a publicação, antes da virada, chegou outro pedido: tirar do painel os textos de ajuda que citam meia-entrada e juntar à próxima publicação. Como a candidata ainda não tinha tráfego, a mudança entrou nesta mesma publicação, com versão nova.
 
 - **Campos de data e hora** (`5b16173`): sem aparência nativa, texto à esquerda, altura e fonte dos campos de texto, ícone onde o aparelho não mostra; "R$" do valor sem quebrar; botão da capa com 44 px.

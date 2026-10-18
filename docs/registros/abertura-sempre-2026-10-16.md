@@ -128,3 +128,20 @@ Capturas a 360, 390 e 1280 px (vídeo, plano B em CSS no meio e no fim, logo par
 **E-mails de cadastro parados desde 14/10 (15 em `falhou`):** ficam como estão, por decisão do responsável. Conferido no código que nenhuma rotina os envia depois da virada: o envio (na hora, pelas novas tentativas do Cloud Tasks e pela varredura diária) só pega e-mails `pendente`; uma tarefa antiga que chegue para um e-mail em `falhou` responde "já resolvido"; reabrir só existe em `POST /api/admin/emails/:id/retry`, à mão, e nenhuma tela do painel chama essa rota; o e-mail de cadastro tem chave única por pessoa e nunca é gerado de novo. A fila do Cloud Tasks (`partyx-conciliacao`) estava vazia em 17/10/2026.
 
 **Bateria (local, 17/10/2026):** lint 0 erros (27 avisos antigos), tipos e build ok, `test:db` 1.107 + 4, abertura 51 (17 testes x 3 aparelhos), painel no celular 62, busca 4, textos longos 78, documentos 3, transições 12, cronômetro 8, cor 8, transferência 6, Turnstile 6, responsivo 593, roteiro de compra com gateway fictício 20 (1 pulado, como antes).
+
+**Candidata `partyx-00040-dow` (`release-2026-10-16d`, 18/10/2026 20:09 UTC, sem tráfego, com o SMTP):** build `30a41554`, backup `partyx-backup-jsg9j`, teste rápido 15 de 15 com `salesOpen=false`. Script e vídeo com hash (`/assets/abertura-H5co4uFN.js`, `/assets/partyx-intro-HuldccPs.mp4`) com cache de 1 ano, imutável; o vídeo responde em partes (206). Os endereços antigos em `/intro` respondem com o HTML do site, como qualquer endereço inexistente. A Vercel não guarda o HTML (`x-vercel-cache: MISS` em todas as páginas; `no-cache` no HTML, menos a página do evento, com `max-age=60` só no navegador): por isso `/intro` não precisa continuar no ar.
+
+Medição pela internet na candidata (8 primeiras visitas por aparelho, cada uma num navegador novo, e 3 voltas com recarregar):
+
+| Aparelho | 1ª visita com vídeo | Vídeo começa, depois da camada | Mais tempo na tela | Volta (recarregar) |
+|---|---|---|---|---|
+| Chromium, computador 1280 | 7 de 8, todos inteiros | 73 a 298 ms | 3,54 s | 3 de 3 com vídeo (31 a 173 ms) |
+| Chrome do Android 360 | 6 de 8, todos inteiros | 252 a 431 ms | 3,67 s | 2 de 3 com vídeo (21 e 31 ms) |
+| WebKit, viewport de iPhone 390 | 8 de 8, todos inteiros | 5 a 324 ms | 3,57 s | 3 de 3 com vídeo |
+
+As outras visitas caíram no logo em CSS. Na `00039-faz` (prazo contado do clique), o vídeo não tinha tocado em nenhum dos três. Pelo domínio (ainda na `00037-zap`): HTML em 0,13 a 0,24 s (3,5 s na primeira, com o serviço acordando); arquivo de `/assets` pela Vercel em 0,12 s com `HIT` depois da primeira vez; o vídeo antigo em `/intro` sempre `MISS`. O vídeo com hash só chega à Vercel depois da virada.
+
+## Publicação
+
+Publicado em 18/10/2026 20:20 UTC, com o OK do responsável: `release-2026-10-16d`, revisão `partyx-00040-dow` (`publicacao-producao-2026-10-18.md`), junto com o e-mail ligado. Pelo domínio, depois da virada: script e vídeo novos com `x-vercel-cache: HIT` (o vídeo a partir do segundo pedido); vídeo em 20 de 24 primeiras visitas (computador 7 de 8, Android 5 de 8, WebKit 8 de 8), as outras no logo em CSS, no máximo 4,0 s na tela; sem rolagem lateral nem erro. Falta conferir num iPhone e num Android de verdade: Safari normal e em Pouca Energia, Chrome com economia de dados, links do Instagram e do WhatsApp, Voltar depois de um link de fora e volta para a aba depois de 1 minuto.
+
