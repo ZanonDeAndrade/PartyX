@@ -80,10 +80,26 @@ Testes novos: `server/src/security/headers.test.ts` (nonce novo por página, igu
 domínios; sem nonce sem o Mercado Pago) e `src/site/cardBrickMount.test.ts` (pronto com nonce, sem nonce, `create` sem controlador,
 SDK com erro, SDK sem resposta aos 10 s e não antes, `onError` antes e depois de pronto, pronto depois do prazo, desmontagem).
 
+## Cronômetro da reserva a 390 px (mesma tag, pedido do responsável)
+
+Achado durante o diagnóstico, já em produção antes: a 360 e 390 px o relógio da reserva quebrava em duas linhas ("25:0" e "0"), no
+Chromium e no WebKit. Causa: a regra do site inteiro `overflow-wrap: anywhere` (texto digitado quebra em qualquer ponto) e o relógio
+como item flexível que encolhia ao lado do rótulo. Correção: o relógio leva `px-nowrap` (valor curto que não parte no meio), e quem
+quebra é o rótulo. Teste: `e2e/textos-longos.spec.ts` ganhou a tela do pedido pendente (360, 768 e 1280 px, com o detector de palavra
+partida) e o cronômetro numa linha só a 360 e 390 px, também no último minuto (rótulo "Menos de um minuto para pagar"); o preparo
+(`e2e/support/seed-textos-longos.mts`) grava um pedido pendente com reserva ativa. Sem a correção, os 5 testes novos falham; com ela,
+`npm run e2e:textos` 85 de 85.
+
+| Comando (com o cronômetro) | Resultado |
+|---|---|
+| `npm run lint` | 0 erros (27 avisos antigos) |
+| `npm run typecheck` | sem erros |
+| `npm run test:db` | 1ª rodada: 1 falha em 1128, `environment.integration.test.ts` (o processo real do servidor não terminou na janela do teste, carga 15; falha intermitente já registrada); 2ª rodada completa: 1128 e 4, nenhum pulado |
+| `npm run build` | sem erros |
+| `npm run e2e:textos` | 85 de 85 |
+
 ## Pendente
 
 - Candidata com a mesma configuração de venda aberta (comandos mostrados ao responsável antes) e, com OK, a virada.
 - Conferir num Firefox real com a proteção estrita ligada (o Playwright não tem a lista de rastreadores): o aviso deve aparecer em
   vez da área cinza.
-- Achado fora do pedido, já em produção antes desta mudança: a 390 px, o cronômetro da reserva quebra em duas linhas ("25:0" e "0"),
-  no Chromium e no WebKit.

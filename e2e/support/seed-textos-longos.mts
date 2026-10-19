@@ -83,5 +83,21 @@ await createDrizzle(db.pool).transaction(tx =>
   }),
 );
 const ticketId = (await q('select id from tickets where order_id = $1 order by unit_index limit 1', [orderId])).rows[0].id as string;
-writeFileSync(path.join(OUT, 'seed.json'), JSON.stringify({ url: db.url, eventId: ev, typeId, orderId, ticketId }));
+// Pedido aguardando pagamento, com reserva ativa: a tela do pedido mostra o cronômetro da reserva.
+const pendingOrderId = (
+  await q(`insert into orders (user_id,event_id,total_cents,status) values ($1,$2,6000,'pendente') returning id`, [buyer, ev])
+).rows[0].id as string;
+await q('insert into order_items (order_id,event_id,ticket_type_id,quantity,unit_price_cents) values ($1,$2,$3,1,6000)', [
+  pendingOrderId,
+  ev,
+  typeId,
+]);
+await q(
+  `insert into reservations (order_id,ticket_type_id,quantity,expires_at,status) values ($1,$2,1,now() + interval '25 minutes','ativa')`,
+  [pendingOrderId, typeId],
+);
+writeFileSync(
+  path.join(OUT, 'seed.json'),
+  JSON.stringify({ url: db.url, eventId: ev, typeId, orderId, ticketId, pendingOrderId }),
+);
 await db.pool.end();

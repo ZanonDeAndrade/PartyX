@@ -173,7 +173,7 @@ function TimerCard({ secondsLeft }: { secondsLeft: number }) {
     <div className={`px-timerbar${warn ? ' px-timerbar-warn' : ''}`} role="timer" aria-live="off">
       <div className="px-timerbar-top">
         <b>{warn ? 'Menos de um minuto para pagar' : 'Ingressos reservados para você'}</b>
-        <span className="px-timerbar-clock" aria-label={`Faltam ${mmss(secondsLeft)}`}>
+        <span className="px-timerbar-clock px-nowrap" aria-label={`Faltam ${mmss(secondsLeft)}`}>
           {mmss(secondsLeft)}
         </span>
       </div>

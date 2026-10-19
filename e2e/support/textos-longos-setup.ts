@@ -12,6 +12,8 @@ export interface TextosState {
   typeId: string;
   orderId: string;
   ticketId: string;
+  /** Pedido pendente com reserva ativa (cronômetro da reserva). */
+  pendingOrderId: string;
 }
 export const readTextosState = (): TextosState => JSON.parse(readFileSync(path.join(TEXTOS_DIR, 'state.json'), 'utf8'));
 

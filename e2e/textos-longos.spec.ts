@@ -10,6 +10,7 @@ import { readTextosState, TEXTOS_DIR } from './support/textos-longos-setup';
  * - rolagem horizontal da página;
  * - texto que escapa da própria caixa (estoura por cima de outra coisa ou fica cortado por um recorte);
  * - palavra curta partida no meio (preço, data, código, rótulo): sinal de coluna espremida ao lado de um texto longo.
+ * O cronômetro da reserva (pedido pendente) também é conferido a 390 px e no último minuto, com o rótulo mais longo.
  * Capturas de página inteira em e2e/.run/textos-longos/img (fora do Git).
  */
 const R = readTextosState();
@@ -35,6 +36,7 @@ const SCREENS: Screen[] = [
   { id: 'ingresso', path: `/ingressos/${R.ticketId}`, who: 'buyer' },
   { id: 'minhas-compras', path: '/minhas-compras', who: 'buyer' },
   { id: 'pedido', path: `/pedido/${R.orderId}`, who: 'buyer' },
+  { id: 'pedido-pendente', path: `/pedido/${R.pendingOrderId}`, who: 'buyer' },
   { id: 'minha-conta', path: '/minha-conta', who: 'buyer' },
   { id: 'autorizacao', path: `/autorizacao-menor/pedido/${R.orderId}`, who: 'buyer' },
   { id: 'admin-inicio', path: '/admin', who: 'admin' },
@@ -162,5 +164,37 @@ for (const width of WIDTHS)
       await page.screenshot({ path: path.join(IMG, `${s.id}-${width}.jpg`), fullPage: true, type: 'jpeg', quality: 72 });
       expect(await page.evaluate(detect)).toEqual([]);
       expect(errors).toEqual([]);
+      await page.close();
+    });
+
+// O relógio da reserva quebrava em duas linhas a 390 px ("25:0" e "0"), espremido ao lado do rótulo (18/10/2026).
+for (const width of [360, 390])
+  for (const lastMinute of [false, true])
+    test(`cronômetro da reserva numa linha só a ${width}px${lastMinute ? ', no último minuto' : ''}`, async ({ browser }) => {
+      const ctx = await contextFor(browser, width, 'buyer');
+      const page = await ctx.newPage();
+      // Último minuto: a resposta do pedido sai com 45 s de reserva (o rótulo muda para o aviso, mais longo).
+      if (lastMinute)
+        await page.route(`**/api/orders/${R.pendingOrderId}`, async route => {
+          const res = await route.fetch();
+          const body = await res.json();
+          body.order.reservation.secondsLeft = 45;
+          await route.fulfill({ response: res, json: body });
+        });
+      await page.goto(R.base + `/pedido/${R.pendingOrderId}`, { waitUntil: 'networkidle' });
+      const clock = page.locator('.px-timerbar-clock');
+      await expect(clock).toHaveText(lastMinute ? /^00:4\d$/ : /^2[45]:\d\d$/);
+      if (lastMinute) await expect(page.locator('.px-timerbar-top b')).toHaveText('Menos de um minuto para pagar');
+      const m = await clock.evaluate(el => {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        const lines = new Set([...r.getClientRects()].filter(x => x.width > 0).map(x => Math.round(x.top))).size;
+        const box = el.getBoundingClientRect();
+        const card = el.closest('.px-timerbar')!.getBoundingClientRect();
+        return { lines, inside: box.left >= card.left && box.right <= card.right };
+      });
+      expect(m).toEqual({ lines: 1, inside: true });
+      expect(await page.evaluate(detect)).toEqual([]);
+      await page.screenshot({ path: path.join(IMG, `cronometro-reserva-${width}${lastMinute ? '-ultimo-minuto' : ''}.jpg`), type: 'jpeg', quality: 72 });
       await page.close();
     });
