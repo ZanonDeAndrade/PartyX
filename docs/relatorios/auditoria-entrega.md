@@ -122,7 +122,110 @@ cópia do backup). Nenhuma correção é aplicada durante a auditoria.
 
 ## Fase 1: código, segurança e dependências
 
-Em andamento.
+### 1.1 Lint, typecheck, build e bateria
+
+| Comando | Resultado | Observação |
+|---|---|---|
+| `npm run lint` | 0 erros, 27 avisos | Avisos só no protótipo (`src/logic`, `src/lib`), em `infra/testes/*.mjs`, `infra/ui/flows-ui.mts` e 2 `no-control-regex` intencionais em `server/src/exports/csv.ts` (neutralização de CSV) |
+| `npm run typecheck` | OK (19 s) | |
+| `npm run build` | OK (14 s) | Pacotes: `index` 313 kB (95,5 kB gzip), `admin` 192 kB (46,4), `gate` 145 kB (52,8, leitor jsQR), `checkout` 36 kB (10,7), CSS principal 63 kB (13,0); 14 arquivos de fonte; vídeo da abertura 80 kB |
+| `npm run test:db` (bateria com PostgreSQL de teste) | 79 arquivos, 1.172 casos: **1.170 passaram, 2 falharam por tempo** (80 s) | As duas falhas foram por carga da máquina (outros processos da auditoria em paralelo): `environment.integration.test.ts` sobe o servidor de verdade 3 vezes e mata o processo em 12 s; `deployTextos.test.ts` roda o `deploy.sh virar` com `gcloud` falso e estourou os 20 s. **Repetidos em isolamento: 2 de 2 passaram (28 s).** Suíte de cluster (papéis do PostgreSQL): 4 de 4. Poppler presente: os testes de PDF rodaram, não foram pulados |
+| `npm run test:sandbox` (Mercado Pago de teste, 14 casos) | Não executado nesta fase | Exige credenciais de teste e rede; fica para a Fase 2 junto com a rodada do roteiro em sandbox |
+
+Cobertura de código da bateria (`@vitest/coverage-v8`, instalado sem gravar no `package.json`), por área:
+
+| Área | Arquivos | Instruções | Ramos |
+|---|---|---|---|
+| Checkout, reserva, lotes | 8 | 94,9% | 87,1% |
+| Pagamento, webhook, conciliação | 21 | 87,2% | 81,3% |
+| Ingressos, PDF, transferência, menores | 8 | 95,3% | 89,0% |
+| Portaria | 2 | 98,4% | 91,9% |
+| Admin (painel, eventos, relatórios, exportações, LGPD) | 18 | 97,1% | 87,4% |
+| E-mails | 4 | 91,0% | 85,1% |
+| Autenticação e segurança | 16 | 97,4% | 91,3% |
+| Vitrine | 6 | 97,2% | 92,7% |
+| **Servidor inteiro (`server/src`)** | 128 | **93,1%** | **86,9%** |
+| Front-end `src/site` | 49 | 7,6% | | 
+
+O front-end só é exercitado pelo Playwright (sem instrumentação); os módulos `.ts` puros do site (formatação, contagem, taxa, sessão) têm teste unitário. Abaixo de 80% no servidor: `index.ts` (partida real, coberto pelo teste de processo), `payments/mercadopago/index.ts` (73%: os ramos reais ficam nos testes de sandbox), `providers/bannerStorage.ts` (36%: Cloud Storage real), `db/appRole.ts` (36%: suíte de cluster, à parte), `payments/index.ts` e `providers/email.ts` (seleção por ambiente).
+
+### 1.2 Dependências
+
+| Verificação | Resultado |
+|---|---|
+| `npm audit` (tudo) | 6 avisos **moderados**, 0 altos ou críticos: 4 pela cadeia `drizzle-kit` > `@esbuild-kit` > `esbuild` 0.18 (servidor de desenvolvimento do esbuild, GHSA-67mh-4wv8-2f99; só `devDependencies`); 2 por `uuid` 9 via `gaxios` (`@google-cloud/storage`, `google-auth-library`; GHSA-w5hq-g745-h8pq, função v3/v5/v6 não usada) |
+| `npm audit --omit=dev` (o que vai para a imagem) | 2 moderados (`uuid`, `gaxios`), com correção disponível sem mudança maior |
+| `npm outdated` | 21 pacotes atrás. Só correções e menores: `hono` 4.13.13, `drizzle-orm` 0.45.4, `nodemailer` 10.1.7, `zod` 4.6.7, `react` e `react-dom` 19.3.1, `@google-cloud/storage` 8.4.0, `@hono/node-server` 2.1.5, `vite` 8.3.4, `vitest` 5.0.5, `@playwright/test` 1.64.1. Maiores disponíveis (não aplicar agora): `google-auth-library` 11, `typescript` 7, `@types/node` 26 |
+| CI (`.github/workflows/ci.yml`) | Roda `npm audit --omit=dev --audit-level=high`: os moderados não travam a CI, por decisão registrada em `docs/registros/riscos-aceitos.md` (10/10/2026), com reavaliação marcada para **20/10/2026**, amanhã |
+
+Recomendação: aplicar as atualizações de correção e menores num lote único depois da entrega (com lint, tipos, bateria e build), e tratar `uuid`/`gaxios` com `npm update @google-cloud/storage google-auth-library` dentro das faixas atuais.
+
+### 1.3 Segurança (OWASP Top 10, no código e no build local)
+
+Método: quatro revisões independentes só de leitura, por frente (autenticação e sessão; autorização e IDOR; estoque, pagamento, webhook, emissão e portaria; entrada, upload, injeção, cabeçalhos, segredos e logs), cada uma com arquivo e linha, mais conferência minha dos pontos mais graves. Relatórios completos em `auditoria/` (resumos em `docs/relatorios/`). Os achados abaixo recebem os ids `S-nn` da tabela final; entre parênteses, o id da frente.
+
+**Controles conferidos e corretos (resumo).** Sessão com token de 256 bits e só o hash no banco; cookie `__session` HttpOnly, Secure fora do local, SameSite=Lax; expiração absoluta e por inatividade por perfil; troca e redefinição de senha derrubam as demais sessões; desativação derruba todas. CSRF por `Origin` exato (ou `Sec-Fetch-Site`) mais token HMAC por sessão em tempo constante; webhook e rotinas fora do cookie, autenticados por assinatura e OIDC. Argon2id; login com tempo igualado e mensagem única; recuperação com token de uso único de 1 h. Autorização: nenhum IDOR encontrado nas 123 rotas; pedidos e ingressos filtram pelo dono (404 para terceiros e para o dono anterior após transferir); portaria com CPF mascarado e janela operacional no servidor; `/admin/*` inteiro atrás de `requireAdmin`. Estoque: transação única com `FOR UPDATE` em ordem fixa e recontagem das reservas válidas; preço só do banco; limite por pedido no servidor; promoter só vincula. Webhook: HMAC-SHA256 em tempo constante com janela de 300 s, idempotência por índice único, reconsulta obrigatória e conferência de valor, moeda, conta e método. Emissão: 144 bits aleatórios mais HMAC, versão de chave e rotação, índices únicos, emissão dentro da transação que marca pago. Portaria: `UPDATE` condicional preservando a primeira entrada, índice único de entrada válida. Cabeçalhos: CSP com nonce por resposta e fontes justificadas, HSTS, `X-Frame-Options: DENY`, Referrer-Policy, Permissions-Policy, `nosniff`, `Cache-Control: private, no-store` em toda a API. Upload: 5 MB, validação pelo conteúdo com sharp, reencode em WebP sem EXIF, nome gerado no servidor. SQL só com parâmetros ligados; LIKE escapado; CSV com neutralização de fórmulas; HTML injetado escapado; logs com mascaramento por nome e por formato; erro interno sem stack.
+
+**Achados de segurança.**
+
+| Id | Sev. | Área | Achado (arquivo:linha) | Correção sugerida | Esforço |
+|---|---|---|---|---|---|
+| S-01 (A-1) | **alta** | Limites por IP | Quem chama o `run.app` direto, com `X-Forwarded-Host` forjado, escolhe o IP que o servidor considera do visitante (`auth/middleware.ts:10-17`, `TRUSTED_PROXY_HOPS=2`, ingress aberto, Turnstile desligado). Todos os limites por IP (cadastro 50/h, recuperação, 30 falhas de login por IP) deixam de valer; o IP gravado no aceite e na sessão é escolhido pelo atacante. Sobram o limite por e-mail e os tetos globais. O risco do `X-Forwarded-Host` foi aceito em 10/10 (`riscos-aceitos.md`), mas a combinação com o Turnstile desligado não foi reavaliada | Limitar também pelo último elemento do `X-Forwarded-For` (o vizinho real que o Google acrescenta) e validar com `isIP`; reavaliar religar o Turnstile | 4 a 6 h |
+| S-02 (A-2) | **alta** | Enumeração | `POST /auth/register` diz qual campo já existe ("Este e-mail já tem cadastro", "Este CPF já tem cadastro"; `auth/service.ts:97-108`) e o teto global só conta cadastros criados (`globalLimits.ts:15-16`): com S-01, enumeração de e-mail e CPF sem limite efetivo | Teto global para respostas "já cadastrado" com alerta; Turnstile; resposta neutra exige decisão do cliente (CA-02) | 2 a 4 h |
+| S-03 (A-3) | média | Disponibilidade | 5 falhas em 15 min por e-mail bloqueiam o dono mesmo com a senha certa, sem depender de IP (`auth/limits.ts:5-6,46`): dá para negar o acesso de um validador ou administrador durante o evento repetindo a cada 14 min | Bloqueio por par e-mail mais IP, ou atraso progressivo e desafio em vez de negar (muda RF-10: decisão do cliente) | 3 a 6 h |
+| S-04 (A-4) | média | Sessão | `POST /me/password` não limita tentativas da senha atual (`auth/service.ts:331-355`); com um aparelho aberto (tablet da portaria) dá força bruta da senha atual e tomada da conta. `docs/autenticacao.md:154` afirma o contrário | Reutilizar `loginBlock`/`recordLoginAttempt` na troca | 1 a 2 h |
+| S-05 (A-5) | média, decisão | Cadastro | Sem prova de posse do e-mail nem do CPF; CPF de terceiro pode ser cadastrado antes do dono e só o atendimento corrige (`auth/service.ts:152-162`) | Confirmar e-mail antes de comprar e fluxo de contestação de CPF; registrar como pendência do cliente | 8 a 16 h |
+| S-06 (B-1) | média | LGPD, logs | CPF completo viaja na URL de `GET /admin/buyers?q=` e `GET /admin/privacy/subjects?cpf=` (`api/panel.ts:111-115`, `api/privacy.ts:42-45`, `src/site/api.ts:1209`): os logs de requisição do Cloud Run e da Vercel gravam a URL fora do mascaramento da aplicação | Buscas por CPF em `POST` com corpo JSON, como `/gate/search` | 2 a 4 h |
+| S-07 (B-2, C-7) | média | Privacidade | Prévia da transferência é oráculo por CPF ou e-mail: 404 sem conta, 409 sem data de nascimento, 403 menor para o evento, 200 nome mascarado (`tickets/transfer.ts:114-170`); limite de 15 por 10 min em memória, por instância | Unificar as recusas de destino na mesma resposta; limite no banco | 2 a 3 h |
+| S-08 (D-1, B-3) | média | Negação de serviço | Limitador do PDF público (`/public/events/:slug/autorizacao-menor.pdf`) usa o `x-forwarded-for` bruto como chave (`api/public.ts:71-73`): variar o prefixo cria uma chave por chamada e cada chamada gera um PDF | `clientIp(..., TRUSTED_PROXY_HOPS)` e teto global | 0,5 h |
+| S-09 (D-2) | média | Negação de serviço | `bodyLimit` de 1 MB só vale com `Content-Type: application/json` (`app.ts:95-103`), mas `c.req.json()` aceita qualquer tipo: corpo de dezenas de MB em `text/plain` vai inteiro à memória da instância de 512 MiB | `bodyLimit` em todo `/api/*` não multipart, ou recusar tipo não JSON em `parseJson` | 0,5 h |
+| S-10 (C-2) | média, decisão (D-03) | Pagamento | Pix gerado com 31 s de reserva vence 1.860 s depois e a reserva não é estendida (`orders/payment.ts:89,229-258`): outro comprador reserva a unidade e o pagamento vira `pago_sem_estoque`, com dinheiro retido até estorno manual | Estender a reserva até o vencimento do Pix, ou exigir folga mínima para gerar Pix | 3 a 4 h |
+| S-11 (C-1) | baixa | Concorrência | Ordem de travas invertida entre `expireOverdue` (reservas, depois pedidos) e a aprovação (pedidos, tipos, reservas): impasse possível com reserva vencida e webhook tardio; o webhook recebe 503 e é reentregue, o comprador pode ver um 500 | Trancar os pedidos primeiro em `expireOverdue` ou repetir em 40P01 | 1 a 2 h |
+| S-12 (C-3) | baixa | Webhook | Id do evento inclui `type`, `action` e `date_created`, que não são assinados (`mercadopago/index.ts:243-246`): reenvio de notificação autêntica com `action` variado em 5 min cria linhas e reconsultas (só carga) | Compor o id só com partes assinadas | 1 h |
+| S-13 (C-4) | baixa | Webhook | Teto de notificações inválidas por instância e por IP forjável | Teto global no banco | 1 a 2 h |
+| S-14 (C-5) | baixa | Taxa mensal | `paid_at` é o relógio do servidor na conciliação, não o instante da aprovação do gateway (`mercadopago/mapping.ts:174-175`); a documentação afirma o contrário; aprovação tardia na fronteira do mês muda o mês da taxa | Ler a data de aprovação da transação (a confirmar na API) ou corrigir o documento | 1 a 2 h |
+| S-15 (C-6) | baixa, requisito | Portaria | Evento publicado abre a portaria a qualquer hora; a janela operacional só vale para encerrado (`gate/service.ts:102-105`): um validador pode marcar "utilizado" dias antes, sem desfazer | Aplicar a abertura (ex.: 12 h antes) também ao publicado, ou confirmação fora da janela | 1 a 2 h |
+| S-16 (C-8) | baixa | Lotes | Aprovação tardia depois da virada soma em `quantity_sold` do lote original (a sobra já passou): relatório por lote incoerente; o teto do tipo é respeitado | Devolver a unidade de `carried_in` do lote seguinte ou documentar | 2 h |
+| S-17 (D-3) | baixa, a confirmar | CSP | `/eventos/:slug` sai com `Cache-Control: public, max-age=60` e nonce novo por resposta: se a CDN guardar, todos recebem o mesmo nonce por 60 s | `no-cache` ou `private` | 0,25 h |
+| S-18 (A-6) | baixa | Enumeração | Tempo de resposta de `POST /auth/password/forgot` difere entre e-mail existente e inexistente (fila processada dentro da requisição, até 3 s) | Responder 202 e processar depois | 1 a 2 h |
+| S-19 (A-7) | baixa | Robustez | Valor não-IP no `X-Forwarded-For` vira 500 no login, cadastro e aceite (colunas `inet`) | Validar com `isIP`, gravar nulo | 1 h |
+| S-20 (A-8) | baixa, doc | Senha temporária | `PATCH /me` e `/me/birth-date` ficam acessíveis com senha temporária, ao contrário do que `docs/autenticacao.md:112` afirma | Regra no `requireUser` ou corrigir a doc | 1 h |
+| S-21 (A-9) | baixa | Senhas | Sem bloqueio de senhas comuns ("senha123" passa) | Lista local de senhas comuns | 2 a 3 h |
+| S-22 (A-10, B-9) | baixa, decisão | Equipe | Um administrador redefine a senha ou o e-mail de outro administrador e entra como ele; fica na trilha, sem aviso | Avisar o alvo e exigir motivo, ou só com alvo desativado | 2 a 4 h |
+| S-23 (B-8) | baixa, a confirmar | LGPD | E-mail completo em `before/after` da trilha; a anonimização não toca `audit_log` | Hash ou máscara do e-mail na trilha | 1 a 2 h |
+| S-24 (B-10) | baixa, RF-54 | Portaria | Leitura de QR de outro evento devolve o nome do titular | Devolver só o código curto e o nome do evento | 0,5 h |
+| S-25 (B-4) | baixa | Negação de serviço | 4 rotas de PDF do comprador sem limite por conta (`api/tickets.ts:62-104`) | Reutilizar o limitador das outras rotas | 1 h |
+| S-26 (B-5, B-6, B-7, B-11, D-5, D-6, D-8, C-9, C-10) | baixa | Higiene | `FOR SHARE` antes de conferir o titular; `orderId` sem UUID no simulador de homologação; proteção de `/admin/*` dependente da ordem de montagem (`ROUTE_POLICY` só usada na portaria); contador da portaria sem `loadEvent`; contexto do Docker com `e2e/.run` e `auditoria/`; `X-Request-Id` do cliente aceito e ecoado; comentário de CSV desatualizado; 404 de ingresso com texto de pedido; rótulo de ingresso utilizado em pedido estornado | Itens de 10 min a 2 h cada | 4 a 6 h no total |
+| S-27 (D-4) | baixa, aceito | CSP | `style-src 'unsafe-inline'` por causa de `style={{}}` do React | Registrar como aceito ou migrar para classes | 2 a 4 h |
+| S-28 (D-7) | baixa, decisão | LGPD | Exportação de encerramento (`ops/closureExport.ts`) tem CPF completo, e-mail, nascimento e telefone, sem procedimento de transporte cifrado e descarte em 30 dias | Documentar o procedimento operacional | 1 h |
+| S-29 (A-11) | baixa, doc | Documentação | `docs/autenticacao.md` afirma garantias que o código ou a produção não têm (Turnstile obrigatório, tempo igualado na recuperação, limite na troca de senha) | Atualizar e registrar a decisão do Turnstile | 1 h |
+
+Lacuna funcional registrada (não é defeito de segurança): não existe forma de o administrador **desativar um cliente**; a única via é a anonimização LGPD.
+
+### 1.4 Segredos e histórico do Git
+
+- `gitleaks` sobre os 118 commits: 8 ocorrências, **todas falsos positivos**: 2 chaves públicas DKIM em `docs/operacao/dkim-para-copiar.txt` (públicas por natureza, para o DNS) e 6 valores fictícios em testes (`tok_...`, assinatura de teste, token de cartão de exemplo).
+- Nenhum `.env`, `.pem`, `.key` ou arquivo de credencial foi versionado em qualquer commit; só `.env.example`. Os scripts `scripts/setup-mp-credentials*.sh` leem os valores por `stdin` e gravam no Secret Manager, nunca em arquivo.
+- Segredos sem valor padrão fora do ambiente local (`config.ts`); a imagem Docker não recebe `.env*`; `USER node`.
+
+### 1.5 Código morto e restos
+
+| Item | Situação | Recomendação |
+|---|---|---|
+| Protótipo navegável (`src/screens`, `src/logic`, `src/docs`, `src/components`, `src/data`, `src/lib`, `src/prototype*`, `src/Shell.tsx`, `src/App.tsx`) | **22.407 linhas**, mais que o site real (17.081) e quase o servidor (20.989). Só compila com `ENABLE_PROTOTYPE=true` em homologação; o build de produção não gera o pacote (confirmado nos arquivos do `dist`). Concentra os avisos de lint e textos de meia-entrada, lotes manuais e regras antigas | Mover para `reference/` ou apagar antes da entrega, por decisão do responsável (o cliente não recebe código-fonte, Cl. 9.4, mas o repositório é o que a contratada mantém) |
+| Meia-entrada | No produto só o redirecionamento 301 de `/meia-entrada` para os Termos (correto, mantém links antigos) e textos no protótipo | Nenhuma ação no produto |
+| Autorização judicial | Coluna `events.judicial_authorization` sem uso desde a 0010 (expand/contract documentado) | Remover numa migração futura, depois da próxima publicação estável |
+| Tema provisório | `VISUAL_APPROVED`/`provisionalTheme` continuam como trava de venda e campo em `/public/site`; em produção `true` | Manter (trava útil) ou remover a flag com a aprovação registrada |
+| Homologação | Referências legítimas: `EMAIL_ALLOWLIST`, `HOMOLOGACAO_GATEWAY_FICTICIO`, `ENABLE_PROTOTYPE`, avisos de documento provisório, `/admin/dev/mock-gateway` (só com flag). Todas guardadas por `APP_ENV` e recusadas em produção pelo `config.ts` | Nenhuma ação |
+| TODO, FIXME, HACK | Nenhum real (os 5 resultados são máscaras `PX-XXXX-XXXX` e um cupom de teste) | Nenhuma ação |
+| Flags de configuração | Todas as 18 conferidas são lidas em pelo menos um arquivo fora de `config.ts` | Nenhuma ação |
+| `infra/testes/*.mjs`, `infra/ui/*` | Scripts de rodadas anteriores com variáveis não usadas (avisos de lint) | Limpeza opcional |
+| `reference/` (2,2 MB de HTML exportado do Claude Design) | Fonte de design; ignorada pelo lint | Manter fora do pacote entregue ao cliente |
+| Trabalho não comitado (taxa de serviço) | 66 arquivos alterados e 20 novos sem commit há mais de um dia de trabalho | Comitar assim que revisado; risco de perda e de divergência entre a pasta e a tag publicada |
+
+### 1.6 Resumo da Fase 1
+
+Sem bloqueante. Dois achados **altos**, ligados entre si e a uma decisão já tomada (Turnstile desligado em 06/10 e `X-Forwarded-Host` aceito em 10/10): com o `run.app` aberto, os limites por IP não protegem, e o cadastro revela se e-mail e CPF existem. Oito **médios**: bloqueio de conta por e-mail (negação de acesso à portaria), troca de senha sem limite, CPF na URL das buscas do admin, oráculo da transferência, dois vetores de consumo de CPU e memória, Pix além da reserva e cadastro sem prova de posse (decisão). O restante é baixo ou de documentação. Bateria, tipos, lint e build passam; dependências sem aviso alto; histórico do Git limpo.
 
 ## Fase 2: testes funcionais de ponta a ponta (local)
 
