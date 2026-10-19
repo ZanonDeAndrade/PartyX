@@ -229,7 +229,19 @@ Sem bloqueante. Dois achados **altos**, ligados entre si e a uma decisão já to
 
 ## Fase 2: testes funcionais de ponta a ponta (local)
 
-Pendente.
+**Estado em 19/10/2026 (interrompida por limite de uso da sessão):** infraestrutura pronta e verificada nos 9 projetos (Chromium, WebKit e
+Firefox a 360, 390 e 1280 px): `auditoria/e2e/auditoria.config.ts`, semente com 8 compradores de idades variadas, 2 promoters e 10 eventos
+em cada estado da vitrine, servidor local com o gateway fictício e 5 pedidos pagos (`auditoria/e2e/support/`). Cenários escritos:
+`01-conta`, `02-vitrine`, `03-checkout`, `05-menores`, `06-transferencia` (interface, 9 projetos), `10-webhook` e `16-concorrencia`
+(regras de servidor, Chromium 1280). Primeira execução só em `chromium-1280`: 20 passaram e 15 falharam; a causa dominante era da
+própria suíte (o cadastro pela API abre sessão e o login seguinte sem token CSRF recebia 403), corrigida em `fixtures.ts` e **ainda não
+reexecutada**. Falhas a investigar na próxima rodada: início da vitrine e página do evento (textos esperados), além de reconferir as
+dependentes do login. Faltam escrever: `04-pagamento` (cartão aprovado, recusado, pendente, aviso do Brick com sandbox), `07-admin` e
+`13-admin` (evento, imagem, lotes, pedidos, equipe, relatórios, CSV, responsividade do painel), `11-cancelamento-estorno`,
+`12-portaria` (câmera simulada, busca manual, câmera negada, contingência, 2 validadores), `14-emails-pdfs`, `15-lgpd`, e a rodada do
+roteiro em sandbox (`npm run e2e:roteiro:sandbox`, `npm run test:sandbox`).
+
+Comando para retomar: `npx vite build && npx playwright test -c auditoria/e2e/auditoria.config.ts` (um projeto: `--project=chromium-1280`).
 
 ## Fase 3: teste de carga (k6, local)
 

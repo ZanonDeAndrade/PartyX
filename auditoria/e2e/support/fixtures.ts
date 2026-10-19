@@ -42,6 +42,8 @@ export const test = base.extend<{ ctx: BrowserContext }>({
 /** Entra pela API com a conta informada e devolve uma página nova do mesmo contexto. */
 export async function loginAs(ctx: BrowserContext, who: Buyer | 'admin' | 'validador' | 'validador2'): Promise<Page> {
   const [email, password] = typeof who === 'string' ? [S.team[who].email, S.team[who].password] : [who.email, who.password];
+  // O cadastro pela API já abre sessão; com sessão, toda mutação exige o token CSRF. Começa do zero antes de entrar.
+  await ctx.clearCookies();
   await apiLogin(ctx.request, S.base, email, password);
   return ctx.newPage();
 }
