@@ -5,8 +5,106 @@ comitado da taxa de serviço, D-90), produção `partyx-producao` só em leitura
 funcionais e de carga no ambiente local com o PostgreSQL de teste e as credenciais de teste do Mercado Pago. Referência de mercado
 para fluxo e informação: minhaentrada.com.br (nunca identidade visual).
 
-> Documento em construção, por fases. Cada fase fecha com um resumo e segue para a próxima. O resumo executivo, a tabela de
-> achados, a ordem de correção e a versão para o cliente (`auditoria-entrega-cliente.md`) ficam prontos no fim.
+Versão para o cliente, sem jargão: [`auditoria-entrega-cliente.md`](auditoria-entrega-cliente.md). Matriz dos testes de interface:
+[`matriz-e2e.md`](matriz-e2e.md). Cobertura por rota: [`matriz-cobertura-rotas.md`](matriz-cobertura-rotas.md). Carga:
+[`carga/`](carga/). Acessibilidade: [`acessibilidade/`](acessibilidade/). Desempenho: [`desempenho/`](desempenho/). Capturas:
+[`capturas/`](capturas/).
+
+## Resumo executivo
+
+**Veredito.** A plataforma está pronta para operar eventos de até 1.500 ingressos na configuração atual, sem achado bloqueante. As
+regras que não podem falhar foram provadas sob carga e por testes de concorrência: nunca vende acima da capacidade, todo pedido pago tem
+os ingressos comprados, nenhum QR repetido, uma entrada só por ingresso, webhook repetido, fora de ordem ou falsificado não cria
+ingresso. O backup diário restaura em 9 segundos com 21 verificações, e a volta de versão leva segundos.
+
+**Números.** 1.172 testes automáticos de servidor passam (93% de cobertura de instruções); 66 cenários novos de ponta a ponta em 3
+navegadores e 3 larguras (346 execuções, 318 aprovadas, 14 falhas, todas do WebKit de teste na página do evento, a confirmar no Safari);
+carga do evento de 500 ingressos e do triplo sem nenhum erro, com p95 abaixo de 50 ms em todas as rotas e o servidor abaixo de três
+quartos de um núcleo; Lighthouse na produção 94 e 96 de desempenho e 100 de acessibilidade; 31 páginas varridas pelo axe com 5
+elementos de contraste a corrigir.
+
+**O que pesa.** Dois achados **altos** de segurança, ligados a decisões já tomadas: com o Turnstile desligado e o `run.app` aberto, os
+limites por IP não protegem (S-01) e o cadastro revela se um e-mail ou CPF já existem (S-02). Oito **médios** de segurança (bloqueio de
+conta por e-mail que pode tirar um validador do ar, troca de senha sem limite, CPF na URL do painel, oráculo da transferência, dois
+vetores de consumo de recursos, Pix além da reserva, cadastro sem prova de posse). Fora de segurança: a ponte Vercel Hobby em uso
+comercial pode ser pausada em dia de evento (O-01); a página do evento derruba o WebKit de teste (F-09, a confirmar); faltam alertas
+para webhook ausente e fila de e-mails parada (O-02); não há manual do painel para o cliente nem runbooks de abertura e de limpeza
+(O-03); a homologação continua no ar (O-04); 18 commits sem push e a taxa de serviço inteira sem commit (O-05); endereços desconhecidos
+respondem 200 (U-13). O restante é baixo ou de documentação. Decisões do cliente registradas como tal: sem meia-entrada, sem reembolso
+por desistência (só transferência), taxa de serviço e desconto de promoter a publicar.
+
+**Ordem recomendada** (seção "Ordem de correção" abaixo): 13 itens antes do primeiro evento grande, cerca de 30 a 40 horas; o resto
+depois, por lotes.
+
+## Tabela consolidada de achados
+
+Severidade: bloqueante (nenhum), alta, média, baixa. Evidência: arquivo e linha, cenário da matriz, captura ou log. Detalhes e
+controles corretos nas fases correspondentes.
+
+| Id | Área | Sev. | Achado | Evidência | Impacto | Correção sugerida | Esforço |
+|---|---|---|---|---|---|---|---|
+| S-01 | Segurança, limites | **alta** | Limites por IP contornáveis chamando o `run.app` direto com `X-Forwarded-Host` forjado; Turnstile desligado | `auth/middleware.ts:10-17`, Cloud Run com ingress aberto, `TURNSTILE_ENABLED=false` | Spraying de senhas e cadastros em massa sem desafio; IP do aceite não confiável | Limitar também pelo último IP do `X-Forwarded-For` e validar com `isIP`; reavaliar o Turnstile | 4 a 6 h |
+| S-02 | Segurança, privacidade | **alta** | Cadastro diz qual campo já existe (e-mail e CPF) e o teto global só conta cadastros criados | `auth/service.ts:97-108`, `globalLimits.ts:15-16` | Enumeração de clientes por CPF; base para phishing | Teto global para "já cadastrado" com alerta; Turnstile; resposta neutra é decisão do cliente | 2 a 4 h |
+| O-01 | Operação, domínio | **alta** (decisão) | Domínio servido pela Vercel Hobby (uso pessoal nos termos) como ponte; certificado do Firebase preso (`HOST_MISMATCH`) | `docs/operacao/vercel.md`, API `customDomains` em 19/10 | Pausa do projeto em dia de evento tira o site do ar | Plano Pro temporário (US$ 20/mês) ou concluir a volta ao Firebase (TXT no Registro.br) | 1 h + decisão |
+| S-03 | Segurança, disponibilidade | média | 5 falhas em 15 min por e-mail bloqueiam o dono mesmo com a senha certa | `auth/limits.ts:5-6,46` | Negar o acesso de um validador durante o evento | Bloquear por e-mail e IP, ou atraso progressivo (muda RF-10) | 3 a 6 h |
+| S-04 | Segurança, sessão | média | Troca de senha sem limite de tentativas da senha atual | `auth/service.ts:331-355` | Força bruta com aparelho aberto | Reutilizar o limite de login | 1 a 2 h |
+| S-05 | Segurança, cadastro | média (decisão) | Sem prova de posse do e-mail nem do CPF; CPF alheio pode ser cadastrado antes do dono | `auth/service.ts:152-162` | Comprador legítimo barrado; atendimento | Confirmar e-mail antes de comprar; contestação de CPF | 8 a 16 h |
+| S-06 | LGPD, logs | média | CPF completo na URL das buscas do painel e da rota LGPD | `api/panel.ts:111-115`, `api/privacy.ts:42-45` | CPF nos logs de requisição da infraestrutura | Buscas por CPF em POST | 2 a 4 h |
+| S-07 | Privacidade | média | Prévia da transferência é oráculo de conta por CPF ou e-mail (404, 409, 403, 200) | `tickets/transfer.ts:114-170` | Varredura de CPFs por quem tem um ingresso | Unificar as recusas; limite no banco | 2 a 3 h |
+| S-08 | Segurança, DoS | média | Limitador do PDF público usa o `x-forwarded-for` bruto | `api/public.ts:71-73` | PDFs sem limite, CPU da instância | `clientIp` e teto global | 0,5 h |
+| S-09 | Segurança, DoS | média | `bodyLimit` só para `application/json`; `c.req.json()` aceita qualquer tipo | `app.ts:95-103` | Corpo de dezenas de MB na memória da instância | Limite em todo `/api/*` não multipart | 0,5 h |
+| S-10 | Pagamento | média (D-03) | Pix gerado com 31 s de reserva vence 1.860 s depois sem estender a reserva | `orders/payment.ts:89,229-258` | Pagamento vira `pago_sem_estoque`, dinheiro retido até estorno | Estender a reserva até o vencimento do Pix ou exigir folga mínima | 3 a 4 h |
+| F-09 | Front, Safari | média (a confirmar) | Página do evento derruba o WebKit de teste a 1280 e 360 px (capa com `filter` mais animações) | matriz (14 falhas), `webkit-repro-css.mjs` | Se reproduzir no Safari real, compra impossível nessas larguras | Testar em iPhone e Mac; trocar o desfoque ao vivo pela miniatura desfocada | 0,5 h + 2 h |
+| O-02 | Operação, alertas | média | Sem alerta para webhook ausente com pedidos pagos nem para fila de e-mails parada | seção 5.3 | Webhook quebrado invisível por até 24 h | Métricas por log na varredura e política nova | 2 h |
+| O-03 | Documentação | média | Sem manual do painel para o cliente; sem runbooks de abertura de vendas e de limpeza; `estoque.md` diz reserva de 10 min (são 30); `rollback.md` não cita a tag do `db:rollback` | seção 5.5 | Dependência da contratada para operar; erro em dia de evento | Escrever com as capturas desta auditoria | 6 a 8 h |
+| O-04 | Operação, custo | média | Homologação no ar (Cloud Run, jobs, Neon, conta de faturamento compartilhada) com dados fictícios públicos | `gcloud` em 19/10 | Custo mensal e exposição | Desligar ou pausar | 0,5 h + decisão |
+| O-05 | Processo | média | 18 commits sem push; taxa de serviço (66 arquivos, migração 0017, textos legais) sem commit | `git status` em 19/10 | Perda de trabalho; divergência com o GitHub | Revisar, comitar e fazer push | 0,5 h |
+| F-01 | LGPD, produto | média | Exportação e exclusão de dados só por API; sem tela para o administrador nem para o comprador | cenário 15, `api/privacy.ts` | O cliente não atende pedidos da LGPD sozinho | Tela "Privacidade" no painel | 4 a 6 h |
+| F-02 | Produto, operação | média | Cancelar um evento com estorno de todos os pedidos não existe como operação | cenário 11 | Estorno manual pedido a pedido no Mercado Pago, sem lista | Lista de pedidos a estornar com marcação | 4 a 8 h |
+| U-01 | Acessibilidade | média | Foco não vai ao primeiro campo com erro no login e no cadastro | heurísticas | Teclado e leitor de tela perdem o erro | Mover o foco ao campo ou ao alerta | 1 h |
+| U-04 | Acessibilidade | média | Contraste insuficiente em 5 textos de apoio (data no transferir, contagens do painel, descrição do evento) | axe | WCAG 1.4.3 | Escurecer o cinza de apoio | 0,5 h |
+| U-07 | Acessibilidade | média | Campo de busca do cabeçalho sem foco visível | axe (teclado) | WCAG 2.4.7 | Anel de foco | 0,25 h |
+| U-08 | Desempenho | média | LCP de 2,6 a 2,7 s no 4G (vídeo da abertura e fontes disputam com o JavaScript; 51 kB não usados) | Lighthouse produção | Faixa "precisa melhorar" por pouco | Adiar o vídeo; separar acesso e conta do pacote inicial | 2 a 4 h |
+| U-13 | SEO | média | Rotas desconhecidas, `robots.txt` e `sitemap.xml` respondem 200 com o HTML do site | Lighthouse produção; `curl` | "soft 404" e robots inválido nos buscadores | `robots.txt`, `sitemap.xml` e 404 para rotas fora da lista | 1 a 2 h |
+| S-11 a S-29 | Segurança | baixa | 19 itens (impasse de travas, id do evento do webhook, teto por instância, `paid_at` do relógio, portaria aberta antes da janela, relatório por lote, nonce em página com cache, tempo da recuperação, `inet` inválido, senha temporária, senhas comuns, admin sobre admin, e-mail na trilha, outro evento com nome, PDFs sem limite, higiene, `unsafe-inline`, exportação de encerramento, documentação) | seção 1.3 | Baixo, individual | Ver seção 1.3 | cerca de 25 h no total |
+| F-03 a F-08 | Fluxo | baixa/info | Sessão encerrada após a senha do primeiro acesso; Esc nos diálogos de pessoas; comportamentos corretos registrados | seção 2.3 | Baixo | Ver seção 2.3 | 1,5 h |
+| U-02, U-03, U-05, U-06, U-09, U-10, U-11, U-12, U-14 | UX, acessibilidade, SEO | baixa | Limites do campo de data; alvos de toque menores que 44 px; ordem de cabeçalhos; marco repetido; CLS do pedido local; `og:image` do início e de evento sem capa; célula com traço longo; 401 no console | seções 4.2 a 4.6 | Baixo | Ver seções | cerca de 5 h |
+| O-06 a O-08 | Operação | baixa | Neon dormindo (latência no primeiro acesso após 5 min); orçamento só do Google; retenção dos logs da Vercel não documentada | seções 3.3 e 5 | Baixo | Ver seções | 1 h + decisões |
+
+## Ordem de correção
+
+**Antes do primeiro evento grande** (cerca de 30 a 40 horas, mais as decisões do cliente):
+
+1. O-01: decidir a ponte do domínio (Pro temporário ou volta ao Firebase com o TXT) para o site não cair em dia de evento.
+2. O-05: comitar e revisar a taxa de serviço; fazer push do repositório (nada de técnico depende disso, mas tudo o mais se perde sem isso).
+3. F-09: confirmar no Safari real (iPhone e Mac) se a página do evento fecha; se sim, trocar o desfoque ao vivo pela miniatura desfocada.
+4. S-01 e S-02: limites pelo último IP real e teto para "já cadastrado", ou religar o Turnstile (decisão de 06/10 a rever).
+5. S-03: bloqueio por e-mail e IP, ou atraso progressivo, para um validador não ser tirado do ar na porta (depende de aceitar a mudança em RF-10).
+6. S-04, S-08, S-09: três correções de meia hora a duas horas que fecham tomada de conta com aparelho aberto e dois vetores de consumo de recursos.
+7. O-02: alertas de webhook ausente e de fila de e-mails parada.
+8. S-10: decidir com o cliente a folga do Pix (estender a reserva até o vencimento do Pix).
+9. O-03: manual do painel para o Bernardo com as capturas desta auditoria; runbook do dia do evento revisto; runbooks de abertura e de limpeza; corrigir os 10 minutos e a tag do rollback.
+10. U-13 e U-14: `robots.txt`, `sitemap.xml`, 404 para rotas desconhecidas e fim do 401 no console (antes de divulgar o link).
+11. S-06: CPF fora da URL das buscas do painel.
+12. U-01, U-04, U-07: foco no erro, contraste do cinza de apoio e foco visível na busca (3 horas no total).
+13. O-04: desligar a homologação.
+
+**Depois do primeiro evento**, por lotes: S-05 (decisão de produto), S-07, F-01 e F-02 (telas novas), U-08 (LCP), os 19 baixos de
+segurança (S-11 a S-29), os baixos de UX e acessibilidade, O-06 a O-08, e a limpeza de código (protótipo de 22 mil linhas, coluna
+`judicial_authorization`, avisos de lint).
+
+## O que não foi testado e por quê
+
+| Item | Motivo |
+|---|---|
+| Pagamento com cartão real (Brick, aviso quando não carrega, cartão em análise pelo antifraude), estorno e contestação reais | Exigem o Mercado Pago de teste com o ritmo do antifraude; cobertos pelo roteiro em sandbox do projeto (12 e 18/10) e pelos 14 testes de sandbox |
+| Conciliação diária e tarefas do Cloud Tasks de ponta a ponta | Exigem OIDC do Google; cobertas por 87 testes de integração e pela execução em homologação (13/10) |
+| Portaria com câmera em WebKit e Firefox, aparelhos e 4G reais | Câmera só simulável em Chromium; aparelhos reais são a seção 11.4 do plano |
+| Safari real | Só o WebKit do Playwright (Linux); por isso F-09 fica "a confirmar" |
+| Páginas logadas em produção (Lighthouse) e qualquer escrita em produção | Produção é só leitura nesta auditoria |
+| Entrega real de e-mail, SPF, DKIM e DMARC em caixas reais | Fora do ambiente local; conferido em 17/10 pelo projeto |
+| Consumo de horas e alertas do Neon | Sem acesso à API do Neon nesta sessão |
+| Checkout da referência (minhaentrada) | Exige conta e compra real |
 
 ## Fase 0: inventário e plano
 
@@ -247,7 +345,31 @@ só é simulável em Chromium (vídeo falso); em WebKit e Firefox a portaria foi
 
 ### 2.2 Resultado por área
 
-RESULTADO_FASE2
+Quatro rodadas (completa nos 9 projetos; duas só do WebKit com 1 trabalhador; uma final dos cenários corrigidos no roteiro): **346
+execuções de 66 cenários, 318 passaram, 5 passaram na segunda tentativa, 14 falharam, 9 puladas** (o cenário do aviso do Brick, que
+exige o gateway real, pulado nos 9 projetos). As 14 falhas são todas do **WebKit a 1280 e 360 px** no mesmo ponto: a página do evento
+fecha ("Page crashed") ao passar o mouse ou tocar nos botões "+"; a 390 px o WebKit passa (ver F-09). Chromium e Firefox passaram em
+tudo nas três larguras.
+
+| Área | Cenários | Chromium 360/390/1280 | WebKit 360/390/1280 | Firefox 360/390/1280 | O que passou | O que não foi possível |
+|---|---|---|---|---|---|---|
+| Comprador: conta | 6 | ok | ok | ok | Cadastro maior, 17 e 16 anos; menor de 16 recusado; CPF inválido e e-mail repetido; login errado e certo; logout; volta protegida; recuperação por e-mail com link de uso único; troca de senha com senha atual e queda das outras sessões; conferência de que não há exclusão de conta nem cópia de dados na tela (F-01) | |
+| Vitrine | 8 | ok | ok | ok | Início com destaque e sem arquivado, rascunho ou encerrado; busca pelo cabeçalho e vazio; página do evento com preço e taxa, formas de pagamento, compartilhar; em breve; vendas encerradas; evento encerrado; esgotado; arquivado e rascunho com 404 no HTML e na API | |
+| Checkout | 5 | ok | 1280 e 360 fecham (F-09) | ok | 1 ingresso até a confirmação com Pix; 6 ingressos e API recusando 7; promoter inexistente, desativado e válido sem desconto; reserva expirando com estoque de volta; compra exige login e volta ao checkout com a seleção | |
+| Pagamento | 5 | ok | 1280 e 360 fecham (F-09) | ok | Pix expirado; cartão aprovado (2 QR distintos); cartão recusado; cartão pendente com atualização automática | Aviso do Brick que não carrega e cartão em análise real (só com o Mercado Pago de teste; cobertos pelo roteiro em sandbox e por teste unitário) |
+| Menores | 4 | ok | 1280 e 360 fecham (F-09) | ok | 17 e 16 anos aceitam o Termo de Ciência, pagam e baixam o Termo de Autorização (PDF sem CPF); evento 18+ recusa 17 anos no servidor; termo público do evento | |
+| Transferência | 6 | ok | ok | ok | Caminho feliz com nome mascarado, os dois lados e os dois e-mails; conta inexistente; para si mesmo; dentro das 2 h; utilizado, cancelado e estornado recusados; retransferência; QR antigo invalidado na portaria; desfazer pelo administrador; idade de quem recebe (18+ recusa 17; 16+ exige o Termo antes do QR) | |
+| Webhook e conciliação | 6 | ok | | | Duplicado; fora de ordem (estorno e aprovação tardia); assinatura inválida 401; pagamento depois da reserva com estoque (confirma) e sem estoque (`pago_sem_estoque`, e-mail e exceção); rotinas internas 503 sem OIDC | Conciliação diária e tarefas do Cloud Tasks (OIDC do Google; cobertas por 87 testes de integração e pela execução em homologação) |
+| Cancelamento e estorno | 5 | ok | | | Cancelar um ingresso e todos do pedido pela tela; estorno total pelo gateway (pedido estornado, válido cancelado, utilizado mantido); contestação; "evento cancelado com estorno de todos" não existe como operação (F-02) | |
+| Portaria | 5 | ok | | | Câmera simulada: válido, reutilizado (amarelo com horário), cancelado, QR antigo de transferência, outro evento, adulterado; busca manual por nome, CPF e código com CPF mascarado e entrada manual; câmera negada; dois validadores no mesmo ingresso (uma entrada); lista de contingência em PDF (CPF mascarado, "CONFIDENCIAL") e CSV | Câmera só simulável em Chromium; aparelhos reais e 4G real fora do alcance |
+| Admin | 10 | ok | ok (páginas) | ok (páginas) | Todas as 15 páginas e as abas do evento sem rolagem horizontal nas 9 combinações; criar evento pela tela com capa, tipos com janelas, publicar, cor válida e inválida, encerrar vendas, arquivar e desarquivar; excluir rascunho pelo nome e recusa para evento com venda; promoters (criar, repetido, desativar); equipe (senha temporária, primeiro acesso, desativar derruba a sessão); compradores (CPF mascarado e revelação auditada); relatórios e 3 CSVs com BOM e sem CPF; pedidos; entradas; configurações da taxa (prévia e limites) | |
+| E-mails e PDFs | 2 | ok | | | 7 modelos gerados na rodada (cadastro, recuperação, compra, 3 de transferência, pagamento sem estoque): assunto, links só do site, rodapé com atendimento, sem "undefined", cabem a 360 px (capturas em `capturas/emails/`); PDF do ingresso e do pedido em A4 com nome, código, valor e sem CPF, QR do PDF lido pelo mesmo leitor da portaria; Termo de Autorização em A4 | Remetente e Reply-To conferidos no código (`EMAIL_FROM`, `Reply-To` = `EMAIL_REPLY_TO` ou o e-mail de atendimento) e na entrega real de 17/10, não na captura local |
+| LGPD | 1 | ok | | | Localizar titular, exportar com protocolo (recusa sem protocolo), validador 403, anonimizar com reconhecimento de ingresso válido, conta deixa de entrar, pedido e trilha preservados sem dado pessoal | |
+| Concorrência | 2 | ok | | | Dois compradores na última unidade (um reserva); lote esgotando no meio do pedido (preço recalculado e tela avisa) | |
+
+Capturas em `docs/relatorios/capturas/` (262 imagens, só dados fictícios), e-mails renderizados em `capturas/emails/`, PDFs em
+`capturas/pdfs/` e `capturas/menores/`.
+
 
 ### 2.3 Achados funcionais e de fluxo
 
@@ -261,9 +383,11 @@ RESULTADO_FASE2
 | F-06 | info | Lote esgotando no meio do pedido: o servidor recalcula e a tela avisa "Atenção. O valor do pedido mudou. Confira o novo total antes de continuar." e mostra o valor novo | `16-concorrencia` | Comportamento correto | | |
 | F-07 | info | Dois compradores na última unidade: um reserva, o outro vê o aviso de estoque; dois validadores no mesmo QR: uma entrada só | `16-concorrencia`, `12-portaria` | Correto | | |
 | F-08 | info | Pagamento depois da reserva vencer: com estoque confirma e emite; sem estoque vira `pago_sem_estoque`, aviso por e-mail aos administradores e item em Exceções | `10-webhook` | Correto (procedimento provisório D-13) | | |
+| F-09 | média, a confirmar | O WebKit do Playwright (motor do Safari, Linux) **fecha a página do evento** a 1280 e 360 px em qualquer interação, inclusive passar o mouse no "+"; a 390 px funciona. Isolado em `auditoria/ferramentas/webkit-repro-css.mjs`: o problema some tanto ao desligar `filter`/`backdrop-filter` quanto ao desligar `transform`/`transition` (é a combinação da capa desfocada com as animações); persiste com "menos movimento"; início, lista de eventos e entrar não fecham | 14 falhas da matriz, `webkit-repro.mjs` e `webkit-repro-css.mjs` | Se reproduzir no Safari real (iPhone e Mac), ninguém compra pelo Safari nessas larguras: impacto alto. Pode ser só do WebKit de teste no Linux | Testar num iPhone e num Mac reais em 30 min; se reproduzir, trocar o `filter: blur` da capa pela miniatura já desfocada que o servidor gera (sem filtro ao vivo) ou tirar a transformação dos elementos com filtro | 0,5 h para confirmar; 2 h para corrigir |
 
-A instabilidade do WebKit na rodada com 3 trabalhadores (navegador fechado no meio do teste por falta de memória na máquina da
-auditoria) foi tratada com uma rodada só dos projetos WebKit com 1 trabalhador; o resultado consolidado está na matriz.
+A primeira rodada do WebKit, com 3 trabalhadores, sofreu também com falta de memória na máquina da auditoria (o kernel matou um
+navegador por falta de memória às 00:33); as duas rodadas seguintes, com 1 trabalhador e memória livre, isolaram o que restou: o
+fechamento da página do evento (F-09).
 
 ## Fase 3: teste de carga (k6, local)
 
@@ -293,8 +417,92 @@ Para rodar em produção, só leitura: `node auditoria/ferramentas/invariantes.m
 
 ### 3.2 Resultados
 
-Em execução (escala 1 e depois escala 3); os números e os gráficos vão para `docs/relatorios/carga/escala-1.md` e `escala-3.md` e o
-resumo entra aqui.
+Relatórios completos com gráficos: [`carga/escala-1.md`](carga/escala-1.md) e [`carga/escala-3.md`](carga/escala-3.md).
+
+| Medida | Escala 1 (500 ingressos) | Escala 3 (1.500 ingressos) | Limiar |
+|---|---|---|---|
+| Pessoas simultâneas na abertura (usuários virtuais máximos) | 330 | 990 | |
+| Tentativas de compra em 10 min; concluídas (pagas, com ingresso); recusadas por estoque | 600; 335; 265 | 1.800; 1.005; 795 | recusas por estoque são esperadas |
+| Ingressos emitidos / capacidade | 500 / 500 | 1.494 / 1.500 (6 unidades sobraram porque os últimos pedidos pediam 2) | nunca acima |
+| Erros inesperados (compra) | 0 | 0 | 0 |
+| Página do evento (HTML): p50 / p95 / p99 | 5 / 6 / 7 ms | 5 / 8 / 12 ms | p95 abaixo de 1 s |
+| Tempo até o primeiro byte da página do evento: p50 / p95 / p99 | 5 / 6 / 7 ms | 5 / 8 / 12 ms | |
+| API do evento: p95 | 5 ms | 6 ms | 1 s |
+| Login (Argon2): p50 / p95 / p99 | 11 / 36 / 46 ms | 13 / 43 / 60 ms | 5 s |
+| Pedido com reserva (`FOR UPDATE`): p50 / p95 / p99 | 8 / 13 / 15 ms | 10 / 16 / 22 ms | 5 s |
+| Pix (cobrança): p95 | 7 ms | 9 ms | 5 s |
+| Confirmação pelo webhook com emissão dos ingressos: p50 / p95 / p99 | 16 / 20 / 25 ms | 17 / 26 / 43 ms | 5 s |
+| Pedido e Meus ingressos: p95 | 8 / 6 ms | 10 / 7 ms | 5 s |
+| Compra completa (inclui 1 a 4 s simulados no app do banco): p95 | 3,9 s | 4,0 s | 10 s |
+| Webhooks: válidos (200) / assinatura inválida (401) / erros; p95 | 450 / 50 / 0; 7 ms | 1.351 / 150 / 0; 7 ms | 2 s |
+| Portaria: leituras; válidas; "já utilizado"; erros; p95 do `/gate/scan` | 505; 459; 46; 0; 14 ms | 1.504; 1.370; 134; 0; 14 ms | 1 s |
+| Contador da portaria: p95 | 4 ms | 4 ms | 1 s |
+| CPU do processo do servidor: máximo (p95) | 25% (18%) de um núcleo | 72% (56%) de um núcleo | |
+| Memória RSS do servidor: máximo | 282 MB | 248 MB | 512 MiB da instância |
+| Conexões abertas no PostgreSQL: máximo (ativas) | 5 (3) | 5 (2) | 5 por instância (`DB_POOL_MAX`) |
+| Fila de e-mails: enviados / falhas; tempo na fila p95 / máximo | 335 / 0; 0,01 s / 0,02 s | 1.005 / 0; 0,01 s / 0,05 s | (captura local, sem SMTP) |
+| Invariantes depois da carga (14 consultas) | todas conferem | todas conferem | 0 violações |
+
+Leitura: com o triplo da carga a latência subiu pouco (p95 da página do evento de 6 para 8 ms, do pedido de 13 para 16 ms) e o
+servidor ficou abaixo de três quartos de um núcleo, com o pool de 5 conexões nunca saturado (no máximo 2 ativas). O custo da compra é
+dominado pelo login (Argon2id, 36 a 43 ms no p95) e pela confirmação com emissão (20 a 26 ms); a página do evento é servida em
+microssegundos de CPU graças ao cache de 60 s do HTML inicial e às consultas leves. A fila de e-mails não acumulou. Nenhum QR
+duplicado, nenhuma entrada dupla, nenhum ingresso acima da capacidade em nenhuma das rodadas.
+
+
+Observações de método: na primeira rodada da escala 1 a fase da portaria falhou por um erro do roteiro k6 (o k6 limpa os cookies do
+usuário virtual a cada iteração e a sessão do validador caía; o servidor respondeu 401 corretamente). O roteiro foi corrigido
+(`noCookiesReset`) e a escala 1 foi repetida; a sondagem de diagnóstico adicionou 5 webhooks e 12 leituras sem sessão à rodada da
+escala 3, sem efeito nos números.
+
+### 3.3 Tradução para a produção (sem rodar lá)
+
+Configuração lida do Cloud Run em 19/10/2026 (só leitura): 1 vCPU, 512 MiB (heap do Node em 320 MB), concorrência 80, tempo limite 60 s,
+0 a 3 instâncias, CPU limitada fora da requisição (`cpu-throttling`), `startup-cpu-boost`, ingress aberto; `DB_POOL_MAX=5` por instância;
+fila do Cloud Tasks com 5 despachos por segundo e 5 concorrentes. Neon Launch com 0,25 a 2 CU e suspensão automática; pela
+documentação do Neon, `max_connections` é 104 a 0,25 CU (97 para a aplicação), 209 a 0,5, 419 a 1 e 839 a 2 CU; o pooler
+(PgBouncer, modo transação) aceita até 10.000 conexões de cliente. Vercel Hobby: 100 GB de transferência, 1 milhão de requisições de
+CDN por mês e regra de uso pessoal. Cloud Run: 2 milhões de requisições, 180 mil vCPU-s e 360 mil GiB-s grátis por mês por conta de
+faturamento.
+
+**Como a conta foi feita.** O servidor local é o mesmo pacote do contêiner, com o mesmo heap e o mesmo pool. A CPU medida aqui é a de
+um núcleo de computador de mesa, mais rápido que uma vCPU do Cloud Run; a tradução usa um fator conservador de 2 vezes (cada 1% medido
+vira 2% de uma vCPU). O Cloud Run abre instância nova quando a CPU ou a concorrência de uma instância se esgotam; com concorrência 80 e
+requisições curtas (p95 de dezenas de ms), o que manda é a CPU.
+
+| Cenário | Medido no local | No Cloud Run (1 vCPU por instância) | Conexões no Neon | Veredito |
+|---|---|---|---|---|
+| Abertura, escala 1 (300 pessoas em 10 min, 60 pedidos/min) | CPU máxima 25% de um núcleo (p95 18%); memória 282 MB; 5 conexões abertas, 3 ativas | cerca de 50% de uma vCPU: **1 instância** (a segunda só com rajadas); memória dentro dos 512 MiB | 5 por instância (até 15 com 3): cabe folgado nas 97 de 0,25 CU | Aguenta |
+| Abertura, escala 3 (900 pessoas, 180 pedidos/min) | CPU máxima 72% de um núcleo (p95 56%, p50 45%); memória 248 MB; 5 conexões, 2 ativas | cerca de 145% de uma vCPU no pico (p95 112%): **2 instâncias no pico, 3 nas rajadas**; é o limite confortável do `--max-instances=3` | até 15 | Aguenta, no limite da configuração atual |
+| 500 webhooks em 5 min | p95 de 7 ms, 450 válidos e 50 recusados por assinatura, nenhum erro | desprezível; o Mercado Pago entrega em paralelo mas cada notificação é curta | reconsulta ao gateway por notificação (rede, não CPU) | Aguenta |
+| Portaria, 500 leituras em 90 min por 3 validadores (medida 10 vezes mais rápida) | 505 leituras, 0 erros, p95 de 14 ms (contador 4 ms), CPU do servidor abaixo de 10% na fase | desprezível (menos de 1 requisição por segundo no ritmo real) | 1 conexão ativa | Aguenta |
+
+**Neon.** Com `DB_POOL_MAX=5` e no máximo 3 instâncias, o teto é 15 conexões: menos de 16% das 97 disponíveis a 0,25 CU, sem precisar do
+pooler para capacidade. O risco real do Neon não é conexão, é o **despertar**: com suspensão automática, a primeira requisição depois
+de 5 minutos parados espera o banco acordar (segundos); a decisão de 18/10 (verificação de saúde sem banco, para deixar dormir) troca
+custo por essa latência na primeira compra de cada período parado. Na abertura das vendas e no dia do evento, o runbook já prevê
+`evento-on` (instância mínima 1), mas o Neon continua a dormir se não houver consulta por 5 minutos: a varredura só roda às 04:00.
+
+**Vercel Hobby.** Um evento de 500 ingressos gera na CDN da Vercel cerca de: página do evento 300 pessoas x 25 requisições = 7.500;
+espera do Pix (consulta a cada 4 s por até 30 min, mas em média 3 min) 600 pedidos x 45 = 27.000; portaria (contador a cada 4 s em 3
+aparelhos por 3 h) 8.100; painel aberto 2 x 3 h x 900 = 5.400; total perto de **50 mil requisições por evento**, 5% do milhão mensal, e
+menos de 1 GB de transferência (100 GB). Três eventos por mês continuam longe do limite. O que pesa não é a cota, é a **regra de uso
+pessoal** do Hobby: venda de ingressos é uso comercial e a Vercel pode pausar o projeto sem aviso prévio em horário de evento.
+
+**Cloud Run (franquia).** O mesmo evento: cerca de 50 mil requisições e, com 1 instância ativa por 3 horas no `evento-on` (parada cobra
+vCPU e memória: cerca de R$ 0,000021 por vCPU-s e por GiB-s), **R$ 1 a 2 por dia de evento**; o resto do mês escala a zero. A franquia
+de 2 milhões de requisições e 180 mil vCPU-s cobre com folga. Escala 3 (1.500 ingressos): três vezes isso, ainda dentro da franquia.
+
+**O que mudar antes do primeiro evento, e o custo.**
+
+| Mudança | Por quê | Custo |
+|---|---|---|
+| `evento-on` (instância mínima 1) na abertura das vendas e no dia do evento, e `evento-off` depois (já previsto nos runbooks) | Evita o arranque a frio (vários segundos) justamente na primeira leva de compradores e na primeira leitura da portaria | Cerca de R$ 5 por dia ligado (seção 8 do `README-DEPLOY.md`) |
+| Manter o Neon acordado nessas janelas: a conciliação sob demanda e o uptime não garantem; opção simples é aumentar o `autosuspend` do Neon para 1 h nos dias de evento (console) ou, por decisão, desligar a suspensão (cerca de US$ 19 por mês a 0,25 CU) | Sem isso, depois de 5 min sem compra o próximo comprador espera o banco acordar | De US$ 0 (ajuste manual nos dias de evento) a US$ 19 por mês |
+| Subir `--max-instances` de 3 para 5 só no dia da abertura de um evento grande (acima de 1.500 ingressos) | A escala 3 é o limite confortável de 3 instâncias (ver tabela); acima disso as requisições fazem fila | Zero fora do pico; no pico, centavos |
+| Trocar a ponte Vercel Hobby pelo Firebase (ou um plano Pro da Vercel, US$ 20 por mês, enquanto o Firebase não emite o certificado) | Risco de pausa por uso comercial em dia de evento | US$ 0 (Firebase) ou US$ 20 por mês (Pro temporário) |
+| Alerta de ausência de webhooks e de fila de e-mails parada (seção 5.3) | Hoje um webhook quebrado só aparece em 24 h | Centavos (métrica por log) |
+| Nada a mudar no pool, na memória ou na concorrência | As medições ficaram longe dos limites | |
 
 ## Fase 4: UI, UX, acessibilidade e desempenho
 
@@ -335,20 +543,140 @@ pede login antes; o número de toques depois do login não foi medido.
 Diferenças que não recomendo adotar: carteira virtual própria (MECash), reconhecimento facial, PDV e área de relações públicas
 (escopo fora do contrato), devolução de Pix para uma carteira interna (pior para o comprador).
 
-### 4.2 Heurísticas, acessibilidade, desempenho e compartilhamento
+### 4.2 Heurísticas de usabilidade (celular)
 
-Em execução.
+Medido com `auditoria/ferramentas/toque-local.mjs` (Chromium emulando iPhone a 390 x 844) e pelas capturas da Fase 2 (relatório
+completo em `docs/relatorios/acessibilidade/heuristicas-celular.md`).
+
+| Heurística | Resultado | Achado |
+|---|---|---|
+| Estados vazios | "Você ainda não tem ingressos. Quando um pagamento for confirmado, os ingressos aparecem aqui. Ver eventos"; "Você ainda não fez nenhuma compra. Ver eventos"; busca sem resultado: "Nenhum evento encontrado para ..." com "Limpar busca" e "Ver todos os eventos"; "Nenhum evento aberto" na portaria | Bons: explicam e dão um caminho |
+| Estados de carregamento | Esqueletos com `aria-busy` nas páginas do evento, ingressos, compras, portaria e áreas sob demanda, na mesma altura do conteúdo (sem salto) | Bom |
+| Mensagens de erro | Login: "E-mail ou senha incorretos." (mensagem única, sem revelar o campo); cadastro: mensagem por campo com `aria-invalid` e texto específico (CPF, 16 anos, e-mail repetido); código de promoter inválido com mensagem no campo; pagamento recusado e prazo terminado com título, explicação e próximo passo | Bons |
+| Foco depois do erro | Depois de enviar o login ou o cadastro com erro, o foco continua no `body`; a mensagem tem `role="alert"` (anunciada), mas o teclado e o leitor de tela não são levados ao primeiro campo com erro | **U-01** (média, acessibilidade) |
+| Máscaras de CPF e telefone | CPF `inputmode="numeric"`, máscara ao digitar ("123.456.789-09"); telefone `inputmode="tel"`, `autocomplete="tel"`, máscara "(11) 98765-4321"; e-mail `type="email"` com `autocomplete` | Bom |
+| Campos de data no iPhone | `type="date"` (teclado e seletor nativos; aparência própria sem `appearance` nativa, tratado em 16/10 pelo projeto); sem `min` e `max` no nascimento | **U-02** (baixa): `min="1900-01-01"` e `max` = hoje menos 16 anos ajudariam o seletor nativo |
+| Teclado numérico | CPF numérico, telefone `tel`, quantidade por botões "+" e "-" com `output` | Bom |
+| Botões ao alcance do polegar | "Continuar" na página do evento (barra fixa) em y = 763 de 844, 318 x 52 px; "Entrar" em y = 465; "Criar conta" abaixo da primeira tela (fim do formulário, esperado) | Bom |
+| Toque mínimo de 44 px | Fora do padrão: "Entrar" e "Painel" no cabeçalho (81 x 40), o link da Política na página do evento e na revisão (253 x 14, texto corrido), os links dos Termos no aceite (108 x 17), a caixa de aceite (24 x 24, com rótulo clicável ao lado) e os links PX-nnnnn na lista de pedidos do painel (69 x 23) | **U-03** (baixa): subir o cabeçalho para 44 px e dar área de toque de 44 px aos links de texto e às caixas |
+| Contraste com a cor de destaque do evento | A cor de destaque só pinta o bloco da data e o cronômetro, com texto calculado pela paleta (`src/site/accent.ts`, testes de contraste em `accent.test.ts` e `e2e/cor-destaque.spec.ts`); o botão de compra continua no roxo da marca | Bom por desenho; o axe não encontrou contraste insuficiente nessas peças |
+| Diálogos | Diálogos de evento fecham com Esc; os de promoter e de membro da equipe não (F-04) | Ver F-04 |
+| Captura de página inteira | Blocos abaixo da dobra entram em cascata quando aparecem (IntersectionObserver): numa captura de página inteira saem transparentes; para quem rola, aparecem; sem JavaScript de observação, já nascem visíveis | Nenhum |
+
+### 4.3 Acessibilidade (WCAG 2.1 AA)
+
+Varredura com axe-core 4.10 (regras WCAG 2.1 A e AA e boas práticas) em 31 páginas (site, conta, portaria e painel) a 390 e
+1280 px, mais navegação por teclado e leitura dos nomes acessíveis nas telas de compra e do ingresso
+(`auditoria/ferramentas/axe-local.mjs`; relatório em `docs/relatorios/acessibilidade/axe.md`). Lighthouse deu **100 em acessibilidade**
+nas 5 páginas medidas.
+
+| Resultado | Detalhe |
+|---|---|
+| Páginas sem violação | 25 de 31 nas duas larguras (início, evento, entrar, criar conta, recuperar senha, checkout, pedido, meus ingressos, ingresso, tela cheia, minha conta, minhas compras, portaria, portaria do evento e a maior parte do painel) |
+| Contraste insuficiente (sério) | `.px-stub-day` e `.px-stub-month` na página de transferir (o bloco da data no resumo do ingresso); `.px-count` (contagem cinza "10 eventos · 1 arquivado") nas listas de eventos e de compradores do painel; `.px-desc` (descrição do evento no detalhe do painel). Cinco elementos, todos texto de apoio em cinza claro sobre fundo claro | **U-04** (média): escurecer o cinza de apoio para a razão 4,5:1 |
+| Ordem de cabeçalhos (moderado) | Cartões da lista `/eventos` usam `h3` logo depois do `h1` (pula o `h2`); página Entradas do painel tem `h3` sem `h2` | **U-05** (baixa) |
+| Marco repetido (moderado) | Página dos Termos: duas regiões `nav` sem nome distinto (`.px-legal-nav`) | **U-06** (baixa): `aria-label` no `nav` dos documentos |
+| Navegação por teclado | Todas as páginas têm "Ir para o conteúdo" como primeira parada; ordem do Tab segue a leitura; botões "+", "Compartilhar", "Copiar link", "Iniciar leitura" e "Busca manual" alcançáveis. **Sem foco visível** no campo de busca do cabeçalho (`input: Buscar evento`) em todas as páginas e num campo do painel (`admin`) | **U-07** (média): anel de foco no campo de busca (o resto tem `outline` ou sombra) |
+| Leitor de tela nas telas de compra e do ingresso | 0 controles sem nome acessível (evento 27 controles, checkout 11, pedido 18, ingresso 26); QR com `aria-label` "QR Code do ingresso PX-...", cronômetro em `role="timer"` com rótulo por extenso e mudanças de estado anunciadas; steppers em `role="group"` com `output` | Bom |
+| Textos alternativos | Capas com `alt` do nome do evento; ícones decorativos com `aria-hidden`; logo com `alt="PartyX"` | Bom |
+
+### 4.4 Desempenho (Lighthouse móvel, 4G simulado)
+
+Lighthouse 13.5 móvel (Moto G emulado, 4G simulado 1,6 Mb/s com 150 ms de ida e volta, CPU 4 vezes mais lenta). Duas medições: no
+servidor local da suíte (sem compressão de resposta: o Node serve os arquivos sem gzip, o que não ocorre em produção) e **na produção,
+só leitura, nas duas páginas públicas** (o domínio passa pela Vercel, que comprime com brotli). Relatórios HTML em
+`docs/relatorios/desempenho/`.
+
+| Página | Onde | Desempenho | Acessib. | Boas práticas | SEO | LCP | CLS | TBT | FCP | Speed Index | Transferido |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Vitrine (início) | produção | **94** | 100 | 96 | 91 | 2,6 s | 0 | 140 ms | 1,8 s | 2,1 s | 295 kB |
+| Página do evento | produção | **96** | 100 | 96 | 92 | 2,7 s | 0 | 40 ms | 1,4 s | 2,1 s | 298 kB |
+| Vitrine (início) | local, sem compressão | 84 | 100 | 96 | 91 | 3,6 s | 0 | 70 ms | 3,0 s | 3,0 s | 548 kB |
+| Página do evento | local, sem compressão | 84 | 100 | 96 | 92 | 3,6 s | 0 | 40 ms | 3,0 s | 3,0 s | 549 kB |
+| Checkout (revisão) | local, logado | 79 | 100 | 100 | 92 | 4,2 s | 0 | 0 ms | 3,2 s | 3,2 s | 540 kB |
+| Pedido (Pix) | local, logado | 72 | 100 | 100 | 92 | 4,4 s | 0,141 | 10 ms | 3,3 s | 3,3 s | 561 kB |
+| Meus ingressos | local, logado | 78 | 100 | 100 | 92 | 4,3 s | 0 | 20 ms | 3,3 s | 3,3 s | 552 kB |
+
+Leitura dos Core Web Vitals em produção: LCP de 2,6 a 2,7 s em 4G simulado (limite "bom" do Google é 2,5 s: fica na faixa "precisa
+melhorar", por pouco), CLS 0 (ótimo), TBT 40 a 140 ms (bom). O tempo de resposta do servidor na produção foi de 40 a 90 ms. A
+composição do download em produção: JavaScript 100 kB, vídeo da abertura 79 kB (só na primeira visita), fontes 70 kB, imagens 23 kB,
+CSS 15 kB, HTML 4 kB. As páginas logadas não foram medidas em produção (exigiriam conta real).
+
+| Id | Sev. | Achado | Correção | Esforço |
+|---|---|---|---|---|
+| U-08 | média | LCP de 2,6 s no 4G: o vídeo da abertura (79 kB) e as fontes (70 kB) disputam a banda com o JavaScript na primeira visita; o Lighthouse aponta 51 a 54 kB de JavaScript não usado no pacote inicial (`index`), que leva as páginas de conta e de acesso | Pré-conectar e priorizar a capa; carregar o vídeo da abertura depois do LCP ou só após a primeira pintura; separar as páginas de acesso e conta do pacote inicial | 2 a 4 h |
+| U-09 | baixa | CLS de 0,141 na página do pedido no ambiente local: o resumo lateral e o painel do simulador (só local) entram depois da primeira pintura | Reservar a altura do resumo (esqueleto do mesmo tamanho); o simulador não existe em produção | 1 h |
+| U-13 | média, SEO | Qualquer endereço desconhecido responde 200 com o HTML do site (inclusive `/robots.txt` e `/sitemap.xml`): o Lighthouse marca "robots.txt is not valid" e os buscadores veem páginas inexistentes como válidas ("soft 404"). A página do evento inexistente já responde 404 corretamente | `robots.txt` e `sitemap.xml` estáticos em `public/` (os eventos publicados no sitemap pelo servidor), e 404 para rotas fora da lista conhecida do front | 1 a 2 h |
+| U-14 | baixa | Erro no console em toda página para visitante sem sessão: a verificação `GET /api/auth/me` responde 401 e o navegador registra "Failed to load resource" (Lighthouse "errors-in-console") | Responder 200 com `{ user: null }` ou 204 para a sondagem da sessão | 0,5 h |
+
+**Pacotes e imagens.** Build de 19/10: JavaScript inicial 313 kB (95,5 kB comprimido) mais CSS 63 kB (13 kB); áreas carregadas sob
+demanda: admin 192 kB (46 kB), portaria 145 kB (53 kB, leitor de QR), checkout 36 kB (11 kB), conta 25 kB (7 kB); 14 arquivos de fonte
+(quatro famílias, latino, latino estendido e vietnamita, 10 a 36 kB cada; só duas pré-carregadas); vídeo da abertura 80 kB com hash e
+cache de 1 ano. Imagens dos eventos: o servidor reprocessa a capa para WebP em 1600, 1080 e 640 px e uma miniatura de 48 px
+desfocada embutida no HTML (`srcset` e `sizes` nos cartões, `decoding="async"`, `loading="lazy"` fora da primeira tela, `preload` da capa
+do destaque e da página do evento). A abertura em vídeo toca uma vez por visita, no máximo 4 s, não toca nas rotas de tarefa nem com
+"economia de dados", e nunca atrasa o carregamento da página por baixo (suíte `e2e/abertura.spec.ts`, 17 casos).
+
+### 4.5 Compartilhamento (pré-visualização dos links)
+
+Medido no servidor local (`curl` no HTML servido): a página do evento leva `og:title` ("Nome do evento · PartyX"), `og:description`
+(data, hora, local e início da descrição), `og:url`, `og:site_name`, `og:locale`, `twitter:card` e, quando o evento tem capa, `og:image`
+1200 x 630 em JPEG com `og:image:width/height` e `twitter:image`. O WhatsApp e o Instagram não executam JavaScript e leem só o HTML:
+o servidor injeta as tags antes de responder (RF-26, verificado também pelos testes de `public.integration.test.ts`). Evento em rascunho
+ou arquivado responde 404 com tags genéricas (nada vaza). Dois achados:
+
+| Id | Sev. | Achado | Correção | Esforço |
+|---|---|---|---|---|
+| U-10 | baixa | O início (`/`) e a lista de eventos não têm `og:image`: o link da bio do Instagram e a mensagem no WhatsApp aparecem só com texto | Imagem padrão da marca 1200 x 630 em `public/brand/` e a tag no `index.html` (ou a capa do evento em destaque) | 0,5 h |
+| U-11 | baixa | Evento sem capa fica sem imagem na pré-visualização (`twitter:card` "summary") | Mesma imagem padrão como reserva | 0,25 h |
+
+### 4.6 Consistência de texto em pt-BR
+
+Varredura automática em `src/site`, `server/src/mail`, `server/src/tickets`, `server/src/minors`, `server/src/exports` e
+`conteudo-legal`: nenhum travessão em texto visível (os 6 encontrados são comentários de código, mais um traço longo como célula vazia na
+tabela de tipos do painel, `src/site/adminEvents.tsx:1915`); "Pix" sempre com essa grafia (0 "PIX"); "e-mail" com hífen em todo texto
+visível ("email" só em identificadores); "Mercado Pago" correto (as ocorrências de `MercadoPago` são o nome do SDK no código);
+reticências "..." só uma vez; sem "ticket" em texto visível; nenhum "Ops", "Oops" ou "Algo deu errado". Erros de digitação: nenhum
+encontrado na amostra de termos comuns. Tom: imperativo direto e "você" minúsculo nas mensagens, títulos de página em caixa alta
+pela fonte (não no texto). Achado: a célula vazia com o traço longo deve virar "sem valor" ou ficar vazia (U-12, baixa, 5 min).
 
 ## Fase 5: operação e prontidão para entrega
 
 ### 5.1 Ensaio de restauração do backup mais recente
 
-Em execução (depois da carga): cópia `partyx-20261019T021135Z.dump` (124 KB, 19/10 02:11 UTC, feita antes da candidata
-`partyx-00044-dil`) baixada do bucket privado em modo leitura, SHA-256 conferido, manifesto com 24 tabelas e 17 migrações.
+Feito em 19/10/2026 com `auditoria/ferramentas/ensaio-restauracao.sh latest` (PostgreSQL 18 local em Docker, descartável; a cópia é lida
+do bucket em modo leitura; nenhum dado pessoal impresso; o banco local é apagado no fim).
 
-### 5.2 Ensaio de rollback no ambiente local
+| Passo | Resultado |
+|---|---|
+| Cópia mais recente | `partyx-20261019T060014Z.dump` (diária das 03:00 de Brasília de 19/10, 124 KB), manifesto e SHA-256 baixados em 2 s |
+| Integridade | SHA-256 confere |
+| Restauração (`pg_restore`, 2 trabalhos) | 4 s |
+| Verificações do projeto (`npm run backup:verify`) | **21 de 21 OK**: 17 migrações (iguais ao manifesto; o repositório tem 18 porque a 0017 da taxa ainda não foi publicada, informado por `MIGRACOES_ESPERADAS=17`), contagens iguais ou maiores que o manifesto em 13 tabelas (19 usuários, 8 pedidos, 7 ingressos, 7 entradas, 77 eventos de pagamento, 79 linhas de auditoria), códigos únicos, vendidos = emitidos, um ingresso por unidade, `paid_at` presente, estoque dentro da capacidade, entradas registradas, 3 gatilhos presentes |
+| Invariantes da auditoria (14 consultas) | 13 conferem; a 11 (total = itens + taxa) não se aplica a esse banco, que ainda não tem a coluna da taxa |
+| Tempo total, do download ao banco conferido | 9 s |
+| Ponto de recuperação | 19/10 06:00 UTC; o que aconteceu depois não está na cópia (RPO do backup diário: até 24 h; o PITR do Neon cobre 7 dias com precisão de segundos) |
 
-Em execução (depois da carga).
+Observação: a primeira execução reprovou a conferência de migrações (17 restauradas contra 18 no repositório) porque a pasta de
+trabalho tem a migração não publicada; a verificação prevê esse caso com `MIGRACOES_ESPERADAS`. O procedimento em
+`docs/operacao/runbooks/restauracao.md` funciona como está; vale acrescentar a variável no texto para cópias anteriores a uma release.
+
+### 5.2 Ensaio de rollback no ambiente local, cronometrado
+
+Feito com `auditoria/ferramentas/ensaio-rollback.sh`, seguindo `docs/operacao/runbooks/rollback.md`:
+
+| Passo do runbook | Ensaio local | Tempo |
+|---|---|---|
+| 1. Listar as revisões | `gcloud run revisions list` na produção, só leitura (seção abaixo) | 3,9 s (5 revisões prontas listadas: 00044-dil, 00042-ten, 00040-dow, 00039-faz, 00037-zap) |
+| 2. "Só o código": trocar o tráfego para a revisão anterior | Parar o servidor empacotado da versão nova (SIGTERM, como o Cloud Run) e subir o da versão anterior na mesma porta até `/api/health/ready` responder com o banco ok | **1,1 s** (na segunda execução; 1,4 s na primeira) |
+| 3. Conferir a página inicial e a saúde | `GET /` 200, `/api/health/ready` com `database: ok` | incluído |
+| "Revisão nova tinha migração": reverter por SQL revisado | `npm run db:rollback -- 0017_taxa_de_servico` num banco de teste com as 18 migrações: a reversão da taxa de serviço aplicou (18 para 17); reaplicação da migração em seguida (17 para 18) | reversão 0,9 s; reaplicação 0,85 s |
+
+Em produção o passo 2 é `PROJECT=partyx-producao REVISAO=<anterior> ./infra/producao/deploy.sh rollback` (`update-traffic`), que leva
+cerca de 10 a 30 s para propagar; a referência de retorno atual é `partyx-00042-ten` (publicação de 18/10 com vendas abertas). A
+reversão de migração em produção continua bloqueada de propósito (`db:rollback` recusa em produção): é decisão humana, com backup, por
+SQL revisado, como o runbook diz. O ensaio mostrou um detalhe do runbook a corrigir: ele não diz que `db:rollback` exige a tag da
+migração como argumento (sem ela o comando falha com a mensagem de uso).
 
 ### 5.3 Alertas: os 17 em produção, o que cobrem e o que falta
 

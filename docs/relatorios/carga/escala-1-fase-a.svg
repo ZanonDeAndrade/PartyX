@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="268" font-family="Arial, sans-serif" font-size="12">
+<rect width="900" height="268" fill="#fff"/>
+<text x="12" y="22" font-size="15" font-weight="bold">Escala 1: tempo por rota (fase A: abertura e pedidos)</text>
+<text x="12" y="40" fill="#555">barras: p50 (escuro), p95 (médio), p99 (claro), em ms; eixo até 44 ms</text>
+<text x="12" y="69">compra_1_login (1202)</text>
+<rect x="260" y="58" width="580" height="16" fill="#c7d2fe"/>
+<rect x="260" y="58" width="429.5900506638038" height="16" fill="#818cf8"/>
+<rect x="260" y="58" width="144.78872416842546" height="16" fill="#3730a3"/>
+<text x="780" y="70" fill="#333">11 / 32 / 44</text>
+<text x="12" y="95">compra_2_pedido_reserva (601)</text>
+<rect x="260" y="84" width="223.5614546134292" height="16" fill="#c7d2fe"/>
+<rect x="260" y="84" width="185.0920864534969" height="16" fill="#818cf8"/>
+<rect x="260" y="84" width="118.10269949477481" height="16" fill="#3730a3"/>
+<text x="489.5614546134292" y="96" fill="#333">9 / 14 / 17</text>
+<text x="12" y="121">compra_3_pix (335)</text>
+<rect x="260" y="110" width="107.5263432053614" height="16" fill="#c7d2fe"/>
+<rect x="260" y="110" width="100.0558433566909" height="16" fill="#818cf8"/>
+<rect x="260" y="110" width="79.3043995057377" height="16" fill="#3730a3"/>
+<text x="373.5263432053614" y="122" fill="#333">6 / 8 / 8</text>
+<text x="12" y="147">compra_4_confirmacao (335)</text>
+<rect x="260" y="136" width="401.3332583250933" height="16" fill="#c7d2fe"/>
+<rect x="260" y="136" width="314.41612303085776" height="16" fill="#818cf8"/>
+<rect x="260" y="136" width="212.88264360878725" height="16" fill="#3730a3"/>
+<text x="667.3332583250933" y="148" fill="#333">16 / 24 / 30</text>
+<text x="12" y="173">compra_5_pedido (335)</text>
+<rect x="260" y="162" width="114.5619318897526" height="16" fill="#c7d2fe"/>
+<rect x="260" y="162" width="102.59441680383543" height="16" fill="#818cf8"/>
+<rect x="260" y="162" width="77.04961311100766" height="16" fill="#3730a3"/>
+<text x="380.5619318897526" y="174" fill="#333">6 / 8 / 9</text>
+<text x="12" y="199">compra_6_meus_ingressos (335)</text>
+<rect x="260" y="188" width="84.75482576404534" height="16" fill="#c7d2fe"/>
+<rect x="260" y="188" width="76.55818792432342" height="16" fill="#818cf8"/>
+<rect x="260" y="188" width="57.8610746682927" height="16" fill="#3730a3"/>
+<text x="350.75482576404534" y="200" fill="#333">4 / 6 / 6</text>
+<text x="12" y="225">evento_api (16348)</text>
+<rect x="260" y="214" width="74.2191917732863" height="16" fill="#c7d2fe"/>
+<rect x="260" y="214" width="62.89664276590315" height="16" fill="#818cf8"/>
+<rect x="260" y="214" width="47.68128213416651" height="16" fill="#3730a3"/>
+<text x="340.2191917732863" y="226" fill="#333">4 / 5 / 6</text>
+<text x="12" y="251">evento_html (16348)</text>
+<rect x="260" y="240" width="93.57212494351768" height="16" fill="#c7d2fe"/>
+<rect x="260" y="240" width="82.36913131513722" height="16" fill="#818cf8"/>
+<rect x="260" y="240" width="63.89078231614121" height="16" fill="#3730a3"/>
+<text x="359.5721249435177" y="252" fill="#333">5 / 6 / 7</text>
+</svg>

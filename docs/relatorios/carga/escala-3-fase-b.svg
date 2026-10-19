@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="138" font-family="Arial, sans-serif" font-size="12">
+<rect width="900" height="138" fill="#fff"/>
+<text x="12" y="22" font-size="15" font-weight="bold">Escala 3: tempo por rota (fase B: webhooks e portaria)</text>
+<text x="12" y="40" fill="#555">barras: p50 (escuro), p95 (médio), p99 (claro), em ms; eixo até 15 ms</text>
+<text x="12" y="69">portaria_contador (1504)</text>
+<rect x="260" y="58" width="173.0199973829407" height="16" fill="#c7d2fe"/>
+<rect x="260" y="58" width="156.36918657292483" height="16" fill="#818cf8"/>
+<rect x="260" y="58" width="126.20487512600357" height="16" fill="#3730a3"/>
+<text x="439.0199973829407" y="70" fill="#333">3 / 4 / 4</text>
+<text x="12" y="95">portaria_scan (1504)</text>
+<rect x="260" y="84" width="580" height="16" fill="#c7d2fe"/>
+<rect x="260" y="84" width="533.4908452865874" height="16" fill="#818cf8"/>
+<rect x="260" y="84" width="453.1179121059771" height="16" fill="#3730a3"/>
+<text x="780" y="96" fill="#333">12 / 14 / 15</text>
+<text x="12" y="121">webhook (1351)</text>
+<rect x="260" y="110" width="305.45784293633085" height="16" fill="#c7d2fe"/>
+<rect x="260" y="110" width="265.40897927910373" height="16" fill="#818cf8"/>
+<rect x="260" y="110" width="212.43803610587526" height="16" fill="#3730a3"/>
+<text x="571.4578429363308" y="122" fill="#333">5 / 7 / 8</text>
+</svg>

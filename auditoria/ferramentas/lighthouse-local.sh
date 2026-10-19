@@ -4,6 +4,8 @@
 # Uso: auditoria/ferramentas/lighthouse-local.sh <base> <slug do evento> <id do pedido> <cookie __session> <pasta de saída>
 set -euo pipefail
 BASE=$1; SLUG=$2; ORDER=$3; COOKIE=$4; OUT=$5
+# Sem Chrome instalado no sistema, usa o Chromium do Playwright.
+if [ -z "${CHROME_PATH:-}" ]; then CHROME_PATH=$(ls -d "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux*/chrome 2>/dev/null | sort | tail -1); export CHROME_PATH; fi
 mkdir -p "$OUT"
 run() { # nome, url, extra-headers json
   npx -y lighthouse@13.5.0 "$2" --quiet --chrome-flags="--headless=new --no-sandbox" --form-factor=mobile --screenEmulation.mobile \

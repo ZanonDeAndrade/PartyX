@@ -34,7 +34,7 @@ echo "== 2) rollback de migração (0017, taxa de serviço) num banco de teste"
 echo "migrações antes: $(node -e "const pg=require('pg');new pg.Client({connectionString:'$URL'}).connect().then(async c=>{console.log((await c.query('select count(*) from drizzle.__drizzle_migrations')).rows[0].count);await c.end()})")"
 T2=$(date +%s%N)
 set +e
-APP_ENV=local DATABASE_URL="$URL" DATABASE_URL_DIRECT="$URL" PARTYX_ALLOW_MISSING_APP_ROLE=1 npm run -s db:rollback 2>&1 | tail -5
+APP_ENV=local DATABASE_URL="$URL" DATABASE_URL_DIRECT="$URL" PARTYX_ALLOW_MISSING_APP_ROLE=1 npm run -s db:rollback -- 0017_taxa_de_servico 2>&1 | tail -5
 RB=$?
 set -e
 T3=$(date +%s%N)

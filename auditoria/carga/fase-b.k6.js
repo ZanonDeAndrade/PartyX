@@ -27,6 +27,8 @@ const leiturasErro = new Counter('leituras_erro');
 
 const portariaRate = Math.ceil(LEITURAS / (Number(PORTARIA_DURACAO.replace('m', '')) || 9));
 export const options = {
+  // O k6 limpa os cookies do usuário virtual a cada iteração; a sessão do validador precisa sobreviver entre as leituras.
+  noCookiesReset: true,
   scenarios: {
     webhooks: {
       executor: 'constant-arrival-rate',
@@ -100,6 +102,7 @@ export function leitura() {
   leituras.add(1);
   if (res.status !== 200) {
     leiturasErro.add(1);
+    if (__ENV.DEBUG) console.log(`scan ${res.status}: ${String(res.body).slice(0, 160)}`);
     return;
   }
   const result = res.json('result');

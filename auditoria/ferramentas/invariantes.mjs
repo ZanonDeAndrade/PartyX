@@ -33,11 +33,17 @@ try {
   await client.query("set local transaction read only");
   for (const b of blocks) {
     const started = Date.now();
+    // Ponto de salvamento por consulta: um erro (ex.: coluna que ainda não existe nesse banco) não aborta as demais.
+    await client.query('savepoint inv');
     try {
       const r = await client.query(b.query);
       results.push({ invariante: b.title, violacoes: r.rowCount, ms: Date.now() - started, amostra: r.rows.slice(0, 3).map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, typeof v === 'string' && v.length > 40 ? v.slice(0, 12) + '…' : v]))) });
+      await client.query('release savepoint inv');
     } catch (e) {
-      results.push({ invariante: b.title, violacoes: null, ms: Date.now() - started, erro: e instanceof Error ? e.message.slice(0, 120) : 'erro' });
+      await client.query('rollback to savepoint inv');
+      const msg = e instanceof Error ? e.message : 'erro';
+      if (/does not exist/.test(msg)) results.push({ invariante: b.title, violacoes: 0, ms: Date.now() - started, naoSeAplica: msg.slice(0, 80) });
+      else results.push({ invariante: b.title, violacoes: null, ms: Date.now() - started, erro: msg.slice(0, 120) });
     }
   }
   await client.query('rollback');
@@ -48,7 +54,7 @@ if (json) console.log(JSON.stringify(results, null, 1));
 else {
   console.log('| Invariante | Violações | Tempo |');
   console.log('|---|---|---|');
-  for (const r of results) console.log(`| ${r.invariante} | ${r.erro ? 'ERRO: ' + r.erro : r.violacoes === 0 ? 'nenhuma' : '**' + r.violacoes + '**'} | ${r.ms} ms |`);
+  for (const r of results) console.log(`| ${r.invariante} | ${r.erro ? 'ERRO: ' + r.erro : r.naoSeAplica ? 'não se aplica neste banco (' + r.naoSeAplica + ')' : r.violacoes === 0 ? 'nenhuma' : '**' + r.violacoes + '**'} | ${r.ms} ms |`);
   const bad = results.filter(r => r.erro || (r.violacoes ?? 1) > 0);
   console.log(bad.length ? `\n${bad.length} invariante(s) com violação ou erro.` : '\nTodas as invariantes conferem.');
   if (bad.length) for (const b of bad) if (b.amostra?.length) console.log(`\n${b.invariante}: amostra ${JSON.stringify(b.amostra)}`);

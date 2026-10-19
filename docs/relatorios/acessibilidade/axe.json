@@ -1,0 +1,762 @@
+{
+ "rows": [
+  {
+   "page": "inicio",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "eventos",
+   "width": 390,
+   "violations": 1,
+   "serious": 0,
+   "ids": [
+    "heading-order (moderate, 1)"
+   ]
+  },
+  {
+   "page": "evento",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "entrar",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "criar-conta",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "recuperar-senha",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "termos",
+   "width": 390,
+   "violations": 1,
+   "serious": 0,
+   "ids": [
+    "landmark-unique (moderate, 1)"
+   ]
+  },
+  {
+   "page": "checkout",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "pedido",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "meus-ingressos",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "ingresso",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "ingresso-tela-cheia",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "transferir",
+   "width": 390,
+   "violations": 1,
+   "serious": 1,
+   "ids": [
+    "color-contrast (serious, 2)"
+   ]
+  },
+  {
+   "page": "minha-conta",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "minhas-compras",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "portaria",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "portaria-evento",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-eventos",
+   "width": 390,
+   "violations": 1,
+   "serious": 1,
+   "ids": [
+    "color-contrast (serious, 1)"
+   ]
+  },
+  {
+   "page": "admin-evento",
+   "width": 390,
+   "violations": 1,
+   "serious": 1,
+   "ids": [
+    "color-contrast (serious, 1)"
+   ]
+  },
+  {
+   "page": "admin-evento-novo",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-pedidos",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-compradores",
+   "width": 390,
+   "violations": 1,
+   "serious": 1,
+   "ids": [
+    "color-contrast (serious, 1)"
+   ]
+  },
+  {
+   "page": "admin-ingressos",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-promoters",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-equipe",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-entradas",
+   "width": 390,
+   "violations": 1,
+   "serious": 0,
+   "ids": [
+    "heading-order (moderate, 1)"
+   ]
+  },
+  {
+   "page": "admin-excecoes",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-relatorio-vendas",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-taxa-mensal",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-configuracoes",
+   "width": 390,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "inicio",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "eventos",
+   "width": 1280,
+   "violations": 1,
+   "serious": 0,
+   "ids": [
+    "heading-order (moderate, 1)"
+   ]
+  },
+  {
+   "page": "evento",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "entrar",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "criar-conta",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "recuperar-senha",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "termos",
+   "width": 1280,
+   "violations": 1,
+   "serious": 0,
+   "ids": [
+    "landmark-unique (moderate, 1)"
+   ]
+  },
+  {
+   "page": "checkout",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "pedido",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "meus-ingressos",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "ingresso",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "ingresso-tela-cheia",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "transferir",
+   "width": 1280,
+   "violations": 1,
+   "serious": 1,
+   "ids": [
+    "color-contrast (serious, 2)"
+   ]
+  },
+  {
+   "page": "minha-conta",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "minhas-compras",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "portaria",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "portaria-evento",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-eventos",
+   "width": 1280,
+   "violations": 1,
+   "serious": 1,
+   "ids": [
+    "color-contrast (serious, 1)"
+   ]
+  },
+  {
+   "page": "admin-evento",
+   "width": 1280,
+   "violations": 1,
+   "serious": 1,
+   "ids": [
+    "color-contrast (serious, 1)"
+   ]
+  },
+  {
+   "page": "admin-evento-novo",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-pedidos",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-compradores",
+   "width": 1280,
+   "violations": 1,
+   "serious": 1,
+   "ids": [
+    "color-contrast (serious, 1)"
+   ]
+  },
+  {
+   "page": "admin-ingressos",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-promoters",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-equipe",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-entradas",
+   "width": 1280,
+   "violations": 1,
+   "serious": 0,
+   "ids": [
+    "heading-order (moderate, 1)"
+   ]
+  },
+  {
+   "page": "admin-excecoes",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-relatorio-vendas",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-taxa-mensal",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  },
+  {
+   "page": "admin-configuracoes",
+   "width": 1280,
+   "violations": 0,
+   "serious": 0,
+   "ids": []
+  }
+ ],
+ "details": [
+  {
+   "page": "eventos",
+   "width": 390,
+   "id": "heading-order",
+   "impact": "moderate",
+   "help": "Heading levels should only increase by one",
+   "nodes": [
+    "a[aria-label=\"Hoje Auditoria, À venda\"] > .px-card-body > h3"
+   ]
+  },
+  {
+   "page": "evento",
+   "width": 390,
+   "id": "leitor-de-tela",
+   "impact": "info",
+   "help": "0 controles sem nome acessível de 27",
+   "nodes": []
+  },
+  {
+   "page": "termos",
+   "width": 390,
+   "id": "landmark-unique",
+   "impact": "moderate",
+   "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+   "nodes": [
+    ".px-legal-nav"
+   ]
+  },
+  {
+   "page": "checkout",
+   "width": 390,
+   "id": "leitor-de-tela",
+   "impact": "info",
+   "help": "0 controles sem nome acessível de 11",
+   "nodes": []
+  },
+  {
+   "page": "pedido",
+   "width": 390,
+   "id": "leitor-de-tela",
+   "impact": "info",
+   "help": "0 controles sem nome acessível de 18",
+   "nodes": []
+  },
+  {
+   "page": "ingresso",
+   "width": 390,
+   "id": "leitor-de-tela",
+   "impact": "info",
+   "help": "0 controles sem nome acessível de 26",
+   "nodes": []
+  },
+  {
+   "page": "transferir",
+   "width": 390,
+   "id": "color-contrast",
+   "impact": "serious",
+   "help": "Elements must meet minimum color contrast ratio thresholds",
+   "nodes": [
+    ".px-stub-day",
+    ".px-stub-month"
+   ]
+  },
+  {
+   "page": "admin-eventos",
+   "width": 390,
+   "id": "color-contrast",
+   "impact": "serious",
+   "help": "Elements must meet minimum color contrast ratio thresholds",
+   "nodes": [
+    ".px-count"
+   ]
+  },
+  {
+   "page": "admin-evento",
+   "width": 390,
+   "id": "color-contrast",
+   "impact": "serious",
+   "help": "Elements must meet minimum color contrast ratio thresholds",
+   "nodes": [
+    ".px-desc"
+   ]
+  },
+  {
+   "page": "admin-compradores",
+   "width": 390,
+   "id": "color-contrast",
+   "impact": "serious",
+   "help": "Elements must meet minimum color contrast ratio thresholds",
+   "nodes": [
+    ".px-count"
+   ]
+  },
+  {
+   "page": "admin-entradas",
+   "width": 390,
+   "id": "heading-order",
+   "impact": "moderate",
+   "help": "Heading levels should only increase by one",
+   "nodes": [
+    "h3"
+   ]
+  },
+  {
+   "page": "inicio",
+   "width": 1280,
+   "id": "teclado",
+   "impact": "info",
+   "help": "18 paradas de Tab; sem foco visível em: input Buscar evento",
+   "nodes": [
+    "a: Ir para o conteúdo",
+    "a: PartyX, página inicial",
+    "a: Eventos",
+    "input: Buscar evento",
+    "a: Entrar",
+    "a: Festa Auditoria",
+    "a: Comprar ingressos",
+    "a: Ver todos os eventos",
+    "a: Hoje Auditoria, À venda",
+    "a: Esgotado Auditoria, Esgotado",
+    "a: Baile Auditoria 16+, À venda",
+    "a: Outro Evento Auditoria, À venda"
+   ]
+  },
+  {
+   "page": "eventos",
+   "width": 1280,
+   "id": "heading-order",
+   "impact": "moderate",
+   "help": "Heading levels should only increase by one",
+   "nodes": [
+    "a[aria-label=\"Hoje Auditoria, À venda\"] > .px-card-body > h3"
+   ]
+  },
+  {
+   "page": "evento",
+   "width": 1280,
+   "id": "teclado",
+   "impact": "info",
+   "help": "16 paradas de Tab; sem foco visível em: input Buscar evento",
+   "nodes": [
+    "a: Ir para o conteúdo",
+    "a: PartyX, página inicial",
+    "a: Eventos",
+    "input: Buscar evento",
+    "a: Entrar",
+    "button: Compartilhar",
+    "button: Copiar link",
+    "button: Mais um Pista",
+    "button: Mais um VIP",
+    "button: Mais um Camarote",
+    "a: Política de cancelamento, troca e reembo",
+    "a: E-mail: atendimento@partyx.test"
+   ]
+  },
+  {
+   "page": "termos",
+   "width": 1280,
+   "id": "landmark-unique",
+   "impact": "moderate",
+   "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+   "nodes": [
+    ".px-legal-nav"
+   ]
+  },
+  {
+   "page": "checkout",
+   "width": 1280,
+   "id": "teclado",
+   "impact": "info",
+   "help": "8 paradas de Tab; sem foco visível em: nenhuma",
+   "nodes": [
+    "a: Ir para o conteúdo",
+    "a: PartyX, página inicial",
+    "a: Voltar ao evento",
+    "a: E-mail: atendimento@partyx.test",
+    "a: WhatsApp: +55 11 90000-0000",
+    "a: Termos de Uso",
+    "a: Política de Privacidade",
+    "a: Cancelamento, troca e reembolso"
+   ]
+  },
+  {
+   "page": "ingresso",
+   "width": 1280,
+   "id": "teclado",
+   "impact": "info",
+   "help": "19 paradas de Tab; sem foco visível em: input Buscar evento",
+   "nodes": [
+    "a: Ir para o conteúdo",
+    "a: PartyX, página inicial",
+    "a: Eventos",
+    "input: Buscar evento",
+    "a: Meus ingressos",
+    "a: Minha conta, Ana Auditoria Fictícia",
+    "button: Sair",
+    "a: Meus ingressos",
+    "a: Minhas compras",
+    "a: Minha conta",
+    "a: Meus ingressos",
+    "a: Abrir em tela cheia"
+   ]
+  },
+  {
+   "page": "transferir",
+   "width": 1280,
+   "id": "color-contrast",
+   "impact": "serious",
+   "help": "Elements must meet minimum color contrast ratio thresholds",
+   "nodes": [
+    ".px-stub-day",
+    ".px-stub-month"
+   ]
+  },
+  {
+   "page": "portaria-evento",
+   "width": 1280,
+   "id": "teclado",
+   "impact": "info",
+   "help": "10 paradas de Tab; sem foco visível em: input Buscar evento",
+   "nodes": [
+    "a: Ir para o conteúdo",
+    "a: PartyX, página inicial",
+    "a: Eventos",
+    "input: Buscar evento",
+    "a: Portaria",
+    "button: Sair",
+    "a: Trocar de evento",
+    "button: Câmera",
+    "button: Busca manual",
+    "button: Iniciar leitura"
+   ]
+  },
+  {
+   "page": "admin",
+   "width": 1280,
+   "id": "teclado",
+   "impact": "info",
+   "help": "25 paradas de Tab; sem foco visível em: input Buscar evento; input INPUT",
+   "nodes": [
+    "a: Ir para o conteúdo",
+    "a: PartyX, página inicial",
+    "a: Eventos",
+    "input: Buscar evento",
+    "a: Painel",
+    "button: Sair",
+    "a: Visão geral",
+    "a: Eventos",
+    "a: Pedidos",
+    "a: Compradores",
+    "a: Ingressos",
+    "a: Promoters"
+   ]
+  },
+  {
+   "page": "admin-eventos",
+   "width": 1280,
+   "id": "color-contrast",
+   "impact": "serious",
+   "help": "Elements must meet minimum color contrast ratio thresholds",
+   "nodes": [
+    ".px-count"
+   ]
+  },
+  {
+   "page": "admin-evento",
+   "width": 1280,
+   "id": "color-contrast",
+   "impact": "serious",
+   "help": "Elements must meet minimum color contrast ratio thresholds",
+   "nodes": [
+    ".px-desc"
+   ]
+  },
+  {
+   "page": "admin-compradores",
+   "width": 1280,
+   "id": "color-contrast",
+   "impact": "serious",
+   "help": "Elements must meet minimum color contrast ratio thresholds",
+   "nodes": [
+    ".px-count"
+   ]
+  },
+  {
+   "page": "admin-entradas",
+   "width": 1280,
+   "id": "heading-order",
+   "impact": "moderate",
+   "help": "Heading levels should only increase by one",
+   "nodes": [
+    "h3"
+   ]
+  }
+ ]
+}
