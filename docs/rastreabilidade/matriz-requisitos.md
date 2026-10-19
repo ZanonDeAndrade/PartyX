@@ -203,6 +203,15 @@ Pedido do responsável: as transições ainda estavam bruscas. Curva `cubic-bezi
 | RF-13 (miniatura de 48 px já desfocada) | `server/src/api/events.integration.test.ts` |
 | CA-32 e desempenho | LCP, CLS e TBT antes e depois e fluidez quadro a quadro no registro; `e2e:responsivo` (597), `e2e:textos` (78), `e2e:cronometro` (7), `e2e:cor` (6), roteiro 11.2 fictício (20) |
 
+### Vitrine para o evento e de volta (19/10/2026, não publicado)
+
+Pedido do responsável: troca mais suave e mais longa, com a página inteira. Só a capa é compartilhada (cartão para o topo e de volta, curva `cubic-bezier(0.22, 1, 0.36, 1)`, `object-fit: cover` nos dois estados); a vitrine esmaece e sobe 8 px; data e título, cronômetro, Quando/Onde/Classificação, aviso de menores com o resto do texto e ingressos (só no computador) sobem 12 px em cascata de 40 ms a partir da capa na metade do caminho; cabeçalho e rodapé parados; a volta é o contrário, com a rolagem da vitrine devolvida antes da foto e a vitrine sem esqueleto (dados da visita anterior, buscados de novo por trás); dados atrasados: troca com o esqueleto e as peças entram quando chegam; menos movimento: só esmaecer de 150 ms; sem View Transitions: esmaecer de 350 ms. Tempos em `tokens.css` (`--px-vt-*`). Variante A no código (420 ms de animação); variante B (513 ms) só nos testes, para comparar. **Pendente: escolha da variante pelo responsável.** Sem migração.
+
+| Requisito ou critério | Evidência |
+|---|---|
+| RF-20, RF-23 (vitrine e página do evento: troca de página) | `e2e/transicoes.spec.ts` (19 casos: tempos, curva, object-fit e ordem lidos das animações da View Transition a 1280, 390 e 360 px, ida e volta; capa na metade do caminho medida; clique ao fim em até 550 ms na variante A; rolagem igual na volta; dados atrasados; menos movimento; sem suporte sem erro), capturas quadro a quadro e vídeos das variantes em `e2e/.run/transicoes/` |
+| Sem regressão | `test:db` (1.223 + 4), `e2e:transicoes` (19), `e2e:cronometro` (8), `e2e:busca` (4), `e2e:abertura` (51), `e2e:cor` (8) |
+
 ## Painel: promoters, compradores, ingressos, entradas, equipe e conta (11/10/2026, etapa 05 do fechamento)
 
 Interface real em `src/site/adminPeople.tsx` (ADM07 a ADM09, ADM12 a ADM15, ADM19 a ADM21, ADM24), menu lateral com gaveta no celular e exportação com estados e data (ADM23, `ExportLink`). API nova com testes: `GET /admin/buyers`, `GET /admin/buyers/:id`, `POST /admin/buyers/:id/cpf` (CPF completo sob demanda, trilha `usuario.cpf_visualizado`), `GET /admin/tickets/:id` (autor e data do cancelamento), `GET /admin/exports/promoters/:id/orders.csv`. Verificado no navegador (Chromium, 360 px e 1280 px, dados fictícios): sem rolagem horizontal e sem alvo menor que 44 px.

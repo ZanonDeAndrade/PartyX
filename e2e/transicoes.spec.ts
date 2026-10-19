@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect, request as apiRequest, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import pg from 'pg';
@@ -247,7 +247,7 @@ test('"Continuar" não espera animação: escolher e continuar logo na entrada l
   await ctx.close();
 });
 
-test('entrar pelo cartão: pré-carrega no toque, abre sem esqueleto, capa, título e data acompanham e a página não repete a entrada', async ({
+test('entrar pelo cartão: pré-carrega no toque, abre sem esqueleto, só a capa acompanha e a página não repete a entrada', async ({
   browser,
 }) => {
   const ctx = await context(browser, { init: spyTransitions });
@@ -255,9 +255,10 @@ test('entrar pelo cartão: pré-carrega no toque, abre sem esqueleto, capa, tít
   await page.goto(`${R.base}/eventos`, { waitUntil: 'networkidle' });
   const card = page.locator('.px-card').filter({ hasText: 'Noite de Verão' });
   await card.scrollIntoViewIfNeeded();
-  // O cartão e a página usam os mesmos nomes de View Transition para capa, título e data.
-  expect(await card.locator('.px-card-title').evaluate(el => getComputedStyle(el).viewTransitionName)).toBe('px-titulo-transicao-a');
-  expect(await card.locator('.px-stub').evaluate(el => getComputedStyle(el).viewTransitionName)).toBe('px-data-transicao-a');
+  // Só a capa é compartilhada (19/10/2026): título e data do cartão saem com a vitrine.
+  expect(await card.locator('.px-banner').evaluate(el => getComputedStyle(el).viewTransitionName)).toBe('px-banner-transicao-a');
+  expect(await card.locator('.px-card-title').evaluate(el => getComputedStyle(el).viewTransitionName)).toBe('none');
+  expect(await card.locator('.px-stub').evaluate(el => getComputedStyle(el).viewTransitionName)).toBe('none');
   // Dedo encosta: os dados do evento e a capa começam a vir antes do clique.
   const fetched = page.waitForRequest(r => r.url().endsWith('/api/public/events/transicao-a'));
   await card.locator('.px-card-link').dispatchEvent('pointerdown');
@@ -268,14 +269,15 @@ test('entrar pelo cartão: pré-carrega no toque, abre sem esqueleto, capa, tít
   await page.waitForSelector('h1.px-event-name');
   expect(await page.evaluate(() => (window as Window & { __skeleton?: boolean }).__skeleton ?? false)).toBe(false);
   expect(await page.evaluate(() => (window as Window & { __vt?: number }).__vt)).toBe(1);
-  expect(await page.locator('h1.px-event-name').evaluate(el => getComputedStyle(el).viewTransitionName)).toBe('px-titulo-transicao-a');
   expect(await page.locator('.px-event-banner').evaluate(el => getComputedStyle(el).viewTransitionName)).toBe('px-banner-transicao-a');
-  // Vindo pela troca, a página não repete a cascata: o resto esmaece com a troca (450 ms).
-  expect(await page.locator('.px-in').count()).toBe(0);
+  // Vindo pela troca, a página não repete a cascata: quem anima são os pseudo-elementos da troca. Depois dela, nenhuma peça tem nome.
+  expect(await page.locator('.px-in, .px-ev-in').count()).toBe(0);
+  await expect(page.locator('html')).not.toHaveAttribute('data-vt', /.*/);
+  expect(await page.locator('.px-facts').evaluate(el => getComputedStyle(el).viewTransitionName)).toBe('none');
   await ctx.close();
 });
 
-test('menos movimento: só esmaecer simples de 250 ms, sem subir, desfocar, crescer, cascata nem View Transition', async ({ browser }) => {
+test('menos movimento: só esmaecer simples, sem subir, desfocar, crescer, cascata nem View Transition (150 ms da vitrine ao evento)', async ({ browser }) => {
   const ctx = await context(browser, { motion: 'reduce', init: spyTransitions });
   const page = await ctx.newPage();
   await slowCovers(page, 300);
@@ -297,14 +299,21 @@ test('menos movimento: só esmaecer simples de 250 ms, sem subir, desfocar, cres
   expect(await style(page, '.px-event-banner[data-cover] img', ['scale'])).toEqual({ scale: '1' });
   expect((await style(page, '.px-event-banner[data-cover] .px-banner-cover', ['transition-duration']))['transition-duration']).toBe('0.25s');
 
-  // Vitrine: cartões só esmaecem; troca de página sem View Transition, com esmaecer de 250 ms.
+  // Vitrine: cartões só esmaecem; da vitrine ao evento e de volta, sem View Transition, só esmaecer de 150 ms, e a página do evento
+  // não anima mais nada. Outras trocas: 250 ms.
   await page.goto(`${R.base}/eventos`, { waitUntil: 'networkidle' });
   const first = page.locator('.px-grid > .px-card').first();
   await expect(first).not.toHaveAttribute('data-reveal', 'wait');
   await page.locator('.px-card-link').first().click();
   await page.waitForURL(/\/eventos\/.+/);
+  await page.waitForSelector('h1.px-event-name');
+  expect(await page.locator('.px-in, .px-ev-in').count()).toBe(0);
+  await page.goBack();
+  await page.waitForURL(/\/eventos$/);
+  await page.locator('.px-footer a[href="/termos-de-uso"]').click();
+  await page.waitForURL(/\/termos-de-uso/);
   expect(await page.evaluate(() => (window as Window & { __vt?: number }).__vt)).toBe(0);
-  expect(await page.evaluate(() => (window as Window & { __fade?: number[] }).__fade)).toEqual([250]);
+  expect(await page.evaluate(() => (window as Window & { __fade?: number[] }).__fade)).toEqual([150, 150, 250]);
   await ctx.close();
 });
 
@@ -485,10 +494,16 @@ test('troca de página: View Transition de 450 ms no site; sem suporte, esmaecer
   });
   await old.addInitScript(spyTransitions);
   const fallback = await old.newPage();
+  const errors: string[] = [];
+  fallback.on('pageerror', e => errors.push(e.message));
   await fallback.goto(`${R.base}/eventos`, { waitUntil: 'networkidle' });
   await fallback.locator('.px-card-link').first().click();
   await fallback.waitForURL(/\/eventos\/.+/);
-  expect(await fallback.evaluate(() => (window as Window & { __fade?: number[] }).__fade)).toEqual([350]);
+  await fallback.waitForSelector('h1.px-event-name');
+  await fallback.goBack();
+  await fallback.waitForURL(/\/eventos$/);
+  expect(await fallback.evaluate(() => (window as Window & { __fade?: number[] }).__fade)).toEqual([350, 350]);
+  expect(errors).toEqual([]);
   await old.close();
 
   // Painel: troca na hora, sem View Transition, e só esmaece 180 ms.
@@ -575,4 +590,333 @@ test('capturas: sequência da entrada da página do evento a 360 px', async ({ b
   await page.waitForTimeout(1400);
   await page.screenshot({ path: path.join(IMG, 'entrada-final.png') });
   await ctx.close();
+});
+
+// ---------- vitrine para o evento e de volta (19/10/2026) ----------
+
+interface SwapAnim {
+  pseudo: string;
+  name: string;
+  delay: number;
+  duration: number;
+  end: number;
+  easing: string;
+  objectFit: string;
+}
+interface Swap {
+  vt: string | null;
+  click?: number;
+  readyAt?: number;
+  end?: number;
+  scrollY?: number;
+  skeleton?: boolean;
+  anims: SwapAnim[];
+}
+
+/**
+ * Lê a próxima troca de página no navegador: o instante do clique, a marcação html[data-vt], as animações da View Transition (com a
+ * curva e o object-fit dos pseudo-elementos, no "ready"), a rolagem e o esqueleto nesse instante, e o fim da troca.
+ * Com `freeze`, as animações param no "ready" (capturas quadro a quadro).
+ */
+const watchSwap = (page: Page, freeze = false) =>
+  page.evaluate(freeze => {
+    const w = window as Window & { __swap?: Swap };
+    w.__swap = { vt: null, anims: [] };
+    document.addEventListener('click', () => (w.__swap!.click = performance.now()), { capture: true, once: true });
+    const doc = document as Document & { __orig?: Document['startViewTransition'] };
+    doc.__orig ??= doc.startViewTransition;
+    doc.startViewTransition = function (this: Document, arg?: Parameters<Document['startViewTransition']>[0]) {
+      const t = doc.__orig!.call(this, arg);
+      w.__swap!.vt = document.documentElement.dataset.vt ?? null;
+      (w.__swap as Swap & { startAt?: number }).startAt = performance.now();
+      (t as ViewTransition).updateCallbackDone.then(() => ((w.__swap as Swap & { cbAt?: number }).cbAt = performance.now()));
+      t.ready.then(() => {
+        const root = document.documentElement;
+        const anims = document.getAnimations().filter(a => (a.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition'));
+        if (freeze) anims.forEach(a => a.pause());
+        w.__swap!.scrollY = window.scrollY;
+        w.__swap!.skeleton = Boolean(document.querySelector('.px-grid-skel, .px-hero-skel'));
+        w.__swap!.anims = anims.map(a => {
+          const pseudo = (a.effect as KeyframeEffect).pseudoElement!;
+          const cs = getComputedStyle(root, pseudo);
+          const timing = a.effect!.getComputedTiming();
+          return {
+            pseudo,
+            name: (a as CSSAnimation).animationName,
+            delay: Number(a.effect!.getTiming().delay),
+            duration: Number(timing.duration),
+            end: Number(timing.endTime),
+            easing: cs.animationTimingFunction,
+            objectFit: cs.objectFit,
+          };
+        });
+        w.__swap!.readyAt = performance.now();
+      });
+      t.finished.then(() => (w.__swap!.end = performance.now())).catch(() => {});
+      return t;
+    };
+  }, freeze);
+
+const readSwap = async (page: Page): Promise<Swap> => {
+  await page.waitForFunction(() => (window as Window & { __swap?: Swap }).__swap?.end !== undefined, null, { timeout: 5000 });
+  return page.evaluate(() => (window as Window & { __swap?: Swap }).__swap!);
+};
+
+/** Tempos da troca lidos do CSS (tokens.css), em ms: os testes valem para as duas variantes. */
+const vtTokens = (page: Page) =>
+  page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    // O navegador pode devolver o tempo em segundos ("0.42s").
+    const ms = (n: string) => {
+      const raw = cs.getPropertyValue(`--px-vt-${n}`).trim();
+      return Math.round(parseFloat(raw) * (raw.endsWith('ms') ? 1 : 1000));
+    };
+    return {
+      banner: ms('banner'),
+      out: ms('out'),
+      start: ms('start'),
+      step: ms('step'),
+      item: ms('item'),
+      backIn: ms('back-in'),
+      reduced: ms('reduced'),
+      inRise: cs.getPropertyValue('--px-vt-in-rise').trim(),
+      outRise: cs.getPropertyValue('--px-vt-out-rise').trim(),
+    };
+  });
+
+/** Variante B (550 ms): só os tempos mudam (tokens.css). A variante A é a do tokens.css. */
+const VARIANT_B = ':root{--px-vt-banner:480ms;--px-vt-out:200ms;--px-vt-start:63ms;--px-vt-item:290ms;--px-vt-back-in:450ms}';
+
+const one = (swap: Swap, pseudo: string) => swap.anims.filter(a => a.pseudo === pseudo);
+const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
+/** Vitrine com o cartão do evento no meio da tela e já pré-carregado (o ponteiro passou por cima). */
+async function cardReady(page: Page, name: string) {
+  await page.goto(`${R.base}/eventos`, { waitUntil: 'networkidle' });
+  const card = page.locator('.px-card').filter({ hasText: name });
+  await card.evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await page.waitForTimeout(1300); // a entrada dos cartões termina
+  const slug = (await card.locator('.px-card-link').getAttribute('href'))!.split('/').pop()!;
+  const fetched = page.waitForResponse(r => r.url().endsWith(`/api/public/events/${slug}`));
+  await card.locator('.px-card-link').hover();
+  await fetched;
+  await page.waitForTimeout(300);
+  return { card, slug };
+}
+
+for (const width of [1280, 390, 360]) {
+  test(`vitrine para o evento e de volta a ${width} px: capa por troca, vitrine sai, cascata de 40 ms, sem salto de rolagem`, async ({
+    browser,
+  }) => {
+    const ctx = await context(browser, { width });
+    const page = await ctx.newPage();
+    const errors: string[] = [];
+    page.on('pageerror', e => errors.push(e.message));
+    const { card, slug } = await cardReady(page, 'Baile de Outono');
+    const tk = await vtTokens(page);
+    // Faixas pedidas: capa de 420 a 480 ms, vitrine de 150 a 200 ms, passo de 40 ms, subida de 12 px e 8 px.
+    expect(tk.banner).toBeGreaterThanOrEqual(420);
+    expect(tk.banner).toBeLessThanOrEqual(480);
+    expect(tk.out).toBeGreaterThanOrEqual(150);
+    expect(tk.out).toBeLessThanOrEqual(200);
+    expect([tk.step, tk.inRise, tk.outRise, tk.reduced]).toEqual([40, '12px', '8px', 150]);
+    const scrollBefore = await page.evaluate(() => window.scrollY);
+    await page.mouse.move(1, 1); // sem o ponteiro por cima (passar o mouse levanta o cartão 3 px)
+    await page.waitForTimeout(250);
+    const cardBox = await card.locator('.px-banner').boundingBox();
+
+    await watchSwap(page);
+    await card.locator('.px-card-link').click();
+    const ida = await readSwap(page);
+    expect(ida.vt).toBe('ida');
+    expect(ida.skeleton).toBe(false);
+    const banner = `::view-transition-group(px-banner-${slug})`;
+    // Capa: a do cartão vira a do topo, com a curva pedida e sem distorção (object-fit: cover nos dois estados).
+    expect(one(ida, banner).map(a => [a.duration, a.easing])).toEqual([[tk.banner, EASE]]);
+    for (const side of ['old', 'new']) expect(one(ida, `::view-transition-${side}(px-banner-${slug})`)[0]?.objectFit).toBe('cover');
+    // Vitrine: esmaece e sobe; a página do evento fica pronta por baixo (sem animação própria).
+    expect(one(ida, '::view-transition-old(root)').map(a => [a.name, a.duration, a.delay])).toEqual([['px-vt-out-up', tk.out, 0]]);
+    expect(one(ida, '::view-transition-new(root)')).toEqual([]);
+    // Cascata a partir da metade do caminho da capa, 40 ms entre as peças; ingressos só no computador.
+    const plan = ida.anims.filter(a => a.name === 'px-vt-item-in').map(a => [a.pseudo, a.delay, a.duration]);
+    const item = (name: string, i: number) => [`::view-transition-new(${name})`, tk.start + i * tk.step, tk.item];
+    const expected = [item('px-event-head', 0), item('px-ev-countdown', 1), item('px-ev-facts', 2), item('px-ev-main', 3)];
+    if (width >= 960) expected.push(item('px-ev-tickets', 4));
+    expect(plan).toEqual(expect.arrayContaining(expected));
+    expect(plan.length).toBe(expected.length + (plan.some(p => p[0] === '::view-transition-new(px-ev-minor)') ? 1 : 0));
+    // Cabeçalho e rodapé parados: nenhuma animação com duração.
+    expect(ida.anims.filter(a => /px-header|px-footer/.test(a.pseudo) && a.duration > 0)).toEqual([]);
+    // Fim: tudo dentro de 550 ms do clique (e a cascata não passa da capa e da variante).
+    const lastEnd = Math.max(...ida.anims.map(a => a.end));
+    expect(lastEnd).toBeLessThanOrEqual(Math.max(tk.banner, tk.start + 4 * tk.step + tk.item) + 1);
+    expect(ida.end! - ida.click!).toBeLessThanOrEqual(550);
+    const x = ida as Swap & { startAt: number; cbAt: number };
+    console.log(`ida ${width}px: animação ${lastEnd} ms, clique ao fim ${Math.round(ida.end! - ida.click!)} ms; clique>start ${Math.round(x.startAt - ida.click!)}, start>callback ${Math.round(x.cbAt - x.startAt)}, callback>ready ${Math.round(ida.readyAt! - x.cbAt)}, ready>fim ${Math.round(ida.end! - ida.readyAt!)}`);
+    await page.waitForSelector('h1.px-event-name');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+
+    // Volta: a capa encolhe até o cartão, que está no mesmo lugar (rolagem devolvida antes da foto, vitrine sem esqueleto).
+    await page.evaluate(() => window.scrollTo({ top: 120, behavior: 'instant' }));
+    await page.mouse.move(1, 1); // o ponteiro sai do cartão (passar o mouse o levanta 3 px)
+    await watchSwap(page);
+    await page.goBack();
+    const volta = await readSwap(page);
+    expect(volta.vt).toBe('volta');
+    expect(volta.skeleton).toBe(false);
+    expect(volta.scrollY).toBe(scrollBefore);
+    expect(one(volta, banner).map(a => [a.duration, a.easing])).toEqual([[tk.banner, EASE]]);
+    expect(one(volta, '::view-transition-old(root)').map(a => [a.name, a.duration])).toEqual([['px-vt-out-down', tk.out]]);
+    expect(one(volta, '::view-transition-new(root)').map(a => [a.name, a.delay, a.duration])).toEqual([['px-vt-page-in', tk.start, tk.backIn]]);
+    expect(one(volta, '::view-transition-old(px-event-head)').map(a => a.name)).toEqual(['px-vt-out-down']);
+    // O bloco da data do cartão entra com a vitrine, por cima da capa que encolhe.
+    expect(volta.anims.filter(a => a.name === 'px-vt-page-in').length).toBeGreaterThan(1);
+    expect(volta.anims.filter(a => /px-header|px-footer/.test(a.pseudo) && a.duration > 0)).toEqual([]);
+    expect(Math.max(...volta.anims.map(a => a.end))).toBeLessThanOrEqual(Math.max(tk.banner, tk.start + tk.backIn) + 1);
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+    expect(await card.locator('.px-banner').boundingBox()).toEqual(cardBox);
+    await expect(page.locator('html')).not.toHaveAttribute('data-vt', /.*/);
+    expect(errors).toEqual([]);
+    await ctx.close();
+  });
+}
+
+test('vitrine para o evento: a cascata começa com a capa na metade do caminho', async ({ browser }) => {
+  const ctx = await context(browser, { width: 1280 });
+  const page = await ctx.newPage();
+  const { card, slug } = await cardReady(page, 'Noite de Verão');
+  const tk = await vtTokens(page);
+  await watchSwap(page, true);
+  await card.locator('.px-card-link').click();
+  await page.waitForFunction(() => (window as Window & { __swap?: Swap }).__swap?.readyAt !== undefined);
+  // Animações paradas no início: a capa no instante 0, no começo da cascata e no fim (posição e altura da caixa).
+  const at = async (ms: number) =>
+    page.evaluate(
+      ([ms, pseudo]) => {
+        document
+          .getAnimations()
+          .filter(a => (a.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition'))
+          .forEach(a => (a.currentTime = ms as number));
+        const cs = getComputedStyle(document.documentElement, pseudo as string);
+        return { y: new DOMMatrix(cs.transform).m42, h: parseFloat(cs.height) };
+      },
+      [ms, `::view-transition-group(px-banner-${slug})`] as const,
+    );
+  const [a, m, b] = [await at(0), await at(tk.start), await at(tk.banner - 0.01)];
+  const half = (m.y - a.y) / (b.y - a.y);
+  expect(half).toBeGreaterThan(0.45);
+  expect(half).toBeLessThan(0.55);
+  expect((m.h - a.h) / (b.h - a.h)).toBeCloseTo(half, 2);
+  await page.evaluate(() => document
+          .getAnimations()
+          .filter(a => (a.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition'))
+          .forEach(a => a.finish()));
+  await ctx.close();
+});
+
+test('dados atrasados: a troca acontece com o esqueleto (capa no lugar) e as peças entram quando os dados chegam', async ({ browser }) => {
+  const ctx = await context(browser, { width: 1280 });
+  const page = await ctx.newPage();
+  await page.goto(`${R.base}/eventos`, { waitUntil: 'networkidle' });
+  await page.route(/\/api\/public\/events\/transicao-c$/, async r => {
+    await new Promise(x => setTimeout(x, 1500));
+    await r.continue();
+  });
+  const card = page.locator('.px-card').filter({ hasText: 'Festival de Inverno' });
+  await card.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1300);
+  await watchSwap(page);
+  await card.locator('.px-card-link').click();
+  const swap = await readSwap(page);
+  // Sem tela em branco: a página do evento é o esqueleto, e a capa do cartão cresce até o lugar da capa dele.
+  expect(swap.vt).toBe('ida');
+  expect(one(swap, '::view-transition-group(px-banner-transicao-c)').length).toBe(1);
+  expect(await page.locator('[aria-label="Carregando evento"]').count()).toBe(1);
+  await page.waitForSelector('h1.px-event-name');
+  const tk = await vtTokens(page);
+  const plan = await page.$$eval('.px-ev-in:not(.px-xfade-out *)', els =>
+    els.map(el => {
+      const s = getComputedStyle(el);
+      return [el.className.split(' ').find((c: string) => /^px-(event-head|countdown-row|event-side|event-minor)$/.test(c)) ?? el.tagName, s.animationName, parseFloat(s.animationDuration) * 1000, parseFloat(s.animationDelay) * 1000];
+    }),
+  );
+  expect(plan).toEqual(
+    expect.arrayContaining([
+      ['px-event-head', 'px-vt-item-in', tk.item, 0],
+      ['px-countdown-row', 'px-vt-item-in', tk.item, tk.step],
+      ['DIV', 'px-vt-item-in', tk.item, 2 * tk.step],
+      ['DIV', 'px-vt-item-in', tk.item, 3 * tk.step],
+      ['px-event-side', 'px-vt-item-in', tk.item, 4 * tk.step],
+    ]),
+  );
+  await ctx.close();
+});
+
+test('capturas: vitrine para o evento e de volta, quadro a quadro, a 1280 e 390 px', async ({ browser }) => {
+  for (const width of [1280, 390]) {
+    const ctx = await context(browser, { width });
+    const page = await ctx.newPage();
+    const { card } = await cardReady(page, 'Baile de Outono');
+    const shots = async (dir: string) => {
+      await page.waitForFunction(() => (window as Window & { __swap?: Swap }).__swap?.readyAt !== undefined);
+      for (const t of [0, 55, 110, 160, 220, 300, 420]) {
+        await page.evaluate(
+          ms =>
+            document
+              .getAnimations()
+              .filter(a => (a.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition'))
+              .forEach(a => (a.currentTime = ms)),
+          t,
+        );
+        await page.screenshot({ path: path.join(IMG, `troca-${dir}-${width}-${String(t).padStart(3, '0')}ms.png`) });
+      }
+      await page.evaluate(() => document
+          .getAnimations()
+          .filter(a => (a.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition'))
+          .forEach(a => a.finish()));
+      await page.waitForTimeout(300);
+    };
+    await watchSwap(page, true);
+    await card.locator('.px-card-link').click();
+    await shots('ida');
+    await page.waitForSelector('h1.px-event-name');
+    await watchSwap(page, true);
+    await page.goBack();
+    await shots('volta');
+    await ctx.close();
+  }
+});
+
+test('gravações: variantes A (450 ms) e B (550 ms), a 1280 e 390 px, ida e volta', async ({ browser }) => {
+  test.setTimeout(180_000);
+  const summary: Record<string, { ida: number; volta: number }> = {};
+  for (const variant of ['A', 'B'] as const)
+    for (const width of [1280, 390]) {
+      const ctx = await context(browser, { width, video: true });
+      const page = await ctx.newPage();
+      await page.goto(`${R.base}/eventos`, { waitUntil: 'networkidle' });
+      if (variant === 'B') await page.addStyleTag({ content: VARIANT_B });
+      const card = page.locator('.px-card').filter({ hasText: 'Baile de Outono' });
+      await card.evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      await page.waitForTimeout(1500);
+      const fetched = page.waitForResponse(r => r.url().endsWith('/api/public/events/transicao-b'));
+      await card.locator('.px-card-link').hover();
+      await fetched;
+      await page.waitForTimeout(700);
+      await watchSwap(page);
+      await card.locator('.px-card-link').click();
+      const ida = await readSwap(page);
+      await page.waitForTimeout(1500);
+      await watchSwap(page);
+      await page.goBack();
+      const volta = await readSwap(page);
+      await page.waitForTimeout(1500);
+      summary[`${variant}-${width}`] = { ida: Math.round(ida.end! - ida.click!), volta: Math.round(volta.end! - volta.readyAt!) };
+      // Gravando, o navegador fica mais lento: o tempo do clique ao fim vale como registro (tempos.json), conferido nos testes acima.
+      const video = page.video()!;
+      await ctx.close();
+      await video.saveAs(path.join(VIDEO, `variante-${variant}-${width}px-ida-e-volta.webm`));
+      await video.delete();
+    }
+  writeFileSync(path.join(VIDEO, 'tempos.json'), JSON.stringify(summary, null, 1));
+  console.log('gravações', summary);
 });

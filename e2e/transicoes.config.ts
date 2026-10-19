@@ -3,8 +3,8 @@ import { defineConfig } from '@playwright/test';
 /**
  * Transições do site (15/10/2026) no navegador, contra o servidor LOCAL com o banco descartável do e2e de texto longo (mesmo
  * `globalSetup`): entrada da página do evento (capa desfocada que fica nítida e cascata em até 700 ms), menos movimento, "Continuar"
- * sem espera, vitrine ao aparecer na tela, passar o mouse, troca de página, painel e portaria. Capturas e vídeos em
- * e2e/.run/transicoes (fora do Git).
+ * sem espera, vitrine ao aparecer na tela, passar o mouse, troca de página (vitrine para o evento e de volta, 19/10/2026, com as
+ * variantes A e B gravadas), painel e portaria. Capturas e vídeos em e2e/.run/transicoes (fora do Git).
  */
 export default defineConfig({
   testDir: '.',

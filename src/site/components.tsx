@@ -14,7 +14,7 @@ import { brl, dateParts, eventPath, searchPath, timeOf } from './format';
 import { IconClose, IconMenu, IconSearch } from './icons';
 import { useReveal } from './motion';
 import { eventLinkProps } from './prefetch';
-import { dateTransitionName, Link, titleTransitionName, useRouter } from './router';
+import { Link, useRouter } from './router';
 import { useSession } from './session';
 
 /** Logo branca com fundo transparente (gerada por reference/tools/brand-assets.mjs). Cabeçalho e rodapé são escuros. */
@@ -513,13 +513,10 @@ export function DateStub({
   iso,
   size = 'md',
   accent,
-  transitionName,
 }: {
   iso: string;
   size?: 'md' | 'lg';
   accent?: string | null;
-  /** Nome de View Transition: o bloco do cartão vira o da página do evento. */
-  transitionName?: string;
 }) {
   const p = dateParts(iso);
   // Cor de destaque do evento (0014), só no card da vitrine: fundo e texto calculados, por variável CSS.
@@ -527,7 +524,7 @@ export function DateStub({
   return (
     <span
       className={`px-stub px-stub-${size}`}
-      style={{ ...(palette ? (stubVars(palette) as CSSProperties) : null), ...(transitionName ? { viewTransitionName: transitionName } : null) }}
+      style={palette ? (stubVars(palette) as CSSProperties) : undefined}
     >
       <span className="px-stub-day" aria-hidden="true">
         {p.day}
@@ -547,7 +544,7 @@ const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 /**
  * Cartão da vitrine. Entra quando aparece na tela, só na primeira vez nesta visita (useReveal), em cascata com os vizinhos. Ao ser
  * tocado, focado ou sobrevoado, pré-carrega o evento e a capa; no clique, espera até 500 ms essa busca terminar para a página abrir
- * já com o conteúdo. A capa e o título têm nomes de View Transition: viram a capa e o título da página.
+ * já com o conteúdo. A capa tem nome de View Transition: vira a capa da página (e encolhe de volta até o cartão).
  */
 export function EventCardView({ event, priority = false }: { event: EventCard; priority?: boolean }) {
   const { go } = useRouter();
@@ -576,10 +573,10 @@ export function EventCardView({ event, priority = false }: { event: EventCard; p
               </span>
             )}
           </Banner>
-          <DateStub iso={event.startsAt} accent={event.accentColor} transitionName={dateTransitionName(event.slug)} />
+          <DateStub iso={event.startsAt} accent={event.accentColor} />
         </div>
         <div className="px-card-body">
-          <h3 className="px-card-title" style={{ viewTransitionName: titleTransitionName(event.slug) }}>
+          <h3 className="px-card-title">
             {event.name}
           </h3>
           <p className="px-card-when">

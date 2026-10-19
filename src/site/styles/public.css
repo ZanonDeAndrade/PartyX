@@ -1548,9 +1548,9 @@ body.px-dark .px-event-side .px-fine {
 }
 
 /* ---------- transições de página (View Transitions) ---------- */
-/* Troca cruzada de 450 ms entre a página antiga e a nova. Do cartão para o evento, a imagem do cartão cresce e vira a capa e o título
-   acompanha (elementos compartilhados, 600 ms); a página nova não repete a própria entrada (pages.tsx). Cabeçalho parado. Os cliques
-   passam para a página nova durante a troca (base.css). */
+/* Troca cruzada de 450 ms entre a página antiga e a nova; elementos com nome (a capa, entre outras trocas) se movem em 600 ms. A
+   página nova não repete a própria entrada (pages.tsx). Cabeçalho parado. Os cliques passam para a página nova durante a troca
+   (base.css). Da vitrine para o evento e de volta, a coreografia abaixo. */
 ::view-transition-old(root) {
   animation: px-fade-out var(--px-page-fade) var(--px-enter-ease) both;
 }
@@ -1563,6 +1563,145 @@ body.px-dark .px-event-side .px-fine {
 }
 ::view-transition-group(px-header) {
   animation: none;
+}
+
+/* ---------- vitrine para o evento e de volta (19/10/2026) ---------- */
+/* router.tsx marca html[data-vt] ('ida' ou 'volta') durante a troca; tempos em tokens.css (--px-vt-*).
+   Ida: a capa do cartão (nome compartilhado, components.tsx) cresce até o topo; a vitrine esmaece e sobe 8 px por cima da página nova
+   (que está pronta por baixo, opaca); data e título, cronômetro, Quando/Onde/Classificação, aviso de menores com o resto do texto e
+   ingressos sobem 12 px e aparecem, um passo de 40 ms depois do outro, a partir do instante em que a capa passou da metade do
+   caminho. Volta: o contrário; as peças do evento descem 12 px e esmaecem, a capa encolhe até o cartão e a vitrine desce 8 px até o
+   lugar. Cabeçalho e rodapé não participam. As peças só têm nome durante a troca (e só dentro da página do evento, não no
+   esqueleto); ingressos só no computador: no celular o quadro guarda a barra fixa de compra, que fica parada na página. */
+html[data-vt] .px-event-scope .px-countdown-row {
+  view-transition-name: px-ev-countdown;
+}
+html[data-vt] .px-event-scope .px-facts {
+  view-transition-name: px-ev-facts;
+}
+html[data-vt] .px-event-scope .px-event-main {
+  view-transition-name: px-ev-main;
+}
+html[data-vt] .px-event-scope .px-event-minor {
+  view-transition-name: px-ev-minor;
+}
+@media (min-width: 960px) {
+  html[data-vt] .px-event-scope .px-event-side {
+    view-transition-name: px-ev-tickets;
+  }
+}
+html[data-vt] .px-footer {
+  view-transition-name: px-footer;
+}
+/* Volta: o bloco da data do cartão fica sobre a base da capa; com nome próprio (um por cartão), ele não some por baixo da capa que
+   encolhe e entra com a vitrine. Navegador sem match-element: o bloco aparece no fim da troca. */
+html[data-vt='volta'] .px-card-media .px-stub {
+  view-transition-name: match-element;
+  view-transition-class: px-card-stub;
+}
+/* Fundo da troca: o mesmo preto das duas páginas, no instante em que as duas estão meio transparentes. */
+html[data-vt]::view-transition {
+  background: var(--px-ink);
+}
+/* A capa: a imagem preenche a caixa nos dois estados (como object-fit: cover), sem esticar, enquanto a caixa muda de proporção. */
+html[data-vt]::view-transition-group(*) {
+  animation-duration: var(--px-vt-banner);
+  animation-timing-function: var(--px-vt-ease);
+  overflow: clip;
+}
+html[data-vt]::view-transition-old(*),
+html[data-vt]::view-transition-new(*) {
+  block-size: 100%;
+  object-fit: cover;
+}
+html[data-vt]::view-transition-group(px-header),
+html[data-vt]::view-transition-group(px-footer) {
+  animation: none;
+}
+/* O cabeçalho fica por cima de tudo o que se move (capa, blocos de data dos cartões), como na página. */
+html[data-vt]::view-transition-group(px-header) {
+  z-index: 1;
+}
+/* Página que sai por cima da que entra. */
+html[data-vt]::view-transition-old(root) {
+  z-index: 1;
+}
+@keyframes px-vt-out-up {
+  to {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--px-vt-out-rise)));
+  }
+}
+@keyframes px-vt-out-down {
+  to {
+    opacity: 0;
+    transform: translateY(var(--px-vt-in-rise));
+  }
+}
+@keyframes px-vt-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--px-vt-in-rise));
+  }
+}
+@keyframes px-vt-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--px-vt-out-rise)));
+  }
+}
+html[data-vt='ida']::view-transition-old(root) {
+  animation: px-vt-out-up var(--px-vt-out) var(--px-vt-ease) both;
+}
+html[data-vt='ida']::view-transition-new(root) {
+  animation: none;
+}
+html[data-vt='ida']::view-transition-new(px-event-head),
+html[data-vt='ida']::view-transition-new(px-ev-countdown),
+html[data-vt='ida']::view-transition-new(px-ev-facts),
+html[data-vt='ida']::view-transition-new(px-ev-main),
+html[data-vt='ida']::view-transition-new(px-ev-minor),
+html[data-vt='ida']::view-transition-new(px-ev-tickets) {
+  animation: px-vt-item-in var(--px-vt-item) var(--px-vt-ease) both;
+}
+html[data-vt='ida']::view-transition-new(px-event-head) {
+  animation-delay: var(--px-vt-start);
+}
+html[data-vt='ida']::view-transition-new(px-ev-countdown) {
+  animation-delay: calc(var(--px-vt-start) + var(--px-vt-step));
+}
+html[data-vt='ida']::view-transition-new(px-ev-facts) {
+  animation-delay: calc(var(--px-vt-start) + 2 * var(--px-vt-step));
+}
+html[data-vt='ida']::view-transition-new(px-ev-main),
+html[data-vt='ida']::view-transition-new(px-ev-minor) {
+  animation-delay: calc(var(--px-vt-start) + 3 * var(--px-vt-step));
+}
+html[data-vt='ida']::view-transition-new(px-ev-tickets) {
+  animation-delay: calc(var(--px-vt-start) + 4 * var(--px-vt-step));
+}
+html[data-vt='volta']::view-transition-old(root),
+html[data-vt='volta']::view-transition-old(px-event-head),
+html[data-vt='volta']::view-transition-old(px-ev-countdown),
+html[data-vt='volta']::view-transition-old(px-ev-facts),
+html[data-vt='volta']::view-transition-old(px-ev-main),
+html[data-vt='volta']::view-transition-old(px-ev-minor),
+html[data-vt='volta']::view-transition-old(px-ev-tickets) {
+  animation: px-vt-out-down var(--px-vt-out) var(--px-vt-ease) both;
+}
+html[data-vt='volta']::view-transition-new(root),
+html[data-vt='volta']::view-transition-new(*.px-card-stub) {
+  animation: px-vt-page-in var(--px-vt-back-in) var(--px-vt-ease) var(--px-vt-start) both;
+}
+/* Dados que chegaram depois da troca (esqueleto): as mesmas peças entram do mesmo jeito, a partir de agora (pages.tsx). */
+.px-ev-in {
+  animation: px-vt-item-in var(--px-vt-item) var(--px-vt-ease) backwards;
+  animation-delay: calc(var(--i, 0) * var(--px-vt-step));
+}
+@media (max-width: 959px) {
+  .px-event-side.px-ev-in {
+    animation: none;
+  }
 }
 
 /* Âncora da barra fixa ("Escolher ingressos"): para abaixo do cabeçalho, com rolagem suave só se o aparelho permitir. */

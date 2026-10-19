@@ -33,12 +33,12 @@ const UNITS = [
 export function EventCountdown({
   event,
   onKind,
-  entrance = true,
+  entrance = ' px-in',
 }: {
   event: EventDetail;
   onKind: (kind: CountdownView['kind']) => void;
-  /** Entra em cascata com a página (posição 1); falso quando a página veio de uma View Transition. */
-  entrance?: boolean;
+  /** Classe de entrada com a página (posição 1): ' px-in', ' px-ev-in' ou nada (a troca de página já anima). */
+  entrance?: string;
 }) {
   const [view, setView] = useState<CountdownView>(() => readCountdown(event));
   const kind = useRef(view.kind);
@@ -73,7 +73,7 @@ export function EventCountdown({
   if (view.kind === 'oculto') return null;
   if (view.kind === 'agora')
     return (
-      <div className={`px-wrap px-countdown-row${entrance ? ' px-in' : ''}`} data-countdown="agora" style={cascade(1)}>
+      <div className={`px-wrap px-countdown-row${entrance}`} data-countdown="agora" style={cascade(1)}>
         <p className="px-live">
           <span className="px-live-dot" aria-hidden="true" />
           Acontecendo agora
@@ -81,7 +81,7 @@ export function EventCountdown({
       </div>
     );
   return (
-    <div className={`px-wrap px-countdown-row${entrance ? ' px-in' : ''}`} data-countdown="antes" style={cascade(1)}>
+    <div className={`px-wrap px-countdown-row${entrance}`} data-countdown="antes" style={cascade(1)}>
       <div
         className="px-countdown"
         role="timer"

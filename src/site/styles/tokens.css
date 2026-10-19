@@ -149,6 +149,22 @@
   --px-hover-dur: 150ms; /* passar o mouse e tocar em botões e cartões */
   --px-admin-fade: 180ms; /* painel: só esmaecer, rápido */
   --px-gate-flash: 150ms; /* portaria: no máximo um destaque de cor */
+
+  /* ---- vitrine para o evento e de volta (19/10/2026), public.css (html[data-vt]) ---- */
+  /* Variante A, 450 ms do clique ao fim: a troca anima em 420 ms e o navegador leva uns 30 ms para fotografar as duas páginas.
+     Variante B (550 ms): --px-vt-banner 480ms, --px-vt-out 200ms, --px-vt-start 63ms, --px-vt-item 290ms, total 513 ms.
+     --px-vt-start é o instante em que a capa passou da metade do caminho: com esta curva, 13,1% do tempo dela.
+     Fim da cascata: start + 4 passos + item (A: 55 + 160 + 205 = 420 ms). */
+  --px-vt-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --px-vt-banner: 420ms; /* capa do cartão para o topo (e de volta) */
+  --px-vt-out: 160ms; /* página que sai esmaece */
+  --px-vt-out-rise: 8px; /* e sobe (vitrine) */
+  --px-vt-in-rise: 12px; /* peças da página do evento sobem até o lugar */
+  --px-vt-start: 55ms; /* a cascata começa com a capa na metade do caminho */
+  --px-vt-step: 40ms;
+  --px-vt-item: 205ms;
+  --px-vt-back-in: 365ms; /* volta: a vitrine entra do start até o fim da capa */
+  --px-vt-reduced: 150ms; /* menos movimento: só esmaecer */
 }
 
 @media (min-width: 768px) {
