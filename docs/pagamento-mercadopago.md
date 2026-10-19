@@ -92,17 +92,34 @@ autorizou, cartão desabilitado, segurança, limite de tentativas, autenticaçã
 
 ## CSP (`server/src/security/headers.ts`, só com `PAYMENT_GATEWAY=mercadopago`)
 
-A documentação manda carregar `https://sdk.mercadopago.com/js/v2` e **não publica lista de domínios para CSP**. Os demais foram
-medidos no navegador, com o Brick em teste, liberando um bloqueio por vez:
+A documentação manda carregar `https://sdk.mercadopago.com/js/v2` e **não publica lista de domínios para CSP** (conferido de novo em
+18/10/2026: as páginas de segurança do Checkout Transparente e do Checkout Bricks tratam de OAuth, OWASP e PCI, nada de CSP). Os
+domínios foram medidos no navegador, liberando um bloqueio por vez (11/10/2026 e 18/10/2026, Chromium, WebKit e Firefox):
 
 | Diretiva | Domínios | Por quê (medido) |
 | --- | --- | --- |
-| `script-src` | `https://sdk.mercadopago.com`, `https://http2.mlstatic.com` | SDK e o código do Brick (`op-cho-bricks/.../cardPayment.js`) |
-| `connect-src` | `https://api.mercadopago.com`, `https://http2.mlstatic.com`, `https://api-static.mercadopago.com`, `https://secure-fields.mercadopago.com` | bandeiras, parcelas, tokenização, textos do Brick e campos seguros |
+| `script-src` | `https://sdk.mercadopago.com`, `https://http2.mlstatic.com`, `'nonce-…'` (novo a cada resposta) | SDK, código do Brick (`op-cho-bricks/.../cardPayment.js`) e o script em linha do perfil do aparelho |
+| `connect-src` | `https://api.mercadopago.com`, `https://http2.mlstatic.com`, `https://api-static.mercadopago.com`, `https://secure-fields.mercadopago.com`, `https://www.mercadolibre.com` | bandeiras, parcelas, tokenização, textos do Brick, campos seguros e impressão do aparelho |
+| `img-src` | `https://www.mercadopago.com.br`, `https://www.mercadolibre.com`, `https://www.mercadolivre.com` | impressão do aparelho (antifraude) |
 | `frame-src` | `https://secure-fields.mercadopago.com` | número, validade e CVV em quadros do Mercado Pago |
 
-Continuam **bloqueados** sem efeito no pagamento (cartão aprovado e recusado com eles bloqueados): um script em linha do SDK e a
-telemetria `https://api.mercadolibre.com/tracks`. `img-src` não precisou de nada além de `data:` (QR do Pix vem em base64).
+`style-src` e `font-src` não precisaram de nada: os campos e as fontes do Brick ficam dentro dos quadros do Mercado Pago.
+
+**Script em linha (perfil do aparelho):** o SDK busca em `/devices/widgets` um script do antifraude e o põe na página como script em
+linha. O conteúdo muda a cada vez (hash não serve). O SDK aceita `deviceProfileCspNonce` e põe o nonce nesse script; o servidor gera
+um nonce por resposta (o `NONCE` do `hono/secure-headers`), põe no `script-src` e num `<meta property="csp-nonce" nonce="…">` do HTML
+(`injectCspNonce`), e a tela de cartão entrega ao SDK (`src/site/cardBrickMount.ts`). Sem `unsafe-inline`. O SDK junta esse perfil
+ao token do cartão (`createCardToken`), então ele conta no antifraude. Até 18/10/2026 o script ficava bloqueado.
+
+Continua **bloqueada**, sem efeito no pagamento: a telemetria do SDK `https://api.mercadolibre.com/tracks` (avisos "Could not send
+event" no console). A documentação não pede esse domínio.
+
+**Bloqueio do próprio navegador:** a proteção contra rastreamento do Firefox (e bloqueadores de anúncio) pode cortar arquivos do Brick,
+como `http2.mlstatic.com/.../i18n/pt/cardPayment/index.json`. Nesse caso o `create` do Brick resolve **sem controlador** e não chama
+`onError` nem `onReady`. A tela mostra "Não foi possível carregar o pagamento com cartão. Desative o bloqueio de rastreamento para
+este site ou pague por Pix." e o botão "Pagar com Pix", que gera o Pix na hora. O mesmo aviso aparece se o SDK der erro, se `onError`
+vier antes de `onReady` ou se nada ficar pronto em 10 s. Se o Brick ficar pronto depois, o formulário volta. Sem Pix (reserva curta,
+D-03), o aviso pede para desativar o bloqueio e recarregar. Registro: `docs/registros/cartao-csp-e-bloqueio-2026-10-18.md`.
 
 ## Provas no ambiente de teste (11/10/2026, servidor local + túnel temporário autorizado)
 

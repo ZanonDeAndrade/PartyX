@@ -1,4 +1,5 @@
-import { secureHeaders } from 'hono/secure-headers';
+import { NONCE, secureHeaders } from 'hono/secure-headers';
+import type { Context } from 'hono';
 import type { Config } from '../config';
 
 /**
@@ -8,7 +9,10 @@ import type { Config } from '../config';
 /**
  * Mercado Pago (Card Payment Brick, só quando o gateway é o Mercado Pago). A documentação oficial manda carregar
  * `https://sdk.mercadopago.com/js/v2`; ela não publica a lista de domínios para CSP. Os demais foram medidos no navegador,
- * com o Brick em teste, registrando cada bloqueio da CSP (docs/pagamentos/mercadopago.md).
+ * com o Brick em teste, registrando cada bloqueio da CSP (docs/pagamento-mercadopago.md, medição de 18/10/2026).
+ * `www.mercadolibre.com`, `www.mercadolivre.com` e `www.mercadopago.com.br`: o perfil do aparelho do antifraude, que o SDK junta
+ * ao token do cartão.
+ * Fica de fora a telemetria do SDK (`api.mercadolibre.com/tracks`), sem efeito no pagamento.
  */
 export const MERCADO_PAGO_CSP = {
   script: ['https://sdk.mercadopago.com', 'https://http2.mlstatic.com'],
@@ -17,10 +21,22 @@ export const MERCADO_PAGO_CSP = {
     'https://http2.mlstatic.com',
     'https://api-static.mercadopago.com',
     'https://secure-fields.mercadopago.com',
+    'https://www.mercadolibre.com',
   ],
   frame: ['https://secure-fields.mercadopago.com'],
-  img: [] as string[],
+  img: ['https://www.mercadopago.com.br', 'https://www.mercadolibre.com', 'https://www.mercadolivre.com'],
 };
+
+/**
+ * O SDK do Mercado Pago põe na página um script em linha, o perfil do aparelho do antifraude, com o conteúdo que o Mercado Pago
+ * devolve na hora (hash não serve). A CSP libera esse script por um nonce novo a cada resposta, que a página entrega ao SDK
+ * (`deviceProfileCspNonce`). O nonce vai num `<meta>` com o atributo `nonce`, que o navegador esconde do HTML depois de ler.
+ */
+export function injectCspNonce(html: string, c: Context): string {
+  const nonce = c.get('secureHeadersNonce');
+  if (!nonce) return html;
+  return html.replace(/<\/head>/i, end => `<meta property="csp-nonce" nonce="${nonce}">${end}`);
+}
 
 export function securityHeaders(
   config: Pick<
@@ -42,7 +58,7 @@ export function securityHeaders(
   return secureHeaders({
     contentSecurityPolicy: {
       defaultSrc: self,
-      scriptSrc: [...self, ...turnstile, ...mp.script],
+      scriptSrc: [...self, ...(config.PAYMENT_GATEWAY === 'mercadopago' ? [NONCE] : []), ...turnstile, ...mp.script],
       // Estilos em linha: o React usa o atributo `style` em alguns elementos.
       // Fontes servidas pelo próprio site (@fontsource): sem Google Fonts.
       styleSrc: [...self, "'unsafe-inline'"],

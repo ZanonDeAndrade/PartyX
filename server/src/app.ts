@@ -2,10 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { getCookie } from 'hono/cookie';
 import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { requestId } from 'hono/request-id';
 import { bodyLimit } from 'hono/body-limit';
-import { securityHeaders } from './security/headers';
+import { injectCspNonce, securityHeaders } from './security/headers';
 import { maintenanceGuard } from './ops/maintenance';
 import { authRoutes } from './api/auth';
 import { healthRoutes } from './api/health';
@@ -182,7 +182,8 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
     else if (c.req.path === '/' || c.req.path.endsWith('.html')) c.header('Cache-Control', 'no-cache');
     else c.header('Cache-Control', 'public, max-age=3600');
   });
-  const readIndex = () => readFile(path.join(dist, 'index.html'), 'utf8');
+  // Todo HTML do app leva o nonce desta resposta (pagamento com cartão do Mercado Pago; security/headers.ts).
+  const readIndex = async (c: Context) => injectCspNonce(await readFile(path.join(dist, 'index.html'), 'utf8'), c);
 
   // Página inicial (LCP): antes dos arquivos estáticos, que serviriam o `index.html` puro. O HTML leva os dados da vitrine e o
   // `preload` do banner do destaque, para a tela não esperar a API. A consulta fica 60 s em memória por instância: a vitrine
@@ -192,7 +193,7 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
   app.get('/', async c => {
     let html: string;
     try {
-      html = await readIndex();
+      html = await readIndex(c);
     } catch {
       return c.text('Front-end não compilado. Rode `npm run build` ou use `npm run dev`.', 404);
     }
@@ -225,7 +226,7 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
   app.get('/eventos/:slug', async c => {
     let html: string;
     try {
-      html = await readIndex();
+      html = await readIndex(c);
     } catch {
       return c.text('Front-end não compilado. Rode `npm run build` ou use `npm run dev`.', 404);
     }
@@ -246,7 +247,7 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
   app.get('*', async c => {
     try {
       c.header('Cache-Control', 'no-cache'); // o HTML do app não é cacheado sem revalidar: assets novos valem no deploy
-      return c.html(await readIndex());
+      return c.html(await readIndex(c));
     } catch {
       return c.text('Front-end não compilado. Rode `npm run build` ou use `npm run dev`.', 404);
     }

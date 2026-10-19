@@ -984,6 +984,15 @@ export function OrderPage({ id }: { id: string }) {
           amountCents={order.totalCents}
           payerEmail={email}
           onToken={payWithCard}
+          onPix={
+            options.pixAvailable
+              ? () => {
+                  setCardOpen(false);
+                  setMethod('pix');
+                  void start('pix');
+                }
+              : undefined
+          }
         />
         <div className="px-done-actions px-done-actions-start">
           {options.pixAvailable ? (
