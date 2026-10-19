@@ -90,8 +90,8 @@ dias 4,49%, 30 dias 3,98%; Pix na hora 0,99%).
 
 ## Pendente
 
-- Publicação (candidata com backup antes da migração; virada com OK do responsável). A taxa nasce em 0%: nada muda para o comprador na
-  virada.
+- Publicada em 19/10/2026 na revisão `partyx-00046-gul` (`publicacao-producao-2026-10-19.md`), com a taxa em 0%: nada mudou para o
+  comprador na virada.
 - Confirmação da PartyX da porcentagem e do mínimo (página de opções enviada pelo responsável em 19/10/2026); depois, o administrador
   grava no painel, em Configurações (vale só para pedidos novos; com evento à venda o painel avisa e a trilha registra).
 - Conferir no relatório a tarifa real dos primeiros pedidos pagos com taxa em produção.
