@@ -1,6 +1,6 @@
 # Responsividade (CA-32): resultado da varredura
 
-Gerado em 2026-10-19T13:54:52.244Z pelo Playwright (e2e/responsividade.spec.ts), Chromium, servidor local com dados e gateway **fictícios**.
+Gerado em 2026-10-19T14:50:58.094Z pelo Playwright (e2e/responsividade.spec.ts), Chromium, servidor local com dados e gateway **fictícios**.
 Critério: a página falha se `document.documentElement.scrollWidth > clientWidth` (rolagem horizontal). Medida na largura do aparelho, depois do carregamento e da ação de cada estado.
 As capturas ficam em `img/`, **fora do Git** (`.gitignore`): os links só abrem na máquina que rodou a varredura ou no arquivo zip guardado à parte.
 

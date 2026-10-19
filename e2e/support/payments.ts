@@ -114,7 +114,7 @@ export function payments(state: RoteiroState) {
 
     /** Cartão: APRO aprova e OTHE recusa (nomes de titular da documentação do Mercado Pago; no fictício, o simulador). */
     async payCard(page: Page, orderId: string, holder: 'APRO' | 'OTHE') {
-      await page.getByRole('radio', { name: /^Cartão de crédito/ }).click();
+      await page.getByRole('radio', { name: /Cartão de crédito ou débito/ }).click();
       if (state.gateway === 'ficticio') {
         // O fictício "leva" a uma página externa que não existe; a resposta vem do simulador, como faria o retorno do gateway.
         await page.route('https://pagamento.ficticio.invalid/**', r =>

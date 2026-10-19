@@ -866,7 +866,7 @@ test('CA-32: formulário de cartão do Mercado Pago (Brick) a 360 px', async () 
   const { page } = await as(buyers.carlos, { viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true });
   await chooseTickets(page, S.base, slug, { Pista: 1 });
   const id = await reserve(page);
-  await page.getByRole('radio', { name: /^Cartão de crédito/ }).click();
+  await page.getByRole('radio', { name: /Cartão de crédito ou débito/ }).click();
   await page.getByRole('button', { name: 'Continuar para o cartão' }).click();
   await expect(page.frameLocator('iframe[name="cardNumber"]').locator('input#cardNumber')).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1000);

@@ -69,6 +69,11 @@ export default defineConfig({
       process.env.APP_ENV === 'homologacao' && process.env.ENABLE_PROTOTYPE === 'true',
     ),
   },
+  build: {
+    // Logos das formas de pagamento (src/assets/pagamento): sempre arquivo próprio em /assets, com hash no nome e cache longo, nunca
+    // embutidas como data: (o padrão do Vite embute arquivos menores que 4 KB). Os demais seguem o padrão.
+    assetsInlineLimit: (file: string) => (file.includes('/assets/pagamento/') ? false : undefined),
+  },
   server: {
     // Em desenvolvimento, a API (`npm run dev:server`) roda na 8080.
     proxy: { '/api': 'http://localhost:8080' },

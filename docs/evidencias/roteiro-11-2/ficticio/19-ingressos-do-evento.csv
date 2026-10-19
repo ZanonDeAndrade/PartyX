@@ -1,14 +1,14 @@
 ﻿Código;Tipo;Titular;CPF do titular (mascarado);E-mail do titular;Transferido;Pedido;Situação do ingresso;Entrou em;Validador;Motivo do cancelamento
-PX-U2ZX-3EZA;Pista;APRO Ana Souza Fictícia;***.007.001-**;ana.roteiro@partyx.test;Não;PX-10001;Utilizado;19/10/2026 10:47;Rafael Validador Fictício;
-PX-5FMJ-QCUP;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;Não;PX-10002;Cancelado;;;Roteiro 11.2: caso cancelado
-PX-9J9W-9L6Y;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;Não;PX-10002;Utilizado;19/10/2026 10:47;Rafael Validador Fictício;
-PX-RWC7-VDL2;VIP;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;Não;PX-10002;Utilizado;19/10/2026 10:47;Rafael Validador Fictício;
-PX-TJNK-88SX;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;Não;PX-10005;Válido;;;
-PX-ZD8E-RD68;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;Não;PX-10005;Cancelado;;;Roteiro 11.2: pedido do comprador registrado pela PartyX
+PX-Y33F-JJ73;Pista;APRO Ana Souza Fictícia;***.007.001-**;ana.roteiro@partyx.test;Não;PX-10001;Utilizado;19/10/2026 11:43;Rafael Validador Fictício;
+PX-2F95-X8D5;VIP;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;Não;PX-10002;Cancelado;;;Roteiro 11.2: caso cancelado
+PX-BM4P-UVDS;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;Não;PX-10002;Utilizado;19/10/2026 11:43;Rafael Validador Fictício;
+PX-P7UY-FT7B;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;Não;PX-10002;Utilizado;19/10/2026 11:43;Rafael Validador Fictício;
+PX-7T8P-AMVK;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;Não;PX-10005;Válido;;;
+PX-RQ83-8FWR;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;Não;PX-10005;Cancelado;;;Roteiro 11.2: pedido do comprador registrado pela PartyX
 
 Total de ingressos listados;6
 Válidos;1
 Utilizados;3
 Cancelados;2
 Filtros aplicados;"Evento: Festival Roteiro E2E; Situação: todas"
-Gerado em;19/10/2026 10:47
+Gerado em;19/10/2026 11:43

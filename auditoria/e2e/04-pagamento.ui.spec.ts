@@ -5,7 +5,7 @@ const principal = () => S.events.principal!;
 /** Cartão no gateway fictício: a página "leva" a um endereço externo inexistente; a resposta vem do simulador, como no retorno real. */
 async function startCard(page: import('@playwright/test').Page, orderId: string) {
   await page.route('https://pagamento.ficticio.invalid/**', r => r.fulfill({ contentType: 'text/html', body: '<h1>Pagamento fictício</h1>' }));
-  await page.getByRole('radio', { name: /^Cartão de crédito/ }).click();
+  await page.getByRole('radio', { name: /Cartão de crédito ou débito/ }).click();
   await page.getByRole('button', { name: 'Continuar para o cartão' }).click();
   await page.waitForURL(/pagamento\.ficticio\.invalid/);
   await page.goto(`${S.base}/pedido/${orderId}`);

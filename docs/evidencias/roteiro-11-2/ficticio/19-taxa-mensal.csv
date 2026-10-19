@@ -1,11 +1,11 @@
 ﻿Código do ingresso;Pedido;Evento;Pagamento aprovado em;Situação atual
-PX-U2ZX-3EZA;PX-10001;Festival Roteiro E2E;19/10/2026 10:46;Utilizado
-PX-5FMJ-QCUP;PX-10002;Festival Roteiro E2E;19/10/2026 10:47;Cancelado (administrador)
-PX-9J9W-9L6Y;PX-10002;Festival Roteiro E2E;19/10/2026 10:47;Utilizado
-PX-RWC7-VDL2;PX-10002;Festival Roteiro E2E;19/10/2026 10:47;Utilizado
-PX-TJNK-88SX;PX-10005;Festival Roteiro E2E;19/10/2026 10:47;Válido
-PX-ZD8E-RD68;PX-10005;Festival Roteiro E2E;19/10/2026 10:47;Cancelado (administrador)
-PX-DYZ3-J94Y;PX-10007;Outro Evento E2E;19/10/2026 10:47;Válido
+PX-Y33F-JJ73;PX-10001;Festival Roteiro E2E;19/10/2026 11:43;Utilizado
+PX-2F95-X8D5;PX-10002;Festival Roteiro E2E;19/10/2026 11:43;Cancelado (administrador)
+PX-BM4P-UVDS;PX-10002;Festival Roteiro E2E;19/10/2026 11:43;Utilizado
+PX-P7UY-FT7B;PX-10002;Festival Roteiro E2E;19/10/2026 11:43;Utilizado
+PX-7T8P-AMVK;PX-10005;Festival Roteiro E2E;19/10/2026 11:43;Válido
+PX-RQ83-8FWR;PX-10005;Festival Roteiro E2E;19/10/2026 11:43;Cancelado (administrador)
+PX-642C-7J3R;PX-10007;Outro Evento E2E;19/10/2026 11:43;Válido
 
 Mês de aprovação;10/2026
 Ingressos apurados (unidades);7
@@ -17,4 +17,4 @@ Pagamentos aprovados sem estoque (fora da contagem);0
 Receita aprovada bruta (R$);631,64
 Receita líquida (R$);631,64
 Critério;Ingressos vendidos no mês = ingressos emitidos de pedidos aprovados cuja data original de aprovação (paid_at) está no mês, no fuso do evento, independentemente da situação atual do ingresso ou do pedido. Cancelados, reembolsados e estornados continuam contando (Cl. 6.3).
-Gerado em;19/10/2026 10:47
+Gerado em;19/10/2026 11:43

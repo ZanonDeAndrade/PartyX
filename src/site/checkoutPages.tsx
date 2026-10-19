@@ -24,6 +24,8 @@ import { brl, dateParts, dateShort, maskEmail, phoneBr, timeOf } from './format'
 import { IconCheck, IconCopy } from './icons';
 import { cascade } from './motion';
 import { discountLabel } from './promoterDiscount';
+import { PIX_TEXT } from './paymentBrands';
+import { CardBrandLogos, PixLogo } from './paymentLogos';
 import { formatRate } from './serviceFee';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
@@ -1068,7 +1070,8 @@ export function OrderPage({ id }: { id: string }) {
         <div role="radiogroup" aria-label="Forma de pagamento" className="px-methods">
           {(
             [
-              ['pix', 'Pix', 'Aprovação em instantes. O QR Code e o código copia e cola valem até o fim da reserva.'],
+              // Ao lado do símbolo Pix, sem a palavra "Pix" (Manual de Uso da Marca Pix 1.6): o nome do botão começa pelo alt "Pix".
+              ['pix', PIX_TEXT, 'Aprovação em instantes. O QR Code e o código copia e cola valem até o fim da reserva.'],
               [
                 'cartao',
                 'Cartão de crédito ou débito',
@@ -1090,6 +1093,7 @@ export function OrderPage({ id }: { id: string }) {
               >
                 <span className="px-radio" aria-hidden="true" />
                 <span>
+                  {k === 'pix' ? <PixLogo /> : <CardBrandLogos />}
                   <b>{label}</b>
                   <small>{text}</small>
                 </span>

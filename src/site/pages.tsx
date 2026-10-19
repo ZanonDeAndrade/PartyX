@@ -20,6 +20,8 @@ import { stateAnnouncement, type CountdownView } from './eventCountdown';
 import { EventCountdown, readCountdown } from './eventCountdownView';
 import { brl, dateLong, dateParts, shareLinks, timeOf } from './format';
 import { formatRate } from './serviceFee';
+import { acceptedText, PIX_TEXT } from './paymentBrands';
+import { CardBrandLogos, PixLogo } from './paymentLogos';
 import { IconCheck, IconClose, IconLink, IconShare } from './icons';
 import { cascade, Roll } from './motion';
 import { eventLinkProps, pendingEvent, prefetchedEvent } from './prefetch';
@@ -491,12 +493,22 @@ function PaymentMethods({ site, feeRateBps }: { site: SiteInfo | null; feeRateBp
         </p>
       ) : null}
       <h3 id="formas-de-pagamento">Formas de pagamento</h3>
-      <ul>
-        {pay.pix ? <li>Pix</li> : null}
+      {/* Texto alternativo do bloco inteiro, montado da lista de bandeiras (src/site/paymentBrands.ts). */}
+      <p className="px-sr">{acceptedText(pay.card, pay.pix)}.</p>
+      <ul className="px-paycards">
         {pay.card ? (
-          <li>
-            Cartão de crédito ou débito
-            {pay.maxInstallments > 1 ? <span className="px-nowrap">, em até {pay.maxInstallments}x</span> : null}
+          <li className="px-paycard">
+            <CardBrandLogos />
+            <span className="px-paycard-text">
+              Cartão de crédito ou débito
+              {pay.maxInstallments > 1 ? <span className="px-nowrap">, em até {pay.maxInstallments}x</span> : null}
+            </span>
+          </li>
+        ) : null}
+        {pay.pix ? (
+          <li className="px-paycard">
+            <PixLogo />
+            <span className="px-paycard-text">{PIX_TEXT}</span>
           </li>
         ) : null}
       </ul>

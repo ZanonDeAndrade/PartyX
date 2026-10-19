@@ -6,4 +6,4 @@ Vendas sem código de promoter (fora do ranking);;;;5;440,00;0,00;440,00;3
 Ordenado por;quantidade de ingressos, do maior para o menor
 Critério;Pedidos com status Pago e código de promoter, pela data original da aprovação. Valor líquido = preço dos ingressos menos o desconto do código. O sistema não calcula nem paga comissão.
 Filtros aplicados;"Evento: Todos; Período de aprovação: todo o período"
-Gerado em;19/10/2026 10:47
+Gerado em;19/10/2026 11:43

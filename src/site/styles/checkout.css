@@ -402,6 +402,14 @@
   flex-direction: column;
   gap: 2px;
 }
+/* Logos no botão (bandeiras ou símbolo Pix), sobre fundo branco próprio para as cores oficiais, com a mesma altura da página do evento. */
+.px-method .px-paylogos {
+  align-self: flex-start;
+  margin-bottom: var(--px-s-1);
+  padding: 4px 6px;
+  background: #fff;
+  border-radius: 6px;
+}
 .px-method b {
   font-size: var(--px-t-lg);
 }

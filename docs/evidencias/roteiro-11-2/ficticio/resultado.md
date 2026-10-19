@@ -1,6 +1,6 @@
 # Roteiro 11.2: resultado da rodada (gateway fictício)
 
-Gerado em 2026-10-19T13:47:33.425Z pelo Playwright (e2e/roteiro-11-2.spec.ts), servidor local http://localhost:8101, banco de teste descartável.
+Gerado em 2026-10-19T14:43:55.697Z pelo Playwright (e2e/roteiro-11-2.spec.ts), servidor local http://localhost:8101, banco de teste descartável.
 Gateway: **gateway fictício (local)**.
 
 | Item | Verificação | Observações |
@@ -17,9 +17,9 @@ Gateway: **gateway fictício (local)**.
 | 10 | Esgotamento: última unidade disputada por dois compradores | Um comprador reservou a última unidade; o outro viu: "Atenção. Alguns ingressos não estão mais disponíveis na quantidade escolhida. As últimas unidades estão reservadas por outros compradores. Tente de novo em alguns minutos.". Banco: total 1, vendidos 0, reservados 1. |
 | 11 | Webhook recebido duas vezes: ingressos não duplicados | Fictício: confirmação repetida 1 → {"status":"processada","outcome":"ignorado"}.<br>Fictício: confirmação repetida 2 → {"status":"processada","outcome":"ignorado"}.<br>Ingressos do pedido continuam 1 (mesmos ids). Notificações gravadas para o pedido: 3 (3 ids distintos, 3 processadas). |
 | 12 | E-mail de confirmação recebido com link para os ingressos | E-mail "[LOCAL] Compra confirmada · Festival Roteiro E2E · Pedido PX-10001" capturado pelo servidor local (sem SMTP real); link /meus-ingressos abre os ingressos de Ana. |
-| 13 | Download do PDF e exibição no celular | PDF 25825 bytes, com nome do evento e sem CPF; tela do ingresso no Pixel 7 (emulado) sem rolagem horizontal. |
+| 13 | Download do PDF e exibição no celular | PDF 24534 bytes, com nome do evento e sem CPF; tela do ingresso no Pixel 7 (emulado) sem rolagem horizontal. |
 | 14 | Validação: válido, já utilizado, cancelado, de outro evento, código adulterado | Válido: tela verde (rgb(21, 128, 61)).<br>Já utilizado: tela amarela (rgb(250, 204, 21)).<br>Cancelado: tela vermelha (rgb(185, 28, 28)).<br>Outro evento: tela vermelha (rgb(185, 28, 28)).<br>Inválido: tela vermelha (rgb(185, 28, 28)).<br>Leituras pela câmera SIMULADA do Chromium (vídeo com o QR real), não por aparelho. |
-| 15 | Busca manual pelo nome e pelo código | Por nome: 3 ingressos de Bruno (válido, utilizado e cancelado), CPF mascarado "***.007.002-**".<br>Por código (PX-9J9W-9L6Y): 1 resultado; entrada confirmada manualmente (verde), ingresso "utilizado". |
+| 15 | Busca manual pelo nome e pelo código | Por nome: 3 ingressos de Bruno (válido, utilizado e cancelado), CPF mascarado "***.007.002-**".<br>Por código (PX-P7UY-FT7B): 1 resultado; entrada confirmada manualmente (verde), ingresso "utilizado". |
 | 16 | Contador de entradas e acompanhamento em tempo real no painel | Painel: 2 → 3 entradas sem recarregar; contador na portaria: 3 de 5. |
 | 17 | Cancelamento de ingresso pelo administrador e leitura posterior (vermelho) | Cancelado pela tela do administrador; leitura seguinte: "Cancelado", tela vermelha (rgb(185, 28, 28)). |
 | 18 | Relatórios: vendas por evento, por tipo, por promoter, mensal da taxa | Vendas por evento e tipo conferem com o banco: Pista 5 (R$ 400,00), VIP 1 (R$ 150,00).<br>Promoters: DUDA com 2 ingressos e R$ 160,00 atribuídos (valor dos ingressos, sem a taxa de serviço e sem desconto); linha "1º Duda Martins Fictícia DUDA 2 R$ 160,00 R$ 0,00 R$ 160,00 1".<br>Taxa mensal (10/2026): 7 ingressos pelo mês de paid_at, dos quais 2 cancelados (continuam contando); a tela mostra o mesmo número. |
