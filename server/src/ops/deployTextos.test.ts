@@ -27,8 +27,8 @@ describe('textos legais da release da taxa de serviço', () => {
   const terms = readFileSync(path.join(ROOT, 'conteudo-legal/termos-de-uso.txt'), 'utf8');
   const cancellation = readFileSync(path.join(ROOT, 'conteudo-legal/cancelamento.txt'), 'utf8');
 
-  it('os textos do repositório (Termos 1.3 e Política 1.1) passam', () => {
-    expect(textCheck(terms, cancellation, '1.3', '1.1')).toEqual({ status: 0, err: '' });
+  it('os textos do repositório (Termos 1.4, com a porcentagem, e Política 1.1) passam', () => {
+    expect(textCheck(terms, cancellation, '1.4', '1.1')).toEqual({ status: 0, err: '' });
   });
 
   it('os textos anteriores, que diziam não haver taxa, são recusados, um motivo por linha', () => {

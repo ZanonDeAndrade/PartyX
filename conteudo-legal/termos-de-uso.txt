@@ -46,7 +46,7 @@ Para excluir sua conta, faça o pedido à PartyX pelos canais de atendimento, co
 
 # 4. Compra de ingressos
 
-Preço e taxa de serviço: cada ingresso tem o seu valor e uma taxa de serviço cobrada pela PartyX, calculada por ingresso. Os dois aparecem separados na página do Evento e na tela de compra, com o total do pedido, antes do pagamento.
+Preço e taxa de serviço: cada ingresso tem o seu valor e uma taxa de serviço cobrada pela PartyX, calculada por ingresso, a mesma para todos os ingressos e para todas as formas de pagamento. A taxa de serviço corresponde a 7,5% do valor total pago por ingresso (valor do ingresso mais a taxa), arredondada para cima ao centavo. Exemplo: num ingresso de R$ 30,00, a taxa é de R$ 2,44 e o total é de R$ 32,44. O valor do ingresso, a taxa e o total do pedido aparecem separados na página do Evento e na tela de compra, antes do pagamento. Uma mudança na porcentagem só vale para os pedidos feitos depois de publicada nestes Termos.
 
 Meia-entrada: os ingressos vendidos na Plataforma são de valor integral. A Plataforma não oferece venda de meia-entrada.
 

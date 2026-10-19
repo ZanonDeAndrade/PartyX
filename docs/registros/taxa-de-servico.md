@@ -6,6 +6,12 @@ opções `taxa-de-servico-opcoes-2026-10-19.md` (exemplo de R$ 30,00 a 4,98%, 2,
 Depois da confirmação, o administrador grava a porcentagem no painel (Configurações) e ela vale só para os pedidos novos. A confirmação
 escrita da PartyX fica com o responsável, fora do repositório.
 
+**Porcentagem aprovada (19/10/2026):** o responsável informou que o Bernardo aprovou **7,5%**, com **mínimo de R$ 0,00**, em todos os
+ingressos, independentemente do valor, para cobrir também um eventual parcelamento no cartão (hoje o pagamento é à vista, D-02). A conta
+é a mesma da página de opções, sobre o total pago: R$ 30,00 → taxa R$ 2,44, total R$ 32,44 (cerca de 8,1% sobre o valor do ingresso).
+Os **Termos de Uso 1.4** escrevem a porcentagem, a conta e esse exemplo, e dizem que uma mudança na porcentagem só vale depois de
+publicada nos Termos. Por isso a porcentagem do painel precisa ser sempre a dos Termos: mudar uma exige mudar a outra.
+
 **Pedido do responsável (18/10/2026):** taxa de serviço somada ao valor do ingresso, para cobrir a tarifa do Mercado Pago, com o valor
 do ingresso chegando inteiro ao organizador; configurável no painel; mostrada separada em todo o site e nos comprovantes; guardada no
 pedido; reembolso devolvendo o total pago, com a taxa; relatório com a tarifa real do Mercado Pago; Termos de Uso e Política de
@@ -92,6 +98,7 @@ dias 4,49%, 30 dias 3,98%; Pix na hora 0,99%).
 
 - Publicada em 19/10/2026 na revisão `partyx-00046-gul` (`publicacao-producao-2026-10-19.md`), com a taxa em 0%: nada mudou para o
   comprador na virada.
-- Confirmação da PartyX da porcentagem e do mínimo (página de opções enviada pelo responsável em 19/10/2026); depois, o administrador
-  grava no painel, em Configurações (vale só para pedidos novos; com evento à venda o painel avisa e a trilha registra).
+- Porcentagem aprovada (7,5%, mínimo R$ 0,00) e escrita nos Termos 1.4. Falta o administrador gravar 7,5% e mínimo R$ 0,00 no painel,
+  em Configurações, **depois** da virada dos Termos 1.4 (vale só para pedidos novos; com evento à venda o painel avisa e a trilha
+  registra).
 - Conferir no relatório a tarifa real dos primeiros pedidos pagos com taxa em produção.

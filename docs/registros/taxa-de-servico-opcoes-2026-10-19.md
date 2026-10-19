@@ -64,3 +64,9 @@ Até a decisão, a taxa fica em 0% e o comprador paga só o preço do ingresso. 
 Configurações, e passa a valer para os pedidos feitos a partir daquele momento. Os pedidos já feitos não mudam. A tarifa real cobrada
 pelo Mercado Pago em cada pedido pago aparece no relatório de vendas do painel, para acompanhar se a porcentagem escolhida está
 cobrindo.
+
+## Decisão
+
+Em 19/10/2026 o Bernardo aprovou **7,5%**, com mínimo de R$ 0,00, em todos os ingressos, para cobrir também um eventual
+parcelamento no cartão. Num ingresso de R$ 30,00: taxa de R$ 2,44, comprador paga R$ 32,44. A porcentagem está escrita nos Termos de
+Uso 1.4.
