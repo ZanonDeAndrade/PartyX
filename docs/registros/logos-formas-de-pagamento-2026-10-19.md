@@ -51,7 +51,7 @@ Hipercard não aparece na conta. No débito, só a Elo Débito aparece na lista 
 - `e2e/formas-pagamento.spec.ts` (`npm run e2e:formas-pagamento`, 6 cenários a 360, 390 e 1280 px, tema claro, evento com cor de
   destaque): dois cartões brancos, textos, alt de cada logo, texto do bloco, alturas, 8 px entre as logos, texto à direita das logos,
   arquivos do próprio domínio em `/assets` com hash e cache longo, sem rolagem lateral; checkout com as mesmas logos nos dois botões.
-- Capturas: `docs/evidencias/formas-pagamento-2026-10-19/` (dados fictícios).
+- Capturas: `docs/evidencias/formas-pagamento-2026-10-19/` (dados fictícios; PNG fora do Git pela regra do `.gitignore`, ficam na pasta local).
 - Os seletores e2e do botão de cartão passaram a procurar "Cartão de crédito ou débito" em qualquer posição do nome (as bandeiras vêm
   antes no botão): `e2e/support/payments.ts`, `e2e/roteiro-11-2.spec.ts`, `auditoria/e2e/04-pagamento.ui.spec.ts`.
 
@@ -61,6 +61,7 @@ Hipercard não aparece na conta. No débito, só a Elo Débito aparece na lista 
 - Banco Central do Brasil, [Manual de Uso da Marca Pix 1.6](https://www.bcb.gov.br/content/estabilidadefinanceira/pix/Regulamento_Pix/I_manual_uso_marca_pix.pdf)
   (redução máxima, símbolo Pix, cores) e o arquivo da marca em `bcb.gov.br/content/estabilidadefinanceira/piximg/logo_pix.png`.
 
-## Pendente
+## Publicação
 
-- Entra na próxima release, com o que já está na fila. Sem publicação até o OK do responsável.
+Publicado em 19/10/2026 15:02 UTC na revisão `partyx-00052-saf` (`release-2026-10-19d`), com OK do responsável ("coloque em produção e faça
+commit"). Registro: `publicacao-producao-2026-10-19.md`.

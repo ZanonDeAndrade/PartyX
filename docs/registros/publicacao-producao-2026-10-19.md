@@ -114,3 +114,20 @@ e deploy"; Termos 1.5 aprovados pelo Bernardo (informado pelo responsável). Reg
 **Voltar atrás:** `PROJECT=partyx-producao REVISAO=partyx-00048-zik ./infra/producao/deploy.sh rollback` (Termos voltam para 1.4;
 convive com a 0018 enquanto nenhum pedido tiver desconto: a revisão anterior ignora as colunas novas).
 
+## Quarta publicação do dia: logos nas formas de pagamento (15:02 UTC)
+
+Release `release-2026-10-19d` (commit `ef071cf`), com OK do responsável: "coloque em produção e faça commit". Registro do recurso:
+`logos-formas-de-pagamento-2026-10-19.md`.
+
+| Campo | Valor |
+|---|---|
+| Migração | nenhuma (backup do dia `partyx-20261019T140403Z.dump` conferido) |
+| Imagem | `partyx-api:release-2026-10-19d-ef071cf` |
+| Revisão | `partyx-00052-saf`, 100% desde 15:02 UTC (12:02 BRT); anterior `partyx-00050-pey` |
+| `env.prod.yaml` | sem mudança (Termos 1.5) |
+| Conferências | candidata e domínio: teste rápido 15 de 15, bateria 48 de 48; as cinco logos em `/assets` com hash, 200 e `public, max-age=31536000, immutable`; Chromium e Firefox a 390 e 1280 px com as 5 logos carregadas, alturas certas, texto do bloco e nenhum bloqueio de CSP; logos desde a virada sem 5xx nem erro |
+| WebKit de teste | fecha a página do evento a 390 px também na revisão anterior (F-09 da auditoria, conferido lado a lado); não é desta mudança |
+| Testes locais | lint, typecheck, `npm test` com banco 1223 + 4, `check:migrations` 19, build, 14 suítes e2e (881 passaram, 1 pulado). A 1ª rodada falhou por falta de espaço em `/tmp` (pastas `partyx-*` deixadas pelos testes); limpas, a 2ª passou inteira |
+
+**Voltar atrás:** `PROJECT=partyx-producao REVISAO=partyx-00050-pey ./infra/producao/deploy.sh rollback` (mesmo banco; volta o bloco sem logos).
+

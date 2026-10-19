@@ -590,3 +590,9 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00050-pey`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00048-zik ./infra/producao/deploy.sh rollback` (Termos 1.4; convive com a 0018 enquanto nenhum pedido tiver desconto).
 
+## 36. Vigésima quarta publicação: logos nas formas de pagamento (19/10/2026)
+
+**Publicado:** revisão `partyx-00052-saf` (tag `release-2026-10-19d`, commit `ef071cf`), 100% desde 19/10 15:02 UTC (12:02 BRT), sem migração, mesmo `env.prod.yaml`. Bandeiras oficiais do Mercado Pago (Visa, Mastercard, Elo, American Express) e símbolo Pix do Banco Central em cartões brancos na página do evento e nos botões do checkout, servidos de `/assets` com hash e cache longo; CSP sem mudança. Teste rápido 15 de 15; bateria pelo domínio 48 de 48. Registros: `docs/registros/publicacao-producao-2026-10-19.md` e `docs/registros/logos-formas-de-pagamento-2026-10-19.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00052-saf`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00050-pey ./infra/producao/deploy.sh rollback` (mesmo banco).
+
