@@ -51,18 +51,18 @@ Feita pelo Bernardo, com o cadastro e a venda abertos só pelo tempo do teste, e
 | # | Item | Como se comprova | Feito em | Por quem |
 |---|---|---|---|---|
 | 4.1 | Assinatura secreta do webhook no painel do Mercado Pago igual à versão vigente de `mp-webhook-secret` | Conferência do responsável no painel |  18/10/2026: o script de comparação do SHA-256 respondeu "igual" | Arthur |
-| 4.2 | Compra com Pix aprovada e ingresso emitido | Pedido pago; ingresso com QR no e-mail e na conta | | |
-| 4.3 | **Webhook real com assinatura válida**, conferido no log | Linha de log do webhook aceito, do pagamento do teste | | |
-| 4.4 | Estorno feito no Mercado Pago e refletido no sistema | Pedido estornado; ingresso cancelado | | |
-| 4.5 | Nenhum alerta inesperado no período | Lista de incidentes | | |
+| 4.2 | Compra com Pix aprovada e ingresso emitido | Pedido pago; ingresso com QR no e-mail e na conta | 18/10/2026 22:28 BRT (19/10 01:28 UTC): PX-10001 pago, 1 ingresso 0,44 s depois, e-mail na 1ª tentativa, Meus ingressos e PDF 200; feita com a venda já aberta ao público, em evento de teste de R$ 1,00 (`publicacao-producao-2026-10-18b.md`) | Compra relatada por Arthur; logs e banco conferidos pelo Claude |
+| 4.3 | **Webhook real com assinatura válida**, conferido no log | Linha de log do webhook aceito, do pagamento do teste | 19/10/2026 01:27:55 e 01:28:32 UTC: `order.action_required` e `order.processed` aceitos, assinatura válida | Claude (só leitura) |
+| 4.4 | Estorno feito no Mercado Pago e refletido no sistema | Pedido estornado; ingresso cancelado | Dispensado: o Bernardo autorizou abrir sem o teste de estorno (`autorizacao-abertura-vendas-2026-10-15.md`) | |
+| 4.5 | Nenhum alerta inesperado no período | Lista de incidentes | 19/10/2026 01:25 a 01:59 UTC: nenhum incidente, nenhuma 5xx, avisos só das recusas de assinatura inválida dos testes | Claude (só leitura) |
 
 ## 5. Abertura
 
 | # | Item | Como se comprova | Feito em | Por quem |
 |---|---|---|---|---|
 | 5.1 | `SIGNUP_OPEN=true`, `SALES_OPEN=true`, `VISUAL_APPROVED=true`, versões e datas dos textos legais no `env.prod.yaml` | Diff revisado pelo responsável |  18/10/2026: `SALES_OPEN=true`, `VISUAL_APPROVED=true`, textos 1.2/1.2/1.0 e de menores 1.0 no `env.prod.yaml` da `release-2026-10-18` | Claude, por ordem de Arthur |
-| 5.2 | Publicação com `GO_LIVE_CONFIRMED=sim-aceite-e-autorizacao-registrados` (o `deploy.sh` recusa sem os itens 1.1, 1.3 e este) | Candidata, teste rápido e virada | | |
-| 5.3 | Rollback pronto, com a revisão anterior anotada | Comando registrado | | |
+| 5.2 | Publicação com `GO_LIVE_CONFIRMED=sim-aceite-e-autorizacao-registrados` (o `deploy.sh` recusa sem os itens 1.1, 1.3 e este) | Candidata, teste rápido e virada | 18/10/2026 22:25 BRT (19/10 01:25 UTC): `partyx-00042-ten` (`release-2026-10-18`), teste rápido 15 de 15 na candidata e na virada | Claude, por ordem de Arthur |
+| 5.3 | Rollback pronto, com a revisão anterior anotada | Comando registrado | 18/10/2026: `REVISAO=partyx-00040-dow` (fecha as vendas); desde 02:20 UTC, com a `partyx-00044-dil` no ar, o retorno é `REVISAO=partyx-00042-ten` (README-DEPLOY, seção 32) | Claude |
 | 5.4 | Comunicação escrita à PartyX com a data e a hora da abertura | Mensagem enviada pelo responsável | | |
-| 5.5 | Registro da abertura em `docs/registros/` | Arquivo novo | | |
+| 5.5 | Registro da abertura em `docs/registros/` | Arquivo novo | 18/10/2026: `publicacao-producao-2026-10-18b.md` | Claude |
 | 5.6 | Instância mínima **não** é ligada na abertura das vendas (decisão do responsável, 18/10/2026): a verificação de saúde `partyx-saude-dominio` chama o site a cada 5 minutos, de 3 regiões, e mantém o servidor acordado. Se um dia precisar: README-DEPLOY, seção 7 (`deploy.sh evento-on`/`evento-off`) | `deploy.sh status`: `MIN_SERVICO` vazio | Não se aplica | Arthur (decisão) |

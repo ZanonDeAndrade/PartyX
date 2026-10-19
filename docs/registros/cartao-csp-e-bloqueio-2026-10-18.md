@@ -112,8 +112,12 @@ partida) e o cronômetro numa linha só a 360 e 390 px, também no último minut
 | 390 px | cronômetro numa linha só nos 3; arquivo de textos cortado: aviso em 0,3 a 2,3 s e "Pagar com Pix" abre a tela do Pix nos 3 |
 | SDK sem resposta | aviso aos 10,3 a 10,4 s nos 3 |
 
+## Publicado
+
+19/10/2026 02:20 UTC (18/10 23:20 BRT), OK do responsável: `partyx-00044-dil` com 100%, teste rápido 15 de 15, bateria pelo domínio
+39 de 39 e Playwright pelo domínio nos 3 navegadores (`publicacao-producao-2026-10-18b.md`). Retorno: `REVISAO=partyx-00042-ten`.
+
 ## Pendente
 
-- Virada para `partyx-00044-dil` com OK do responsável (retorno: `REVISAO=partyx-00042-ten`).
 - Conferir num Firefox real com a proteção estrita ligada (o Playwright não tem a lista de rastreadores): o aviso deve aparecer em
   vez da área cinza.

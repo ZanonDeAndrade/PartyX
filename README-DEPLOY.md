@@ -562,3 +562,13 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00040-dow`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00037-zap ./infra/producao/deploy.sh rollback`. A `00037-zap` usa o mesmo banco, mas sem o SMTP.
 
+## 31. Décima nona publicação: abertura das vendas (18/10/2026)
+
+**Publicado:** revisão `partyx-00042-ten` (tag `release-2026-10-18`, commit `433d829`), 100% desde 19/10 01:25 UTC (18/10 22:25 BRT), sem migração (backup sob demanda `partyx-backup-5g6dc` antes da candidata, `GO_LIVE_CONFIRMED=sim-aceite-e-autorizacao-registrados`). **Venda aberta** (`SALES_OPEN=true`, `VISUAL_APPROVED=true`), cadastro com 50 por hora por IP e a correção do pool do banco (`184da3c`). Teste rápido 15 de 15 na candidata e na virada. Primeira compra real (PX-10001, Pix, R$ 1,00) às 01:28 UTC: webhook com assinatura válida, ingresso 0,44 s depois, e-mail na 1ª tentativa; 30 minutos sem 5xx. Registro: `docs/registros/publicacao-producao-2026-10-18b.md`.
+
+## 32. Vigésima publicação: pagamento com cartão e cronômetro no celular (18/10/2026)
+
+**Publicado:** revisão `partyx-00044-dil` (tag `release-2026-10-18b`, commit `5fbfdab`), 100% desde 19/10 02:20 UTC (18/10 23:20 BRT), sem migração (backup sob demanda `partyx-backup-dxdsf`), mesmo `env.prod.yaml` (venda aberta). CSP do Mercado Pago com nonce por resposta para o script do antifraude (sem `unsafe-inline`), aviso "Não foi possível carregar o pagamento com cartão..." com "Pagar com Pix" quando o navegador bloqueia o Brick (prazo de 10 s), cronômetro da reserva numa linha só a 360 e 390 px. Teste rápido 15 de 15; bateria pelo domínio 39 de 39; Playwright nos 3 navegadores pela candidata e pelo domínio. Registros: `docs/registros/cartao-csp-e-bloqueio-2026-10-18.md` e `docs/registros/publicacao-producao-2026-10-18b.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00044-dil`.** Para desfazer esta publicação: `PROJECT=partyx-producao REVISAO=partyx-00042-ten ./infra/producao/deploy.sh rollback` (mesmo banco, venda aberta, CSP antiga). Para fechar as vendas: `REVISAO=partyx-00040-dow`, com a verificação de saúde de volta em `/api/health/ready` antes, se tiver sido mudada (seção 6).
+
