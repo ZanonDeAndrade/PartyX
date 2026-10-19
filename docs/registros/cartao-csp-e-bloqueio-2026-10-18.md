@@ -98,8 +98,22 @@ partida) e o cronômetro numa linha só a 360 e 390 px, também no último minut
 | `npm run build` | sem erros |
 | `npm run e2e:textos` | 85 de 85 |
 
+## Candidata (OK do responsável para os três comandos, 18/10/2026 ~23:10 BRT)
+
+| Passo | Resultado |
+|---|---|
+| Tag | `release-2026-10-18b` em `5fbfdab` (cartão `8233481` e cronômetro `5fbfdab`; a tag foi refeita no commit do cronômetro antes do build, nunca enviada) |
+| `deploy.sh build` | Cloud Build `c966b7ef`, 1 min 50 s, imagem `partyx-api:release-2026-10-18b-5fbfdab`; textos legais da tag com os mesmos hashes |
+| Backup sob demanda | `partyx-backup-dxdsf`, 02:11:39 UTC, 124.560 bytes, `check-backup.sh` OK |
+| `deploy.sh candidata` | revisão **`partyx-00044-dil`**, sem tráfego, mesmo `env.prod.yaml` (venda e cadastro abertos); teste rápido 15 de 15. Público em `partyx-00042-ten` |
+| Bateria pela candidata (cabeçalho do domínio) | 39 de 39: os 28 de antes e os 11 da CSP nova (nonce igual no cabeçalho e no HTML, novo a cada página, domínios, telemetria fora). A 1ª rodada teve 3 falhas da própria bateria (origem do cadastro e chamadas ao run.app levando o cabeçalho do domínio), corrigidas no script |
+| Playwright pela candidata, 1280 px, duas rodadas | Brick carregou no Chromium, WebKit e Firefox (2,1 a 3,8 s); único bloqueio de CSP: `api.mercadolibre.com/tracks` |
+| Antifraude, 12 a 15 s de observação | script do perfil do aparelho com o nonce; `api.mercadopago.com/v1/devices/widgets` 200 e impressão do aparelho em `www.mercadolibre.com` e `www.mercadolivre.com` 200 nos 3 navegadores; nenhum outro bloqueio de CSP |
+| 390 px | cronômetro numa linha só nos 3; arquivo de textos cortado: aviso em 0,3 a 2,3 s e "Pagar com Pix" abre a tela do Pix nos 3 |
+| SDK sem resposta | aviso aos 10,3 a 10,4 s nos 3 |
+
 ## Pendente
 
-- Candidata com a mesma configuração de venda aberta (comandos mostrados ao responsável antes) e, com OK, a virada.
+- Virada para `partyx-00044-dil` com OK do responsável (retorno: `REVISAO=partyx-00042-ten`).
 - Conferir num Firefox real com a proteção estrita ligada (o Playwright não tem a lista de rastreadores): o aviso deve aparecer em
   vez da área cinza.
