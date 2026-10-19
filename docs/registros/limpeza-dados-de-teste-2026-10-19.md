@@ -23,8 +23,8 @@ compras continuam aprovadas** (não houve estorno pelo gateway; conferido no PX-
 - Sem dinheiro: PX-10002 (Teste, expirou em 18/10 22:47) e PX-10007 (Teste02, criado às 23:28 e expirado às 23:29 de 18/10).
 - Taxa de serviço 0 e nenhum desconto de promoter nesses pedidos. A tarifa do Mercado Pago não foi gravada no sistema (a coleta das
   tarifas começou depois); conferir no extrato do Mercado Pago.
-- **A confirmar com o administrador:** se o Pix manual incluiu o PX-10001. Se incluiu e o estorno pelo Mercado Pago ainda se
-  concluir, esse pedido terá duas devoluções (Pix manual e Mercado Pago).
+- **PX-10001 (confirmado pelo administrador em 19/10/2026):** o Pix manual incluiu esse pedido. Se o estorno pelo Mercado Pago ainda se
+  concluir, fica como devolução em duplicidade de R$ 1,00, a favor do administrador (que fez a compra), **sem ação**.
 - Um dos pedidos (PX-10003) é de outra conta de comprador da equipe, também de teste (confirmado pelo administrador).
 
 ## Estorno pelo Mercado Pago (teste do caminho, PX-10001)
