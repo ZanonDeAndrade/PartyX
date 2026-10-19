@@ -109,7 +109,7 @@ const events: EventSpec[] = [
     accent: '#7C3AED',
     types: [
       { key: 'pista', name: 'Pista', price: 8000, qty: 100, start: d(-1), end: principalStart },
-      { key: 'vip', name: 'VIP', price: 15000, qty: 20, start: d(-1), end: principalStart },
+      { key: 'vip', name: 'VIP', price: 15000, qty: 10000, start: d(-1), end: principalStart },
       { key: 'camarote', name: 'Camarote', price: 30000, qty: 5, start: d(-1), end: principalStart },
     ],
   },

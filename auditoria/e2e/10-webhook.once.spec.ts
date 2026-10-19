@@ -58,10 +58,22 @@ test.describe('webhook e conciliação (gateway fictício pelo caminho real do w
   });
 
   test('pagamento tardio sem estoque: pago_sem_estoque, nada emitido, aviso aos administradores e exceção no painel', async ({ ctx, browser }) => {
-    // Camarote tem 5 unidades: A reserva as 5 e deixa vencer; B compra as 5; o pagamento de A chega depois.
+    // Tipo próprio com 5 unidades: A reserva as 5 e deixa vencer; B compra as 5; o pagamento de A chega depois.
+    const admCreate = await browser.newContext();
+    await apiLogin(admCreate.request, S.base, S.team.admin.email, S.team.admin.password);
+    const typeRes = await api(admCreate.request, S.base, 'POST', `/admin/events/${principal().id}/ticket-types`, {
+      name: `Sem estoque ${Date.now().toString(36)}`,
+      priceCents: 4000,
+      quantityTotal: 5,
+      salesStartAt: new Date(Date.now() - 86_400_000).toISOString(),
+      salesEndAt: principal().startsAt,
+    });
+    expect(typeRes.status, JSON.stringify(typeRes.json)).toBe(201);
+    const typeId = typeRes.json.ticketType.id as string;
+    await admCreate.close();
     const a = await newBuyer(ctx.request);
     void a;
-    const created = await createOrder(ctx.request, principal().slug, [{ ticketTypeId: principal().types.camarote!, quantity: 5 }]);
+    const created = await createOrder(ctx.request, principal().slug, [{ ticketTypeId: typeId, quantity: 5 }]);
     expect(created.status, JSON.stringify(created.json)).toBe(201);
     const orderA = created.json.order.id as string;
     await api(ctx.request, S.base, 'POST', `/orders/${orderA}/payment`, { method: 'pix' });
@@ -69,12 +81,12 @@ test.describe('webhook e conciliação (gateway fictício pelo caminho real do w
     await api(ctx.request, S.base, 'GET', `/orders/${orderA}`);
     const bCtx = await browser.newContext();
     await newBuyer(bCtx.request);
-    const bought = await buyPaid(bCtx.request, principal().slug, [{ ticketTypeId: principal().types.camarote!, quantity: 5 }]);
+    const bought = await buyPaid(bCtx.request, principal().slug, [{ ticketTypeId: typeId, quantity: 5 }]);
     expect(bought.tickets).toHaveLength(5);
     expect((await mockStatus(ctx.request, orderA, 'aprovado')).status).toBe(200);
     await expect.poll(async () => (await orderRow(orderA)).status).toBe('pago_sem_estoque');
     expect(await ticketsOf(orderA)).toHaveLength(0);
-    const sold = (await sql<{ n: number }>(S.db, `select count(*)::int as n from tickets where ticket_type_id = $1 and status <> 'cancelado'`, [principal().types.camarote!]))[0]!.n;
+    const sold = (await sql<{ n: number }>(S.db, `select count(*)::int as n from tickets where ticket_type_id = $1 and status <> 'cancelado'`, [typeId]))[0]!.n;
     expect(sold).toBeLessThanOrEqual(5);
     await expect.poll(() => capturedEmails({ template: 'pagamento_sem_estoque' }).length, { timeout: 15_000 }).toBeGreaterThan(0);
     const adm = await browser.newContext();

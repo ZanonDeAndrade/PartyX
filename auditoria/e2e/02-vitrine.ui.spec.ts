@@ -1,15 +1,18 @@
 import { expect, expectNoOverflow, S, shot, test } from './support/fixtures';
 
+const norm = (t: string) => t.replace(/\s+/g, ' ').toLowerCase();
+
 test.describe('vitrine e página do evento', () => {
   test('início: destaque, próximos eventos, sem arquivado, rascunho nem encerrado', async ({ ctx }, info) => {
     const page = await ctx.newPage();
     await page.goto(`${S.base}/`);
     await expect(page.getByRole('heading', { name: 'Festa Auditoria' }).first()).toBeVisible();
-    const text = await page.locator('main').innerText();
-    expect(text).toContain('Baile Auditoria 16+');
-    expect(text).not.toContain('Arquivado Auditoria');
-    expect(text).not.toContain('Rascunho Auditoria');
-    expect(text).not.toContain('Evento Encerrado Auditoria');
+    // innerText segue o CSS (maiúsculas, espaço fixo): compara sem caixa e com espaços normalizados.
+    const text = norm(await page.locator('main').innerText());
+    expect(text).toContain('baile auditoria 16+');
+    expect(text).not.toContain('arquivado auditoria');
+    expect(text).not.toContain('rascunho auditoria');
+    expect(text).not.toContain('evento encerrado auditoria');
     await expectNoOverflow(page, 'início');
     await shot(page, info, 'vitrine', 'inicio', { full: true });
   });
@@ -31,13 +34,15 @@ test.describe('vitrine e página do evento', () => {
     await page.goto(`${S.base}/eventos/${S.events.principal!.slug}`);
     await expect(page.getByRole('heading', { name: 'Festa Auditoria' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Mais um Pista', exact: true })).toBeEnabled();
-    const text = await page.locator('main').innerText();
-    expect(text).toContain('R$ 80,00');
-    expect(text).toMatch(/taxa/i);
-    expect(text).toContain('Formas de pagamento');
-    expect(text).toContain('Pix');
+    const text = norm(await page.locator('main').innerText());
+    // O tipo VIP tem estoque farto; o 1º lote da Pista esgota durante as rodadas paralelas e muda de preço.
+    expect(text).toContain('r$ 150,00 + r$ 7,90 taxa');
+    expect(text).toContain('formas de pagamento');
+    expect(text).toContain('pix');
+    expect(text).toContain('cartão de crédito ou débito');
     expect(text).toContain('18 anos');
-    expect(text).toContain('Galpão Fictício');
+    expect(text).toContain('galpão fictício');
+    expect(text).toContain('até 6 por pedido');
     await expect(page.getByRole('button', { name: /Compartilhar/ }).first()).toBeVisible();
     await expectNoOverflow(page, 'página do evento');
     await shot(page, info, 'vitrine', 'evento-a-venda', { full: true });

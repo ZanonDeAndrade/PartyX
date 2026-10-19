@@ -84,7 +84,7 @@ test.describe('checkout e reserva', () => {
   test('reserva de 30 minutos expirando: aviso na tela, pedido expirado e estoque de volta', async ({ ctx }, info) => {
     const b = await newBuyer(ctx.request);
     const page = await loginAs(ctx, b);
-    await chooseTickets(page, S.base, principal().slug, { Camarote: 1 });
+    await chooseTickets(page, S.base, principal().slug, { VIP: 1 });
     const orderId = await reserve(page);
     await page.getByRole('radio', { name: /^Pix/ }).click();
     await page.getByRole('button', { name: /^Gerar Pix de/ }).click();

@@ -5,11 +5,14 @@ import { acceptPolicy, CAPTURAS, chooseTickets, expect, expectNoOverflow, loginA
 
 const baile = () => S.events.menores!;
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
-/** Nascimento para ter `age` anos completos na data do evento (10 dias antes do aniversário seguinte). */
-function birthForAge(eventStartsAt: string, age: number) {
-  const d = new Date(eventStartsAt);
+/**
+ * Nascimento para ter `age` anos completos HOJE (aniversário há 40 dias) e ainda `age` na data do evento (eventos da semente a até 20
+ * dias): o cadastro exige 16 anos hoje e a compra confere a idade na data do evento.
+ */
+function birthForAge(_eventStartsAt: string, age: number) {
+  const d = new Date();
   d.setUTCFullYear(d.getUTCFullYear() - age);
-  d.setUTCDate(d.getUTCDate() - 10);
+  d.setUTCDate(d.getUTCDate() - 40);
   return ymd(d);
 }
 

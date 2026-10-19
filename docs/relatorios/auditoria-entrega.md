@@ -229,28 +229,200 @@ Sem bloqueante. Dois achados **altos**, ligados entre si e a uma decisão já to
 
 ## Fase 2: testes funcionais de ponta a ponta (local)
 
-**Estado em 19/10/2026 (interrompida por limite de uso da sessão):** infraestrutura pronta e verificada nos 9 projetos (Chromium, WebKit e
-Firefox a 360, 390 e 1280 px): `auditoria/e2e/auditoria.config.ts`, semente com 8 compradores de idades variadas, 2 promoters e 10 eventos
-em cada estado da vitrine, servidor local com o gateway fictício e 5 pedidos pagos (`auditoria/e2e/support/`). Cenários escritos:
-`01-conta`, `02-vitrine`, `03-checkout`, `05-menores`, `06-transferencia` (interface, 9 projetos), `10-webhook` e `16-concorrencia`
-(regras de servidor, Chromium 1280). Primeira execução só em `chromium-1280`: 20 passaram e 15 falharam; a causa dominante era da
-própria suíte (o cadastro pela API abre sessão e o login seguinte sem token CSRF recebia 403), corrigida em `fixtures.ts` e **ainda não
-reexecutada**. Falhas a investigar na próxima rodada: início da vitrine e página do evento (textos esperados), além de reconferir as
-dependentes do login. Faltam escrever: `04-pagamento` (cartão aprovado, recusado, pendente, aviso do Brick com sandbox), `07-admin` e
-`13-admin` (evento, imagem, lotes, pedidos, equipe, relatórios, CSV, responsividade do painel), `11-cancelamento-estorno`,
-`12-portaria` (câmera simulada, busca manual, câmera negada, contingência, 2 validadores), `14-emails-pdfs`, `15-lgpd`, e a rodada do
-roteiro em sandbox (`npm run e2e:roteiro:sandbox`, `npm run test:sandbox`).
+### 2.1 Como foi feito
 
-Comando para retomar: `npx vite build && npx playwright test -c auditoria/e2e/auditoria.config.ts` (um projeto: `--project=chromium-1280`).
+Suíte nova em `auditoria/e2e/` (Playwright 1.62), servidor local com o gateway fictício pelo caminho real do webhook, PostgreSQL de
+teste descartável, semente própria (8 compradores de idades diferentes, 2 promoters, 10 eventos em cada estado da vitrine, 5 pedidos
+pagos). 35 cenários de interface rodam em **9 projetos** (Chromium, WebKit e Firefox a 360, 390 e 1280 px) e 31 cenários de regra de
+servidor, portaria com câmera simulada, admin, e-mails, PDFs e LGPD rodam uma vez em Chromium 1280. Comando:
+`npx vite build && npx playwright test -c auditoria/e2e/auditoria.config.ts`. A matriz completa (cenário por navegador e largura) está em
+[`matriz-e2e.md`](matriz-e2e.md), gerada por `auditoria/ferramentas/resumo-e2e.mjs`; as capturas em `docs/relatorios/capturas/`.
+
+O que ficou fora, e por quê: pagamento com cartão real (Card Payment Brick, aviso quando o Brick não carrega, cartão em análise pelo
+antifraude) exige as credenciais de sandbox do Mercado Pago e o ritmo que o antifraude de teste impõe; é coberto pela rodada do
+roteiro 11.2 em sandbox do projeto (`npm run e2e:roteiro:sandbox`, feita em 12/10 e 18/10) e por `src/site/cardBrickMount.test.ts`.
+A rotina diária de conciliação e as tarefas do Cloud Tasks não são chamáveis no ambiente local (exigem OIDC do Google; respondem
+503), e ficam com os 87 casos de `reconcile.integration.test.ts` e a execução real em homologação (13/10). A leitura de QR pela câmera
+só é simulável em Chromium (vídeo falso); em WebKit e Firefox a portaria foi testada pela busca manual e pela API.
+
+### 2.2 Resultado por área
+
+RESULTADO_FASE2
+
+### 2.3 Achados funcionais e de fluxo
+
+| Id | Sev. | O que | Evidência | Impacto | Correção sugerida | Esforço |
+|---|---|---|---|---|---|---|
+| F-01 | média | Não existe forma de o comprador excluir a própria conta nem baixar os próprios dados; também não há tela no painel para o administrador atender o pedido (só API com protocolo) | `01-conta` (cenário "não existe na interface"), `15-lgpd` | A Política promete os dois direitos "a pedido" e o fluxo hoje depende de a contratada rodar a API; o Bernardo não consegue atender sozinho | Tela "Privacidade" no painel (localizar, exportar, anonimizar com protocolo); exclusão pelo comprador é decisão do cliente | 4 a 6 h |
+| F-02 | média | "Evento cancelado com estorno de todos os pedidos" não existe como operação: encerrar o evento não estorna nem cancela ingressos; o estorno é pedido a pedido no Mercado Pago e cada webhook cancela os ingressos | `11-cancelamento-estorno` | Num cancelamento com dezenas de pedidos, o Bernardo faz um estorno por vez no painel do Mercado Pago, sem checklist nem lista pronta | Página do evento no painel com a lista de pedidos pagos a estornar (link para cada pagamento no Mercado Pago, valor com a taxa) e marcação do que já foi estornado; o estorno pela API seria mudança de escopo | 4 a 8 h |
+| F-03 | baixa | Depois de salvar a senha nova no primeiro acesso, a sessão é encerrada e a pessoa precisa entrar de novo | `13-admin` (equipe) | Mais um passo para o validador no dia do evento | Manter a sessão atual ao trocar a senha no primeiro acesso (como já ocorre na troca pela conta) | 1 h |
+| F-04 | baixa | Os diálogos de promoter e de membro da equipe não fecham com Esc; os de evento e de desfazer transferência fecham | `13-admin` (anotação) e `src/site/adminPeople.tsx` | Inconsistência de teclado (WCAG 2.1.2 na prática) | Mesmo tratamento de Esc nos quatro diálogos | 0,5 h |
+| F-05 | baixa | Cartão sem resposta do banco: a tela do pedido mostra a mensagem registrada no cenário "cartão pendente" (ver matriz) e atualiza sozinha quando a aprovação chega | `04-pagamento` | Nenhum | Nenhuma | |
+| F-06 | info | Lote esgotando no meio do pedido: o servidor recalcula e a tela avisa "Atenção. O valor do pedido mudou. Confira o novo total antes de continuar." e mostra o valor novo | `16-concorrencia` | Comportamento correto | | |
+| F-07 | info | Dois compradores na última unidade: um reserva, o outro vê o aviso de estoque; dois validadores no mesmo QR: uma entrada só | `16-concorrencia`, `12-portaria` | Correto | | |
+| F-08 | info | Pagamento depois da reserva vencer: com estoque confirma e emite; sem estoque vira `pago_sem_estoque`, aviso por e-mail aos administradores e item em Exceções | `10-webhook` | Correto (procedimento provisório D-13) | | |
+
+A instabilidade do WebKit na rodada com 3 trabalhadores (navegador fechado no meio do teste por falta de memória na máquina da
+auditoria) foi tratada com uma rodada só dos projetos WebKit com 1 trabalhador; o resultado consolidado está na matriz.
 
 ## Fase 3: teste de carga (k6, local)
 
-Pendente.
+### 3.1 Modelo e hipóteses
+
+Evento de **500 ingressos numa cidade pequena** (Pista 350 a R$ 60,00 e VIP 150 a R$ 120,00), compradores já cadastrados (quem compra na
+abertura já tem conta), 3 validadores. Servidor local empacotado como no contêiner (`dist-server`), heap de 320 MB, `DB_POOL_MAX=5`,
+gateway fictício com confirmação pelo caminho real do webhook, PostgreSQL 16 de teste em Docker. Ferramentas em `auditoria/carga/`;
+execução por `auditoria/carga/run-carga-auditoria.sh [escala]`. Nada toca a produção.
+
+| Hipótese | Como foi modelada | Métrica de sucesso |
+|---|---|---|
+| H1 Abertura das vendas: 300 pessoas ao mesmo tempo nos primeiros 10 min | `ramping-vus` 0 a 300 em 2 min, 300 por mais 8 min; cada pessoa abre a página do evento (HTML com Open Graph e API) e lê por 5 a 15 s, repetidamente | p95 da página do evento e da API abaixo de 1 s; tempo até o primeiro byte do HTML; 0 erros |
+| H2 Pico de 60 pedidos por minuto | `constant-arrival-rate` de 60/min por 10 min (600 tentativas para 500 ingressos: as recusas por estoque depois de esgotar são esperadas, não erros); cada pedido: login, pedido com reserva (1 ou 2 unidades, 70% Pista), Pix, confirmação pelo webhook, consulta do pedido até "pago", Meus ingressos | p95 de cada etapa abaixo de 5 s; compra completa p95 abaixo de 10 s; nenhum erro inesperado; vendidos nunca acima de 500 |
+| H3 500 webhooks do Mercado Pago em 5 min | 100/min por 5 min: 90% repetições de confirmação de pedidos já pagos (idempotência) e 10% com assinatura inválida (devem dar 401) | p95 abaixo de 2 s; repetição não duplica ingresso; 401 nas inválidas |
+| H4 Portaria: 500 leituras em 90 min por 3 validadores | 3 usuários virtuais (um por validador) com a mesma quantidade de leituras **em 9 min** (tempo comprimido 10 vezes para caber na rodada: a taxa é 10 vezes maior que a real, portanto mais exigente); 1 em cada 12 leituras repete um QR já usado; cada leitura consulta o contador, como a tela faz | p95 do `/gate/scan` abaixo de 1 s; uma entrada só por ingresso; 0 erros |
+| H5 Três vezes a carga | Escala 3: 900 pessoas, 180 pedidos/min, 1.500 webhooks, 1.500 leituras, evento de 1.500 ingressos | Os mesmos limiares |
+
+Medidas: p50, p95 e p99 por rota (etiqueta `etapa` do k6), taxa de erro, tempo até o primeiro byte da página do evento, conexões
+abertas e ativas no PostgreSQL (amostra a cada 2 s em `pg_stat_activity`), CPU e memória RSS do processo (a cada 2 s), tempo de fila
+dos e-mails (`email_log`: criado até enviado, p50, p95, máximo). Depois de cada rodada, as invariantes do banco
+(`auditoria/consultas/invariantes.sql`, 14 consultas só leitura, executadas numa transação `read only` por
+`auditoria/ferramentas/invariantes.mjs`): ingressos nunca acima da capacidade, todo pedido pago com os ingressos comprados, nenhum
+ingresso de pedido não pago, nenhum QR, código ou código curto repetido, nenhuma entrada válida duplicada, vendidos iguais aos emitidos,
+lotes dentro da capacidade, total igual a itens mais taxa, notificação processada uma vez, reserva ativa só em pedido pendente.
+Para rodar em produção, só leitura: `node auditoria/ferramentas/invariantes.mjs "<URL do papel partyx_backup>"`.
+
+### 3.2 Resultados
+
+Em execução (escala 1 e depois escala 3); os números e os gráficos vão para `docs/relatorios/carga/escala-1.md` e `escala-3.md` e o
+resumo entra aqui.
 
 ## Fase 4: UI, UX, acessibilidade e desempenho
 
-Pendente.
+### 4.1 Comparação com a referência (minhaentrada.com.br), fluxo e informação
+
+Fonte: páginas públicas da referência lidas em 19/10/2026 (início, página de evento, fale conosco, termos de uso). O checkout da
+referência não foi percorrido (exige conta e compra). Nada de identidade visual foi considerado.
+
+**Cliques do Instagram até o Pix pago no PartyX** (comprador que já tem conta e já está logado): link da bio abre o início (com a
+abertura em vídeo de até 4 s na primeira visita) > cartão do evento > "+" no tipo > "Continuar" > caixa da Política de Cancelamento >
+"Ir para o pagamento" (reserva de 30 min) > "Pix" > "Gerar Pix" > "Copiar código" > pagamento no app do banco > a página confirma
+sozinha. **9 toques** até o código Pix. Comprador novo: mais a tela de cadastro (7 campos, aceite e "Criar conta", volta ao checkout
+com a seleção preservada), cerca de **19 toques**. Na referência o acesso é por CPF e senha ou Google e o "Compre Agora" também
+pede login antes; o número de toques depois do login não foi medido.
+
+| Tema | PartyX hoje | Referência | Recomendação |
+|---|---|---|---|
+| Preço e taxa | Preço do ingresso com a taxa de serviço separada ao lado ("R$ 80,00 + R$ 4,22 taxa"), no evento, na revisão, no pedido, no e-mail e no PDF (trabalho não comitado) | Taxa de conveniência não aparece na página do evento (fica nos termos, por evento) | **Manter o PartyX**: a taxa visível desde o início é mais transparente e evita surpresa no checkout (CDC) |
+| Formas de pagamento no evento | Bloco "Formas de pagamento": Pix e cartão de crédito ou débito, sem parcelas (à vista, D-02) | Bandeiras com "Em até 6x" e PIX | Parcelamento é decisão do cliente (D-02); se adotar, mostrar "em até Nx" no mesmo bloco |
+| Local com mapa | Nome do local e endereço em texto; **sem link para o mapa** | Nome do local com link para o Google Maps | **Adotar**: link "Ver no mapa" (endereço codificado numa URL do Google Maps), baixo esforço, muito usado no celular |
+| Horário | Só o horário de início | Abertura dos portões e início | Opcional, decisão do cliente: campo "abertura" por evento |
+| Classificação etária | Classificação com a frase da regra e as regras de menores (16 e 17 com termo) | Campo vazio no evento consultado; aviso em texto livre | **Manter o PartyX** |
+| Lineup e descrição | Descrição e lista de atrações | Descrição com "Mostrar mais"; sem lista separada | Manter; "Mostrar mais" para descrições longas é um ganho pequeno |
+| Lote e disponibilidade | Nome do lote, "últimas unidades", "em breve", "esgotado", "indisponível no momento" (reservas em andamento) | Sem lote nem "a partir de" nos cartões | **Manter o PartyX**; considerar "a partir de R$ X" nos cartões da vitrine |
+| Limite por pedido | "Até 6 por pedido" visível e imposto no servidor | Não aparece | Manter |
+| Cupom | Código de promoter (só atribui a venda, sem desconto) | Campo de cupom de desconto | Desconto de promoter é decisão do cliente, a implementar; não é defeito |
+| Política na página | Link para a Política de Cancelamento, Troca e Reembolso abaixo do "Continuar" e caixa obrigatória na revisão | Políticas só no rodapé | **Manter o PartyX** |
+| Sinais de confiança | Rodapé com razão social, CNPJ, e-mail, WhatsApp e horário de atendimento (por configuração); HTTPS | CNPJ, endereço, telefone e horário, redes sociais | **Adotar**: link para o Instagram da PartyX no rodapé e, na página do evento, uma linha "Compra segura: pagamento pelo Mercado Pago" perto do botão |
+| Ajuda e perguntas frequentes | **Não existe** página de ajuda; só os documentos legais e o contato no rodapé | "Central de ajuda" é um formulário de contato com telefone; também sem FAQ | **Adotar** uma página "Ajuda" curta (8 a 10 perguntas: como recebo o ingresso, não recebi o e-mail, transferir, reembolso, menores, entrada, Pix não aprovado, cartão recusado) com link no rodapé e no e-mail de compra |
+| Área "Meus ingressos" | Carteira por evento com QR, tela cheia, PDF, transferir, Termo de Autorização; "Minhas compras" com o estado de cada pedido | "Meus pedidos" com cancelamento em 7 dias | Manter; o cancelamento por desistência não existe por decisão do cliente (só transferência) |
+| Entrega do ingresso | Na conta (QR), PDF por ingresso e do pedido, e-mail de compra com link (sem anexo) | E-ticket por e-mail; impressão | Manter; considerar o PDF anexado no e-mail como opção futura (hoje o link exige login, o que protege o QR) |
+| Compartilhar e salvar | Compartilhar com WhatsApp, Instagram, copiar link e compartilhamento nativo; Open Graph com a capa | WhatsApp e Facebook; sem salvar na agenda | **Adotar** "Adicionar à agenda" (arquivo `.ics` ou link do Google Agenda) na página do evento e na confirmação |
+| Transferência | Ilimitada, por e-mail ou CPF, até 2 h antes, com regras de idade e termo para menores | Uma única vez, por termo com nome e CPF; o novo titular não retransfere | Manter (mais flexível); avaliar com o cliente se quer limitar a uma retransferência |
+| Reembolso | Sem reembolso por desistência (decisão do cliente); evento cancelado devolve pelo Mercado Pago | 7 dias de arrependimento, nunca nas 48 h antes do evento; Pix devolve para carteira própria | Decisão do cliente; registrar o risco do art. 49 do CDC na Política (já citada) |
+| Login | E-mail e senha; recuperação por e-mail | CPF ou documento e senha; login com Google | Login social é evolução, não defeito |
+| Atendimento ao comprador | E-mail e WhatsApp da PartyX, horário comercial | Telefone e formulário, seg a sáb 9h às 18h | Manter; a página de Ajuda cobre o que o formulário faz |
+
+Diferenças que não recomendo adotar: carteira virtual própria (MECash), reconhecimento facial, PDV e área de relações públicas
+(escopo fora do contrato), devolução de Pix para uma carteira interna (pior para o comprador).
+
+### 4.2 Heurísticas, acessibilidade, desempenho e compartilhamento
+
+Em execução.
 
 ## Fase 5: operação e prontidão para entrega
 
-Pendente.
+### 5.1 Ensaio de restauração do backup mais recente
+
+Em execução (depois da carga): cópia `partyx-20261019T021135Z.dump` (124 KB, 19/10 02:11 UTC, feita antes da candidata
+`partyx-00044-dil`) baixada do bucket privado em modo leitura, SHA-256 conferido, manifesto com 24 tabelas e 17 migrações.
+
+### 5.2 Ensaio de rollback no ambiente local
+
+Em execução (depois da carga).
+
+### 5.3 Alertas: os 17 em produção, o que cobrem e o que falta
+
+Lidos do Cloud Monitoring do projeto `partyx-producao` em 19/10/2026 (só leitura): 17 políticas, todas ativas, canal de e-mail da
+operação. As 13 por log vêm de `infra/operacao/alerts.sh`; as outras 4 foram criadas à mão (uptime, 5xx, backup).
+
+| Alerta | O que cobre | Limite |
+|---|---|---|
+| `saúde indisponível (partyx.com.br)` | `GET /api/health` pelo domínio, 3 regiões a cada 5 min, com validação do certificado; dispara após 10 min de falha em 2 regiões ou mais | Desde 18/10 aponta para `/api/health` (sem banco), para o Neon poder dormir: um banco fora do ar **não** dispara este alerta; só o de 5xx |
+| `respostas 5xx (partyx)` | Respostas 5xx do serviço no Cloud Run (criado em 18/10) | Cobre o banco fora do ar quando há tráfego; sem tráfego, nada dispara |
+| `backup_falhou`, `backup ausente` | Job de backup falhou; nenhum backup bem-sucedido em 25 h | |
+| `pago_sem_estoque` | Pagamento aprovado depois da reserva vencer, sem estoque; também avisa os administradores por e-mail | |
+| `webhook_falhou`, `reconciliacao_falhou`, `fila_conciliacao_falhou`, `conciliacao_revisao_manual` | Webhook não processado; reconsulta ao gateway falhou; não conseguiu agendar a tarefa no Cloud Tasks; pedido sem estado conclusivo depois de 24 h | |
+| `pagamento_divergente`, `estorno_fora_de_fluxo`, `estorno_parcial`, `cobranca_duplicada` | Valor, conta ou pedido diferentes; estorno de pedido nunca aprovado; estorno parcial (D-82); segunda cobrança (D-83) | |
+| `email_falhou`, `fila_email_falhou` | E-mail que esgotou as 4 tentativas; não conseguiu agendar o reenvio | |
+| `limite_global_atingido`, `verificacao_humana_indisponivel` | Teto global de cadastros ou recuperações por hora; Turnstile fora do ar (hoje desligado: nunca dispara) | |
+
+Lacunas pedidas na auditoria:
+
+| Situação | Coberta? | Como cobrir |
+|---|---|---|
+| Fila de e-mails parada (e-mails `pendente` acumulando sem nenhuma tentativa) | **Não.** `email_falhou` só sai depois de 4 tentativas de um e-mail; `fila_email_falhou` só quando o Cloud Tasks recusa o agendamento. Se as tarefas forem criadas e nunca executadas (fila pausada, permissão da conta de serviço), ninguém é avisado até a varredura das 04:00 | Métrica por log na varredura diária (`conciliação de pagamentos executada` com `emails.pending` acima de 0) ou uma verificação de uptime num endpoint de saúde que conte `email_log` pendente há mais de 30 min (exige mudança de código) |
+| Webhook sem chegar por 1 hora com pedidos pendentes | **Não.** Hoje a conciliação por pedido (1, 2, 4, 8 min e tardias) confirma o pagamento mesmo sem webhook, e `conciliacao_revisao_manual` só aparece após 24 h. Um webhook quebrado (assinatura secreta trocada no Mercado Pago, URL errada) fica invisível enquanto a conciliação sob demanda compensa | Métrica "pedidos pagos nas últimas horas sem `payment_events` válido" na varredura, ou alerta de ausência da métrica de webhooks válidos quando há pedidos pagos (log `webhook processado`) |
+| Conciliação com divergência | **Sim**: `pagamento_divergente` | |
+| Certificado | **Parcial**: o uptime valida o certificado do domínio (expiração ou cadeia inválida falham a verificação). Não há aviso antecipado (ex.: 14 dias antes); a Vercel renova sozinha | Aceitável enquanto a Vercel for a ponte; ao voltar ao Firebase, o Firebase também renova |
+| Orçamento | **Parcial**: orçamento `partyx-prod` de R$ 30 com avisos em 50, 90 e 100% por e-mail de faturamento, só para o Google. O Neon (cobrado à parte) e a Vercel não têm alerta de custo | Configurar o alerta de consumo do Neon (console) e acompanhar o uso da Vercel antes e depois dos eventos |
+| Neon dormindo | **Parcial**: o uptime não acorda o banco de propósito; um erro de conexão só aparece como 5xx no primeiro acesso | Decisão registrada em 18/10 (`neon-dormindo-2026-10-18.md`) |
+
+### 5.4 LGPD
+
+| Item | Situação |
+|---|---|
+| Cadastro de aceites | Termos e Privacidade com versão, data, IP e navegador no cadastro e no novo aceite; Política de Cancelamento por compra; Termo de Ciência por pedido e por transferência (`consents`, `cancellation_acceptances`, `minor_term_acceptances`, `ticket_minor_acceptances`). O IP registrado pode ser forjado no acesso direto ao `run.app` (S-01) |
+| Exportação e exclusão de dados | Só por API de administrador, a pedido da PartyX, com protocolo, limite por minuto e trilha sem dado pessoal; a anonimização desativa a conta, apaga nome, e-mail, CPF, telefone e senha e mantém pedidos (obrigação legal). **Não há tela** no painel nem na conta do comprador. Verificado na Fase 2 (cenário 15) |
+| Retenção descrita na Política x real | Sessões, tentativas de login e códigos de recuperação: Política diz 6 meses, produção apaga com 180 dias às 04:05 (**confere**). Backups 35 dias (**confere**, bucket com retenção de 35 dias e cifra em repouso do Google). Registros de acesso 30 dias (**confere** no Cloud Logging; a retenção dos logs da Vercel no plano Hobby não está documentada). Pedidos e aceites 5 anos (sem rotina de descarte, por decisão). **Exceção**: a trilha de auditoria guarda o e-mail completo em `before/after` de correções de identidade e equipe, e a anonimização não a toca (S-23); a Política promete que o e-mail é apagado ou anonimizado |
+| Logs sem CPF | Logs da aplicação mascaram por nome e por formato (Fase 1). Os logs de requisição da infraestrutura recebem a URL com o CPF nas buscas do painel e na rota LGPD (S-06) |
+| Encarregado e contato | Publicados na Política (seção 1 e 8): nome, e-mail e WhatsApp; resposta em 15 dias |
+| Exportação de encerramento | Contém CPF completo, e-mail, nascimento e telefone, sem procedimento de transporte e descarte (S-28) |
+
+### 5.5 Documentação
+
+| Pedido | Existe? | Observação |
+|---|---|---|
+| Runbook de abertura de vendas | Parcial: `docs/registros/checklist-abertura-de-vendas.md` (lista) e `README-DEPLOY.md` seção 7 ("dias de evento"), fora da pasta de runbooks | Consolidar em `docs/operacao/runbooks/abertura-de-vendas.md`: revisão de capacidade, `evento-on`, backup do dia, alertas, varredura, teste rápido, quem avisa quem |
+| Runbook do dia do evento | `portaria.md`: antes (lista impressa, teste nos aparelhos, `evento-on` cedo), durante (tabela de situações), depois (`evento-off` no dia seguinte) | Adequado como base. Falta: conferir validadores e senhas temporárias na véspera, o caso do QR antigo de transferência ("Inválido" com explicação), a linha de "meia-entrada" (não existe mais) e "reserva de 10 min" em `estoque.md` (a reserva é de 30 min) |
+| Runbook de incidente | `incidente.md`: 6 passos (identificar, conter, avaliar, avisar a PartyX sem demora, corrigir, registrar; ANPD e titulares são decisão da PartyX) | Base correta. Falta: modelo de comunicação à PartyX, lista de contatos, comando pronto para revogar todas as sessões e trocar cada segredo (sessão, QR, webhook, SMTP), e um exemplo de linha do tempo |
+| Runbook de rollback | `rollback.md` (18 linhas) com os comandos e a regra para migrações | Adequado; acrescentar a referência de retorno atual e o ensaio cronometrado (5.2) |
+| Runbook de limpeza | **Não existe** | Pós-evento: `evento-off`, exportações (CSV de ingressos e compradores), descarte da lista impressa, Termos de Autorização em papel (6 meses), retenção |
+| Manual do painel para o Bernardo, em linguagem simples, com capturas | **Não existe**. Há rascunhos internos em `docs/homologacao/` (guia da portaria 0.26 com seção de meia-entrada já desatualizada, roteiro de testes 0.26, orientação remota de 1 h) | Escrever a partir das capturas desta auditoria (`docs/relatorios/capturas/admin/` e `portaria/`): criar evento e tipos, publicar, promoters, acompanhar pedidos, cancelar ingresso, estornar no Mercado Pago, exceções, relatórios e CSV, equipe e senhas, portaria passo a passo |
+| Lista do que é da Zanon de Andrade e do que é do cliente | Espalhada (`README-DEPLOY.md`, `docs/operacao/*.md`, `docs/producao.md`) | Consolidada abaixo (5.7) |
+
+### 5.6 Pendências conhecidas (estado em 19/10/2026)
+
+| Pendência | Estado | Risco |
+|---|---|---|
+| Firebase e DNS antigo | Domínio `partyx.com.br` servido pela Vercel (plano Hobby, uso pessoal nos termos da Vercel) como ponte; certificado do Firebase preso em validação desde 15/10 por causa da zona antiga em `a.auto.dns.br`/`b.auto.dns.br`; o Firebase pede um TXT `_acme-challenge` no Registro.br | Pausa do projeto na Vercel por uso comercial tira o site do ar; a volta de emergência está em `docs/operacao/vercel.md` |
+| Homologação a desligar | `partyx-hml` continua no ar: Cloud Run `partyx-hml-00012-tqz`, varredura 04:00 e backup 03:00 ativos, Neon de homologação, faturamento na conta `0158D3-9C1431-A0ABCF` (compartilhada com outros projetos) | Custo mensal do Neon de homologação e dos jobs; dados fictícios expostos na internet |
+| CNPJ | Produção configurada com a razão social e o CNPJ do MEI do Bernardo (`PARTYX_LEGAL_NAME`, `PARTYX_CNPJ`), mostrados no rodapé, nos e-mails e nos PDFs; a conta do Mercado Pago é a mesma pessoa (`MP_COLLECTOR_ID` conferido na partida) | Se a PartyX passar a operar por outra pessoa jurídica, troca-se a configuração e a conta do gateway |
+| Neon: plano e horas | Projeto `polished-truth-93517378`, plano Launch, 0,25 a 2 CU com suspensão automática, restauração de 7 dias; consumo de horas de computação não consultado (sem acesso à API do Neon nesta auditoria) | Conferir no console o consumo do mês e configurar o alerta de consumo |
+| Push do repositório | A branch local está 15 commits à frente de `origin/feature/fechamento-homologacao`, mais os 3 commits desta auditoria; o trabalho da taxa de serviço (66 arquivos, 20 novos) continua sem commit | Perda de trabalho em falha da máquina; divergência entre o que está publicado (tags locais) e o GitHub |
+| Taxa de serviço (D-90) | Pronta na pasta de trabalho, com migração `0017`, textos legais 1.3 e 1.1 e `env.prod.yaml` datado de 19/10; produção ainda na 1.2 sem taxa | Publicar só com backup, migração e virada no mesmo dia da data dos textos (o `deploy.sh` já exige) |
+
+### 5.7 O que é da Zanon de Andrade e o que é do cliente
+
+| Item | De quem | Custo | Observação |
+|---|---|---|---|
+| Projeto Google Cloud `partyx-producao` (Cloud Run, Tasks, Scheduler, Storage, Secret Manager, Monitoring, Firebase) | Conta Google do responsável (Zanon de Andrade), faturamento `01B4CE-D0C9DA-391606` ("PartyX", organização `zanondea-org`) | Dentro da franquia: perto de zero por mês; orçamento de R$ 30 com avisos | Para transferir ao cliente seria preciso uma conta Google dele e a mudança do dono do projeto e do faturamento |
+| Projeto Google Cloud `partyx-hml` | Idem, faturamento `0158D3-9C1431-A0ABCF` (compartilhado) | Baixo, mas não nulo (Neon de homologação, jobs) | A desligar |
+| Neon (produção `polished-truth-93517378` e homologação) | Conta Neon do responsável, plano Launch | Estimativa US$ 2 a 5 por mês em produção (`README-DEPLOY.md` seção 8), cobrado à parte | Não entra no orçamento do Google |
+| GitHub `ZanonDeAndrade/PartyX` | Zanon de Andrade | Zero | O cliente não recebe o código (Cl. 9.4) |
+| Vercel (`partyx-dominio`, time `zanondeandrades-projects`, Hobby) | Zanon de Andrade | Zero (Hobby, uso pessoal) | Temporário |
+| Domínio `partyx.com.br` (Registro.br, vence em 24/04/2027) | **Cliente** (titular do domínio; o DNS passou a ser o do Registro.br em 14/10 por decisão do responsável) | Cerca de R$ 40 por ano | Só o titular altera registros |
+| Mercado Pago (conta `3563483345`, credenciais de produção, assinatura secreta do webhook) | **Cliente** (Bernardo) | Tarifas por transação (Pix 0,99%, cartão 3,98% a 4,98%) | Segredos no Secret Manager do projeto; estornos feitos pelo cliente no painel do Mercado Pago |
+| E-mail transacional (Resend por SMTP, remetente `ingressos@partyx.com.br`, DKIM no domínio) | Conta do provedor: a confirmar quem criou (os registros em `docs/operacao/resend-registros.json` foram preparados pelo responsável) | Plano gratuito do Resend (limite diário e mensal a conferir) | Depende do domínio do cliente |
+| Caixa `partyx992@gmail.com` e WhatsApp de atendimento | **Cliente** | Zero | Publicados na Política como encarregado e contato |
+| Cloudflare Turnstile | Chave de teste; desligado | Zero | Religar exige conta e chave de produção |
+| Canal de alertas (e-mail da operação) | Zanon de Andrade | Zero | Avisos chegam só à contratada |
