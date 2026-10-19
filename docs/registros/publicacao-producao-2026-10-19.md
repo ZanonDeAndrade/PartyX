@@ -67,3 +67,25 @@ real (iPhone e Mac).
   1.0 (variáveis da revisão anterior).
 - **Banco:** `drizzle/rollback/0017_taxa_de_servico.down.sql` só se nenhum pedido tiver taxa gravada (hoje, nenhum). Enquanto a taxa
   for 0%, nenhum pedido ganha taxa.
+
+## Segunda publicação do dia: Termos de Uso 1.4 com a porcentagem (13:14 UTC)
+
+Release `release-2026-10-19b` (commit `00e3adf`), com OK do responsável: "coloque em produção e faça commit". O Bernardo aprovou 7,5%,
+mínimo R$ 0,00, em todos os ingressos (informado pelo responsável). Os Termos 1.4 escrevem a porcentagem, a conta sobre o total pago e
+o exemplo de R$ 30,00 (taxa R$ 2,44, total R$ 32,44), e dizem que mudar a porcentagem só vale depois de publicada nos Termos.
+
+| Campo | Valor |
+|---|---|
+| Migração | nenhuma (backup do dia `partyx-20261019T125251Z.dump` conferido) |
+| Imagem | `partyx-api:release-2026-10-19b-00e3adf` (Termos da tag com sha256 `fe01864729e2cb57`) |
+| Revisão | `partyx-00048-zik`, 100% desde 13:14 UTC (10:14 BRT); anterior `partyx-00046-gul` |
+| `env.prod.yaml` | `TERMS_VERSION 1.4`, vigência 2026-10-19; Política 1.1 e Privacidade 1.2 sem mudança |
+| Conferências | candidata: teste rápido 15 de 15, bateria 46 de 46; domínio: teste rápido 15 de 15, bateria 46 de 46 (com "7,5%" e "R$ 2,44" nos Termos servidos), Chromium e Firefox ok; logs desde a virada sem 5xx nem erro |
+| Testes locais | lint, typecheck, build; `npm test` com banco 1170 de 1172 na rodada cheia, as 2 de tempo (`environment.integration`, `deployTextos`) passaram sozinhas, 11 de 11; e2e textos 85, roteiro 20 (1 pulado, Brick), documentos 3 |
+
+**Falta, com o responsável:** gravar **7,5%** e mínimo **R$ 0,00** no painel, em Configurações. Até lá a taxa continua 0% e os
+Termos 1.4 descrevem uma taxa que ainda não é cobrada; fazer antes de 20/10 01:29 (Brasília), quando abre a venda do Masculino.
+
+**Voltar atrás:** `PROJECT=partyx-producao REVISAO=partyx-00046-gul ./infra/producao/deploy.sh rollback` (Termos voltam para 1.3).
+Se a porcentagem já estiver gravada no painel, voltar os Termos deixa a taxa cobrada sem o número escrito: nesse caso, gravar 0% antes.
+
