@@ -932,7 +932,8 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
       const csv = await res.text();
       expect(csv).toContain('Festa Promoter');
       expect(csv).toMatch(/Total;;;3;240,00/);
-      expect(csv).toContain('Sem desconto e sem comissão');
+      expect(csv).toContain('Sem comissão');
+      expect(csv).toContain('Desconto (R$);Valor líquido (R$)');
       expect(csv).not.toContain('OUTRO10');
       expect(
         (await sql("select count(*)::int as n from audit_log where action = 'exportacao.vendas_promoter'")).rows[0].n,

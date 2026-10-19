@@ -29,6 +29,7 @@
     "e2e:painel-celular": "vite build && playwright test -c e2e/painel-celular.config.ts",
     "e2e:transicoes": "vite build && playwright test -c e2e/transicoes.config.ts",
     "e2e:abertura": "vite build && playwright test -c e2e/abertura.config.ts",
+    "e2e:desconto": "vite build && playwright test -c e2e/desconto.config.ts",
     "carga": "bash infra/carga/run-carga.sh",
     "preview": "vite preview",
     "db:generate": "drizzle-kit generate",

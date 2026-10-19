@@ -13,6 +13,7 @@ import {
 import { Layout, usePageTitle } from './components';
 import { brl, dateShort, timeOf } from './format';
 import { formatRate } from './serviceFee';
+import { discountLabel } from './promoterDiscount';
 import { IconBack, IconClose, IconMenu } from './icons';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
@@ -907,6 +908,16 @@ export function AdminOrderPage({ id }: { id: string }) {
               <dd>{brl(o.ticketsCents ?? o.totalCents)}</dd>
             </div>
             <div>
+              <dt>Desconto do promoter</dt>
+              <dd>
+                {o.discountCents
+                  ? `${brl(o.discountCents)} (código ${o.coupon ?? ''}${o.discount ? `, ${discountLabel(o.discount)} por ingresso` : ''})`
+                  : o.coupon
+                    ? `Sem desconto (código ${o.coupon})`
+                    : 'Sem código'}
+              </dd>
+            </div>
+            <div>
               <dt>Taxa de serviço</dt>
               <dd>
                 {o.serviceFeeCents
@@ -927,7 +938,10 @@ export function AdminOrderPage({ id }: { id: string }) {
             {o.paidAt ? (
               <div>
                 <dt>Valor a devolver num reembolso total</dt>
-                <dd>{brl(o.refundCents ?? o.totalCents)}, com a taxa de serviço</dd>
+                <dd>
+                  {brl(o.refundCents ?? o.totalCents)}, o total pago{o.serviceFeeCents ? ', com a taxa de serviço' : ''}
+                  {o.discountCents ? ' (já com o desconto)' : ''}
+                </dd>
               </div>
             ) : null}
           </dl>
@@ -938,11 +952,18 @@ export function AdminOrderPage({ id }: { id: string }) {
               <li key={i.name}>
                 <span>
                   {i.quantity} × {i.name} ({brl(i.unitPriceCents)}
+                  {i.unitDiscountCents ? `, desconto de ${brl(i.unitDiscountCents)}` : ''}
                   {i.unitServiceFeeCents ? ` + ${brl(i.unitServiceFeeCents)} de taxa` : ''})
                 </span>
                 <b className="px-nowrap">{brl(i.subtotalCents)}</b>
               </li>
             ))}
+            {o.discountCents ? (
+              <li>
+                <span>Desconto ({o.coupon ?? 'código'})</span>
+                <b className="px-nowrap">{'\u2212'}{brl(o.discountCents)}</b>
+              </li>
+            ) : null}
             {o.serviceFeeCents ? (
               <li>
                 <span>Taxa de serviço</span>
@@ -963,10 +984,10 @@ export function AdminOrderPage({ id }: { id: string }) {
                   {t.usedAt ? <span className="px-muted"> entrou {timeOf(t.usedAt)}</span> : null}
                   {t.cancelReason ? <span className="px-muted"> · {t.cancelReason}</span> : null}
                   {t.priceCents !== undefined && o.paidAt ? (
-                    // O que volta num reembolso só deste ingresso: o valor dele com a taxa de serviço dele (D-90).
+                    // O que volta num reembolso só deste ingresso: o valor pago por ele (preço menos o desconto, D-91) com a taxa dele (D-90).
                     <span className="px-muted">
                       {' '}
-                      · reembolso deste ingresso: {brl(t.priceCents + (t.serviceFeeCents ?? 0))}
+                      · reembolso deste ingresso: {brl(t.priceCents - (t.discountCents ?? 0) + (t.serviceFeeCents ?? 0))}
                     </span>
                   ) : null}
                 </div>

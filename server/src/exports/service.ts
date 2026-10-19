@@ -84,6 +84,7 @@ export async function exportOrders(deps: ExportDeps, f: Omit<OrderFilter, 'page'
       'Ingressos',
       'Ingressos cancelados',
       'Valor dos ingressos (R$)',
+      'Desconto (R$)',
       'Taxa de serviço (R$)',
       'Valor (R$)',
     ],
@@ -100,7 +101,8 @@ export async function exportOrders(deps: ExportDeps, f: Omit<OrderFilter, 'page'
       o.coupon ?? '',
       int(o.tickets),
       int(o.cancelledTickets),
-      money(o.totalCents - o.serviceFeeCents),
+      money(o.totalCents - o.serviceFeeCents + o.discountCents),
+      money(o.discountCents),
       money(o.serviceFeeCents),
       money(o.totalCents),
     ]),
@@ -229,21 +231,33 @@ export async function exportSales(
   // Uma linha por lote (0013) quando o tipo vende em lotes; o "Lote único" fica numa linha só, com a coluna do lote em branco.
   const rowsByLot = r.lines.flatMap((l): Cell[][] => {
     const named = l.lots.filter(x => x.lotName !== 'Lote único');
-    const row = (lot: string, tickets: number, cents: number, fee: number): Cell[] => [
+    const row = (lot: string, tickets: number, cents: number, discount: number, fee: number): Cell[] => [
       l.eventName,
       l.typeName,
       lot,
       int(tickets),
       money(cents),
+      money(discount),
+      money(cents - discount),
       money(fee),
-      money(cents + fee),
+      money(cents - discount + fee),
     ];
-    if (named.length === 0) return [row('', l.tickets, l.cents, l.serviceFeeCents)];
-    return l.lots.map(x => row(x.lotName, x.tickets, x.cents, x.serviceFeeCents));
+    if (named.length === 0) return [row('', l.tickets, l.cents, l.discountCents, l.serviceFeeCents)];
+    return l.lots.map(x => row(x.lotName, x.tickets, x.cents, x.discountCents, x.serviceFeeCents));
   });
   const optionalMoney = (cents: number | null) => (cents === null ? 'não se aplica com filtro de tipo' : money(cents));
   const csv = toCsv(
-    ['Evento', 'Tipo de ingresso', 'Lote', 'Ingressos', 'Valor dos ingressos (R$)', 'Taxa de serviço (R$)', 'Total cobrado (R$)'],
+    [
+      'Evento',
+      'Tipo de ingresso',
+      'Lote',
+      'Ingressos',
+      'Valor dos ingressos (R$)',
+      'Desconto de promoter (R$)',
+      'Valor líquido dos ingressos (R$)',
+      'Taxa de serviço (R$)',
+      'Total cobrado (R$)',
+    ],
     rowsByLot,
     [
       [
@@ -252,12 +266,14 @@ export async function exportSales(
         '',
         int(r.totals.tickets),
         money(r.totals.cents),
+        money(r.totals.discountCents),
+        money(r.totals.netCents),
         money(r.totals.serviceFeeCents),
         money(r.totals.chargedCents),
       ],
-      ['Soma dos pedidos pagos (R$)', '', '', '', '', '', money(r.reconciliation.ordersCents)],
-      ['Tarifa do Mercado Pago (R$)', '', '', '', '', '', optionalMoney(r.totals.gatewayFeeCents)],
-      ['Líquido recebido do Mercado Pago (R$)', '', '', '', '', '', optionalMoney(r.totals.gatewayNetCents)],
+      ['Soma dos pedidos pagos (R$)', '', '', '', '', '', '', '', money(r.reconciliation.ordersCents)],
+      ['Tarifa do Mercado Pago (R$)', '', '', '', '', '', '', '', optionalMoney(r.totals.gatewayFeeCents)],
+      ['Líquido recebido do Mercado Pago (R$)', '', '', '', '', '', '', '', optionalMoney(r.totals.gatewayNetCents)],
       [
         'Pedidos pagos ainda sem a tarifa informada',
         '',
@@ -300,7 +316,17 @@ export async function exportPromoters(
   const r = await promoterRanking({ db: deps.db }, f);
   const evName = f.eventId ? await eventName(deps.db, f.eventId) : 'Todos';
   const csv = toCsv(
-    ['Posição', 'Promoter', 'Código', 'Situação do cadastro', 'Ingressos', 'Valor atribuído (R$)', 'Pedidos'],
+    [
+      'Posição',
+      'Promoter',
+      'Código',
+      'Situação do cadastro',
+      'Ingressos',
+      'Valor atribuído (R$)',
+      'Desconto concedido (R$)',
+      'Valor líquido (R$)',
+      'Pedidos',
+    ],
     r.ranking.map(p => [
       int(p.position),
       p.name,
@@ -308,6 +334,8 @@ export async function exportPromoters(
       p.isActive ? 'Ativo' : 'Inativo',
       int(p.tickets),
       money(p.cents),
+      money(p.discountCents),
+      money(p.netCents),
       int(p.orders),
     ]),
     [
@@ -318,13 +346,15 @@ export async function exportPromoters(
         '',
         int(r.withoutPromoter.tickets),
         money(r.withoutPromoter.cents),
+        money(0),
+        money(r.withoutPromoter.cents),
         int(r.withoutPromoter.orders),
       ],
       [
         'Ordenado por',
         f.metric === 'qtd'
           ? 'quantidade de ingressos, do maior para o menor'
-          : 'valor atribuído, do maior para o menor',
+          : 'valor líquido (valor atribuído menos o desconto), do maior para o menor',
       ],
       ['Critério', r.criterion],
       ['Filtros aplicados', `Evento: ${evName}; Período de aprovação: ${period(f)}`],
@@ -348,14 +378,22 @@ export async function exportPromoterOrders(
   const r = await promoterOrders({ db: deps.db }, promoterId, f);
   const evName = f.eventId ? await eventName(deps.db, f.eventId) : 'Todos';
   const csv = toCsv(
-    ['Pedido', 'Evento', 'Pagamento aprovado em', 'Ingressos', 'Valor (R$)'],
-    r.orders.map(o => [`PX-${o.number}`, o.eventName, when(o.paidAt), int(o.tickets), money(o.cents)]),
+    ['Pedido', 'Evento', 'Pagamento aprovado em', 'Ingressos', 'Valor (R$)', 'Desconto (R$)', 'Valor líquido (R$)'],
+    r.orders.map(o => [
+      `PX-${o.number}`,
+      o.eventName,
+      when(o.paidAt),
+      int(o.tickets),
+      money(o.cents),
+      money(o.discountCents),
+      money(o.netCents),
+    ]),
     [
-      ['Total', '', '', int(r.totals.tickets), money(r.totals.cents)],
+      ['Total', '', '', int(r.totals.tickets), money(r.totals.cents), money(r.totals.discountCents), money(r.totals.netCents)],
       ['Promoter', `${r.promoter.name} (${r.promoter.code})`],
       [
         'Critério',
-        'Pedidos pagos com o código do promoter, pela data original da aprovação. Sem desconto e sem comissão.',
+        'Pedidos pagos com o código do promoter, pela data original da aprovação. Valor líquido = valor menos o desconto do código. Sem comissão.',
       ],
       ['Filtros aplicados', `Evento: ${evName}; Período de aprovação: ${period(f)}`],
       ['Gerado em', stamp(deps)],

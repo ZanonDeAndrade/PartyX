@@ -8,6 +8,7 @@ import {
   orderItemLots,
   orderItems,
   orders,
+  promoterDiscountEvents,
   promoters,
   reservations,
   ticketLots,
@@ -36,6 +37,15 @@ import type { TaskQueue } from '../payments/taskQueue';
 import type { RequestMeta } from '../auth/types';
 import { assertBuyerMayPurchase, checkBuyer, type BuyerCheck } from './buyer';
 import { currentServiceFee } from '../settings/serviceFee';
+import {
+  discountFor,
+  NO_DISCOUNT_TEXT,
+  ZERO_TOTAL_TEXT,
+  type DiscountCheck,
+  type DiscountRule,
+  type NoDiscountReason,
+} from '../domain/promoterDiscount';
+import { dateKeyInEventZone } from '../domain/time';
 
 export interface OrdersDeps {
   db: Db;
@@ -109,19 +119,97 @@ function assertSalesOpen(deps: OrdersDeps) {
   }
 }
 
-/** Cupom do promoter (RF-30, RF-31). Só vincula a venda: não existe desconto. */
-async function resolveCoupon(db: Db | Tx, raw: string | null | undefined): Promise<string | null> {
+/** Código do promoter aplicado ao pedido: a quem a venda é atribuída e se há desconto (D-91). */
+interface Coupon {
+  promoterId: string;
+  code: string;
+  check: DiscountCheck;
+}
+
+/**
+ * Pedidos que seguram um uso do desconto do promoter: os que receberam o desconto e foram pagos (em qualquer situação depois disso), e
+ * os que ainda esperam pagamento dentro da reserva. Pedido vencido ou liberado devolve o uso.
+ */
+async function discountUsesTaken(db: Db | Tx, promoterId: string, now: Date): Promise<number> {
+  const rows = await db.execute<{ n: number }>(sql`
+    select count(*)::int as n from orders o
+     where o.promoter_id = ${promoterId} and o.discount_kind is not null
+       and (o.paid_at is not null
+            or exists (select 1 from reservations r where r.order_id = o.id and r.status = 'ativa' and r.expires_at > ${now}))`);
+  return rows.rows[0]?.n ?? 0;
+}
+
+/**
+ * Código do promoter (RF-30, RF-31; desconto desde a D-91). Inativo ou inexistente: recusado. Ativo: atribui a venda e, se o
+ * desconto dele vale para este evento, nesta data e ainda tem uso, dá o desconto. Com `lock` (criação do pedido), a linha do promoter
+ * fica trancada até o fim da transação: dois pedidos simultâneos não passam do limite de usos.
+ */
+async function resolveCoupon(
+  db: Db | Tx,
+  raw: string | null | undefined,
+  eventId: string,
+  now: Date,
+  lock = false,
+): Promise<Coupon | null> {
   const code = normalizeCouponCode(raw ?? '');
   if (!code) return null;
   const message = 'Código inválido ou desativado. Confira o código ou finalize sem ele.';
   if (!isCouponCodeValid(code)) throw invalid('couponCode', message, 'cupom_invalido');
-  const [promoter] = await db
-    .select({ id: promoters.id })
+  const query = db
+    .select()
     .from(promoters)
     .where(and(eq(promoters.couponCode, code), eq(promoters.isActive, true)))
     .limit(1);
+  const [promoter] = await (lock ? query.for('update') : query);
   if (!promoter) throw invalid('couponCode', message, 'cupom_invalido');
-  return promoter.id;
+  const eventIds =
+    promoter.discountScope === 'eventos'
+      ? (
+          await db
+            .select({ eventId: promoterDiscountEvents.eventId })
+            .from(promoterDiscountEvents)
+            .where(eq(promoterDiscountEvents.promoterId, promoter.id))
+        ).map(r => r.eventId)
+      : [];
+  const uses = promoter.discountKind !== 'nenhum' && promoter.discountMaxUses !== null ? await discountUsesTaken(db, promoter.id, now) : 0;
+  const check = discountFor(
+    {
+      kind: promoter.discountKind,
+      value: promoter.discountValue,
+      scope: promoter.discountScope,
+      eventIds,
+      startsOn: promoter.discountStartsOn,
+      endsOn: promoter.discountEndsOn,
+      maxUses: promoter.discountMaxUses,
+    },
+    eventId,
+    dateKeyInEventZone(now),
+    uses,
+  );
+  return { promoterId: promoter.id, code, check };
+}
+
+const ruleOf = (coupon: Coupon | null): DiscountRule | null => (coupon?.check.ok ? coupon.check.rule : null);
+
+/** O desconto não pode zerar o pedido (D-91, opção B): o código é recusado e nada é gravado. */
+function assertNotZero(totalCents: number) {
+  if (totalCents <= 0) throw invalid('couponCode', ZERO_TOTAL_TEXT, 'cupom_recusado');
+}
+
+/** O que o comprador vê sobre o código: aplicado com desconto, ou aplicado só para atribuir a venda, e por quê. */
+export interface CouponView {
+  code: string;
+  /** Desconto aplicado: tipo e valor (porcentagem em centésimos de ponto percentual, ou centavos). Nulo sem desconto. */
+  discount: DiscountRule | null;
+  status: 'desconto' | NoDiscountReason;
+  message: string;
+}
+
+function couponView(coupon: Coupon | null): CouponView | null {
+  if (!coupon) return null;
+  return coupon.check.ok
+    ? { code: coupon.code, discount: coupon.check.rule, status: 'desconto', message: 'Desconto aplicado.' }
+    : { code: coupon.code, discount: null, status: coupon.check.reason, message: NO_DISCOUNT_TEXT[coupon.check.reason] };
 }
 
 function shapeOrThrow(deps: OrdersDeps, items: RequestedItem[]) {
@@ -186,13 +274,17 @@ function forPlan(rows: (typeof ticketTypes.$inferSelect)[]): Map<string, TypeFor
 export interface Summary {
   event: { slug: string; name: string; startsAt: string; venue: string; allowsMinors: boolean };
   items: PlannedLine[];
-  /** Valor dos ingressos, sem a taxa de serviço (D-90). */
+  /** Valor dos ingressos pelo preço dos lotes, sem desconto e sem a taxa de serviço (D-90). */
   ticketsCents: number;
+  /** Desconto do promoter (D-91). */
+  discountCents: number;
   serviceFeeCents: number;
-  /** Ingressos mais taxa de serviço: o que o comprador paga. */
+  /** Porcentagem da taxa de serviço em vigor (centésimos de ponto percentual), para a tela mostrar "Taxa de serviço (7,5%)". */
+  serviceFeeRateBps: number;
+  /** Ingressos menos desconto mais taxa de serviço: o que o comprador paga. */
   totalCents: number;
   units: number;
-  coupon: { code: string } | null;
+  coupon: CouponView | null;
   /** O que o comprador ainda precisa (novo aceite, data de nascimento, termo de menor) ou por que não pode comprar. Com `userId`. */
   buyer: BuyerCheck | null;
 }
@@ -218,17 +310,19 @@ export async function quote(deps: OrdersDeps, input: CheckoutInput, userId?: str
   );
   // Lotes como valeriam agora, sem gravar: o resumo é informação; quem grava é `createOrder`, com os tipos trancados.
   const lots = await previewTypes(deps.db, rows, now);
+  const coupon = await resolveCoupon(deps.db, input.couponCode, event.id, now);
+  const fee = await currentServiceFee(deps.db);
   const plan = planOrder(
     input.items,
     forPlan(rows),
     reserved,
     now,
     { byType: lots.byType, reservedByLot: lots.reserved },
-    await currentServiceFee(deps.db),
+    fee,
+    ruleOf(coupon),
   );
   if (!plan.ok) throw stockError(plan.failures);
-  await resolveCoupon(deps.db, input.couponCode);
-  const code = normalizeCouponCode(input.couponCode ?? '');
+  assertNotZero(plan.totalCents);
   return {
     event: {
       slug: event.slug,
@@ -239,10 +333,12 @@ export async function quote(deps: OrdersDeps, input: CheckoutInput, userId?: str
     },
     items: plan.lines,
     ticketsCents: plan.ticketsCents,
+    discountCents: plan.discountCents,
     serviceFeeCents: plan.serviceFeeCents,
+    serviceFeeRateBps: fee.rateBps,
     totalCents: plan.totalCents,
     units: plan.units,
-    coupon: code ? { code } : null,
+    coupon: couponView(coupon),
     buyer: userId ? await checkBuyer(deps.db, deps.config, userId, event) : null,
   };
 }
@@ -257,12 +353,17 @@ export interface OrderView {
   /** Comprador com 16 ou 17 anos na data do evento: a tela oferece a autorização preenchida com os dados dele. */
   buyerMinor: boolean;
   items: PlannedLine[];
-  /** Valor dos ingressos (`total_cents - service_fee_cents`). */
+  /** Valor dos ingressos pelo preço dos lotes (`total_cents - service_fee_cents + discount_cents`). */
   ticketsCents: number;
+  /** Desconto do promoter guardado no pedido (D-91): não muda se o promoter mudar depois. */
+  discountCents: number;
   /** Taxa de serviço guardada no pedido (D-90): não muda se a taxa do painel mudar depois. Zero nos pedidos anteriores. */
   serviceFeeCents: number;
+  /** Porcentagem da taxa de serviço usada no pedido (centésimos de ponto percentual). */
+  serviceFeeRateBps: number;
   totalCents: number;
-  coupon: { code: string } | null;
+  /** Código usado e o desconto que ele deu, como gravado no pedido. */
+  coupon: { code: string; discount: DiscountRule | null } | null;
   paymentMethod: 'pix' | 'cartao' | null;
   /** Reserva do pedido. O contador usa `serverNow`, não o relógio do aparelho. */
   reservation: { status: string; expiresAt: string; serverNow: string; secondsLeft: number } | null;
@@ -303,6 +404,7 @@ async function view(
       quantity: orderItems.quantity,
       unitPriceCents: orderItems.unitPriceCents,
       serviceFeeCents: orderItems.serviceFeeCents,
+      discountCents: orderItems.discountCents,
     })
     .from(orderItems)
     .innerJoin(ticketTypes, eq(ticketTypes.id, orderItems.ticketTypeId))
@@ -318,6 +420,7 @@ async function view(
       quantity: orderItemLots.quantity,
       unitPriceCents: orderItemLots.unitPriceCents,
       unitServiceFeeCents: orderItemLots.unitServiceFeeCents,
+      unitDiscountCents: orderItemLots.unitDiscountCents,
     })
     .from(orderItemLots)
     .innerJoin(ticketLots, eq(ticketLots.id, orderItemLots.lotId))
@@ -329,13 +432,19 @@ async function view(
     .where(eq(reservations.orderId, orderId))
     .orderBy(asc(reservations.ticketTypeId));
   const first = resv[0];
-  let coupon: { code: string } | null = null;
-  if (order.o.promoterId) {
+  // Código como gravado no pedido (D-91); pedidos anteriores à 0018 mostram o código atual do promoter.
+  let coupon: OrderView['coupon'] = null;
+  const discount: DiscountRule | null =
+    order.o.discountKind && order.o.discountKind !== 'nenhum' && order.o.discountValue !== null
+      ? { kind: order.o.discountKind, value: order.o.discountValue }
+      : null;
+  if (order.o.couponCode) coupon = { code: order.o.couponCode, discount };
+  else if (order.o.promoterId) {
     const [p] = await db
       .select({ code: promoters.couponCode })
       .from(promoters)
       .where(eq(promoters.id, order.o.promoterId));
-    coupon = p ? { code: p.code } : null;
+    coupon = p ? { code: p.code, discount: null } : null;
   }
   return {
     id: order.o.id,
@@ -359,8 +468,10 @@ async function view(
         lots,
       };
     }),
-    ticketsCents: order.o.totalCents - order.o.serviceFeeCents,
+    ticketsCents: order.o.totalCents - order.o.serviceFeeCents + order.o.discountCents,
+    discountCents: order.o.discountCents,
     serviceFeeCents: order.o.serviceFeeCents,
+    serviceFeeRateBps: order.o.serviceFeeRateBps,
     totalCents: order.o.totalCents,
     coupon,
     paymentMethod: order.o.paymentMethod,
@@ -464,7 +575,6 @@ export async function createOrder(
   assertSalesOpen(deps);
   shapeOrThrow(deps, input.items);
   const policyVersion = assertCancellationAccepted(deps.config, input);
-  const promoterId = await resolveCoupon(deps.db, input.couponCode);
   const now = deps.clock.now();
   const expiresAt = new Date(now.getTime() + deps.config.RESERVATION_MINUTES * 60_000);
 
@@ -524,8 +634,11 @@ export async function createOrder(
       rows.map(r => r.id),
       now,
     );
-    // Taxa de serviço lida na mesma transação (D-90): o pedido guarda a taxa, a porcentagem e o mínimo deste instante. Se a taxa
-    // mudou desde a tela, o total muda e o `expectedTotalCents` abaixo recusa, como numa virada de lote.
+    // Código do promoter com a linha dele trancada (D-91): os usos do desconto são contados depois de soltar o pedido anterior deste
+    // comprador, e dois pedidos simultâneos não passam do limite. Promoter é trancado depois dos tipos (só aqui e no painel).
+    const coupon = await resolveCoupon(tx, input.couponCode, event.id, now, true);
+    // Taxa de serviço lida na mesma transação (D-90): o pedido guarda a taxa, a porcentagem e o mínimo deste instante. Se a taxa ou o
+    // desconto mudaram desde a tela, o total muda e o `expectedTotalCents` abaixo recusa, como numa virada de lote.
     const fee = await currentServiceFee(tx);
     const plan = planOrder(
       input.items,
@@ -534,8 +647,10 @@ export async function createOrder(
       now,
       { byType: settled.byType, reservedByLot: settled.reserved },
       fee,
+      ruleOf(coupon),
     );
     if (!plan.ok) throw stockError(plan.failures);
+    assertNotZero(plan.totalCents);
     if (input.expectedTotalCents !== undefined && input.expectedTotalCents !== plan.totalCents) {
       throw new AppError(409, 'preco_alterado', 'O valor do pedido mudou. Confira o novo total antes de continuar.', {
         totalCents: plan.totalCents,
@@ -547,7 +662,11 @@ export async function createOrder(
       .values({
         userId,
         eventId: event.id,
-        promoterId,
+        promoterId: coupon?.promoterId ?? null,
+        couponCode: coupon?.code ?? null,
+        discountKind: ruleOf(coupon)?.kind ?? null,
+        discountValue: ruleOf(coupon)?.value ?? null,
+        discountCents: plan.discountCents,
         totalCents: plan.totalCents,
         serviceFeeCents: plan.serviceFeeCents,
         serviceFeeRateBps: fee.rateBps,
@@ -589,6 +708,7 @@ export async function createOrder(
           quantity: line.quantity,
           unitPriceCents: line.unitPriceCents,
           serviceFeeCents: line.serviceFeeCents,
+          discountCents: line.discountCents,
         })
         .returning({ id: orderItems.id });
       // O preço de cada lote (e a taxa de serviço dele) fica preso aqui: quem estiver pagando quando o lote virar paga o reservado.
@@ -602,6 +722,7 @@ export async function createOrder(
           quantity: part.quantity,
           unitPriceCents: part.unitPriceCents,
           unitServiceFeeCents: part.unitServiceFeeCents,
+          unitDiscountCents: part.unitDiscountCents,
         });
       }
       await tx.insert(reservations).values({

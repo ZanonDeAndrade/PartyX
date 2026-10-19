@@ -46,8 +46,9 @@ export interface TicketSummary {
   transferUntil: string;
   /** Recebido com 16 ou 17 anos e o Termo de Ciência ainda não aceito: o QR e o PDF esperam o aceite. */
   minorTermPending: boolean;
-  /** Valor pago por este ingresso (o do lote de onde ele saiu) e a taxa de serviço dele (D-90; zero nos pedidos anteriores). */
+  /** Preço do lote de onde ele saiu, o desconto do promoter nele (D-91) e a taxa de serviço dele (D-90; zero nos pedidos anteriores). */
   priceCents: number;
+  discountCents: number;
   serviceFeeCents: number;
 }
 
@@ -85,6 +86,7 @@ const columns = {
   // todas as unidades, então a do item dividida pela quantidade é exata.
   priceCents: sql<number>`coalesce(${orderItemLots.unitPriceCents}, ${orderItems.unitPriceCents})`.mapWith(Number),
   serviceFeeCents: sql<number>`coalesce(${orderItemLots.unitServiceFeeCents}, ${orderItems.serviceFeeCents} / ${orderItems.quantity})`.mapWith(Number),
+  discountCents: sql<number>`coalesce(${orderItemLots.unitDiscountCents}, ${orderItems.discountCents} / ${orderItems.quantity})`.mapWith(Number),
 };
 
 type Row = {
@@ -109,6 +111,7 @@ type Row = {
   minorTermPending: boolean;
   priceCents: number;
   serviceFeeCents: number;
+  discountCents: number;
 };
 
 type Received = Map<string, { name: string; at: string }>;
@@ -155,6 +158,7 @@ const summary = (r: Row, from?: Received): TicketSummary => ({
   transferUntil: new Date(r.startsAt.getTime() - TRANSFER_DEADLINE_MS).toISOString(),
   minorTermPending: r.minorTermPending,
   priceCents: r.priceCents,
+  discountCents: r.discountCents,
   serviceFeeCents: r.serviceFeeCents,
 });
 

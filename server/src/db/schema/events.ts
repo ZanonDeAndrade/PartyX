@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -13,7 +14,14 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createdAt, instant, updatedAt } from './columns';
-import { eventStatus, lotCloseReason, lotLeftover, lotStatus } from './enums';
+import {
+  eventStatus,
+  lotCloseReason,
+  lotLeftover,
+  lotStatus,
+  promoterDiscountKind,
+  promoterDiscountScope,
+} from './enums';
 
 /**
  * Eventos. O ciclo é rascunho, publicado e encerrado. Só o evento SEM uso (nenhum pedido, em qualquer situação, e nenhuma leitura de
@@ -214,7 +222,11 @@ export const ticketLots = pgTable(
   ],
 );
 
-/** Promoters com código exclusivo. O código só atribui a venda: sem desconto e sem comissão. */
+/**
+ * Promoters com código exclusivo. O código atribui a venda ao promoter (sem comissão) e, desde a D-91 (0018, mudança de escopo aprovada
+ * pela PartyX), pode dar um desconto por ingresso: porcentagem ou valor fixo, em todos os eventos ou nos escolhidos, com prazo e limite
+ * de usos opcionais. Sem desconto (`nenhum`, o padrão), o código só atribui a venda, como antes.
+ */
 export const promoters = pgTable(
   'promoters',
   {
@@ -225,9 +237,48 @@ export const promoters = pgTable(
     phone: text('phone'),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: createdAt(),
+    /** Tipo do desconto (D-91). */
+    discountKind: promoterDiscountKind('discount_kind').notNull().default('nenhum'),
+    /** Porcentagem em centésimos de ponto percentual (1% = 100, 100% = 10000) ou valor fixo em centavos. Nulo sem desconto. */
+    discountValue: integer('discount_value'),
+    discountScope: promoterDiscountScope('discount_scope').notNull().default('todos'),
+    /** Primeiro e último dia do desconto, no fuso do evento (São Paulo), os dois incluídos. Nulos: sem limite de data. */
+    discountStartsOn: date('discount_starts_on'),
+    discountEndsOn: date('discount_ends_on'),
+    /** Quantos pedidos podem ter o desconto (pagos, e os pendentes dentro da reserva, que seguram um uso). Nulo: sem limite. */
+    discountMaxUses: integer('discount_max_uses'),
   },
   t => [
     uniqueIndex('promoters_coupon_code_key').on(t.couponCode),
     check('promoters_coupon_code_format', sql`${t.couponCode} ~ '^[A-Z0-9]{3,20}$'`),
+    check(
+      'promoters_discount_value_valid',
+      sql`(${t.discountKind} = 'nenhum' and ${t.discountValue} is null) or (${t.discountKind} = 'percentual' and ${t.discountValue} between 100 and 10000) or (${t.discountKind} = 'fixo' and ${t.discountValue} between 1 and 10000000)`,
+    ),
+    check(
+      'promoters_discount_dates_valid',
+      sql`${t.discountStartsOn} is null or ${t.discountEndsOn} is null or ${t.discountEndsOn} >= ${t.discountStartsOn}`,
+    ),
+    check('promoters_discount_max_uses_valid', sql`${t.discountMaxUses} is null or ${t.discountMaxUses} >= 1`),
+  ],
+);
+
+/**
+ * Eventos em que o desconto do promoter vale, quando o alcance é `eventos` (D-91, 0018). Apagar um evento sem uso (0011) leva junto
+ * a ligação; o painel troca a lista inteira ao salvar (por isso o `partyx_app` pode apagar aqui).
+ */
+export const promoterDiscountEvents = pgTable(
+  'promoter_discount_events',
+  {
+    promoterId: uuid('promoter_id')
+      .notNull()
+      .references(() => promoters.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+  },
+  t => [
+    uniqueIndex('promoter_discount_events_key').on(t.promoterId, t.eventId),
+    index('promoter_discount_events_event_idx').on(t.eventId),
   ],
 );

@@ -408,7 +408,7 @@ describe.skipIf(!ADMIN_URL)('carrinho, reserva e estoque (integração)', () => 
       const a = await buyer();
       const { order } = await json(await a.order(e.slug, [item(e.types[0]!, 2)], { couponCode: ' joao10 ' }));
       expect(order.totalCents).toBe(16000); // sem desconto
-      expect(order.coupon).toEqual({ code: 'JOAO10' });
+      expect(order.coupon).toEqual({ code: 'JOAO10', discount: null }); // promoter sem desconto (D-91): só atribui
       expect((await sql('select promoter_id from orders')).rows[0].promoter_id).toBe(p);
     });
 

@@ -183,6 +183,8 @@ export interface PurchaseData {
   lines: string[];
   /** Valor dos ingressos (sem a taxa de serviço), já formatado. */
   ticketsAmount: string;
+  /** Desconto do promoter (D-91): "Desconto (DUDA)" e "−R$ 3,00". Nulo ou ausente sem desconto (a linha não aparece). */
+  discount?: { label: string; value: string } | null;
   /** Taxa de serviço do pedido, formatada; nula quando o pedido não tem taxa (a linha não aparece). */
   serviceFee: string | null;
   totalPaid: string;
@@ -205,6 +207,7 @@ export function composeCompra(data: PurchaseData, ctx: MailContext): Composed {
       { label: 'Pedido', value: data.orderNumber },
       ...data.lines.map((line, i) => ({ label: i === 0 ? 'Ingressos' : '', value: line })),
       { label: 'Valor dos ingressos', value: data.ticketsAmount },
+      ...(data.discount ? [data.discount] : []),
       ...(data.serviceFee ? [{ label: 'Taxa de serviço', value: data.serviceFee }] : []),
       { label: 'Total pago', value: data.totalPaid },
     ],

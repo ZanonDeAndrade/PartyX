@@ -1591,3 +1591,9 @@ body.px-dark .px-event-side .px-fine {
   }
 }
 
+/* Porcentagem da taxa de serviço em vigor (Termos 1.5), acima das formas de pagamento. Só aparece com taxa maior que zero. */
+.px-paymethods-fee {
+  margin: 0 0 var(--px-s-3);
+  font-size: var(--px-t-sm);
+  color: var(--px-text-3);
+}

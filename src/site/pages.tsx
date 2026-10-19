@@ -19,6 +19,7 @@ import {
 import { stateAnnouncement, type CountdownView } from './eventCountdown';
 import { EventCountdown, readCountdown } from './eventCountdownView';
 import { brl, dateLong, dateParts, shareLinks, timeOf } from './format';
+import { formatRate } from './serviceFee';
 import { IconCheck, IconClose, IconLink, IconShare } from './icons';
 import { cascade, Roll } from './motion';
 import { eventLinkProps, pendingEvent, prefetchedEvent } from './prefetch';
@@ -415,7 +416,7 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
               })}
               {fees > 0 ? (
                 <li>
-                  <span>Taxa de serviço</span>
+                  <span>Taxa de serviço{event.serviceFeeRateBps ? ` (${formatRate(event.serviceFeeRateBps)})` : ''}</span>
                   <span className="px-nowrap">{brl(fees)}</span>
                 </li>
               ) : null}
@@ -467,7 +468,9 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
         </>
       ) : null}
       {/* Abaixo dos ingressos, também quando ainda estão "em breve"; some quando nada mais será vendido. */}
-      {event.ticketTypes.some(t => t.canBuy || t.state === 'em_breve') ? <PaymentMethods site={site} /> : null}
+      {event.ticketTypes.some(t => t.canBuy || t.state === 'em_breve') ? (
+        <PaymentMethods site={site} feeRateBps={event.serviceFeeRateBps ?? 0} />
+      ) : null}
     </>
   );
 }
@@ -476,11 +479,17 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
  * Formas de pagamento que o checkout aceita hoje (servidor, `/public/site`): Pix só quando cabe na reserva (D-03); cartão de crédito
  * ou débito, como no componente do Mercado Pago. Parcelamento só aparece com o número real ("em até 3x"); à vista, nada se diz.
  */
-function PaymentMethods({ site }: { site: SiteInfo | null }) {
+function PaymentMethods({ site, feeRateBps }: { site: SiteInfo | null; feeRateBps: number }) {
   const pay = site?.payment;
   if (!pay || (!pay.pix && !pay.card)) return null;
   return (
     <section className="px-paymethods" aria-labelledby="formas-de-pagamento">
+      {/* Termos 1.5: a porcentagem vigente da taxa aparece aqui e na tela de compra. Em 0%, nada de taxa. */}
+      {feeRateBps > 0 ? (
+        <p className="px-paymethods-fee">
+          Taxa de serviço: {formatRate(feeRateBps)} do total pago por ingresso, já mostrada ao lado de cada valor.
+        </p>
+      ) : null}
       <h3 id="formas-de-pagamento">Formas de pagamento</h3>
       <ul>
         {pay.pix ? <li>Pix</li> : null}

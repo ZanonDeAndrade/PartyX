@@ -17,7 +17,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { createdAt, instant, updatedAt } from './columns';
-import { orderStatus, paymentMethod, reservationStatus, ticketStatus } from './enums';
+import { orderStatus, paymentMethod, promoterDiscountKind, reservationStatus, ticketStatus } from './enums';
 import { events, promoters, ticketLots, ticketTypes } from './events';
 import { users } from './users';
 
@@ -42,8 +42,17 @@ export const orders = pgTable(
     eventId: uuid('event_id')
       .notNull()
       .references(() => events.id),
-    /** Só atribui a venda ao promoter. Não altera o total. */
+    /** Promoter da venda (atribuição). Com desconto (D-91), o desconto aplicado fica nas colunas `discount_*` abaixo. */
     promoterId: uuid('promoter_id').references(() => promoters.id),
+    /**
+     * Retrato do código e do desconto do promoter no momento do pedido (D-91, 0018): mudar o promoter depois não altera o pedido.
+     * `discount_cents` é a soma dos descontos por ingresso, já fora de `total_cents` (total = ingressos - desconto + taxa de serviço).
+     * Nulos e zero nos pedidos sem código, nos sem desconto e nos anteriores à 0018.
+     */
+    couponCode: text('coupon_code'),
+    discountKind: promoterDiscountKind('discount_kind'),
+    discountValue: integer('discount_value'),
+    discountCents: integer('discount_cents').notNull().default(0),
     totalCents: integer('total_cents').notNull(),
     status: orderStatus('status').notNull().default('pendente'),
     /** Nulo até o comprador escolher a forma de pagamento. */
@@ -104,6 +113,10 @@ export const orders = pgTable(
       sql`${t.serviceFeeCents} >= 0 and ${t.serviceFeeCents} < ${t.totalCents} and ${t.serviceFeeRateBps} >= 0 and ${t.serviceFeeMinCents} >= 0`,
     ),
     check(
+      'orders_discount_valid',
+      sql`${t.discountCents} >= 0 and (${t.discountCents} = 0 or (${t.discountKind} in ('percentual', 'fixo') and ${t.discountValue} is not null and ${t.couponCode} is not null))`,
+    ),
+    check(
       'orders_gateway_fee_valid',
       sql`(${t.gatewayFeeCents} is null or ${t.gatewayFeeCents} >= 0) and (${t.gatewayNetCents} is null or ${t.gatewayNetCents} >= 0)`,
     ),
@@ -123,6 +136,8 @@ export const orderItems = pgTable(
     unitPriceCents: integer('unit_price_cents').notNull(),
     /** Taxa de serviço das unidades do item (soma das taxas por ingresso dos lotes, 0017). */
     serviceFeeCents: integer('service_fee_cents').notNull().default(0),
+    /** Desconto do promoter nas unidades do item (soma dos descontos por ingresso dos lotes, D-91, 0018). */
+    discountCents: integer('discount_cents').notNull().default(0),
   },
   t => [
     foreignKey({
@@ -142,6 +157,8 @@ export const orderItems = pgTable(
     check('order_items_quantity_positive', sql`${t.quantity} > 0`),
     check('order_items_price_positive', sql`${t.unitPriceCents} > 0`),
     check('order_items_service_fee_nonnegative', sql`${t.serviceFeeCents} >= 0`),
+    // O teto exato fica por lote (`order_item_lots_discount_valid`): aqui o preço unitário é a média arredondada dos lotes.
+    check('order_items_discount_nonnegative', sql`${t.discountCents} >= 0`),
   ],
 );
 
@@ -161,8 +178,10 @@ export const orderItemLots = pgTable(
     lotId: uuid('lot_id').notNull(),
     quantity: integer('quantity').notNull(),
     unitPriceCents: integer('unit_price_cents').notNull(),
-    /** Taxa de serviço de cada ingresso deste lote, presa junto com o preço (0017). */
+    /** Taxa de serviço de cada ingresso deste lote, presa junto com o preço (0017); com desconto, calculada sobre o valor descontado. */
     unitServiceFeeCents: integer('unit_service_fee_cents').notNull().default(0),
+    /** Desconto do promoter em cada ingresso deste lote (D-91, 0018). O ingresso custa `unit_price_cents - unit_discount_cents`. */
+    unitDiscountCents: integer('unit_discount_cents').notNull().default(0),
   },
   t => [
     foreignKey({
@@ -181,6 +200,7 @@ export const orderItemLots = pgTable(
     check('order_item_lots_quantity_positive', sql`${t.quantity} > 0`),
     check('order_item_lots_price_positive', sql`${t.unitPriceCents} > 0`),
     check('order_item_lots_service_fee_nonnegative', sql`${t.unitServiceFeeCents} >= 0`),
+    check('order_item_lots_discount_valid', sql`${t.unitDiscountCents} >= 0 and ${t.unitDiscountCents} <= ${t.unitPriceCents}`),
   ],
 );
 

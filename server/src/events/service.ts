@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, gt, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { writeAudit, type Tx } from '../db/audit';
-import { events, orderItemLots, promoters, reservations, ticketLots, ticketTypes } from '../db/schema';
+import { events, orderItemLots, promoterDiscountEvents, promoters, reservations, ticketLots, ticketTypes } from '../db/schema';
+import { validDiscountRule } from '../domain/promoterDiscount';
 import { lotCapacity, lotRemaining, lotSalesState, typeLotsView, type Lot } from '../domain/lots';
 import { lotsByType, previewTypes } from './lots';
 import {
@@ -958,14 +959,31 @@ export async function getEvent(deps: EventsDeps, id: string) {
   return { event, ticketTypes: await viewTypes(deps.db, types, now) };
 }
 
-// ---------- promoters (RF-18, CA-10) ----------
+// ---------- promoters (RF-18, CA-10; desconto D-91) ----------
 
 export type PromoterRow = typeof promoters.$inferSelect;
-const promoterSnapshot = (p: PromoterRow) => ({
+type DiscountKindValue = PromoterRow['discountKind'];
+
+/** Promoter como o painel recebe: a linha, os eventos do desconto e os usos (pedidos pagos e pendentes que seguram um uso). */
+export interface PromoterView extends PromoterRow {
+  discountEventIds: string[];
+  discountUses: { paid: number; pending: number };
+}
+
+const promoterSnapshot = (p: PromoterRow, eventIds: string[]) => ({
   name: p.name,
   couponCode: p.couponCode,
   phone: p.phone,
   isActive: p.isActive,
+  discount: {
+    kind: p.discountKind,
+    value: p.discountValue,
+    scope: p.discountScope,
+    eventIds: [...eventIds].sort(),
+    startsOn: p.discountStartsOn,
+    endsOn: p.discountEndsOn,
+    maxUses: p.discountMaxUses,
+  },
 });
 
 export interface PromoterInput {
@@ -973,11 +991,24 @@ export interface PromoterInput {
   couponCode: string;
   phone?: string | null;
   isActive?: boolean;
+  /** Desconto (D-91). Sem estes campos, o promoter fica (ou continua) como estava; `nenhum` limpa o resto. */
+  discountKind?: DiscountKindValue;
+  /** Porcentagem em centésimos de ponto percentual (100 a 10000) ou valor fixo em centavos. */
+  discountValue?: number | null;
+  discountScope?: 'todos' | 'eventos';
+  discountEventIds?: string[];
+  /** AAAA-MM-DD, dias do fuso do evento, incluídos. */
+  discountStartsOn?: string | null;
+  discountEndsOn?: string | null;
+  discountMaxUses?: number | null;
 }
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const validDate = (d: string) => DATE_RE.test(d) && !Number.isNaN(Date.parse(`${d}T12:00:00Z`)) && new Date(`${d}T12:00:00Z`).toISOString().startsWith(d);
 
 function checkPromoter(input: Partial<PromoterInput>, required: boolean) {
   const errors: FieldError[] = [];
-  const out: Partial<PromoterInput> = {};
+  const out: Partial<Pick<PromoterInput, 'name' | 'couponCode' | 'phone' | 'isActive'>> = {};
   if (input.name !== undefined || required) {
     const name = normalizeName(input.name ?? '');
     if (!name || name.length > 80)
@@ -997,8 +1028,118 @@ function checkPromoter(input: Partial<PromoterInput>, required: boolean) {
     else out.phone = phone;
   }
   if (input.isActive !== undefined) out.isActive = input.isActive;
-  if (errors.length) throw invalid(errors);
-  return out;
+  return { out, errors };
+}
+
+const DISCOUNT_KEYS = [
+  'discountKind',
+  'discountValue',
+  'discountScope',
+  'discountEventIds',
+  'discountStartsOn',
+  'discountEndsOn',
+  'discountMaxUses',
+] as const;
+const touchesDiscount = (input: Partial<PromoterInput>) => DISCOUNT_KEYS.some(k => input[k] !== undefined);
+
+interface DiscountFields {
+  discountKind: DiscountKindValue;
+  discountValue: number | null;
+  discountScope: 'todos' | 'eventos';
+  discountStartsOn: string | null;
+  discountEndsOn: string | null;
+  discountMaxUses: number | null;
+}
+
+/**
+ * Confere o desconto inteiro (D-91), já somado ao que estava gravado (`current`), porque os campos dependem uns dos outros. `nenhum`
+ * limpa valor, alcance, eventos, datas e limite. Os eventos escolhidos precisam existir.
+ */
+async function checkDiscount(
+  db: Db | Tx,
+  input: Partial<PromoterInput>,
+  current: { fields: DiscountFields; eventIds: string[] },
+  errors: FieldError[],
+): Promise<{ fields: DiscountFields; eventIds: string[] }> {
+  const kind = input.discountKind ?? current.fields.discountKind;
+  if (!['nenhum', 'percentual', 'fixo'].includes(kind)) {
+    errors.push({ campo: 'discountKind', mensagem: 'Escolha: sem desconto, porcentagem ou valor fixo.' });
+    return current;
+  }
+  if (kind === 'nenhum')
+    return {
+      fields: {
+        discountKind: 'nenhum',
+        discountValue: null,
+        discountScope: 'todos',
+        discountStartsOn: null,
+        discountEndsOn: null,
+        discountMaxUses: null,
+      },
+      eventIds: [],
+    };
+  // Trocar o tipo sem mandar o valor não aproveita o valor antigo (porcentagem e centavos não se misturam).
+  const value =
+    input.discountValue !== undefined ? input.discountValue : kind === current.fields.discountKind ? current.fields.discountValue : null;
+  if (value === null || !validDiscountRule({ kind, value }))
+    errors.push({
+      campo: 'discountValue',
+      mensagem:
+        kind === 'percentual'
+          ? 'Informe uma porcentagem de 1 a 100, com até 2 casas depois da vírgula.'
+          : 'Informe um valor de R$ 0,01 a R$ 100.000,00.',
+    });
+  const scope = input.discountScope ?? current.fields.discountScope;
+  if (scope !== 'todos' && scope !== 'eventos') errors.push({ campo: 'discountScope', mensagem: 'Escolha onde o desconto vale.' });
+  let eventIds = scope === 'eventos' ? [...new Set(input.discountEventIds ?? current.eventIds)] : [];
+  if (scope === 'eventos') {
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (eventIds.length === 0) errors.push({ campo: 'discountEventIds', mensagem: 'Escolha ao menos um evento.' });
+    else if (eventIds.length > 200 || !eventIds.every(id => uuidRe.test(id)))
+      errors.push({ campo: 'discountEventIds', mensagem: 'Algum evento escolhido não existe.' });
+    else {
+      const found = await db.select({ id: events.id }).from(events).where(inArray(events.id, eventIds));
+      if (found.length !== eventIds.length) errors.push({ campo: 'discountEventIds', mensagem: 'Algum evento escolhido não existe.' });
+    }
+  } else eventIds = [];
+  const startsOn = input.discountStartsOn !== undefined ? input.discountStartsOn || null : current.fields.discountStartsOn;
+  const endsOn = input.discountEndsOn !== undefined ? input.discountEndsOn || null : current.fields.discountEndsOn;
+  if (startsOn !== null && !validDate(startsOn)) errors.push({ campo: 'discountStartsOn', mensagem: 'Informe uma data válida.' });
+  if (endsOn !== null && !validDate(endsOn)) errors.push({ campo: 'discountEndsOn', mensagem: 'Informe uma data válida.' });
+  if (startsOn && endsOn && validDate(startsOn) && validDate(endsOn) && endsOn < startsOn)
+    errors.push({ campo: 'discountEndsOn', mensagem: 'A data de fim precisa ser igual ou depois da de início.' });
+  const maxUses = input.discountMaxUses !== undefined ? input.discountMaxUses : current.fields.discountMaxUses;
+  if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 1_000_000))
+    errors.push({ campo: 'discountMaxUses', mensagem: 'Informe um limite de 1 ou mais, ou deixe vazio para não ter limite.' });
+  return {
+    fields: { discountKind: kind, discountValue: value, discountScope: scope, discountStartsOn: startsOn, discountEndsOn: endsOn, discountMaxUses: maxUses },
+    eventIds,
+  };
+}
+
+const NO_DISCOUNT: { fields: DiscountFields; eventIds: string[] } = {
+  fields: {
+    discountKind: 'nenhum',
+    discountValue: null,
+    discountScope: 'todos',
+    discountStartsOn: null,
+    discountEndsOn: null,
+    discountMaxUses: null,
+  },
+  eventIds: [],
+};
+
+async function discountEventIdsOf(db: Db | Tx, promoterId: string): Promise<string[]> {
+  const rows = await db
+    .select({ eventId: promoterDiscountEvents.eventId })
+    .from(promoterDiscountEvents)
+    .where(eq(promoterDiscountEvents.promoterId, promoterId));
+  return rows.map(r => r.eventId).sort();
+}
+
+async function saveDiscountEvents(tx: Tx, promoterId: string, eventIds: string[]) {
+  await tx.delete(promoterDiscountEvents).where(eq(promoterDiscountEvents.promoterId, promoterId));
+  if (eventIds.length) await tx.insert(promoterDiscountEvents).values(eventIds.map(eventId => ({ promoterId, eventId })));
 }
 
 function promoterConflict(error: unknown): never {
@@ -1008,13 +1149,43 @@ function promoterConflict(error: unknown): never {
   throw error;
 }
 
-export async function listPromoters(deps: EventsDeps) {
-  return deps.db.select().from(promoters).orderBy(asc(promoters.name), asc(promoters.id));
+/** Usos do desconto de cada promoter: pedidos com desconto já pagos, e os pendentes que ainda seguram um uso dentro da reserva. */
+async function discountUses(db: Db | Tx, now: Date, promoterId?: string) {
+  const rows = await db.execute<{ promoter_id: string; paid: number; pending: number }>(sql`
+    select o.promoter_id,
+           count(*) filter (where o.paid_at is not null)::int as paid,
+           count(*) filter (where o.paid_at is null and exists (
+             select 1 from reservations r where r.order_id = o.id and r.status = 'ativa' and r.expires_at > ${now}))::int as pending
+      from orders o
+     where o.discount_kind is not null ${promoterId ? sql`and o.promoter_id = ${promoterId}` : sql``}
+     group by o.promoter_id`);
+  return new Map(rows.rows.map(r => [r.promoter_id, { paid: r.paid, pending: r.pending }]));
 }
 
-export async function createPromoter(deps: EventsDeps, actor: Actor, input: PromoterInput) {
-  const data = checkPromoter(input, true);
+async function promoterView(db: Db | Tx, p: PromoterRow, now: Date): Promise<PromoterView> {
+  const uses = await discountUses(db, now, p.id);
+  return { ...p, discountEventIds: await discountEventIdsOf(db, p.id), discountUses: uses.get(p.id) ?? { paid: 0, pending: 0 } };
+}
+
+export async function listPromoters(deps: EventsDeps): Promise<PromoterView[]> {
+  const rows = await deps.db.select().from(promoters).orderBy(asc(promoters.name), asc(promoters.id));
+  const links = await deps.db.select().from(promoterDiscountEvents);
+  const uses = await discountUses(deps.db, deps.clock.now());
+  return rows.map(p => ({
+    ...p,
+    discountEventIds: links
+      .filter(l => l.promoterId === p.id)
+      .map(l => l.eventId)
+      .sort(),
+    discountUses: uses.get(p.id) ?? { paid: 0, pending: 0 },
+  }));
+}
+
+export async function createPromoter(deps: EventsDeps, actor: Actor, input: PromoterInput): Promise<PromoterView> {
+  const { out: data, errors } = checkPromoter(input, true);
   const now = deps.clock.now();
+  const discount = touchesDiscount(input) ? await checkDiscount(deps.db, input, NO_DISCOUNT, errors) : NO_DISCOUNT;
+  if (errors.length) throw invalid(errors);
   try {
     return await deps.db.transaction(async tx => {
       const [created] = await tx
@@ -1025,42 +1196,79 @@ export async function createPromoter(deps: EventsDeps, actor: Actor, input: Prom
           phone: data.phone ?? null,
           isActive: data.isActive ?? true,
           createdAt: now,
+          ...discount.fields,
         })
         .returning();
+      await saveDiscountEvents(tx, created!.id, discount.eventIds);
       await writeAudit(tx, {
         actorId: actor.id,
         action: 'promoter.criar',
         entity: 'promoter',
         entityId: created!.id,
         before: null,
-        after: promoterSnapshot(created!),
+        after: promoterSnapshot(created!, discount.eventIds),
         at: now,
       });
-      return created!;
+      return promoterView(tx, created!, now);
     });
   } catch (error) {
     return promoterConflict(error);
   }
 }
 
-export async function updatePromoter(deps: EventsDeps, actor: Actor, id: string, input: Partial<PromoterInput>) {
-  const data = checkPromoter(input, false);
+/**
+ * Edita o promoter. Mudar o desconto vale para os pedidos NOVOS: cada pedido guarda o código e o desconto que recebeu (D-91). A trilha
+ * registra o antes e o depois, com o desconto inteiro (`promoter.desconto` quando só o desconto mudou).
+ */
+export async function updatePromoter(deps: EventsDeps, actor: Actor, id: string, input: Partial<PromoterInput>): Promise<PromoterView> {
+  const { out: data, errors } = checkPromoter(input, false);
   const now = deps.clock.now();
   try {
     return await deps.db.transaction(async tx => {
       const [before] = await tx.select().from(promoters).where(eq(promoters.id, id)).limit(1).for('update');
       if (!before) throw notFound('Promoter');
-      const [after] = await tx.update(promoters).set(data).where(eq(promoters.id, id)).returning();
+      const beforeEvents = await discountEventIdsOf(tx, id);
+      const discount = touchesDiscount(input)
+        ? await checkDiscount(
+            tx,
+            input,
+            {
+              fields: {
+                discountKind: before.discountKind,
+                discountValue: before.discountValue,
+                discountScope: before.discountScope,
+                discountStartsOn: before.discountStartsOn,
+                discountEndsOn: before.discountEndsOn,
+                discountMaxUses: before.discountMaxUses,
+              },
+              eventIds: beforeEvents,
+            },
+            errors,
+          )
+        : null;
+      if (errors.length) throw invalid(errors);
+      const [after] = await tx
+        .update(promoters)
+        .set({ ...data, ...(discount?.fields ?? {}) })
+        .where(eq(promoters.id, id))
+        .returning();
+      const afterEvents = discount ? discount.eventIds : beforeEvents;
+      if (discount) await saveDiscountEvents(tx, id, afterEvents);
+      const snapBefore = promoterSnapshot(before, beforeEvents);
+      const snapAfter = promoterSnapshot(after!, afterEvents);
+      const onlyDiscount =
+        JSON.stringify(snapBefore.discount) !== JSON.stringify(snapAfter.discount) &&
+        JSON.stringify({ ...snapBefore, discount: null }) === JSON.stringify({ ...snapAfter, discount: null });
       await writeAudit(tx, {
         actorId: actor.id,
-        action: before.isActive && data.isActive === false ? 'promoter.desativar' : 'promoter.editar',
+        action: before.isActive && data.isActive === false ? 'promoter.desativar' : onlyDiscount ? 'promoter.desconto' : 'promoter.editar',
         entity: 'promoter',
         entityId: id,
-        before: promoterSnapshot(before),
-        after: promoterSnapshot(after!),
+        before: snapBefore,
+        after: snapAfter,
         at: now,
       });
-      return after!;
+      return promoterView(tx, after!, now);
     });
   } catch (error) {
     return promoterConflict(error);

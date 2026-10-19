@@ -28,9 +28,16 @@ import { useSession } from './session';
 import { useFetch } from './useFetch';
 
 /** Leva o visitante ao login e de volta (como no checkout). */
-/** Valor do ingresso e taxa de serviço separados (D-90): "R$ 30,00 + R$ 1,58 de taxa de serviço"; sem taxa, só o valor. */
-const ticketValue = (t: TicketSummary) =>
-  t.serviceFeeCents ? `${brl(t.priceCents ?? 0)} + ${brl(t.serviceFeeCents)} de taxa de serviço` : brl(t.priceCents ?? 0);
+/**
+ * Valor do ingresso, desconto do promoter (D-91) e taxa de serviço (D-90), na mesma frase do PDF: "R$ 27,00 (R$ 30,00 com desconto de
+ * R$ 3,00) + R$ 2,19 de taxa de serviço". Sem desconto: "R$ 30,00 + R$ 2,44 de taxa de serviço"; sem taxa, só o valor.
+ */
+function ticketValue(t: TicketSummary): string {
+  const price = t.priceCents ?? 0;
+  const discount = t.discountCents ?? 0;
+  const value = discount > 0 ? `${brl(price - discount)} (${brl(price)} com desconto de ${brl(discount)})` : brl(price - discount);
+  return t.serviceFeeCents ? `${value} + ${brl(t.serviceFeeCents)} de taxa de serviço` : value;
+}
 
 export function useLoggedIn(returnTo: string): boolean {
   const { go } = useRouter();

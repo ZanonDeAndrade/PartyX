@@ -204,6 +204,8 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       expect(r.totals).toEqual({
         tickets: 9,
         cents: expected,
+        discountCents: 0,
+        netCents: expected,
         serviceFeeCents: 0,
         chargedCents: expected,
         gatewayFeeCents: 0,
@@ -236,6 +238,8 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       expect(vip.totals).toEqual({
         tickets: 1,
         cents: 20000,
+        discountCents: 0,
+        netCents: 20000,
         serviceFeeCents: 0,
         chargedCents: 20000,
         gatewayFeeCents: null,
@@ -281,8 +285,8 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const adm = await session();
       const r = await json(await adm.get('/admin/reports/sales'));
       expect(r.daily).toEqual([
-        { day: '2026-12-10', tickets: 3, cents: 36000, serviceFeeCents: 0 },
-        { day: '2026-12-11', tickets: 2, cents: 16000, serviceFeeCents: 0 },
+        { day: '2026-12-10', tickets: 3, cents: 36000, discountCents: 0, serviceFeeCents: 0 },
+        { day: '2026-12-11', tickets: 2, cents: 16000, discountCents: 0, serviceFeeCents: 0 },
       ]);
       expect(r.daily.reduce((t: number, d: any) => t + d.cents, 0)).toBe(r.totals.cents);
     });
@@ -420,7 +424,7 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const detail = await json(await adm.get(`/admin/reports/promoters/${p}?eventId=${b.id}`));
       expect(detail.promoter.code).toBe('JOAO10');
       expect(detail.orders).toHaveLength(2);
-      expect(detail.totals).toEqual({ tickets: 3, cents: 36000 });
+      expect(detail.totals).toEqual({ tickets: 3, cents: 36000, discountCents: 0, netCents: 36000 });
       expect((await adm.get(`/admin/reports/promoters/${crypto.randomUUID()}`)).status).toBe(404);
       expect((await adm.get('/admin/reports/promoters/nao-uuid')).status).toBe(404);
     });

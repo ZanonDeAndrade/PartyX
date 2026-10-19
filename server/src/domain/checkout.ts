@@ -1,6 +1,17 @@
 import { availableQuantity, salesState, type SalesInput, type SalesState } from './events';
 import { allocateLots, typeLotsView, type Lot, type LotChange } from './lots';
 import { NO_SERVICE_FEE, unitServiceFee, type ServiceFeeRule } from './serviceFee';
+import { unitDiscount, type DiscountRule } from './promoterDiscount';
+
+/**
+ * Desconto e taxa de UM ingresso (D-91 sobre D-90): o desconto sai do preço; a taxa é calculada sobre o valor que sobra. Ingresso que
+ * fica em R$ 0,00 não tem taxa, nem a mínima.
+ */
+export function unitAmounts(priceCents: number, fee: ServiceFeeRule, discount: DiscountRule | null) {
+  const discountCents = unitDiscount(priceCents, discount);
+  const net = priceCents - discountCents;
+  return { discountCents, serviceFeeCents: net > 0 ? unitServiceFee(net, fee) : 0 };
+}
 
 /** Regras puras do carrinho e da reserva. Sem I/O: o banco só entra em `orders/service.ts`. */
 
@@ -32,8 +43,10 @@ export interface PlannedLot {
   quantity: number;
   unitPriceCents: number;
   subtotalCents: number;
-  /** Taxa de serviço de cada ingresso deste lote (D-90), calculada sobre o preço dele. */
+  /** Taxa de serviço de cada ingresso deste lote (D-90), calculada sobre o preço dele já com desconto. */
   unitServiceFeeCents: number;
+  /** Desconto do promoter em cada ingresso deste lote (D-91). Zero sem desconto. */
+  unitDiscountCents: number;
 }
 
 export interface PlannedLine {
@@ -45,6 +58,8 @@ export interface PlannedLine {
   subtotalCents: number;
   /** Taxa de serviço das unidades da linha (soma das taxas por ingresso). */
   serviceFeeCents: number;
+  /** Desconto do promoter nas unidades da linha (soma dos descontos por ingresso, D-91). */
+  discountCents: number;
   /** De que lote sai cada parte. Vazio só para tipo sem lotes (versão anterior aos lotes). */
   lots: PlannedLot[];
 }
@@ -66,10 +81,12 @@ export type Plan =
   | {
       ok: true;
       lines: PlannedLine[];
-      /** Valor dos ingressos, sem a taxa de serviço. */
+      /** Valor dos ingressos pelo preço dos lotes, sem desconto e sem a taxa de serviço. */
       ticketsCents: number;
+      /** Desconto do promoter (D-91), somado de todos os ingressos. */
+      discountCents: number;
       serviceFeeCents: number;
-      /** O que o comprador paga: ingressos mais taxa de serviço. É o valor enviado ao gateway. */
+      /** O que o comprador paga: ingressos menos desconto mais taxa de serviço. É o valor enviado ao gateway. */
       totalCents: number;
       units: number;
       lotUpdates: LotUpdate[];
@@ -119,6 +136,7 @@ export function planOrder(
   now: Date,
   lots?: LotsForPlan,
   fee: ServiceFeeRule = NO_SERVICE_FEE,
+  discount: DiscountRule | null = null,
 ): Plan {
   const failures: ItemFailure[] = [];
   const lines: PlannedLine[] = [];
@@ -152,6 +170,7 @@ export function planOrder(
       const lotById = new Map(alloc.lots.map(l => [l.id, l]));
       const parts: PlannedLot[] = alloc.parts.map(p => {
         const l = lotById.get(p.lotId)!;
+        const unit = unitAmounts(p.unitPriceCents, fee, discount);
         return {
           lotId: p.lotId,
           name: l.name,
@@ -159,7 +178,8 @@ export function planOrder(
           quantity: p.quantity,
           unitPriceCents: p.unitPriceCents,
           subtotalCents: p.unitPriceCents * p.quantity,
-          unitServiceFeeCents: unitServiceFee(p.unitPriceCents, fee),
+          unitServiceFeeCents: unit.serviceFeeCents,
+          unitDiscountCents: unit.discountCents,
         };
       });
       const subtotal = parts.reduce((t, p) => t + p.subtotalCents, 0);
@@ -170,6 +190,7 @@ export function planOrder(
         unitPriceCents: Math.round(subtotal / item.quantity),
         subtotalCents: subtotal,
         serviceFeeCents: parts.reduce((t, p) => t + p.unitServiceFeeCents * p.quantity, 0),
+        discountCents: parts.reduce((t, p) => t + p.unitDiscountCents * p.quantity, 0),
         lots: parts,
       });
       lotUpdates.push({ ticketTypeId: type.id, lots: alloc.lots, changes: alloc.changes });
@@ -179,25 +200,29 @@ export function planOrder(
       failures.push({ ticketTypeId: type.id, reason: 'quantidade_indisponivel', available });
       continue;
     }
+    const unit = unitAmounts(type.priceCents, fee, discount);
     lines.push({
       ticketTypeId: type.id,
       name: type.name,
       quantity: item.quantity,
       unitPriceCents: type.priceCents,
       subtotalCents: type.priceCents * item.quantity,
-      serviceFeeCents: unitServiceFee(type.priceCents, fee) * item.quantity,
+      serviceFeeCents: unit.serviceFeeCents * item.quantity,
+      discountCents: unit.discountCents * item.quantity,
       lots: [],
     });
   }
   if (failures.length) return { ok: false, failures };
   const ticketsCents = lines.reduce((t, l) => t + l.subtotalCents, 0);
   const serviceFeeCents = lines.reduce((t, l) => t + l.serviceFeeCents, 0);
+  const discountCents = lines.reduce((t, l) => t + l.discountCents, 0);
   return {
     ok: true,
     lines,
     ticketsCents,
+    discountCents,
     serviceFeeCents,
-    totalCents: ticketsCents + serviceFeeCents,
+    totalCents: ticketsCents - discountCents + serviceFeeCents,
     units: lines.reduce((t, l) => t + l.quantity, 0),
     lotUpdates,
   };

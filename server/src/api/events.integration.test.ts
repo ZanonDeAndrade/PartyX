@@ -502,7 +502,7 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
   });
 
   describe('promoters (RF-18, CA-10)', () => {
-    it('cria com código em maiúsculas, sem desconto nem comissão', async () => {
+    it('cria com código em maiúsculas, sem desconto (o padrão, D-91) nem comissão', async () => {
       const a = await session();
       const res = await a.post('/admin/promoters', {
         name: 'João Promoter',
@@ -512,7 +512,24 @@ describe.skipIf(!ADMIN_URL)('eventos, tipos e promoters (integração)', () => {
       expect(res.status).toBe(201);
       const { promoter } = await json(res);
       expect(promoter).toMatchObject({ couponCode: 'JOAO10', isActive: true, phone: '55998124470' });
-      expect(Object.keys(promoter).sort()).toEqual(['couponCode', 'createdAt', 'id', 'isActive', 'name', 'phone']);
+      expect(Object.keys(promoter).sort()).toEqual([
+        'couponCode',
+        'createdAt',
+        'discountEndsOn',
+        'discountEventIds',
+        'discountKind',
+        'discountMaxUses',
+        'discountScope',
+        'discountStartsOn',
+        'discountUses',
+        'discountValue',
+        'id',
+        'isActive',
+        'name',
+        'phone',
+      ]);
+      // Sem desconto por padrão: o código só atribui a venda.
+      expect(promoter).toMatchObject({ discountKind: 'nenhum', discountValue: null, discountScope: 'todos', discountEventIds: [] });
     });
 
     it('dois promoters não podem ter o mesmo código, nem variando maiúsculas (CA-10)', async () => {

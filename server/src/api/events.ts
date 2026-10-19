@@ -109,6 +109,14 @@ const promoterBody = z.object({
   couponCode: text,
   phone: text.nullable().optional(),
   isActive: z.boolean().optional(),
+  // Desconto (D-91): conferido por inteiro no serviço (os campos dependem uns dos outros).
+  discountKind: z.enum(['nenhum', 'percentual', 'fixo']).optional(),
+  discountValue: z.number().int().nullable().optional(),
+  discountScope: z.enum(['todos', 'eventos']).optional(),
+  discountEventIds: z.array(z.string().max(64)).max(500).optional(),
+  discountStartsOn: z.string().max(10).nullable().optional(),
+  discountEndsOn: z.string().max(10).nullable().optional(),
+  discountMaxUses: z.number().int().nullable().optional(),
 });
 
 const bannerLimit = bodyLimit({

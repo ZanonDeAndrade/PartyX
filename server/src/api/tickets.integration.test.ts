@@ -374,6 +374,7 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
       expect(tickets).toHaveLength(2);
       for (const t of tickets) {
         expect(Object.keys(t).sort()).toEqual([
+          'discountCents',
           'event',
           'holderName',
           'id',
@@ -606,6 +607,7 @@ describe.skipIf(!ADMIN_URL)('ingresso, QR e PDF (integração)', () => {
             minorTermPending: false,
             priceCents: 3000,
             serviceFeeCents: 0,
+            discountCents: 0,
             qrPayload: 'PX1.1.' + 'a'.repeat(32) + '.' + 'b'.repeat(24) + '.' + 'c'.repeat(22),
           },
         ],

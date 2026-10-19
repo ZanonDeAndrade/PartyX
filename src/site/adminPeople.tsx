@@ -2,15 +2,18 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { PasswordDialog } from './accountPages';
 import { ConfirmDialog, described, errorText, EventStatusBadge, fieldErrors, FormField } from './adminEvents';
 import { CancelDialog, ExportLink, Gate, LiveEntriesPanel, Loading, Pager, TicketsPanel, useAdmin } from './adminPages';
-import { api, ApiError, type AdminEventRow, type Promoter, type TeamMember } from './api';
+import { api, ApiError, type AdminEventRow, type DiscountKind, type Promoter, type PromoterBody, type TeamMember } from './api';
+import { dayBr, discountLabel, discountSummary, percentBpsFromText, unitDiscount } from './promoterDiscount';
 import { toast, usePageTitle } from './components';
 import {
   brl,
   dateShort,
   isCouponValid,
+  centsFromMasked,
   isCpfValid,
   isEmailLike,
   maskCpfInput,
+  maskedFromCents,
   normalizeCoupon,
   timeOf,
 } from './format';
@@ -97,6 +100,10 @@ export function AdminPromotersPage() {
   const access = useAdmin('/admin/promoters');
   const [version, setVersion] = useState(0);
   const [state, retry] = useFetch(s => api.admin.promoters(s), access === 'ok' ? `promoters|${version}` : 'espera');
+  // Nomes dos eventos, para o resumo do desconto ("só em Festa X") e para a lista de eventos do formulário.
+  const [eventList] = useFetch(s => api.admin.events(s), access === 'ok' ? 'events' : 'espera');
+  const eventsAll = eventList.status === 'ok' ? eventList.data : [];
+  const eventName = (id: string) => eventsAll.find(e => e.id === id)?.name;
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<'' | 'ativo' | 'inativo'>('');
   const [editing, setEditing] = useState<Promoter | 'novo' | null>(null);
@@ -137,8 +144,9 @@ export function AdminPromotersPage() {
         </button>
       </div>
       <p className="px-small px-muted">
-        O código do promoter só rastreia as vendas feitas com ele. <b>Não dá desconto</b> ao comprador e o sistema não
-        calcula comissão, saldo nem pagamento.
+        O código do promoter rastreia as vendas feitas com ele. O desconto é <b>opcional</b> e configurado em cada
+        promoter: nenhum (padrão), porcentagem ou valor fixo por ingresso, em todos os eventos ou nos escolhidos, com
+        prazo e limite de usos se quiser. O sistema não calcula comissão, saldo nem pagamento.
       </p>
       <form className="px-filters" role="search" onSubmit={e => e.preventDefault()}>
         <div className="px-field">
@@ -173,6 +181,18 @@ export function AdminPromotersPage() {
                   <span className="px-small">
                     Código <b className="px-mono">{p.couponCode}</b> · {p.phone ?? 'sem telefone'}
                   </span>
+                  <span className="px-small px-muted">
+                    {discountSummary(p, eventName) ? (
+                      <>
+                        Desconto: {discountSummary(p, eventName)}. Usos: {p.discountUses?.paid ?? 0} pago
+                        {(p.discountUses?.paid ?? 0) === 1 ? '' : 's'}
+                        {p.discountUses?.pending ? `, ${p.discountUses.pending} aguardando pagamento` : ''}
+                        {p.discountMaxUses ? ` de ${p.discountMaxUses}` : ''}.
+                      </>
+                    ) : (
+                      'Sem desconto: só rastreia as vendas.'
+                    )}
+                  </span>
                 </div>
                 <div className="px-adm-card-status">
                   <span className={`px-badge px-badge-${p.isActive ? 'ok' : 'neu'}`}>
@@ -198,6 +218,7 @@ export function AdminPromotersPage() {
       {editing ? (
         <PromoterDialog
           promoter={editing === 'novo' ? null : editing}
+          events={eventsAll}
           onCancel={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -234,21 +255,69 @@ export function AdminPromotersPage() {
   );
 }
 
+interface PromoterForm {
+  name: string;
+  code: string;
+  phone: string;
+  isActive: boolean;
+  discountKind: DiscountKind;
+  /** Texto digitado: "12,5" (porcentagem) ou "3,00" (valor fixo, com a máscara de dinheiro). */
+  discountText: string;
+  discountScope: 'todos' | 'eventos';
+  discountEventIds: string[];
+  discountStartsOn: string;
+  discountEndsOn: string;
+  discountMaxUses: string;
+}
+
+/** Ingresso de exemplo da prévia do desconto (o mesmo da página da taxa de serviço). */
+const EXAMPLE_CENTS = 3000;
+
+function initialForm(p: Promoter | null): PromoterForm {
+  const kind = p?.discountKind ?? 'nenhum';
+  const value = p?.discountValue ?? null;
+  return {
+    name: p?.name ?? '',
+    code: p?.couponCode ?? '',
+    phone: p?.phone ?? '',
+    isActive: p?.isActive ?? true,
+    discountKind: kind,
+    discountText:
+      value === null || kind === 'nenhum'
+        ? ''
+        : kind === 'percentual'
+          ? discountLabel({ kind, value }).replace('%', '')
+          : maskedFromCents(value),
+    discountScope: p?.discountScope ?? 'todos',
+    discountEventIds: p?.discountEventIds ?? [],
+    discountStartsOn: p?.discountStartsOn ?? '',
+    discountEndsOn: p?.discountEndsOn ?? '',
+    discountMaxUses: p?.discountMaxUses ? String(p.discountMaxUses) : '',
+  };
+}
+
+/** Valor do desconto como o servidor recebe (centésimos de ponto percentual ou centavos); texto inválido: nulo. */
+function discountValueOf(form: PromoterForm): number | null {
+  if (form.discountKind === 'percentual') return percentBpsFromText(form.discountText);
+  if (form.discountKind === 'fixo') {
+    const cents = form.discountText ? centsFromMasked(form.discountText) : 0;
+    return cents >= 1 && cents <= 10_000_000 ? cents : null;
+  }
+  return null;
+}
+
 function PromoterDialog({
   promoter,
+  events,
   onCancel,
   onSaved,
 }: {
   promoter: Promoter | null;
+  events: AdminEventRow[];
   onCancel: () => void;
   onSaved: () => void;
 }) {
-  const initial = {
-    name: promoter?.name ?? '',
-    code: promoter?.couponCode ?? '',
-    phone: promoter?.phone ?? '',
-    isActive: promoter?.isActive ?? true,
-  };
+  const initial = useMemo(() => initialForm(promoter), [promoter]);
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
@@ -257,14 +326,23 @@ function PromoterDialog({
   useLeaveGuard(dirty);
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => ref.current?.querySelector<HTMLElement>('#pr-name')?.focus(), []);
-  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
+  const FIELD_OF: Partial<Record<keyof PromoterForm, string>> = {
+    code: 'couponCode',
+    discountText: 'discountValue',
+  };
+  const set = <K extends keyof PromoterForm>(k: K, v: PromoterForm[K]) => {
     setForm(f => ({ ...f, [k]: v }));
-    setErrors(e => ({ ...e, [k === 'code' ? 'couponCode' : k]: '' }));
+    setErrors(e => ({ ...e, [FIELD_OF[k] ?? k]: '' }));
   };
   const cancel = () => {
     if (dirty && !window.confirm('Descartar as alterações deste promoter?')) return;
     onCancel();
   };
+  // Eventos que podem receber o desconto: os não arquivados, mais os já escolhidos (para nunca sumir da lista sem aviso).
+  const choosable = events.filter(e => !e.archivedAt || form.discountEventIds.includes(e.id));
+  const value = discountValueOf(form);
+  const example =
+    form.discountKind !== 'nenhum' && value !== null ? unitDiscount(EXAMPLE_CENTS, { kind: form.discountKind, value }) : null;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const code = normalizeCoupon(form.code);
@@ -272,20 +350,47 @@ function PromoterDialog({
     if (!form.name.trim()) errs.name = 'Informe o nome do promoter.';
     if (!isCouponValid(code)) errs.couponCode = 'Use de 3 a 20 letras ou números, sem acento, espaço ou símbolo.';
     if (form.phone.trim() && form.phone.replace(/\D/g, '').length < 10) errs.phone = 'Informe o telefone com DDD.';
+    if (form.discountKind !== 'nenhum') {
+      if (value === null)
+        errs.discountValue =
+          form.discountKind === 'percentual'
+            ? 'Informe uma porcentagem de 1 a 100, com até 2 casas depois da vírgula (ex.: 10 ou 12,5).'
+            : 'Informe um valor de R$ 0,01 a R$ 100.000,00.';
+      if (form.discountScope === 'eventos' && form.discountEventIds.length === 0)
+        errs.discountEventIds = 'Escolha ao menos um evento.';
+      if (form.discountStartsOn && form.discountEndsOn && form.discountEndsOn < form.discountStartsOn)
+        errs.discountEndsOn = 'A data de fim precisa ser igual ou depois da de início.';
+      if (form.discountMaxUses && !/^[1-9]\d{0,6}$/.test(form.discountMaxUses))
+        errs.discountMaxUses = 'Informe um limite de 1 ou mais, ou deixe vazio para não ter limite.';
+    }
     if (Object.keys(errs).length) {
       setErrors(errs);
-      ref.current
-        ?.querySelector<HTMLElement>(`#pr-${Object.keys(errs)[0] === 'couponCode' ? 'code' : Object.keys(errs)[0]}`)
-        ?.focus();
+      const first = Object.keys(errs)[0]!;
+      const ids: Record<string, string> = {
+        couponCode: 'pr-code',
+        discountValue: 'pr-dvalue',
+        discountEventIds: 'pr-devents',
+        discountEndsOn: 'pr-dend',
+        discountMaxUses: 'pr-dmax',
+      };
+      ref.current?.querySelector<HTMLElement>(`#${ids[first] ?? `pr-${first}`}`)?.focus();
       return;
     }
     setBusy(true);
     setFormError('');
-    const body = {
+    const none = form.discountKind === 'nenhum';
+    const body: PromoterBody = {
       name: form.name.trim(),
       couponCode: code,
       phone: form.phone.trim() || null,
       isActive: form.isActive,
+      discountKind: form.discountKind,
+      discountValue: none ? null : value,
+      discountScope: none ? 'todos' : form.discountScope,
+      discountEventIds: none || form.discountScope === 'todos' ? [] : form.discountEventIds,
+      discountStartsOn: none ? null : form.discountStartsOn || null,
+      discountEndsOn: none ? null : form.discountEndsOn || null,
+      discountMaxUses: none || !form.discountMaxUses ? null : Number(form.discountMaxUses),
     };
     try {
       if (promoter) await api.admin.updatePromoter(promoter.id, body);
@@ -299,6 +404,21 @@ function PromoterDialog({
       setBusy(false);
     }
   };
+  const kindOption = (kind: DiscountKind, label: string) => (
+    <div className="px-check">
+      <input
+        id={`pr-kind-${kind}`}
+        type="radio"
+        name="pr-kind"
+        checked={form.discountKind === kind}
+        onChange={() => {
+          set('discountKind', kind);
+          set('discountText', '');
+        }}
+      />
+      <label htmlFor={`pr-kind-${kind}`}>{label}</label>
+    </div>
+  );
   return (
     <div className="px-modal-bg" onClick={() => !busy && cancel()}>
       <form
@@ -315,7 +435,8 @@ function PromoterDialog({
           {promoter ? `Editar ${promoter.name}` : 'Novo promoter'}
         </h2>
         <p className="px-notice px-notice-info">
-          O código rastreia as vendas do promoter. <b>Não dá desconto</b> e não gera comissão no sistema.
+          O código rastreia as vendas do promoter. O desconto é opcional e configurável abaixo; sem desconto, o código
+          só rastreia. O sistema não gera comissão.
         </p>
         {formError ? (
           <p className="px-notice px-notice-err" role="alert">
@@ -358,6 +479,158 @@ function PromoterDialog({
             {...described('pr-phone', errors.phone)}
           />
         </FormField>
+        <fieldset className="px-fieldset">
+          <legend>Desconto para quem usar o código</legend>
+          {kindOption('nenhum', 'Nenhum (padrão): o código só rastreia as vendas')}
+          {kindOption('percentual', 'Porcentagem sobre o valor de cada ingresso')}
+          {kindOption('fixo', 'Valor fixo em reais em cada ingresso')}
+          {form.discountKind !== 'nenhum' ? (
+            <>
+              <FormField
+                id="pr-dvalue"
+                label={form.discountKind === 'percentual' ? 'Porcentagem' : 'Valor por ingresso'}
+                error={errors.discountValue}
+                hint={
+                  form.discountKind === 'percentual'
+                    ? 'De 1 a 100, com até 2 casas depois da vírgula. Arredondado para baixo ao centavo.'
+                    : 'Se for maior que o preço de algum ingresso, aquele ingresso fica em R$ 0,00.'
+                }
+              >
+                <div className={`px-money${form.discountKind === 'percentual' ? ' px-money-suffix' : ''}`}>
+                  {form.discountKind === 'fixo' ? <span aria-hidden="true">R$</span> : null}
+                  <input
+                    id="pr-dvalue"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder={form.discountKind === 'percentual' ? '10' : '0,00'}
+                    value={form.discountText}
+                    onChange={e =>
+                      set(
+                        'discountText',
+                        form.discountKind === 'percentual'
+                          ? e.target.value.replace(/[^\d,.]/g, '')
+                          : e.target.value
+                            ? maskedFromCents(centsFromMasked(e.target.value))
+                            : '',
+                      )
+                    }
+                    {...described('pr-dvalue', errors.discountValue, true)}
+                  />
+                  {form.discountKind === 'percentual' ? <span aria-hidden="true">%</span> : null}
+                </div>
+              </FormField>
+              <p className="px-small px-muted" aria-live="polite">
+                {example === null
+                  ? 'Informe o desconto para ver o exemplo.'
+                  : `Exemplo: ingresso de ${brl(EXAMPLE_CENTS)} com desconto de ${brl(example)} fica em ${brl(
+                      EXAMPLE_CENTS - example,
+                    )}, mais a taxa de serviço sobre esse valor. O desconto nunca zera o pedido inteiro.`}
+              </p>
+              <fieldset className="px-fieldset" id="pr-devents" tabIndex={-1}>
+                <legend>Onde vale</legend>
+                <div className="px-check">
+                  <input
+                    id="pr-scope-todos"
+                    type="radio"
+                    name="pr-scope"
+                    checked={form.discountScope === 'todos'}
+                    onChange={() => set('discountScope', 'todos')}
+                  />
+                  <label htmlFor="pr-scope-todos">Todos os eventos (padrão)</label>
+                </div>
+                <div className="px-check">
+                  <input
+                    id="pr-scope-eventos"
+                    type="radio"
+                    name="pr-scope"
+                    checked={form.discountScope === 'eventos'}
+                    onChange={() => set('discountScope', 'eventos')}
+                  />
+                  <label htmlFor="pr-scope-eventos">Só nos eventos escolhidos</label>
+                </div>
+                {form.discountScope === 'eventos' ? (
+                  choosable.length === 0 ? (
+                    <p className="px-small px-muted">Nenhum evento cadastrado.</p>
+                  ) : (
+                    <ul className="px-check-list" aria-label="Eventos do desconto">
+                      {choosable.map(ev => (
+                        <li key={ev.id} className="px-check">
+                          <input
+                            id={`pr-ev-${ev.id}`}
+                            type="checkbox"
+                            checked={form.discountEventIds.includes(ev.id)}
+                            onChange={e =>
+                              set(
+                                'discountEventIds',
+                                e.target.checked
+                                  ? [...form.discountEventIds, ev.id]
+                                  : form.discountEventIds.filter(x => x !== ev.id),
+                              )
+                            }
+                          />
+                          <label htmlFor={`pr-ev-${ev.id}`}>
+                            {ev.name} · {dateShort(ev.startsAt)}
+                            {ev.status !== 'publicado' ? ` (${ev.status})` : ''}
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                ) : null}
+                {errors.discountEventIds ? (
+                  <small className="px-error" role="alert">
+                    {errors.discountEventIds}
+                  </small>
+                ) : null}
+              </fieldset>
+              <div className="px-form-grid">
+                <FormField id="pr-dstart" label="Primeiro dia (opcional)" error={errors.discountStartsOn}>
+                  <input
+                    id="pr-dstart"
+                    type="date"
+                    value={form.discountStartsOn}
+                    onChange={e => set('discountStartsOn', e.target.value)}
+                    {...described('pr-dstart', errors.discountStartsOn)}
+                  />
+                </FormField>
+                <FormField id="pr-dend" label="Último dia (opcional)" error={errors.discountEndsOn}>
+                  <input
+                    id="pr-dend"
+                    type="date"
+                    value={form.discountEndsOn}
+                    onChange={e => set('discountEndsOn', e.target.value)}
+                    {...described('pr-dend', errors.discountEndsOn)}
+                  />
+                </FormField>
+              </div>
+              <FormField
+                id="pr-dmax"
+                label="Limite de usos (opcional)"
+                error={errors.discountMaxUses}
+                hint="Pedidos pagos com o desconto. O pedido aguardando pagamento segura um uso até a reserva vencer. Vazio: sem limite."
+              >
+                <input
+                  id="pr-dmax"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={form.discountMaxUses}
+                  maxLength={7}
+                  onChange={e => set('discountMaxUses', e.target.value.replace(/\D/g, ''))}
+                  {...described('pr-dmax', errors.discountMaxUses, true)}
+                />
+              </FormField>
+              <p className="px-small px-muted">
+                Os dias são os do horário de Brasília, os dois incluídos
+                {form.discountStartsOn || form.discountEndsOn
+                  ? `: de ${form.discountStartsOn ? dayBr(form.discountStartsOn) : 'agora'} até ${
+                      form.discountEndsOn ? dayBr(form.discountEndsOn) : 'sem data de fim'
+                    }`
+                  : ''}
+                . Mudar o desconto vale para os pedidos novos; os já feitos guardam o desconto que receberam.
+              </p>
+            </>
+          ) : null}
+        </fieldset>
         <div className="px-check">
           <input
             id="pr-active"
@@ -409,8 +682,8 @@ export function AdminPromoterPage({ id }: { id: string }) {
         </p>
       ) : null}
       <p className="px-small px-muted">
-        Vendas atribuídas: pedidos <b>pagos</b> com este código, pela data da aprovação. Sem desconto, comissão, saldo
-        ou acesso do promoter.
+        Vendas atribuídas: pedidos <b>pagos</b> com este código, pela data da aprovação. Valor líquido é o valor dos
+        ingressos menos o desconto do código. Sem comissão, saldo ou acesso do promoter.
       </p>
       <form className="px-filters" onSubmit={e => e.preventDefault()}>
         {events.status === 'ok' ? (
@@ -432,6 +705,13 @@ export function AdminPromoterPage({ id }: { id: string }) {
           <p className="px-count" role="status">
             <b>{state.data.totals.tickets}</b> ingressos · <b>{brl(state.data.totals.cents)}</b> em{' '}
             {state.data.orders.length} pedido{state.data.orders.length === 1 ? '' : 's'}
+            {state.data.totals.discountCents ? (
+              <>
+                {' '}
+                · desconto concedido <b>{brl(state.data.totals.discountCents)}</b> · líquido{' '}
+                <b>{brl(state.data.totals.netCents ?? state.data.totals.cents)}</b>
+              </>
+            ) : null}
           </p>
           {state.data.orders.length === 0 ? (
             <p className="px-muted">Nenhuma venda atribuída com esses filtros.</p>
@@ -448,7 +728,10 @@ export function AdminPromoterPage({ id }: { id: string }) {
                     </span>
                   </div>
                   <div className="px-adm-card-status">
-                    {o.tickets} ingresso{o.tickets === 1 ? '' : 's'} · <b>{brl(o.cents)}</b>
+                    {o.tickets} ingresso{o.tickets === 1 ? '' : 's'} · <b>{brl(o.netCents ?? o.cents)}</b>
+                    {o.discountCents ? (
+                      <span className="px-small px-muted"> ({brl(o.cents)} com desconto de {brl(o.discountCents)})</span>
+                    ) : null}
                   </div>
                 </li>
               ))}
@@ -923,7 +1206,8 @@ export function AdminTicketPage({ id }: { id: string }) {
         <>
           <h1 className="px-h1 px-mono">{t.shortCode}</h1>
           <p>
-            <Badge map={TICKET_LABEL} value={t.status} /> {t.typeName} · {brl(t.priceCents)}
+            <Badge map={TICKET_LABEL} value={t.status} /> {t.typeName} · {brl(t.priceCents - (t.discountCents ?? 0))}
+            {t.discountCents ? ` (${brl(t.priceCents)} com desconto de ${brl(t.discountCents)})` : ''}
             {t.serviceFeeCents ? ` + ${brl(t.serviceFeeCents)} de taxa de serviço` : ''} · {t.event.name}
           </p>
           {t.status === 'cancelado' && t.cancellation ? (

@@ -8,6 +8,7 @@ import {
   type DeclineReason,
   type LegalDocument,
   minorAuthorizationUrl,
+  type DiscountRule,
   type OrderLineLot,
   type OrderView,
   type PaymentOptions,
@@ -22,6 +23,8 @@ import { mmss, useCountdown } from './countdown';
 import { brl, dateParts, dateShort, maskEmail, phoneBr, timeOf } from './format';
 import { IconCheck, IconCopy } from './icons';
 import { cascade } from './motion';
+import { discountLabel } from './promoterDiscount';
+import { formatRate } from './serviceFee';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
 
@@ -38,10 +41,13 @@ function useRequireLogin(returnTo: string) {
 interface AsideData {
   event: { name: string; startsAt: string; venue: string };
   items: LineWithLots[];
-  /** Taxa de serviço do pedido (D-90). Zero ou ausente: sem linha de taxa. */
+  /** Desconto do código do promoter (D-91). Zero ou ausente: sem linha de desconto. */
+  discountCents?: number;
+  /** Taxa de serviço do pedido (D-90) e a porcentagem dela (Termos 1.5). Zero ou ausente: sem linha de taxa. */
   serviceFeeCents?: number;
+  serviceFeeRateBps?: number;
   totalCents: number;
-  coupon: { code: string } | null;
+  coupon: { code: string; discount?: DiscountRule | null } | null;
 }
 
 interface LineWithLots {
@@ -51,6 +57,7 @@ interface LineWithLots {
   unitPriceCents?: number;
   subtotalCents: number;
   serviceFeeCents?: number;
+  discountCents?: number;
   lots?: OrderLineLot[];
 }
 
@@ -70,6 +77,7 @@ function linesByLot(items: LineWithLots[]) {
           unitPriceCents: i.unitPriceCents ?? Math.round(i.subtotalCents / i.quantity),
           subtotalCents: i.subtotalCents,
           unitServiceFeeCents: lots[0]?.unitServiceFeeCents ?? Math.round((i.serviceFeeCents ?? 0) / i.quantity),
+          unitDiscountCents: lots[0]?.unitDiscountCents ?? Math.round((i.discountCents ?? 0) / i.quantity),
         },
       ];
     return lots.map(l => ({
@@ -79,6 +87,7 @@ function linesByLot(items: LineWithLots[]) {
       unitPriceCents: l.unitPriceCents,
       subtotalCents: l.subtotalCents,
       unitServiceFeeCents: l.unitServiceFeeCents ?? 0,
+      unitDiscountCents: l.unitDiscountCents ?? 0,
     }));
   });
 }
@@ -140,17 +149,27 @@ function CheckoutShell({
                     <span className="px-nowrap">{brl(i.subtotalCents)}</span>
                   </li>
                 ))}
+                {aside.discountCents && aside.coupon ? (
+                  <li className="px-ck-discount">
+                    <span>
+                      Desconto (<span className="px-mono">{aside.coupon.code}</span>)
+                    </span>
+                    <span className="px-nowrap">{'\u2212'}{brl(aside.discountCents)}</span>
+                  </li>
+                ) : null}
                 {aside.serviceFeeCents ? (
                   <li>
-                    <span>Taxa de serviço</span>
+                    <span>
+                      Taxa de serviço{aside.serviceFeeRateBps ? ` (${formatRate(aside.serviceFeeRateBps)})` : ''}
+                    </span>
                     <span className="px-nowrap">{brl(aside.serviceFeeCents)}</span>
                   </li>
                 ) : null}
-                {aside.coupon ? (
+                {aside.coupon && !aside.discountCents ? (
                   <li className="px-ck-promo">
                     <span className="px-nowrap">Promoter</span>
                     <span>
-                      <span className="px-mono">{aside.coupon.code}</span>, valor inalterado
+                      <span className="px-mono">{aside.coupon.code}</span>, sem desconto
                     </span>
                   </li>
                 ) : null}
@@ -294,10 +313,10 @@ export function CheckoutPage({ slug }: { slug: string }) {
         setSummary(await api.quote(slug, items, code));
         setApplied(code);
       } catch (e) {
-        // Cupom errado não derruba o resumo: o pedido segue válido sem ele.
-        if (!(e instanceof ApiError && e.code === 'cupom_invalido')) setSummary(null);
-        if (e instanceof ApiError && e.code === 'cupom_invalido')
-          setError({ message: '', coupon: e.fields.couponCode ?? e.message });
+        // Cupom recusado (inválido, desativado, ou que zeraria o pedido, D-91) não derruba o resumo: o pedido segue válido sem ele.
+        const couponRefused = e instanceof ApiError && (e.code === 'cupom_invalido' || e.code === 'cupom_recusado');
+        if (!couponRefused) setSummary(null);
+        if (couponRefused) setError({ message: '', coupon: e.fields.couponCode ?? e.message });
         else setError({ message: stockMessage(e) });
       } finally {
         setLoading(false);
@@ -365,6 +384,15 @@ export function CheckoutPage({ slug }: { slug: string }) {
       saveCart(null);
       go(`/pedido/${order.id}`);
     } catch (e) {
+      // O código deixou de valer entre o resumo e o pedido (desativado, ou zeraria o pedido): o resumo volta sem ele e o campo explica.
+      if (e instanceof ApiError && (e.code === 'cupom_invalido' || e.code === 'cupom_recusado')) {
+        const message = e.fields.couponCode ?? e.message;
+        await load('');
+        setCoupon(applied);
+        setError({ message: '', coupon: message });
+        setBusy(false);
+        return;
+      }
       const recheck = ['preco_alterado', 'data_nascimento_obrigatoria', 'aceite_pendente', 'versao_desatualizada'];
       if (e instanceof ApiError && e.code && recheck.includes(e.code)) {
         if (e.code === 'versao_desatualizada') {
@@ -431,6 +459,7 @@ export function CheckoutPage({ slug }: { slug: string }) {
                   </span>
                   <small>
                     {brl(i.unitPriceCents)} cada
+                    {i.unitDiscountCents ? `, com desconto de ${brl(i.unitDiscountCents)}` : ''}
                     {i.unitServiceFeeCents ? ` + ${brl(i.unitServiceFeeCents)} de taxa de serviço` : ''}
                   </small>
                 </span>
@@ -484,13 +513,24 @@ export function CheckoutPage({ slug }: { slug: string }) {
           Código do promoter <small>(opcional)</small>
         </h2>
         <p className="px-ck-text">
-          Se alguém indicou o evento, informe o código dessa pessoa. O código registra a indicação e não altera o valor
-          do pedido.
+          Se alguém indicou o evento, informe o código dessa pessoa. O código registra a indicação e, quando tem
+          desconto, ele aparece no total antes do pagamento. Um código por pedido.
         </p>
         {applied && !error?.coupon ? (
-          <div className="px-promo-ok">
+          <div className="px-promo-ok" role="status">
             <span>
-              <b className="px-mono">{summary?.coupon?.code ?? applied}</b> aplicado. Total inalterado.
+              {summary?.coupon?.discount ? (
+                <>
+                  <b className="px-mono">{summary.coupon.code}</b> aplicado: desconto de{' '}
+                  {discountLabel(summary.coupon.discount)} em cada ingresso
+                  {summary.discountCents ? `, ${brl(summary.discountCents)} neste pedido` : ''}.
+                </>
+              ) : (
+                <>
+                  <b className="px-mono">{summary?.coupon?.code ?? applied}</b> aplicado.{' '}
+                  {summary?.coupon?.message ?? 'Total inalterado.'}
+                </>
+              )}
             </span>
             <button
               type="button"

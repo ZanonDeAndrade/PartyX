@@ -116,6 +116,26 @@ describe('e-mails (RF-36, RF-67)', () => {
     expect(semTaxa.text).not.toContain('Taxa de serviço');
     expect(semTaxa.html).not.toContain('Taxa de serviço');
     expect(semTaxa.text).toContain('Total pago');
+    expect(semTaxa.text).not.toContain('Desconto');
+  });
+
+  it('compra com desconto do promoter (D-91): linha "Desconto (código)" entre o valor dos ingressos e a taxa', () => {
+    const m = composeCompra(
+      {
+        ...purchase,
+        ticketsAmount: 'R$ 60,00',
+        discount: { label: 'Desconto (DUDA)', value: '\u2212R$ 6,00' },
+        serviceFee: 'R$ 4,38',
+        totalPaid: 'R$ 58,38',
+      },
+      ctx,
+    );
+    for (const out of [m.text, m.html]) {
+      expect(out).toContain('Desconto (DUDA)');
+      expect(out).toContain('\u2212R$ 6,00');
+      expect(out.indexOf('Valor dos ingressos')).toBeLessThan(out.indexOf('Desconto (DUDA)'));
+      expect(out.indexOf('Desconto (DUDA)')).toBeLessThan(out.indexOf('Taxa de serviço'));
+    }
   });
 
   it('texto longo sem espaço (evento, local, tipo, comprador) quebra no HTML: blocos com quebra e tabelas de largura fixa', () => {

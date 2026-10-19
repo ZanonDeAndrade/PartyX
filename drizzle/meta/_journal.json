@@ -127,6 +127,13 @@
       "when": 1792378024833,
       "tag": "0017_taxa_de_servico",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792416111729,
+      "tag": "0018_desconto_por_promoter",
+      "breakpoints": true
     }
   ]
 }

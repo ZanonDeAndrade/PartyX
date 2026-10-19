@@ -87,6 +87,8 @@ export interface PublicEventDetail extends PublicEventCard {
    */
   countdown: { liveUntil: string } | null;
   /** Hora do servidor ao montar a resposta. A página conta por ela (diferença para o relógio do aparelho), não só pelo aparelho. */
+  /** Porcentagem da taxa de serviço em vigor, em centésimos de ponto percentual (D-90; Termos 1.5). Zero: a página não fala de taxa. */
+  serviceFeeRateBps: number;
   serverNow: string;
 }
 
@@ -283,6 +285,7 @@ async function detail(deps: VitrineDeps, row: EventRow, preview: boolean): Promi
           }
         : null,
     serverNow: now.toISOString(),
+    serviceFeeRateBps: fee.rateBps,
     ticketTypes: types.map(t => {
       // Em evento encerrado nada está à venda, qualquer que seja o período do tipo.
       const state = ended && t.state === 'a_venda' ? 'encerrada' : t.state;

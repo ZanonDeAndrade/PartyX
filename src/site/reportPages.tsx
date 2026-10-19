@@ -88,6 +88,12 @@ export function SalesReportPage() {
               </p>
               <ul className="px-minilist">
                 <li>
+                  Desconto dos códigos de promoter: <b>{brl(r.totals.discountCents ?? 0)}</b>
+                </li>
+                <li>
+                  Valor líquido dos ingressos: <b>{brl(r.totals.netCents ?? r.totals.cents)}</b>
+                </li>
+                <li>
                   Taxa de serviço: <b>{brl(r.totals.serviceFeeCents ?? 0)}</b>
                 </li>
                 <li>
@@ -96,7 +102,7 @@ export function SalesReportPage() {
               </ul>
               <p className={r.reconciliation.ok === false ? 'px-error' : 'px-ok'}>
                 {r.reconciliation.ok === false
-                  ? `Atenção: os itens somam ${brl(r.reconciliation.itemsCents)}, a taxa de serviço ${brl(r.reconciliation.serviceFeeCents ?? 0)} e os pedidos pagos ${brl(r.reconciliation.ordersCents)}.`
+                  ? `Atenção: os itens somam ${brl(r.reconciliation.itemsCents)}, o desconto ${brl(r.reconciliation.discountCents ?? 0)}, a taxa de serviço ${brl(r.reconciliation.serviceFeeCents ?? 0)} e os pedidos pagos ${brl(r.reconciliation.ordersCents)}.`
                   : `Confere com a soma de ${r.reconciliation.orders} pedido(s) pago(s): ${brl(r.reconciliation.ordersCents)}.`}
               </p>
             </section>
@@ -170,6 +176,8 @@ export function SalesReportPage() {
                   <th>Tipo</th>
                   <th>Ingressos</th>
                   <th>Valor dos ingressos</th>
+                  <th>Desconto</th>
+                  <th>Valor líquido</th>
                   <th>Taxa de serviço</th>
                   <th>Total cobrado</th>
                 </tr>
@@ -185,8 +193,10 @@ export function SalesReportPage() {
                         <td>{l.typeName}</td>
                         <td>{l.tickets}</td>
                         <td className="px-nowrap">{brl(l.cents)}</td>
+                        <td className="px-nowrap">{brl(l.discountCents ?? 0)}</td>
+                        <td className="px-nowrap">{brl(l.netCents ?? l.cents)}</td>
                         <td className="px-nowrap">{brl(l.serviceFeeCents ?? 0)}</td>
-                        <td className="px-nowrap">{brl(l.cents + (l.serviceFeeCents ?? 0))}</td>
+                        <td className="px-nowrap">{brl((l.netCents ?? l.cents) + (l.serviceFeeCents ?? 0))}</td>
                       </tr>
                       {lots.map(x => (
                         <tr key={x.lotId} className="px-lot-row">
@@ -197,8 +207,10 @@ export function SalesReportPage() {
                           </td>
                           <td>{x.tickets}</td>
                           <td className="px-nowrap">{brl(x.cents)}</td>
+                          <td className="px-nowrap">{brl(x.discountCents ?? 0)}</td>
+                          <td className="px-nowrap">{brl(x.netCents ?? x.cents)}</td>
                           <td className="px-nowrap">{brl(x.serviceFeeCents ?? 0)}</td>
-                          <td className="px-nowrap">{brl(x.cents + (x.serviceFeeCents ?? 0))}</td>
+                          <td className="px-nowrap">{brl((x.netCents ?? x.cents) + (x.serviceFeeCents ?? 0))}</td>
                         </tr>
                       ))}
                     </Fragment>
@@ -212,6 +224,8 @@ export function SalesReportPage() {
                         </th>
                         <td>{e.tickets}</td>
                         <td className="px-nowrap">{brl(e.cents)}</td>
+                        <td className="px-nowrap">{brl(e.discountCents ?? 0)}</td>
+                        <td className="px-nowrap">{brl(e.netCents ?? e.cents)}</td>
                         <td className="px-nowrap">{brl(e.serviceFeeCents ?? 0)}</td>
                         <td className="px-nowrap">{brl(e.chargedCents ?? e.cents)}</td>
                       </tr>
@@ -226,6 +240,12 @@ export function SalesReportPage() {
                   </td>
                   <td className="px-nowrap">
                     <b>{brl(r.totals.cents)}</b>
+                  </td>
+                  <td className="px-nowrap">
+                    <b>{brl(r.totals.discountCents ?? 0)}</b>
+                  </td>
+                  <td className="px-nowrap">
+                    <b>{brl(r.totals.netCents ?? r.totals.cents)}</b>
                   </td>
                   <td className="px-nowrap">
                     <b>{brl(r.totals.serviceFeeCents ?? 0)}</b>
@@ -287,7 +307,9 @@ export function PromoterReportPage() {
     access === 'ok' ? `rank|${query}` : 'espera',
   );
   const r = state.status === 'ok' ? state.data : null;
-  const top = r ? Math.max(1, ...r.ranking.map(p => (metric === 'qtd' ? p.tickets : p.cents))) : 1;
+  // Por valor, o ranking usa o valor líquido (valor atribuído menos o desconto do código, D-91).
+  const valueOf = (p: { cents: number; netCents?: number }) => p.netCents ?? p.cents;
+  const top = r ? Math.max(1, ...r.ranking.map(p => (metric === 'qtd' ? p.tickets : valueOf(p)))) : 1;
   return (
     <Gate access={access} active="relatorios">
       <ReportNav active="promoters" />
@@ -319,7 +341,7 @@ export function PromoterReportPage() {
           <label htmlFor="p-m">Ordenar por</label>
           <select id="p-m" value={metric} onChange={e => setMetric(e.target.value as 'qtd' | 'valor')}>
             <option value="qtd">Quantidade de ingressos</option>
-            <option value="valor">Valor atribuído</option>
+            <option value="valor">Valor líquido</option>
           </select>
         </div>
       </form>
@@ -337,6 +359,8 @@ export function PromoterReportPage() {
                   <th aria-label="Participação" />
                   <th>Ingressos</th>
                   <th>Valor atribuído</th>
+                  <th>Desconto concedido</th>
+                  <th>Valor líquido</th>
                   <th>Pedidos</th>
                 </tr>
               </thead>
@@ -358,12 +382,14 @@ export function PromoterReportPage() {
                       <span className="px-bars-track">
                         <span
                           className="px-bars-fill"
-                          style={{ width: `${((metric === 'qtd' ? p.tickets : p.cents) / top) * 100}%` }}
+                          style={{ width: `${((metric === 'qtd' ? p.tickets : valueOf(p)) / top) * 100}%` }}
                         />
                       </span>
                     </td>
                     <td>{metric === 'qtd' ? <b>{p.tickets}</b> : p.tickets}</td>
-                    <td className="px-nowrap">{metric === 'valor' ? <b>{brl(p.cents)}</b> : brl(p.cents)}</td>
+                    <td className="px-nowrap">{brl(p.cents)}</td>
+                    <td className="px-nowrap">{brl(p.discountCents ?? 0)}</td>
+                    <td className="px-nowrap">{metric === 'valor' ? <b>{brl(valueOf(p))}</b> : brl(valueOf(p))}</td>
                     <td>{p.orders}</td>
                   </tr>
                 ))}

@@ -136,6 +136,12 @@ D-03), o aviso pede para desativar o bloqueio e recarregar. Registro: `docs/regi
   O adaptador (`paymentFees`) soma as tarifas pagas pela PartyX do único pagamento aprovado; com mais de um (cobrança em dobro), não grava.
   A rotina diária grava em `orders.gateway_fee_cents` e `orders.gateway_net_cents`.
 
+## Desconto por promoter (D-91, 19/10/2026)
+
+- Com o código de um promoter com desconto, o valor enviado ao Mercado Pago é o total já com desconto (ingressos menos desconto mais
+  taxa de serviço), o mesmo no Pix e no cartão; a conferência na reconsulta continua pelo total. O desconto nunca zera o pedido (o código
+  é recusado antes), então o Mercado Pago nunca recebe cobrança de R$ 0,00. Regras em `docs/registros/desconto-por-promoter.md`.
+
 ## Provas no ambiente de teste (11/10/2026, servidor local + túnel temporário autorizado)
 
 Evidências só com ids e estados (ids de order de teste começam com `ORDTST`).

@@ -14,13 +14,14 @@ Este arquivo vale para as próximas tarefas no repositório. Antes de implementa
 
 - Compra exige login e retorno ao checkout com seleção preservada, sempre revalidando estoque no servidor.
 - Estoque e reserva só em transação com `SELECT ... FOR UPDATE`. Para cada tipo, vendidos + reservas válidas não podem exceder a capacidade. Expiração e liberação devem ser idempotentes.
-- Código de promoter atribui a venda; **não concede desconto** nem calcula comissão.
+- Código de promoter atribui a venda e não calcula comissão. Desconto só o configurado no promoter (exceção D-91, abaixo).
 - Navegador nunca aprova pagamento nem emite ingresso. Webhook exige verificação de assinatura, reconsulta à API do gateway e idempotência por ID de evento.
 - Emitir um registro e um QR distinto por unidade: código aleatório de 144 bits mais HMAC. Repetições de webhook não duplicam ingressos.
 - Check-in por `UPDATE` condicional do ingresso válido, preservando a primeira entrada. Sem validação offline. Busca manual mostra CPF mascarado; ingresso, QR e PDF não exibem CPF sem decisão expressa do cliente.
 - Taxa mensal conta `tickets` pelo mês de `orders.paid_at`, independentemente do estado atual do pedido ou ingresso. Cancelar ingresso não executa estorno financeiro; estorno é operação do gateway/cliente.
-- Não implementar itens excluídos no §16 do PDF: desconto por cupom, comissão de promoter, lotes automáticos, cortesias/lista de convidados, assentos/mapa, bilheteria/POS, app nativo, notas fiscais, SMS/WhatsApp automático, múltiplos gateways, cashless, migração de outras plataformas ou atendimento ao comprador pela contratada. Lista impressa de contingência não é validação offline.
+- Não implementar itens excluídos no §16 do PDF: desconto por cupom (salvo o desconto do promoter da D-91, abaixo), comissão de promoter, lotes automáticos, cortesias/lista de convidados, assentos/mapa, bilheteria/POS, app nativo, notas fiscais, SMS/WhatsApp automático, múltiplos gateways, cashless, migração de outras plataformas ou atendimento ao comprador pela contratada. Lista impressa de contingência não é validação offline.
 - Exceção decidida: a transferência de ingresso entre contas foi incluída como mudança de escopo (D-87, 15/10/2026, `docs/registros/transferencia-e-cancelamento-2026-10-15.md`). O pedido, o pagamento e o reembolso continuam do comprador; a transferência troca o titular e o QR na mesma linha do ingresso, numa transação.
+- Exceção decidida: desconto por promoter, mudança de escopo aprovada pela PartyX (D-91, 19/10/2026, `docs/registros/desconto-por-promoter.md`). O desconto é por ingresso, sobre o preço do lote, conferido e calculado no servidor; nunca zera o pedido (o código é recusado); a taxa de serviço é calculada sobre o valor já com desconto; o pedido guarda o desconto que recebeu.
 
 ## Convenções e segurança
 

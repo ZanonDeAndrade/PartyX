@@ -870,3 +870,14 @@ body.px-dark .px-preview-bar a {
 .px-field .px-money-suffix input {
   padding-left: 14px;
 }
+
+/* Desconto por promoter (D-91): eventos em que o desconto vale, com rolagem própria para listas longas. */
+.px-check-list {
+  list-style: none;
+  margin: var(--px-s-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--px-s-2);
+  max-height: 14rem;
+  overflow-y: auto;
+}

@@ -64,11 +64,15 @@ select tt.id as ticket_type_id, tt.name, tt.quantity_total, sum(l.quantity) as s
  group by tt.id, tt.name, tt.quantity_total
 having sum(l.quantity) <> tt.quantity_total or max(case when l.quantity_sold > l.quantity then 1 else 0 end) = 1;
 
--- @nome 11. Total do pedido igual aos itens mais a taxa de serviço
-select o.id as order_id, o.number, o.total_cents, o.service_fee_cents, sum(oi.quantity * oi.unit_price_cents) as itens
+-- @nome 11. Total do pedido igual aos itens, menos o desconto do promoter (0018, D-91), mais a taxa de serviço
+-- O preço de cada item sai dos lotes (a média do item arredonda); o desconto é lido por to_jsonb, então a consulta roda também em banco
+-- anterior à 0018 (desconto zero).
+select o.id as order_id, o.number, o.total_cents, o.service_fee_cents, coalesce((to_jsonb(o) ->> 'discount_cents')::int, 0) as desconto,
+       sum(coalesce((select sum(il.quantity * il.unit_price_cents) from order_item_lots il where il.order_item_id = oi.id), oi.quantity * oi.unit_price_cents)) as itens
   from orders o join order_items oi on oi.order_id = o.id
  group by o.id, o.number, o.total_cents, o.service_fee_cents
-having o.total_cents <> sum(oi.quantity * oi.unit_price_cents) + o.service_fee_cents;
+having o.total_cents <> sum(coalesce((select sum(il.quantity * il.unit_price_cents) from order_item_lots il where il.order_item_id = oi.id), oi.quantity * oi.unit_price_cents))
+                        - coalesce((to_jsonb(o) ->> 'discount_cents')::int, 0) + o.service_fee_cents;
 
 -- @nome 12. Notificação do gateway processada só uma vez por id de evento
 select gateway_event_id, count(*) from payment_events where gateway_event_id is not null group by gateway_event_id having count(*) > 1;

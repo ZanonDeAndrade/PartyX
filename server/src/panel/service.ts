@@ -233,11 +233,11 @@ export async function listOrders(deps: PanelDeps, f: OrderFilter) {
   const offset = (f.page - 1) * f.pageSize;
   const rows = await deps.db.execute<Record<string, unknown>>(sql`
     select o.id, o.number, o.status::text as status, o.payment_method::text as payment_method, o.total_cents, o.service_fee_cents,
-           o.created_at, o.paid_at,
+           o.discount_cents, o.created_at, o.paid_at,
            e.id as event_id, e.name as event_name, u.name as buyer_name, u.email as buyer_email, u.cpf as buyer_cpf,
            (select count(*) from tickets t where t.order_id = o.id)::int as tickets,
            (select count(*) from tickets t where t.order_id = o.id and t.status = 'cancelado')::int as cancelled,
-           p.coupon_code,
+           coalesce(o.coupon_code, p.coupon_code) as coupon_code,
            count(*) over()::int as total_rows
       from orders o
       join events e on e.id = o.event_id
@@ -259,6 +259,7 @@ export async function listOrders(deps: PanelDeps, f: OrderFilter) {
       paymentMethod: (r.payment_method as string | null) ?? null,
       totalCents: num(r.total_cents),
       serviceFeeCents: num(r.service_fee_cents),
+      discountCents: num(r.discount_cents),
       createdAt: new Date(r.created_at as string).toISOString(),
       paidAt: r.paid_at ? new Date(r.paid_at as string).toISOString() : null,
       event: { id: r.event_id as string, name: r.event_name as string },
@@ -286,6 +287,10 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
       serviceFeeCents: orders.serviceFeeCents,
       serviceFeeRateBps: orders.serviceFeeRateBps,
       serviceFeeMinCents: orders.serviceFeeMinCents,
+      couponCode: orders.couponCode,
+      discountKind: orders.discountKind,
+      discountValue: orders.discountValue,
+      discountCents: orders.discountCents,
       gatewayFeeCents: orders.gatewayFeeCents,
       gatewayNetCents: orders.gatewayNetCents,
       createdAt: orders.createdAt,
@@ -311,10 +316,12 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
     quantity: number;
     unit_price_cents: number;
     unit_service_fee_cents: number;
+    unit_discount_cents: number;
   }>(sql`
     select case when l.name is null or l.name = 'Lote único' then t.name else t.name || ' · ' || l.name end as name,
            coalesce(il.quantity, i.quantity) as quantity, coalesce(il.unit_price_cents, i.unit_price_cents) as unit_price_cents,
-           coalesce(il.unit_service_fee_cents, i.service_fee_cents / i.quantity) as unit_service_fee_cents
+           coalesce(il.unit_service_fee_cents, i.service_fee_cents / i.quantity) as unit_service_fee_cents,
+           coalesce(il.unit_discount_cents, i.discount_cents / i.quantity) as unit_discount_cents
       from order_items i
       join ticket_types t on t.id = i.ticket_type_id
       left join order_item_lots il on il.order_item_id = i.id
@@ -330,8 +337,10 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
       usedAt: tickets.usedAt,
       cancelledAt: tickets.cancelledAt,
       cancelReason: tickets.cancelReason,
-      // Valor pago por este ingresso e a taxa de serviço dele (D-90): o que volta num reembolso só deste ingresso.
+      // Preço do lote, desconto do promoter (D-91) e taxa de serviço (D-90) deste ingresso: num reembolso só dele, volta o preço menos o
+      // desconto mais a taxa.
       priceCents: sql<number>`coalesce(${orderItemLots.unitPriceCents}, ${orderItems.unitPriceCents})`.mapWith(Number),
+      discountCents: sql<number>`coalesce(${orderItemLots.unitDiscountCents}, ${orderItems.discountCents} / ${orderItems.quantity})`.mapWith(Number),
       serviceFeeCents: sql<number>`coalesce(${orderItemLots.unitServiceFeeCents}, ${orderItems.serviceFeeCents} / ${orderItems.quantity})`.mapWith(Number),
     })
     .from(tickets)
@@ -383,7 +392,14 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
     gatewayPaymentId: order.gatewayPaymentId,
     // Valores (D-90): ingressos, taxa de serviço (com a porcentagem e o mínimo usados neste pedido) e total. O reembolso previsto na
     // Política devolve o total pago, com a taxa. Tarifa e líquido do Mercado Pago: nulos até a rotina diária consultar.
-    ticketsCents: order.totalCents - order.serviceFeeCents,
+    ticketsCents: order.totalCents - order.serviceFeeCents + order.discountCents,
+    // Desconto do promoter (D-91), como gravado no pedido: o código usado, o tipo e o valor do desconto, e o total descontado.
+    discountCents: order.discountCents,
+    coupon: order.couponCode,
+    discount:
+      order.discountKind && order.discountKind !== 'nenhum' && order.discountValue !== null
+        ? { kind: order.discountKind, value: order.discountValue }
+        : null,
     serviceFeeCents: order.serviceFeeCents,
     serviceFeeRateBps: order.serviceFeeRateBps,
     serviceFeeMinCents: order.serviceFeeMinCents,
@@ -408,6 +424,8 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
       subtotalCents: num(i.quantity) * num(i.unit_price_cents),
       unitServiceFeeCents: num(i.unit_service_fee_cents),
       serviceFeeCents: num(i.quantity) * num(i.unit_service_fee_cents),
+      unitDiscountCents: num(i.unit_discount_cents),
+      discountCents: num(i.quantity) * num(i.unit_discount_cents),
     })),
     tickets: orderTickets.map(t => ({
       ...t,

@@ -1,6 +1,6 @@
 # Responsividade (CA-32): resultado da varredura
 
-Gerado em 2026-10-19T12:25:16.389Z pelo Playwright (e2e/responsividade.spec.ts), Chromium, servidor local com dados e gateway **fictícios**.
+Gerado em 2026-10-19T13:54:52.244Z pelo Playwright (e2e/responsividade.spec.ts), Chromium, servidor local com dados e gateway **fictícios**.
 Critério: a página falha se `document.documentElement.scrollWidth > clientWidth` (rolagem horizontal). Medida na largura do aparelho, depois do carregamento e da ação de cada estado.
 As capturas ficam em `img/`, **fora do Git** (`.gitignore`): os links só abrem na máquina que rodou a varredura ou no arquivo zip guardado à parte.
 
@@ -163,4 +163,5 @@ Telas e estados: **151**; larguras: 360, 390, 768, 1440 px; medições: **604**;
 ## Rolagem horizontal interna (não reprova pelo critério; para revisão)
 
 - ADM10 "lista de pedidos" a 768px: div.px-tablewrap (821/718)
+- ADM16 "relatorio de vendas" a 768px: div.px-tablewrap (824/718)
 - ADM11 "excecoes de pagamento" a 768px: div.px-tablewrap (725/718)

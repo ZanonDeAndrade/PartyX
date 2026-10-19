@@ -52,3 +52,8 @@ export const lotStatus = pgEnum('lot_status', ['aguardando', 'a_venda', 'encerra
 export const lotCloseReason = pgEnum('lot_close_reason', ['esgotado', 'data', 'manual']);
 /** O que fazer com as unidades que sobram na virada automática: passam para o próximo lote ou são descartadas. */
 export const lotLeftover = pgEnum('lot_leftover', ['passar', 'descartar']);
+
+/** Desconto do promoter (D-91, 0018): nenhum, porcentagem (centésimos de ponto percentual) ou valor fixo (centavos) por ingresso. */
+export const promoterDiscountKind = pgEnum('promoter_discount_kind', ['nenhum', 'percentual', 'fixo']);
+/** Onde o desconto do promoter vale: em todos os eventos ou só nos escolhidos (`promoter_discount_events`). */
+export const promoterDiscountScope = pgEnum('promoter_discount_scope', ['todos', 'eventos']);

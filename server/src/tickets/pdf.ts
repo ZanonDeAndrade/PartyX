@@ -22,6 +22,16 @@ import type { TicketDetail } from './service';
  */
 const EMOJI = / ?(?:(?![\u00A9\u00AE])[\p{Extended_Pictographic}\p{Regional_Indicator}\u{1F3FB}-\u{1F3FF}]|\u200D|\uFE0E|\uFE0F|\u20E3)+/gu;
 
+/**
+ * "R$ 27,00 (R$ 30,00 com desconto de R$ 3,00) + R$ 2,19 de taxa de serviço". Sem desconto: "R$ 30,00 + R$ 2,44 de taxa de serviço";
+ * sem taxa: só o valor. Sem sinal de menos (a fonte do PDF é Latin-1). A mesma frase vai para a tela do ingresso.
+ */
+export function ticketPriceText(t: { priceCents: number; discountCents: number; serviceFeeCents: number }): string {
+  const net = t.priceCents - t.discountCents;
+  const value = t.discountCents > 0 ? `${formatBRL(net)} (${formatBRL(t.priceCents)} com desconto de ${formatBRL(t.discountCents)})` : formatBRL(net);
+  return t.serviceFeeCents > 0 ? `${value} + ${formatBRL(t.serviceFeeCents)} de taxa de serviço` : value;
+}
+
 /** Tira o emoji e troca por "?" o resto que a fonte padrão não desenha, para o PDF nunca sair com lixo. */
 export function toLatin1(text: string): string {
   const keep = new Set(['–', '—', '‘', '’', '“', '”', '•', '€', '…']);
@@ -164,11 +174,8 @@ function page(
   const holderSize = fitFontSize(doc, holder, 'Helvetica-Bold', [15, 12.5, 11], holderW, 2);
   doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Tipo', M, fields);
   doc.fillColor(INK).font('Helvetica-Bold').fontSize(typeSize).text(typeName, M, fields + 13, { width: 230 });
-  // Valor pago e taxa de serviço deste ingresso (D-90), embaixo do tipo. Sem taxa, só o valor.
-  const price =
-    t.serviceFeeCents > 0
-      ? `${formatBRL(t.priceCents)} + ${formatBRL(t.serviceFeeCents)} de taxa de serviço`
-      : formatBRL(t.priceCents);
+  // Valor deste ingresso, com o desconto do promoter (D-91) e a taxa de serviço (D-90), embaixo do tipo. Sem os dois, só o valor.
+  const price = ticketPriceText(t);
   doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Valor', M, doc.y + 8);
   doc.fillColor(INK).font('Helvetica-Bold').fontSize(11).text(toLatin1(price), M, undefined, { width: 230 });
   const typeEnd = doc.y;

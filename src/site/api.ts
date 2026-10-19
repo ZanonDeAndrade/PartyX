@@ -56,6 +56,8 @@ export interface EventDetail extends EventCard {
   countdown?: { liveUntil: string } | null;
   /** Hora do servidor ao montar a resposta. */
   serverNow?: string;
+  /** Porcentagem da taxa de serviço em vigor, em centésimos de ponto percentual (Termos 1.5). Zero ou ausente: sem taxa. */
+  serviceFeeRateBps?: number;
   /** Só no navegador: diferença entre a hora do servidor e o relógio do aparelho, medida na chegada da resposta. */
   clockOffsetMs?: number;
 }
@@ -232,6 +234,8 @@ export interface OrderLineLot {
   subtotalCents: number;
   /** Taxa de serviço de cada ingresso deste lote (D-90). */
   unitServiceFeeCents?: number;
+  /** Desconto do promoter em cada ingresso deste lote (D-91). */
+  unitDiscountCents?: number;
 }
 export interface OrderLine {
   ticketTypeId: string;
@@ -241,6 +245,8 @@ export interface OrderLine {
   subtotalCents: number;
   /** Taxa de serviço das unidades da linha (D-90). */
   serviceFeeCents?: number;
+  /** Desconto do promoter nas unidades da linha (D-91). */
+  discountCents?: number;
   /** Lotes de onde saíram as unidades. Vazio em pedido anterior aos lotes. */
   lots?: OrderLineLot[];
 }
@@ -248,14 +254,31 @@ export interface OrderLine {
 export interface Summary {
   event: { slug: string; name: string; startsAt: string; venue: string; allowsMinors?: boolean };
   items: OrderLine[];
-  /** Valor dos ingressos, sem a taxa de serviço (D-90). */
+  /** Valor dos ingressos pelo preço dos lotes, sem desconto e sem a taxa de serviço (D-90). */
   ticketsCents?: number;
+  /** Desconto do código do promoter (D-91). */
+  discountCents?: number;
   serviceFeeCents?: number;
-  /** Ingressos mais taxa de serviço: o que o comprador paga. */
+  /** Porcentagem da taxa de serviço em vigor (centésimos de ponto percentual). */
+  serviceFeeRateBps?: number;
+  /** Ingressos menos desconto mais taxa de serviço: o que o comprador paga. */
   totalCents: number;
   units: number;
-  coupon: { code: string } | null;
+  coupon: CouponView | null;
   buyer?: BuyerCheck | null;
+}
+
+/** Desconto do promoter (D-91): porcentagem em centésimos de ponto percentual, ou valor fixo em centavos, por ingresso. */
+export interface DiscountRule {
+  kind: 'percentual' | 'fixo';
+  value: number;
+}
+/** O código aplicado: com desconto, ou só atribuindo a venda (e por quê), com o texto para o comprador. */
+export interface CouponView {
+  code: string;
+  discount?: DiscountRule | null;
+  status?: 'desconto' | 'sem_desconto' | 'fora_do_prazo' | 'esgotado' | 'outro_evento';
+  message?: string;
 }
 
 export type OrderStatus =
@@ -269,11 +292,13 @@ export interface OrderView {
   /** Comprador com 16 ou 17 anos na data do evento. */
   buyerMinor?: boolean;
   items: OrderLine[];
-  /** Valor dos ingressos e taxa de serviço guardada no pedido (D-90; zero nos pedidos anteriores). */
+  /** Valor dos ingressos, desconto do promoter (D-91) e taxa de serviço (D-90), como guardados no pedido. */
   ticketsCents?: number;
+  discountCents?: number;
   serviceFeeCents?: number;
+  serviceFeeRateBps?: number;
   totalCents: number;
-  coupon: { code: string } | null;
+  coupon: { code: string; discount?: DiscountRule | null } | null;
   paymentMethod: 'pix' | 'cartao' | null;
   reservation: { status: string; expiresAt: string; serverNow: string; secondsLeft: number } | null;
   /** Contato de atendimento da PartyX, só no pedido pago sem estoque. Nulo: a PartyX ainda não forneceu (mensagem neutra). */
@@ -343,8 +368,9 @@ export interface TicketSummary {
   transferUntil: string;
   /** Recebido com 16 ou 17 anos: o QR e o PDF esperam o aceite do Termo de Ciência. */
   minorTermPending: boolean;
-  /** Valor pago por este ingresso e a taxa de serviço dele (D-90). */
+  /** Preço do lote deste ingresso, o desconto do promoter nele (D-91) e a taxa de serviço dele (D-90). */
   priceCents?: number;
+  discountCents?: number;
   serviceFeeCents?: number;
 }
 /** Detalhe: o conteúdo do QR só vem aqui, e nunca para ingresso cancelado. */
@@ -481,6 +507,7 @@ export interface AdminOrderRow {
   paymentMethod: 'pix' | 'cartao' | null;
   totalCents: number;
   serviceFeeCents?: number;
+  discountCents?: number;
   createdAt: string;
   paidAt: string | null;
   event: { id: string; name: string };
@@ -550,6 +577,10 @@ export interface AdminOrderDetail {
   gatewayPaymentId: string | null;
   /** Valores (D-90): ingressos, taxa de serviço (porcentagem e mínimo usados neste pedido), total e o que volta num estorno total. */
   ticketsCents?: number;
+  /** Desconto do promoter (D-91), como gravado: o código usado, o tipo e o valor, e o total descontado. */
+  discountCents?: number;
+  coupon?: string | null;
+  discount?: DiscountRule | null;
   serviceFeeCents?: number;
   serviceFeeRateBps?: number;
   serviceFeeMinCents?: number;
@@ -569,6 +600,8 @@ export interface AdminOrderDetail {
     subtotalCents: number;
     unitServiceFeeCents?: number;
     serviceFeeCents?: number;
+    unitDiscountCents?: number;
+    discountCents?: number;
   }[];
   tickets: {
     id: string;
@@ -580,6 +613,7 @@ export interface AdminOrderDetail {
     cancelledAt: string | null;
     cancelReason: string | null;
     priceCents?: number;
+    discountCents?: number;
     serviceFeeCents?: number;
   }[];
   trail: { action: string; entity: string; at: string; actor: string | null; reason: string | null }[];
@@ -681,6 +715,7 @@ export interface LotBody {
   leftoverPolicy?: 'passar' | 'descartar';
 }
 
+export type DiscountKind = 'nenhum' | 'percentual' | 'fixo';
 export interface Promoter {
   id: string;
   name: string;
@@ -688,11 +723,43 @@ export interface Promoter {
   phone: string | null;
   isActive: boolean;
   createdAt: string;
+  /** Desconto (D-91): tipo, valor (centésimos de ponto percentual ou centavos), alcance, eventos, prazo (dias) e limite de usos. */
+  discountKind?: DiscountKind;
+  discountValue?: number | null;
+  discountScope?: 'todos' | 'eventos';
+  discountEventIds?: string[];
+  discountStartsOn?: string | null;
+  discountEndsOn?: string | null;
+  discountMaxUses?: number | null;
+  /** Pedidos com o desconto: pagos, e pendentes que seguram um uso dentro da reserva. */
+  discountUses?: { paid: number; pending: number };
+}
+export interface PromoterBody {
+  name: string;
+  couponCode: string;
+  phone: string | null;
+  isActive: boolean;
+  discountKind: DiscountKind;
+  discountValue: number | null;
+  discountScope: 'todos' | 'eventos';
+  discountEventIds: string[];
+  discountStartsOn: string | null;
+  discountEndsOn: string | null;
+  discountMaxUses: number | null;
 }
 export interface PromoterOrders {
   promoter: { id: string; name: string; code: string; isActive: boolean };
-  orders: { id: string; number: number; eventName: string; tickets: number; cents: number; paidAt: string }[];
-  totals: { tickets: number; cents: number };
+  orders: {
+    id: string;
+    number: number;
+    eventName: string;
+    tickets: number;
+    cents: number;
+    discountCents?: number;
+    netCents?: number;
+    paidAt: string;
+  }[];
+  totals: { tickets: number; cents: number; discountCents?: number; netCents?: number };
 }
 export interface BuyerRow {
   id: string;
@@ -748,8 +815,9 @@ export interface AdminTicketDetail {
     status: 'valido' | 'utilizado' | 'cancelado';
     holderName: string;
     typeName: string;
-    /** Valor pago por este ingresso (o do lote dele) e a taxa de serviço dele (D-90). */
+    /** Preço do lote deste ingresso, o desconto do promoter nele (D-91) e a taxa de serviço dele (D-90). */
     priceCents: number;
+    discountCents?: number;
     serviceFeeCents?: number;
     issuedAt: string;
     event: { id: string; name: string; startsAt: string };
@@ -898,17 +966,30 @@ export interface SalesReport {
     typeId: string;
     typeName: string;
     tickets: number;
-    /** Valor dos ingressos, sem a taxa de serviço. */
+    /** Valor dos ingressos pelo preço dos lotes, sem desconto e sem a taxa de serviço. */
     cents: number;
+    /** Desconto dos códigos de promoter (D-91) e valor líquido (preço menos desconto). */
+    discountCents?: number;
+    netCents?: number;
     serviceFeeCents?: number;
     /** Vendas por lote dentro do tipo, na ordem dos lotes. */
-    lots?: { lotId: string; lotName: string; tickets: number; cents: number; serviceFeeCents?: number }[];
+    lots?: {
+      lotId: string;
+      lotName: string;
+      tickets: number;
+      cents: number;
+      discountCents?: number;
+      netCents?: number;
+      serviceFeeCents?: number;
+    }[];
   }[];
   byEvent: {
     eventId: string;
     eventName: string;
     tickets: number;
     cents: number;
+    discountCents?: number;
+    netCents?: number;
     serviceFeeCents?: number;
     chargedCents?: number;
     gatewayFeeCents?: number;
@@ -918,6 +999,8 @@ export interface SalesReport {
   totals: {
     tickets: number;
     cents: number;
+    discountCents?: number;
+    netCents?: number;
     serviceFeeCents?: number;
     chargedCents?: number;
     /** Nulos com filtro de tipo (a tarifa é do pedido inteiro). */
@@ -925,8 +1008,15 @@ export interface SalesReport {
     gatewayNetCents?: number | null;
     ordersWithoutGatewayFee?: number | null;
   };
-  reconciliation: { ok: boolean | null; ordersCents: number; itemsCents: number; serviceFeeCents?: number; orders: number };
-  daily: { day: string; tickets: number; cents: number; serviceFeeCents?: number }[];
+  reconciliation: {
+    ok: boolean | null;
+    ordersCents: number;
+    itemsCents: number;
+    discountCents?: number;
+    serviceFeeCents?: number;
+    orders: number;
+  };
+  daily: { day: string; tickets: number; cents: number; discountCents?: number; serviceFeeCents?: number }[];
   reversals: { refunded: Bucket; contested: Bucket; grossCents: number; netCents: number };
   exceptions: { paidWithoutStock: Bucket };
   notes: string[];
@@ -942,6 +1032,9 @@ export interface PromoterRanking {
     isActive: boolean;
     tickets: number;
     cents: number;
+    /** Desconto concedido pelo código (D-91) e valor líquido (por ele o ranking "por valor" ordena). */
+    discountCents?: number;
+    netCents?: number;
     orders: number;
   }[];
   withoutPromoter: { tickets: number; cents: number; orders: number };
@@ -1199,11 +1292,10 @@ export const api = {
     salesReport: (query: string, signal?: AbortSignal) => get<SalesReport>(`/admin/reports/sales?${query}`, signal),
     promoters: (signal?: AbortSignal) =>
       get<{ promoters: Promoter[] }>('/admin/promoters', signal).then(r => r.promoters),
-    createPromoter: (body: { name: string; couponCode: string; phone: string | null; isActive: boolean }) =>
-      request<{ promoter: Promoter }>('POST', '/admin/promoters', body),
+    createPromoter: (body: PromoterBody) => request<{ promoter: Promoter }>('POST', '/admin/promoters', body),
     updatePromoter: (
       id: string,
-      body: Partial<{ name: string; couponCode: string; phone: string | null; isActive: boolean }>,
+      body: Partial<PromoterBody>,
     ) => request<{ promoter: Promoter }>('PATCH', `/admin/promoters/${encodeURIComponent(id)}`, body),
     promoterOrders: (id: string, query: string, signal?: AbortSignal) =>
       get<PromoterOrders>(`/admin/reports/promoters/${encodeURIComponent(id)}?${query}`, signal),

@@ -329,7 +329,7 @@ describe.skipIf(!ADMIN_URL)('taxa de serviço (integração)', () => {
     const csv = await (await a.get('/admin/exports/sales.csv?from=2026-10-01&to=2026-10-31')).text();
     expect(csv).toContain('Taxa de serviço (R$)');
     expect(csv).toContain('Tarifa do Mercado Pago (R$)');
-    expect(csv).toMatch(/TOTAL;;;2;60,00;3,16;63,16/);
+    expect(csv).toMatch(/TOTAL;;;2;60,00;0,00;60,00;3,16;63,16/);
   });
 
   it('configurações: só o administrador vê e muda; limites de 0% a 20% e mínimo até R$ 50,00; 0% esconde a taxa', async () => {

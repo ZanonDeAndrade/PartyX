@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderTicketsPdf, toLatin1 } from './pdf';
+import { renderTicketsPdf, ticketPriceText, toLatin1 } from './pdf';
 import { HAS_POPPLER, longWord, readPdf } from './pdfTesting';
 import type { TicketDetail } from './service';
 
@@ -18,6 +18,7 @@ const ticket = (
   transferUntil: '2026-12-12T23:00:00.000Z',
   minorTermPending: false,
   priceCents: 3000,
+  discountCents: 0,
   serviceFeeCents: 158,
   qrPayload: 'PX1.1.' + 'a'.repeat(32) + '.' + 'b'.repeat(24) + '.' + 'c'.repeat(22),
   ...over,
@@ -31,6 +32,20 @@ const ticket = (
     allowsMinors: false,
     ...over.event,
   },
+});
+
+describe('valor do ingresso no PDF e em Meus ingressos (D-90, D-91)', () => {
+  it('desconto e taxa na mesma frase, sem sinal de menos (a fonte é Latin-1)', () => {
+    const nb = (t: string) => t.replace(/\s/g, ' ');
+    expect(nb(ticketPriceText({ priceCents: 3000, discountCents: 300, serviceFeeCents: 219 }))).toBe(
+      'R$ 27,00 (R$ 30,00 com desconto de R$ 3,00) + R$ 2,19 de taxa de serviço',
+    );
+    expect(nb(ticketPriceText({ priceCents: 3000, discountCents: 0, serviceFeeCents: 244 }))).toBe('R$ 30,00 + R$ 2,44 de taxa de serviço');
+    expect(nb(ticketPriceText({ priceCents: 3000, discountCents: 0, serviceFeeCents: 0 }))).toBe('R$ 30,00');
+    // Ingresso que ficou em R$ 0,00 pelo desconto: sem taxa.
+    expect(nb(ticketPriceText({ priceCents: 1000, discountCents: 1000, serviceFeeCents: 0 }))).toBe('R$ 0,00 (R$ 10,00 com desconto de R$ 10,00)');
+    expect(toLatin1(ticketPriceText({ priceCents: 3000, discountCents: 300, serviceFeeCents: 219 }))).not.toContain('?');
+  });
 });
 
 describe('texto do PDF (fontes padrão, Latin-1)', () => {

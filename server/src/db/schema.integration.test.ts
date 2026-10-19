@@ -147,9 +147,10 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
           'ticket_minor_acceptances',
           'cancellation_acceptances',
           'service_fee_settings',
+          'promoter_discount_events',
         ]),
       );
-      expect(tables).toHaveLength(25);
+      expect(tables).toHaveLength(26);
     });
 
     it('0016: titular do ingresso preenchido com o comprador (também para quem não o informa); histórico só de inclusão', async () => {
@@ -189,7 +190,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(18);
+      expect(r.rows[0].n).toBe(19);
     });
   });
 
@@ -749,6 +750,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag15 = '0015_capa_desfocada';
       const tag16 = '0016_transferencia_e_aceite_da_politica';
       const tag17 = '0017_taxa_de_servico';
+      const tag18 = '0018_desconto_por_promoter';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag15)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
@@ -762,6 +764,51 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag13)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag14)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag16)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag17)).rejects.toThrow(/não é a última/);
+
+      // 0018: promoter nasce sem desconto; recusa com pedido que tem desconto; sem ele, apaga o desconto dos promoters, a tabela de
+      // eventos do desconto e as colunas, e o pedido continua com o total.
+      const q18 = db.pool.query.bind(db.pool);
+      const u18 = (
+        await q18("insert into users (name,email,cpf,password_hash,role) values ('Bia','bia18@partyx.test','11144477735','x','cliente') returning id")
+      ).rows[0].id;
+      const ev18 = (
+        await q18("insert into events (slug,name,starts_at,venue,address,description,age_rating) values ('ev-18','E',now()+interval '9 days','L','A','D','Livre') returning id")
+      ).rows[0].id;
+      const p18 = (await q18("insert into promoters (name,coupon_code) values ('Duda','DUDA18') returning id, discount_kind, discount_scope")).rows[0];
+      expect(p18).toMatchObject({ discount_kind: 'nenhum', discount_scope: 'todos' });
+      await expect(q18("update promoters set discount_kind = 'percentual', discount_value = 50 where id = $1", [p18.id])).rejects.toThrow(
+        /promoters_discount_value_valid/,
+      );
+      await q18("update promoters set discount_kind = 'percentual', discount_value = 1000, discount_scope = 'eventos' where id = $1", [p18.id]);
+      await q18('insert into promoter_discount_events (promoter_id, event_id) values ($1, $2)', [p18.id, ev18]);
+      const o18 = (
+        await q18(
+          "insert into orders (user_id,event_id,promoter_id,total_cents,coupon_code,discount_kind,discount_value,discount_cents) values ($1,$2,$3,2700,'DUDA18','percentual',1000,300) returning id",
+          [u18, ev18, p18.id],
+        )
+      ).rows[0].id;
+      await expect(q18("update orders set coupon_code = null where id = $1", [o18])).rejects.toThrow(/orders_discount_valid/);
+      await expect(rollbackLastMigration(db.url, tag18)).rejects.toThrow(/pedidos com desconto de promoter/);
+      await q18("update orders set discount_cents = 0 where id = $1", [o18]);
+      await rollbackLastMigration(db.url, tag18);
+      expect((await q18("select to_regclass('promoter_discount_events') as t")).rows[0].t).toBeNull();
+      expect(
+        (await q18("select count(*)::int as n from information_schema.columns where column_name in ('discount_kind','discount_cents','unit_discount_cents','coupon_code','discount_max_uses')")).rows[0].n,
+      ).toBe(1); // só promoters.coupon_code, que é anterior
+      expect((await q18('select total_cents from orders where id = $1', [o18])).rows[0].total_cents).toBe(2700);
+      await q18('alter table orders disable trigger orders_forbid_delete');
+      await q18('delete from orders where id = $1', [o18]);
+      await q18('alter table orders enable trigger orders_forbid_delete');
+      await q18('alter table promoters disable trigger promoters_forbid_delete');
+      await q18('delete from promoters where id = $1', [p18.id]);
+      await q18('alter table promoters enable trigger promoters_forbid_delete');
+      await q18('delete from events where id = $1', [ev18]);
+      await q18('delete from users where id = $1', [u18]).catch(async () => {
+        await q18('alter table users disable trigger users_forbid_delete');
+        await q18('delete from users where id = $1', [u18]);
+        await q18('alter table users enable trigger users_forbid_delete');
+      });
 
       // 0017: nasce com 0% e mínimo 0 (sem taxa até o painel gravar); recusa com pedido que tem taxa de serviço; sem ele, apaga a
       // configuração e as colunas, e o
@@ -1059,8 +1106,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0017 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0018 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag18);
       await rollbackLastMigration(db.url, tag17);
       await rollbackLastMigration(db.url, tag16);
       await rollbackLastMigration(db.url, tag15);
@@ -1139,7 +1187,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       r = await db.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'");
-      expect(r.rows[0].n).toBe(25); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013) + as três da 0016 + service_fee_settings (0017)
+      expect(r.rows[0].n).toBe(26); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013) + as três da 0016 + service_fee_settings (0017) + promoter_discount_events (0018)
     } finally {
       await db.drop();
     }

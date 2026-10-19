@@ -1,9 +1,9 @@
-﻿Posição;Promoter;Código;Situação do cadastro;Ingressos;Valor atribuído (R$);Pedidos
-1;Duda Martins Fictícia;DUDA;Ativo;2;160,00;1
-2;Leo Noturno Fictício;LEO;Inativo;0;0,00;0
+﻿Posição;Promoter;Código;Situação do cadastro;Ingressos;Valor atribuído (R$);Desconto concedido (R$);Valor líquido (R$);Pedidos
+1;Duda Martins Fictícia;DUDA;Ativo;2;160,00;0,00;160,00;1
+2;Leo Noturno Fictício;LEO;Inativo;0;0,00;0,00;0,00;0
 
-Vendas sem código de promoter (fora do ranking);;;;5;440,00;3
+Vendas sem código de promoter (fora do ranking);;;;5;440,00;0,00;440,00;3
 Ordenado por;quantidade de ingressos, do maior para o menor
-Critério;Pedidos com status Pago e código de promoter, pela data original da aprovação. Só contagem: o sistema não calcula nem paga comissão.
+Critério;Pedidos com status Pago e código de promoter, pela data original da aprovação. Valor líquido = preço dos ingressos menos o desconto do código. O sistema não calcula nem paga comissão.
 Filtros aplicados;"Evento: Todos; Período de aprovação: todo o período"
-Gerado em;19/10/2026 10:09
+Gerado em;19/10/2026 10:47

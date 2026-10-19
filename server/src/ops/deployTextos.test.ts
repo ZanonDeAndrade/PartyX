@@ -27,8 +27,8 @@ describe('textos legais da release da taxa de serviço', () => {
   const terms = readFileSync(path.join(ROOT, 'conteudo-legal/termos-de-uso.txt'), 'utf8');
   const cancellation = readFileSync(path.join(ROOT, 'conteudo-legal/cancelamento.txt'), 'utf8');
 
-  it('os textos do repositório (Termos 1.4, com a porcentagem, e Política 1.1) passam', () => {
-    expect(textCheck(terms, cancellation, '1.4', '1.1')).toEqual({ status: 0, err: '' });
+  it('os textos do repositório (Termos 1.5, com o desconto por promoter, e Política 1.1) passam', () => {
+    expect(textCheck(terms, cancellation, '1.5', '1.1')).toEqual({ status: 0, err: '' });
   });
 
   it('os textos anteriores, que diziam não haver taxa, são recusados, um motivo por linha', () => {
@@ -49,6 +49,35 @@ describe('textos legais da release da taxa de serviço', () => {
     expect(textCheck(terms, cancellation, '1.2', '1.1').err).toContain('TERMS_VERSION=1.2');
     expect(textCheck(terms, cancellation, '1.3', '').err).toContain('CANCELLATION_VERSION=(vazio)');
     expect(textCheck(terms, cancellation, '1.10', '2.0').status).toBe(0);
+  });
+});
+
+function discountCheck(terms: string, termsVersion: string) {
+  writeFileSync(path.join(dir, 'td.txt'), terms);
+  const r = spawnSync('python3', ['-I', path.join(ROOT, 'infra/producao/textos-desconto.py'), path.join(dir, 'td.txt'), termsVersion], {
+    encoding: 'utf8',
+  });
+  return { status: r.status, err: r.stderr };
+}
+
+describe('Termos de Uso da release do desconto por promoter (D-91)', () => {
+  const terms = readFileSync(path.join(ROOT, 'conteudo-legal/termos-de-uso.txt'), 'utf8');
+  it('os Termos do repositório (1.5) passam', () => {
+    expect(discountCheck(terms, '1.5')).toEqual({ status: 0, err: '' });
+  });
+  it('os Termos 1.4, que diziam que o código não dá desconto, são recusados, um motivo por linha', () => {
+    const r = discountCheck(
+      'Código de divulgação: o campo de código de promoter é opcional. Ele só identifica quem indicou a compra e não dá desconto.',
+      '1.4',
+    );
+    expect(r.status).toBe(1);
+    expect(r.err).toContain('TERMS_VERSION=1.4');
+    expect(r.err).toContain('ainda dizem que o código de promoter não dá desconto');
+    expect(r.err).toContain('não explicam o desconto do código de divulgação');
+  });
+  it('texto novo com a versão antiga no env: recusa', () => {
+    expect(discountCheck(terms, '1.4').err).toContain('TERMS_VERSION=1.4');
+    expect(discountCheck(terms, '').err).toContain('TERMS_VERSION=(vazio)');
   });
 });
 

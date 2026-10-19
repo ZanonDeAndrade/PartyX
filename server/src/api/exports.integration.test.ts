@@ -393,20 +393,26 @@ describe.skipIf(!ADMIN_URL)('exportações e contingência (integração)', () =
       const rows = parseCsv(await (await adm.get(`/admin/exports/sales.csv?eventId=${e.id}`)).text());
       expect(rows.slice(1, 1 + screen.lines.length)).toHaveLength(screen.lines.length);
       const total = rows.find(r => r[0] === 'TOTAL')!;
-      // Colunas: Evento, Tipo, Lote (0013), Ingressos, Valor dos ingressos, Taxa de serviço e Total cobrado (D-90).
+      // Colunas: Evento, Tipo, Lote (0013), Ingressos, Valor dos ingressos, Desconto e Valor líquido (D-91), Taxa de serviço e Total
+      // cobrado (D-90).
       expect(rows[0]).toEqual([
         'Evento',
         'Tipo de ingresso',
         'Lote',
         'Ingressos',
         'Valor dos ingressos (R$)',
+        'Desconto de promoter (R$)',
+        'Valor líquido dos ingressos (R$)',
         'Taxa de serviço (R$)',
         'Total cobrado (R$)',
       ]);
+      const reais = (cents: number) => (cents / 100).toFixed(2).replace('.', ',');
       expect(total[3]).toBe(String(screen.totals.tickets));
-      expect(total[4]).toBe((screen.totals.cents / 100).toFixed(2).replace('.', ','));
-      expect(total[5]).toBe((screen.totals.serviceFeeCents / 100).toFixed(2).replace('.', ','));
-      expect(total[6]).toBe((screen.totals.chargedCents / 100).toFixed(2).replace('.', ','));
+      expect(total[4]).toBe(reais(screen.totals.cents));
+      expect(total[5]).toBe(reais(screen.totals.discountCents));
+      expect(total[6]).toBe(reais(screen.totals.netCents));
+      expect(total[7]).toBe(reais(screen.totals.serviceFeeCents));
+      expect(total[8]).toBe(reais(screen.totals.chargedCents));
       const rank = parseCsv(await (await adm.get('/admin/exports/promoters.csv')).text());
       expect(rank[1]![2]).toBe('ANA10');
       const fee = parseCsv(await (await adm.get('/admin/exports/fee.csv?month=2026-12')).text());

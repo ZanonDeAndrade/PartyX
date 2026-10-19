@@ -314,6 +314,17 @@ cmd_conferir() {
       || { rm -rf "$fee_tmp"; echo "Recuso: a release cobra a taxa de serviço e os textos legais $where não são os da taxa (Termos 1.3, Política 1.1)." >&2; exit 1; }
     rm -rf "$fee_tmp"
   fi
+  # Desconto por promoter (D-91): a release que dá desconto pelo código (migração 0018 na tag) só sobe com os Termos de Uso 1.5, que
+  # falam do desconto; os anteriores diziam que o código não dá desconto (infra/producao/textos-desconto.py).
+  local discount_migration="drizzle/0018_desconto_por_promoter.sql"
+  if { [ -n "${RELEASE:-}" ] && git cat-file -e "refs/tags/$RELEASE:$discount_migration" 2>/dev/null; } || { [ -z "${RELEASE:-}" ] && [ -f "$discount_migration" ]; }; then
+    local disc_tmp; disc_tmp="$(mktemp -d)"
+    if [ -n "${RELEASE:-}" ]; then git show "refs/tags/$RELEASE:$legal_dir/termos-de-uso.txt" > "$disc_tmp/termos.txt" 2>/dev/null || : > "$disc_tmp/termos.txt"
+    else cat "$legal_dir/termos-de-uso.txt" > "$disc_tmp/termos.txt" 2>/dev/null || : > "$disc_tmp/termos.txt"; fi
+    python3 -I infra/producao/textos-desconto.py "$disc_tmp/termos.txt" "${TERMS_VERSION:-}" \
+      || { rm -rf "$disc_tmp"; echo "Recuso: a release dá desconto pelo código do promoter e os Termos de Uso $where não são os do desconto (1.5)." >&2; exit 1; }
+    rm -rf "$disc_tmp"
+  fi
   if [ "$SALES_OPEN" = "true" ]; then   # travas extras para ABRIR A VENDA (go-live)
     [ "$PAYMENT_GATEWAY" != "none" ] || { echo "Recuso: venda aberta sem gateway real." >&2; exit 1; }
     for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE GO_LIVE_CONFIRMED; do [ -n "${!v:-}" ] || { echo "Recuso: $v é obrigatório para abrir a venda." >&2; exit 1; }; done
