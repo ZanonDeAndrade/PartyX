@@ -26,7 +26,7 @@ if (REMOTE) {
   const ADMIN_URL = process.env.TEST_DATABASE_URL;
   if (!ADMIN_URL) throw new Error('defina TEST_DATABASE_URL (ver .env.test)');
   if (/neon\.tech/.test(ADMIN_URL)) throw new Error('recusado: o roteiro local só roda no PostgreSQL de teste');
-  const db = await createTestDatabase(ADMIN_URL);
+  const db = await createTestDatabase(ADMIN_URL, { serviceFee: { rateBps: 500, minCents: 0 } });
   pool = db.pool;
   url = db.url;
 }

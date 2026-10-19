@@ -144,6 +144,7 @@ const SCREENS: Screen[] = [
   { id: 'equipe-novo', path: '/admin/equipe', open: [click('Novo usuário')] },
   { id: 'conta', path: '/admin/conta' },
   { id: 'conta-senha', path: '/admin/conta', open: [click('Alterar senha')] },
+  { id: 'configuracoes', path: '/admin/configuracoes', shot: true },
   { id: 'excecoes', path: '/admin/excecoes' },
   { id: 'rel-vendas', path: '/admin/relatorios/vendas' },
   { id: 'rel-promoters', path: '/admin/relatorios/promoters' },

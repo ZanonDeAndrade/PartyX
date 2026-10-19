@@ -1,10 +1,10 @@
 # Responsividade (CA-32): resultado da varredura
 
-Gerado em 2026-10-12T16:44:35.079Z pelo Playwright (e2e/responsividade.spec.ts), Chromium, servidor local com dados e gateway **fictícios**.
+Gerado em 2026-10-19T12:25:16.389Z pelo Playwright (e2e/responsividade.spec.ts), Chromium, servidor local com dados e gateway **fictícios**.
 Critério: a página falha se `document.documentElement.scrollWidth > clientWidth` (rolagem horizontal). Medida na largura do aparelho, depois do carregamento e da ação de cada estado.
 As capturas ficam em `img/`, **fora do Git** (`.gitignore`): os links só abrem na máquina que rodou a varredura ou no arquivo zip guardado à parte.
 
-Telas e estados: **152**; larguras: 360, 390, 768, 1440 px; medições: **608**; falhas: **0**; não medidos (teste interrompido antes da medida): **0**.
+Telas e estados: **151**; larguras: 360, 390, 768, 1440 px; medições: **604**; falhas: **0**; não medidos (teste interrompido antes da medida): **0**.
 
 | Tela | Estado | Rota | 360 | 390 | 768 | 1440 |
 |---|---|---|---|---|---|---|
@@ -29,7 +29,6 @@ Telas e estados: **152**; larguras: 360, 390, 768, 1440 px; medições: **608**;
 | P04 | termos | `/termos-de-uso` | ok ([captura](img/360/P04__termos.jpg)) | ok ([captura](img/390/P04__termos.jpg)) | ok ([captura](img/768/P04__termos.jpg)) | ok ([captura](img/1440/P04__termos.jpg)) |
 | P05 | privacidade | `/privacidade` | ok ([captura](img/360/P05__privacidade.jpg)) | ok ([captura](img/390/P05__privacidade.jpg)) | ok ([captura](img/768/P05__privacidade.jpg)) | ok ([captura](img/1440/P05__privacidade.jpg)) |
 | P06 | cancelamento | `/politica-de-cancelamento` | ok ([captura](img/360/P06__cancelamento.jpg)) | ok ([captura](img/390/P06__cancelamento.jpg)) | ok ([captura](img/768/P06__cancelamento.jpg)) | ok ([captura](img/1440/P06__cancelamento.jpg)) |
-| P06 | meia-entrada | `/meia-entrada` | ok ([captura](img/360/P06__meia-entrada.jpg)) | ok ([captura](img/390/P06__meia-entrada.jpg)) | ok ([captura](img/768/P06__meia-entrada.jpg)) | ok ([captura](img/1440/P06__meia-entrada.jpg)) |
 | P07 | evento inexistente | `/eventos/evento-que-nao-existe` | ok ([captura](img/360/P07__evento-inexistente.jpg)) | ok ([captura](img/390/P07__evento-inexistente.jpg)) | ok ([captura](img/768/P07__evento-inexistente.jpg)) | ok ([captura](img/1440/P07__evento-inexistente.jpg)) |
 | P07 | pagina inexistente | `/pagina-que-nao-existe` | ok ([captura](img/360/P07__pagina-inexistente.jpg)) | ok ([captura](img/390/P07__pagina-inexistente.jpg)) | ok ([captura](img/768/P07__pagina-inexistente.jpg)) | ok ([captura](img/1440/P07__pagina-inexistente.jpg)) |
 | E05 | compartilhar com pre-visualizacao | `/eventos/noite-roxa-warehouse` | ok ([captura](img/360/E05__compartilhar-com-pre-visualizacao.jpg)) | ok ([captura](img/390/E05__compartilhar-com-pre-visualizacao.jpg)) | ok ([captura](img/768/E05__compartilhar-com-pre-visualizacao.jpg)) | ok ([captura](img/1440/E05__compartilhar-com-pre-visualizacao.jpg)) |
@@ -163,8 +162,5 @@ Telas e estados: **152**; larguras: 360, 390, 768, 1440 px; medições: **608**;
 
 ## Rolagem horizontal interna (não reprova pelo critério; para revisão)
 
-- ADM14 "ingressos do evento" a 768px: div.px-tablewrap (816/718)
-- ADM12 "compradores do evento" a 768px: div.px-tablewrap (801/718)
-- ADM10 "lista de pedidos" a 768px: div.px-tablewrap (752/718)
-- ADM18 "taxa mensal" a 768px: div.px-tablewrap (723/718)
-- ADM11 "excecoes de pagamento" a 768px: div.px-tablewrap (774/718)
+- ADM10 "lista de pedidos" a 768px: div.px-tablewrap (821/718)
+- ADM11 "excecoes de pagamento" a 768px: div.px-tablewrap (725/718)

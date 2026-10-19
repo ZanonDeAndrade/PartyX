@@ -923,7 +923,8 @@ export function AdminTicketPage({ id }: { id: string }) {
         <>
           <h1 className="px-h1 px-mono">{t.shortCode}</h1>
           <p>
-            <Badge map={TICKET_LABEL} value={t.status} /> {t.typeName} · {brl(t.priceCents)} · {t.event.name}
+            <Badge map={TICKET_LABEL} value={t.status} /> {t.typeName} · {brl(t.priceCents)}
+            {t.serviceFeeCents ? ` + ${brl(t.serviceFeeCents)} de taxa de serviço` : ''} · {t.event.name}
           </p>
           {t.status === 'cancelado' && t.cancellation ? (
             <p className="px-notice px-notice-err" role="note">

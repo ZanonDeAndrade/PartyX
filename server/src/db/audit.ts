@@ -10,7 +10,8 @@ export async function writeAudit(
     actorId: string | null;
     action: string;
     entity: string;
-    entityId: string;
+    /** Nulo para o que não tem id próprio (a configuração da taxa de serviço, linha única). */
+    entityId: string | null;
     before: unknown;
     after: unknown;
     reason?: string;

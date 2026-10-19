@@ -314,7 +314,10 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
   const units = chosen.reduce((t, [, n]) => t + n, 0);
   // Lotes: o que passar do que resta no lote à venda sai do próximo, com o preço dele, que só aparece no resumo (antes de pagar).
   const inLot = (id: string, n: number) => Math.min(n, buyable.get(id)!.lotRemaining ?? n);
-  const total = chosen.reduce((t, [id, n]) => t + inLot(id, n) * (buyable.get(id)!.priceCents ?? 0), 0);
+  // Taxa de serviço por ingresso (D-90), calculada pelo servidor para o preço do lote à venda. Zero: nenhuma linha de taxa.
+  const tickets = chosen.reduce((t, [id, n]) => t + inLot(id, n) * (buyable.get(id)!.priceCents ?? 0), 0);
+  const fees = chosen.reduce((t, [id, n]) => t + inLot(id, n) * (buyable.get(id)!.serviceFeeCents ?? 0), 0);
+  const total = tickets + fees;
   const fromNextLot = chosen.reduce((t, [id, n]) => t + n - inLot(id, n), 0);
   // O total mostra só o que já tem preço; o que sai do próximo lote aparece na linha pequena e no resumo, com o valor.
   const unitsText = `${units} ${units === 1 ? 'ingresso' : 'ingressos'}${fromNextLot > 0 ? `, ${fromNextLot} do próximo lote` : ''}`;
@@ -350,7 +353,12 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
                   {t.name}
                   {t.lot ? <span className="px-type-lot"> · {t.lot.name}</span> : null}
                 </h3>
-                {t.priceCents !== null ? <p className="px-type-price">{brl(t.priceCents)}</p> : null}
+                {t.priceCents !== null ? (
+                  <p className="px-type-price">
+                    {brl(t.priceCents)}
+                    {t.serviceFeeCents ? <small className="px-type-fee"> + {brl(t.serviceFeeCents)} taxa</small> : null}
+                  </p>
+                ) : null}
                 {t.lastUnits ? <p className="px-type-flag">Últimas unidades deste lote</p> : null}
                 {t.note ? <p className="px-type-note">{t.note}</p> : null}
                 {t.nextLot ? <p className="px-type-note">Próximo lote: em breve.</p> : null}
@@ -405,6 +413,12 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
                   </li>
                 );
               })}
+              {fees > 0 ? (
+                <li>
+                  <span>Taxa de serviço</span>
+                  <span className="px-nowrap">{brl(fees)}</span>
+                </li>
+              ) : null}
             </ul>
           ) : null}
           <p className="px-total px-total-row-side">
@@ -452,7 +466,32 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
           </div>
         </>
       ) : null}
+      {/* Abaixo dos ingressos, também quando ainda estão "em breve"; some quando nada mais será vendido. */}
+      {event.ticketTypes.some(t => t.canBuy || t.state === 'em_breve') ? <PaymentMethods site={site} /> : null}
     </>
+  );
+}
+
+/**
+ * Formas de pagamento que o checkout aceita hoje (servidor, `/public/site`): Pix só quando cabe na reserva (D-03); cartão de crédito
+ * ou débito, como no componente do Mercado Pago. Parcelamento só aparece com o número real ("em até 3x"); à vista, nada se diz.
+ */
+function PaymentMethods({ site }: { site: SiteInfo | null }) {
+  const pay = site?.payment;
+  if (!pay || (!pay.pix && !pay.card)) return null;
+  return (
+    <section className="px-paymethods" aria-labelledby="formas-de-pagamento">
+      <h3 id="formas-de-pagamento">Formas de pagamento</h3>
+      <ul>
+        {pay.pix ? <li>Pix</li> : null}
+        {pay.card ? (
+          <li>
+            Cartão de crédito ou débito
+            {pay.maxInstallments > 1 ? <span className="px-nowrap">, em até {pay.maxInstallments}x</span> : null}
+          </li>
+        ) : null}
+      </ul>
+    </section>
   );
 }
 

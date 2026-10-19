@@ -12,6 +12,7 @@ import {
 } from './api';
 import { Layout, usePageTitle } from './components';
 import { brl, dateShort, timeOf } from './format';
+import { formatRate } from './serviceFee';
 import { IconBack, IconClose, IconMenu } from './icons';
 import { Link, useRouter } from './router';
 import { useSession } from './session';
@@ -40,6 +41,7 @@ export type AdminTab =
   | 'entradas'
   | 'equipe'
   | 'excecoes'
+  | 'configuracoes'
   | 'conta';
 
 /** Avisa o painel de que a lista de exceções mudou (um caso foi tratado), para o contador do alerta se atualizar. */
@@ -84,6 +86,7 @@ const REPORTS: { label: string; to: string }[] = [
 const NAV_END: { tab: AdminTab; label: string; to: string }[] = [
   { tab: 'entradas', label: 'Entradas', to: '/admin/entradas' },
   { tab: 'equipe', label: 'Equipe', to: '/admin/equipe' },
+  { tab: 'configuracoes', label: 'Configurações', to: '/admin/configuracoes' },
 ];
 
 /** Itens do painel: no computador, coluna lateral; no celular, dentro da gaveta. */
@@ -898,6 +901,35 @@ export function AdminOrderPage({ id }: { id: string }) {
               <dt>Id no gateway</dt>
               <dd className="px-mono">{o.gatewayPaymentId ?? 'Sem referência'}</dd>
             </div>
+            {/* Valores da taxa de serviço (D-90) depois dos dados de sempre: não mudam a coluna de quem já estava na grade. */}
+            <div>
+              <dt>Valor dos ingressos</dt>
+              <dd>{brl(o.ticketsCents ?? o.totalCents)}</dd>
+            </div>
+            <div>
+              <dt>Taxa de serviço</dt>
+              <dd>
+                {o.serviceFeeCents
+                  ? `${brl(o.serviceFeeCents)} (${formatRate(o.serviceFeeRateBps ?? 0)}${o.serviceFeeMinCents ? `, mínimo ${brl(o.serviceFeeMinCents)}` : ''})`
+                  : 'Sem taxa'}
+              </dd>
+            </div>
+            <div>
+              <dt>Tarifa do Mercado Pago</dt>
+              <dd>
+                {o.gatewayFeeCents === null || o.gatewayFeeCents === undefined
+                  ? o.paidAt
+                    ? 'Ainda não informada (a rotina diária consulta)'
+                    : 'Sem pagamento'
+                  : `${brl(o.gatewayFeeCents)}${o.gatewayNetCents !== null && o.gatewayNetCents !== undefined ? ` · líquido ${brl(o.gatewayNetCents)}` : ''}`}
+              </dd>
+            </div>
+            {o.paidAt ? (
+              <div>
+                <dt>Valor a devolver num reembolso total</dt>
+                <dd>{brl(o.refundCents ?? o.totalCents)}, com a taxa de serviço</dd>
+              </div>
+            ) : null}
           </dl>
 
           <h2 className="px-h3">Itens</h2>
@@ -905,11 +937,18 @@ export function AdminOrderPage({ id }: { id: string }) {
             {o.items.map(i => (
               <li key={i.name}>
                 <span>
-                  {i.quantity} × {i.name} ({brl(i.unitPriceCents)})
+                  {i.quantity} × {i.name} ({brl(i.unitPriceCents)}
+                  {i.unitServiceFeeCents ? ` + ${brl(i.unitServiceFeeCents)} de taxa` : ''})
                 </span>
                 <b className="px-nowrap">{brl(i.subtotalCents)}</b>
               </li>
             ))}
+            {o.serviceFeeCents ? (
+              <li>
+                <span>Taxa de serviço</span>
+                <b className="px-nowrap">{brl(o.serviceFeeCents)}</b>
+              </li>
+            ) : null}
           </ul>
 
           <h2 className="px-h3">Ingressos</h2>
@@ -923,6 +962,13 @@ export function AdminOrderPage({ id }: { id: string }) {
                   <span className={`px-badge px-badge-${TICKET_TONE[t.status]}`}>{TICKET_LABEL[t.status]}</span>
                   {t.usedAt ? <span className="px-muted"> entrou {timeOf(t.usedAt)}</span> : null}
                   {t.cancelReason ? <span className="px-muted"> · {t.cancelReason}</span> : null}
+                  {t.priceCents !== undefined && o.paidAt ? (
+                    // O que volta num reembolso só deste ingresso: o valor dele com a taxa de serviço dele (D-90).
+                    <span className="px-muted">
+                      {' '}
+                      · reembolso deste ingresso: {brl(t.priceCents + (t.serviceFeeCents ?? 0))}
+                    </span>
+                  ) : null}
                 </div>
                 <button
                   type="button"

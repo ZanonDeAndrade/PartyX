@@ -67,6 +67,24 @@ export function paymentOptions(gateway: PaymentGateway | undefined, reservationM
   };
 }
 
+/**
+ * Formas de pagamento que o checkout aceita hoje, para o bloco "Formas de pagamento" da página do evento (sem login). Cartão de
+ * crédito ou débito, como no Brick; `maxInstallments` 1 = à vista (D-02): a página não fala de parcelamento.
+ */
+export interface PublicPaymentMethods {
+  pix: boolean;
+  card: boolean;
+  maxInstallments: number;
+}
+
+export function publicPaymentMethods(gateway: PaymentGateway | undefined, reservationMinutes: number): PublicPaymentMethods {
+  return {
+    pix: pixFits(gateway, reservationMinutes),
+    card: Boolean(gateway),
+    maxInstallments: gateway?.capabilities.maxInstallments ?? 1,
+  };
+}
+
 /** Folga mínima para criar a cobrança: abaixo disso o Pix nasceria praticamente vencido. */
 const MIN_REMAINING_SECONDS = 30;
 

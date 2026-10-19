@@ -15,6 +15,7 @@ import {
   AdminTicketsPage,
 } from '../adminPeople';
 import { FeeReportPage, PromoterReportPage, SalesReportPage } from '../reportPages';
+import { AdminSettingsPage } from '../adminSettings';
 
 const ID = '([0-9a-f-]{36})';
 
@@ -30,6 +31,7 @@ export default function AdminArea({ path }: { path: string }) {
   if (path === '/admin/entradas') return <AdminEntriesPage />;
   if (path === '/admin/equipe') return <AdminTeamPage />;
   if (path === '/admin/conta') return <AdminAccountPage />;
+  if (path === '/admin/configuracoes') return <AdminSettingsPage />;
   if (path === '/admin/relatorios/vendas') return <SalesReportPage />;
   if (path === '/admin/relatorios/promoters') return <PromoterReportPage />;
   if (path === '/admin/relatorios/taxa-mensal') return <FeeReportPage />;

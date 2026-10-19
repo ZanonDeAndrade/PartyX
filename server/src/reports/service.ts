@@ -42,6 +42,8 @@ const all = (conds: SQL[]): SQL => sql.join(conds, sql` and `);
  * média arredondada; senão, quantidade vezes preço. Mantém a conciliação com os pedidos (CA-28) centavo a centavo.
  */
 const ITEM_CENTS = sql`coalesce((select sum(il.quantity * il.unit_price_cents) from order_item_lots il where il.order_item_id = i.id), i.quantity * i.unit_price_cents)`;
+/** Taxa de serviço da linha (D-90): soma das taxas por ingresso, guardada no item. Zero nos pedidos anteriores à taxa. */
+const ITEM_FEE_CENTS = sql`i.service_fee_cents`;
 
 // ---------- vendas por evento e por tipo (RF-58, CA-28) ----------
 
@@ -59,7 +61,7 @@ export async function salesReport(deps: ReportDeps, f: SalesFilter) {
 
   const rows = await deps.db.execute<Record<string, unknown>>(sql`
     select e.id as event_id, e.name as event_name, e.starts_at, ty.id as type_id, ty.name as type_name,
-           sum(i.quantity)::int as qty, sum(${ITEM_CENTS})::bigint as cents
+           sum(i.quantity)::int as qty, sum(${ITEM_CENTS})::bigint as cents, sum(${ITEM_FEE_CENTS})::bigint as fee_cents
       from orders o
       join order_items i on i.order_id = o.id
       join ticket_types ty on ty.id = i.ticket_type_id
@@ -73,7 +75,8 @@ export async function salesReport(deps: ReportDeps, f: SalesFilter) {
   if (f.typeId) lotConds.push(sql`il.ticket_type_id = ${f.typeId}`);
   const lotRows = await deps.db.execute<Record<string, unknown>>(sql`
     select il.ticket_type_id as type_id, l.id as lot_id, l.name as lot_name, l.position,
-           sum(il.quantity)::int as qty, sum(il.quantity * il.unit_price_cents)::bigint as cents
+           sum(il.quantity)::int as qty, sum(il.quantity * il.unit_price_cents)::bigint as cents,
+           sum(il.quantity * il.unit_service_fee_cents)::bigint as fee_cents
       from orders o
       join order_item_lots il on il.order_id = o.id
       join ticket_lots l on l.id = il.lot_id
@@ -83,7 +86,13 @@ export async function salesReport(deps: ReportDeps, f: SalesFilter) {
   const lotsOf = (typeId: string) =>
     lotRows.rows
       .filter(r => r.type_id === typeId)
-      .map(r => ({ lotId: r.lot_id as string, lotName: r.lot_name as string, tickets: num(r.qty), cents: num(r.cents) }));
+      .map(r => ({
+        lotId: r.lot_id as string,
+        lotName: r.lot_name as string,
+        tickets: num(r.qty),
+        cents: num(r.cents),
+        serviceFeeCents: num(r.fee_cents),
+      }));
   const lines = rows.rows.map(r => ({
     eventId: r.event_id as string,
     eventName: r.event_name as string,
@@ -91,44 +100,103 @@ export async function salesReport(deps: ReportDeps, f: SalesFilter) {
     typeName: r.type_name as string,
     tickets: num(r.qty),
     cents: num(r.cents),
+    serviceFeeCents: num(r.fee_cents),
     lots: lotsOf(r.type_id as string),
   }));
-  const byEvent = new Map<string, { eventId: string; eventName: string; tickets: number; cents: number }>();
+
+  // Tarifa e líquido do Mercado Pago por evento (D-90): são do pagamento, então ficam por pedido, não por tipo. Só pedidos pagos; os
+  // ainda sem a tarifa (a rotina diária consulta) entram em `ordersWithoutGatewayFee`.
+  const gatewayRows = await deps.db.execute<Record<string, unknown>>(sql`
+    select o.event_id, coalesce(sum(o.gateway_fee_cents), 0)::bigint as fee, coalesce(sum(o.gateway_net_cents), 0)::bigint as net,
+           count(*) filter (where o.gateway_fee_cents is null)::int as missing
+      from orders o
+     where ${all([...base, sql`o.status = 'pago'`])}
+     group by o.event_id`);
+  const gatewayOf = (eventId: string) => {
+    const r = gatewayRows.rows.find(x => x.event_id === eventId);
+    return { gatewayFeeCents: num(r?.fee), gatewayNetCents: num(r?.net), ordersWithoutGatewayFee: num(r?.missing) };
+  };
+  const byEvent = new Map<
+    string,
+    {
+      eventId: string;
+      eventName: string;
+      tickets: number;
+      cents: number;
+      serviceFeeCents: number;
+      chargedCents: number;
+      gatewayFeeCents: number;
+      gatewayNetCents: number;
+      ordersWithoutGatewayFee: number;
+    }
+  >();
   for (const l of lines) {
-    const e = byEvent.get(l.eventId) ?? { eventId: l.eventId, eventName: l.eventName, tickets: 0, cents: 0 };
+    const e = byEvent.get(l.eventId) ?? {
+      eventId: l.eventId,
+      eventName: l.eventName,
+      tickets: 0,
+      cents: 0,
+      serviceFeeCents: 0,
+      chargedCents: 0,
+      ...gatewayOf(l.eventId),
+    };
     e.tickets += l.tickets;
     e.cents += l.cents;
+    e.serviceFeeCents += l.serviceFeeCents;
+    e.chargedCents = e.cents + e.serviceFeeCents;
     byEvent.set(l.eventId, e);
   }
-  const totals = { tickets: lines.reduce((t, l) => t + l.tickets, 0), cents: lines.reduce((t, l) => t + l.cents, 0) };
+  const ticketsCents = lines.reduce((t, l) => t + l.cents, 0);
+  const serviceFeeCents = lines.reduce((t, l) => t + l.serviceFeeCents, 0);
+  const totals = {
+    tickets: lines.reduce((t, l) => t + l.tickets, 0),
+    /** Valor dos ingressos, sem a taxa de serviço. */
+    cents: ticketsCents,
+    serviceFeeCents,
+    /** Ingressos mais taxa de serviço: o que os compradores pagaram. */
+    chargedCents: ticketsCents + serviceFeeCents,
+    // Com filtro de tipo, a tarifa (que é do pedido inteiro) não se divide por tipo: nula.
+    ...(f.typeId
+      ? { gatewayFeeCents: null as number | null, gatewayNetCents: null as number | null, ordersWithoutGatewayFee: null as number | null }
+      : {
+          gatewayFeeCents: gatewayRows.rows.reduce((t, r) => t + num(r.fee), 0) as number | null,
+          gatewayNetCents: gatewayRows.rows.reduce((t, r) => t + num(r.net), 0) as number | null,
+          ordersWithoutGatewayFee: gatewayRows.rows.reduce((t, r) => t + num(r.missing), 0) as number | null,
+        }),
+  };
 
-  // Conciliação (CA-28): o total das linhas precisa bater com a soma dos pedidos pagos. Só faz sentido sem filtro de tipo,
-  // porque um pedido pode ter vários tipos.
+  // Conciliação (CA-28): ingressos mais taxa de serviço das linhas precisam bater com a soma dos pedidos pagos (D-90). Só faz sentido
+  // sem filtro de tipo, porque um pedido pode ter vários tipos.
   const orderSum = await deps.db.execute<{ n: number; cents: string }>(sql`
     select count(*)::int as n, coalesce(sum(o.total_cents), 0)::bigint as cents from orders o where ${all([...base, sql`o.status = 'pago'`])}`);
   const ordersCents = num(orderSum.rows[0]?.cents);
-  const reconciliation = f.typeId
-    ? { ok: null as boolean | null, ordersCents, itemsCents: totals.cents, orders: num(orderSum.rows[0]?.n) }
-    : { ok: ordersCents === totals.cents, ordersCents, itemsCents: totals.cents, orders: num(orderSum.rows[0]?.n) };
+  const reconciliation = {
+    ok: f.typeId ? (null as boolean | null) : ordersCents === totals.chargedCents,
+    ordersCents,
+    itemsCents: totals.cents,
+    serviceFeeCents: totals.serviceFeeCents,
+    orders: num(orderSum.rows[0]?.n),
+  };
 
   // Devoluções e exceções, separadas das vendas: nada disso entra no total acima.
-  const other = await deps.db.execute<{ status: string; orders: number; tickets: number; cents: string }>(sql`
+  const other = await deps.db.execute<{ status: string; orders: number; tickets: number; cents: string; fee_cents: string }>(sql`
     select o.status::text as status, count(*)::int as orders,
            coalesce(sum((select sum(i.quantity) from order_items i where i.order_id = o.id)), 0)::int as tickets,
-           coalesce(sum(o.total_cents), 0)::bigint as cents
+           coalesce(sum(o.total_cents), 0)::bigint as cents, coalesce(sum(o.service_fee_cents), 0)::bigint as fee_cents
       from orders o
      where ${all([...base, sql`o.status in ('estornado', 'contestado', 'pago_sem_estoque')`])}
      group by o.status`);
   const bucket = (s: string) => {
     const r = other.rows.find(x => x.status === s);
-    return { orders: num(r?.orders), tickets: num(r?.tickets), cents: num(r?.cents) };
+    // `cents` é o total pago (com a taxa de serviço): é o que volta num estorno total.
+    return { orders: num(r?.orders), tickets: num(r?.tickets), cents: num(r?.cents), serviceFeeCents: num(r?.fee_cents) };
   };
   const refunded = bucket('estornado');
   const contested = bucket('contestado');
 
-  const daily = await deps.db.execute<{ day: string; qty: number; cents: string }>(sql`
+  const daily = await deps.db.execute<{ day: string; qty: number; cents: string; fee_cents: string }>(sql`
     select to_char(o.paid_at at time zone ${TZ}, 'YYYY-MM-DD') as day, sum(i.quantity)::int as qty,
-           sum(${ITEM_CENTS})::bigint as cents
+           sum(${ITEM_CENTS})::bigint as cents, sum(${ITEM_FEE_CENTS})::bigint as fee_cents
       from orders o join order_items i on i.order_id = o.id
      where ${all(itemConds)}
      group by 1 order by 1 limit 400`);
@@ -140,16 +208,21 @@ export async function salesReport(deps: ReportDeps, f: SalesFilter) {
     byEvent: [...byEvent.values()],
     totals,
     reconciliation,
-    daily: daily.rows.map(d => ({ day: d.day, tickets: num(d.qty), cents: num(d.cents) })),
+    daily: daily.rows.map(d => ({ day: d.day, tickets: num(d.qty), cents: num(d.cents), serviceFeeCents: num(d.fee_cents) })),
     reversals: {
       refunded,
       contested,
-      // Receita líquida = vendas pagas (já sem estornados e contestados). Bruta = líquida + devolvidos/contestados.
-      grossCents: totals.cents + refunded.cents + contested.cents,
-      netCents: totals.cents,
+      // Receita líquida = o que os compradores pagaram nos pedidos pagos (ingressos e taxa de serviço, já sem estornados e
+      // contestados). Bruta = líquida + devolvidos/contestados (o total deles, com a taxa).
+      grossCents: totals.chargedCents + refunded.cents + contested.cents,
+      netCents: totals.chargedCents,
     },
     exceptions: { paidWithoutStock: bucket('pago_sem_estoque') },
-    notes: ['Não inclui taxas do gateway (D-04) nem comissão de promoter.'],
+    notes: [
+      'Valor dos ingressos sem a taxa de serviço; a taxa de serviço e a tarifa do Mercado Pago têm colunas próprias.',
+      'Tarifa do Mercado Pago: lida do Mercado Pago pela rotina diária, por pedido pago; pedido ainda sem tarifa aparece como não informado.',
+      'Não inclui comissão de promoter.',
+    ],
   };
 }
 
@@ -229,7 +302,7 @@ export async function promoterOrders(deps: ReportDeps, promoterId: string, f: Pe
     ...(f.eventId ? [sql`o.event_id = ${f.eventId}`] : []),
   ];
   const rows = await deps.db.execute<Record<string, unknown>>(sql`
-    select o.id, o.number, o.total_cents, o.paid_at, e.name as event_name,
+    select o.id, o.number, o.total_cents - o.service_fee_cents as tickets_cents, o.paid_at, e.name as event_name,
            (select sum(i.quantity) from order_items i where i.order_id = o.id)::int as qty
       from orders o join events e on e.id = o.event_id
      where ${all(conds)}
@@ -241,12 +314,13 @@ export async function promoterOrders(deps: ReportDeps, promoterId: string, f: Pe
       number: num(r.number),
       eventName: r.event_name as string,
       tickets: num(r.qty),
-      cents: num(r.total_cents),
+      // Valor atribuído ao promoter: o dos ingressos, sem a taxa de serviço (D-90), como no ranking.
+      cents: num(r.tickets_cents),
       paidAt: iso(r.paid_at),
     })),
     totals: {
       tickets: rows.rows.reduce((t, r) => t + num(r.qty), 0),
-      cents: rows.rows.reduce((t, r) => t + num(r.total_cents), 0),
+      cents: rows.rows.reduce((t, r) => t + num(r.tickets_cents), 0),
     },
   };
 }

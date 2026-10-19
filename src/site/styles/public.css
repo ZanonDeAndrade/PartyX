@@ -1053,6 +1053,42 @@ body.px-dark .px-event-side .px-fine {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
+/* Taxa de serviço (D-90): menor, ao lado do valor do ingresso, que continua em destaque. */
+.px-type-fee {
+  font-size: var(--px-t-sm);
+  font-weight: 600;
+  color: var(--px-text-3);
+  white-space: nowrap;
+}
+/* Formas de pagamento aceitas hoje, abaixo dos ingressos. */
+.px-paymethods {
+  margin: var(--px-s-4) 0 0;
+  padding-top: var(--px-s-3);
+  border-top: 1px solid var(--px-line-2);
+}
+.px-paymethods h3 {
+  margin: 0 0 var(--px-s-2);
+  font-size: var(--px-t-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--px-text-3);
+}
+.px-paymethods ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--px-s-2);
+}
+.px-paymethods li {
+  padding: 4px 10px;
+  border: 1px solid var(--px-line);
+  border-radius: var(--px-r-pill);
+  font-size: var(--px-t-sm);
+  font-weight: 600;
+}
 .px-type-note {
   margin: 2px 0 0;
   font-size: var(--px-t-sm);

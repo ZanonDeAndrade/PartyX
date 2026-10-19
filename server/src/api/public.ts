@@ -6,12 +6,14 @@ import { AppError } from '../domain/errors';
 import { isLegalKind, legalDocument } from '../legal/documents';
 import { createMemoryLimiter } from '../auth/limits';
 import { blankAuthorizationPdf } from '../minors/authorization';
+import type { PaymentGateway } from '../payments/gateway';
+import { publicPaymentMethods } from '../orders/payment';
 
 /**
  * Vitrine pública: leitura sem login. A disponibilidade em cache é só para exibir; quem decide
  * é o checkout, que confere de novo dentro da transação de reserva (RF-33).
  */
-export function publicRoutes(deps: VitrineDeps & { config: Config }) {
+export function publicRoutes(deps: VitrineDeps & { config: Config; gateway?: PaymentGateway }) {
   const app = new Hono();
   // Sem cache compartilhado: a política da API inteira é `private, no-store` (definida em `app.ts`). Decisão de produção: atrás do
   // Firebase Hosting, nenhuma resposta de `/api/*` pode ficar na CDN, nem a vitrine. O volume esperado cabe no Cloud Run sem isso.
@@ -28,6 +30,8 @@ export function publicRoutes(deps: VitrineDeps & { config: Config }) {
       turnstileSiteKey: deps.config.TURNSTILE_SITE_KEY ?? null,
       // Dados e contatos públicos DA PARTYX para o rodapé e os textos de atendimento (D-16). Só o que vier da configuração.
       partyx: deps.config.partyx,
+      // O que o checkout aceita hoje (bloco "Formas de pagamento" da página do evento).
+      payment: publicPaymentMethods(deps.gateway, deps.config.RESERVATION_MINUTES),
     }),
   );
   /** Textos legais (RF-68). Texto simples em blocos; o front nunca o trata como HTML. */

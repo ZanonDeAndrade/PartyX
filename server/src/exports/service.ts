@@ -83,6 +83,8 @@ export async function exportOrders(deps: ExportDeps, f: Omit<OrderFilter, 'page'
       'Código do promoter',
       'Ingressos',
       'Ingressos cancelados',
+      'Valor dos ingressos (R$)',
+      'Taxa de serviço (R$)',
       'Valor (R$)',
     ],
     rows.map(o => [
@@ -98,6 +100,8 @@ export async function exportOrders(deps: ExportDeps, f: Omit<OrderFilter, 'page'
       o.coupon ?? '',
       int(o.tickets),
       int(o.cancelledTickets),
+      money(o.totalCents - o.serviceFeeCents),
+      money(o.serviceFeeCents),
       money(o.totalCents),
     ]),
     [
@@ -225,15 +229,41 @@ export async function exportSales(
   // Uma linha por lote (0013) quando o tipo vende em lotes; o "Lote único" fica numa linha só, com a coluna do lote em branco.
   const rowsByLot = r.lines.flatMap((l): Cell[][] => {
     const named = l.lots.filter(x => x.lotName !== 'Lote único');
-    if (named.length === 0) return [[l.eventName, l.typeName, '', int(l.tickets), money(l.cents)]];
-    return l.lots.map(x => [l.eventName, l.typeName, x.lotName, int(x.tickets), money(x.cents)]);
+    const row = (lot: string, tickets: number, cents: number, fee: number): Cell[] => [
+      l.eventName,
+      l.typeName,
+      lot,
+      int(tickets),
+      money(cents),
+      money(fee),
+      money(cents + fee),
+    ];
+    if (named.length === 0) return [row('', l.tickets, l.cents, l.serviceFeeCents)];
+    return l.lots.map(x => row(x.lotName, x.tickets, x.cents, x.serviceFeeCents));
   });
+  const optionalMoney = (cents: number | null) => (cents === null ? 'não se aplica com filtro de tipo' : money(cents));
   const csv = toCsv(
-    ['Evento', 'Tipo de ingresso', 'Lote', 'Ingressos', 'Valor (R$)'],
+    ['Evento', 'Tipo de ingresso', 'Lote', 'Ingressos', 'Valor dos ingressos (R$)', 'Taxa de serviço (R$)', 'Total cobrado (R$)'],
     rowsByLot,
     [
-      ['TOTAL', '', '', int(r.totals.tickets), money(r.totals.cents)],
-      ['Soma dos pedidos pagos (R$)', '', '', '', money(r.reconciliation.ordersCents)],
+      [
+        'TOTAL',
+        '',
+        '',
+        int(r.totals.tickets),
+        money(r.totals.cents),
+        money(r.totals.serviceFeeCents),
+        money(r.totals.chargedCents),
+      ],
+      ['Soma dos pedidos pagos (R$)', '', '', '', '', '', money(r.reconciliation.ordersCents)],
+      ['Tarifa do Mercado Pago (R$)', '', '', '', '', '', optionalMoney(r.totals.gatewayFeeCents)],
+      ['Líquido recebido do Mercado Pago (R$)', '', '', '', '', '', optionalMoney(r.totals.gatewayNetCents)],
+      [
+        'Pedidos pagos ainda sem a tarifa informada',
+        '',
+        '',
+        r.totals.ordersWithoutGatewayFee === null ? 'não se aplica com filtro de tipo' : int(r.totals.ordersWithoutGatewayFee),
+      ],
       [
         'Conciliação',
         '',

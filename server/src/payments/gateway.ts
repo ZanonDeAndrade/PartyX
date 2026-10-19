@@ -80,6 +80,12 @@ export type NotificationCheck =
   | { valid: true; eventId: string; type: string; subject: NotificationSubject }
   | { valid: false; reason: 'assinatura_ausente' | 'assinatura_invalida' | 'formato_invalido' | 'fora_do_prazo' };
 
+/** Tarifa e líquido de um pagamento, em centavos. `netCents` nulo quando o provedor não informa. */
+export interface GatewayFees {
+  feeCents: number;
+  netCents: number | null;
+}
+
 export interface PaymentGateway {
   readonly capabilities: GatewayCapabilities;
   createPix(input: CreatePixInput): Promise<CreatedPayment>;
@@ -91,6 +97,11 @@ export interface PaymentGateway {
    * resposta de criação se perdeu (tempo esgotado depois de o gateway criar). Opcional: sem ela, a recuperação fica com o webhook.
    */
   findPaymentsByOrderRef?(orderId: string, since: Date): Promise<PaymentSnapshot[]>;
+  /**
+   * Tarifa cobrada pelo provedor e líquido recebido no pagamento APROVADO de um pedido nosso (relatório da taxa de serviço, D-90).
+   * Nulo quando o provedor não informa ou não há exatamente um pagamento aprovado. Opcional: sem ela, o relatório mostra "não informada".
+   */
+  paymentFees?(orderId: string): Promise<GatewayFees | null>;
   /** Autentica a notificação segundo o método do provedor, sobre o corpo **bruto** recebido e os parâmetros da URL. */
   verifyNotification(input: { headers: Headers; rawBody: string; query: URLSearchParams }): Promise<NotificationCheck>;
   /** Conta do provedor que deve receber (a da PartyX). Usada na conferência antes de aprovar. */

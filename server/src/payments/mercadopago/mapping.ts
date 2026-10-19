@@ -22,6 +22,14 @@ export interface MpTransaction {
 }
 
 /** Só os campos que a PartyX lê. Tudo opcional: o adaptador nunca confia no formato sem conferir. */
+/** Resultado de `GET /v1/payments/search`, só o que a tarifa usa (D-90). */
+export interface MpPaymentSearchResult {
+  status?: string | null;
+  external_reference?: string;
+  fee_details?: { amount?: number | string | null; fee_payer?: string | null; type?: string | null }[] | null;
+  transaction_details?: { net_received_amount?: number | string | null } | null;
+}
+
 export interface MpOrder {
   id?: string;
   status?: string;

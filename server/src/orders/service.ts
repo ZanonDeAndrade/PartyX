@@ -35,6 +35,7 @@ import { logger } from '../logger';
 import type { TaskQueue } from '../payments/taskQueue';
 import type { RequestMeta } from '../auth/types';
 import { assertBuyerMayPurchase, checkBuyer, type BuyerCheck } from './buyer';
+import { currentServiceFee } from '../settings/serviceFee';
 
 export interface OrdersDeps {
   db: Db;
@@ -185,6 +186,10 @@ function forPlan(rows: (typeof ticketTypes.$inferSelect)[]): Map<string, TypeFor
 export interface Summary {
   event: { slug: string; name: string; startsAt: string; venue: string; allowsMinors: boolean };
   items: PlannedLine[];
+  /** Valor dos ingressos, sem a taxa de serviço (D-90). */
+  ticketsCents: number;
+  serviceFeeCents: number;
+  /** Ingressos mais taxa de serviço: o que o comprador paga. */
   totalCents: number;
   units: number;
   coupon: { code: string } | null;
@@ -213,7 +218,14 @@ export async function quote(deps: OrdersDeps, input: CheckoutInput, userId?: str
   );
   // Lotes como valeriam agora, sem gravar: o resumo é informação; quem grava é `createOrder`, com os tipos trancados.
   const lots = await previewTypes(deps.db, rows, now);
-  const plan = planOrder(input.items, forPlan(rows), reserved, now, { byType: lots.byType, reservedByLot: lots.reserved });
+  const plan = planOrder(
+    input.items,
+    forPlan(rows),
+    reserved,
+    now,
+    { byType: lots.byType, reservedByLot: lots.reserved },
+    await currentServiceFee(deps.db),
+  );
   if (!plan.ok) throw stockError(plan.failures);
   await resolveCoupon(deps.db, input.couponCode);
   const code = normalizeCouponCode(input.couponCode ?? '');
@@ -226,6 +238,8 @@ export async function quote(deps: OrdersDeps, input: CheckoutInput, userId?: str
       allowsMinors: event.allowsMinors,
     },
     items: plan.lines,
+    ticketsCents: plan.ticketsCents,
+    serviceFeeCents: plan.serviceFeeCents,
     totalCents: plan.totalCents,
     units: plan.units,
     coupon: code ? { code } : null,
@@ -243,6 +257,10 @@ export interface OrderView {
   /** Comprador com 16 ou 17 anos na data do evento: a tela oferece a autorização preenchida com os dados dele. */
   buyerMinor: boolean;
   items: PlannedLine[];
+  /** Valor dos ingressos (`total_cents - service_fee_cents`). */
+  ticketsCents: number;
+  /** Taxa de serviço guardada no pedido (D-90): não muda se a taxa do painel mudar depois. Zero nos pedidos anteriores. */
+  serviceFeeCents: number;
   totalCents: number;
   coupon: { code: string } | null;
   paymentMethod: 'pix' | 'cartao' | null;
@@ -284,6 +302,7 @@ async function view(
       name: ticketTypes.name,
       quantity: orderItems.quantity,
       unitPriceCents: orderItems.unitPriceCents,
+      serviceFeeCents: orderItems.serviceFeeCents,
     })
     .from(orderItems)
     .innerJoin(ticketTypes, eq(ticketTypes.id, orderItems.ticketTypeId))
@@ -298,6 +317,7 @@ async function view(
       position: ticketLots.position,
       quantity: orderItemLots.quantity,
       unitPriceCents: orderItemLots.unitPriceCents,
+      unitServiceFeeCents: orderItemLots.unitServiceFeeCents,
     })
     .from(orderItemLots)
     .innerJoin(ticketLots, eq(ticketLots.id, orderItemLots.lotId))
@@ -339,6 +359,8 @@ async function view(
         lots,
       };
     }),
+    ticketsCents: order.o.totalCents - order.o.serviceFeeCents,
+    serviceFeeCents: order.o.serviceFeeCents,
     totalCents: order.o.totalCents,
     coupon,
     paymentMethod: order.o.paymentMethod,
@@ -502,10 +524,17 @@ export async function createOrder(
       rows.map(r => r.id),
       now,
     );
-    const plan = planOrder(input.items, forPlan(rows), reserved, now, {
-      byType: settled.byType,
-      reservedByLot: settled.reserved,
-    });
+    // Taxa de serviço lida na mesma transação (D-90): o pedido guarda a taxa, a porcentagem e o mínimo deste instante. Se a taxa
+    // mudou desde a tela, o total muda e o `expectedTotalCents` abaixo recusa, como numa virada de lote.
+    const fee = await currentServiceFee(tx);
+    const plan = planOrder(
+      input.items,
+      forPlan(rows),
+      reserved,
+      now,
+      { byType: settled.byType, reservedByLot: settled.reserved },
+      fee,
+    );
     if (!plan.ok) throw stockError(plan.failures);
     if (input.expectedTotalCents !== undefined && input.expectedTotalCents !== plan.totalCents) {
       throw new AppError(409, 'preco_alterado', 'O valor do pedido mudou. Confira o novo total antes de continuar.', {
@@ -520,6 +549,9 @@ export async function createOrder(
         eventId: event.id,
         promoterId,
         totalCents: plan.totalCents,
+        serviceFeeCents: plan.serviceFeeCents,
+        serviceFeeRateBps: fee.rateBps,
+        serviceFeeMinCents: fee.minCents,
         status: 'pendente',
         buyerMinor: buyer.minor,
         createdAt: now,
@@ -556,9 +588,10 @@ export async function createOrder(
           ticketTypeId: line.ticketTypeId,
           quantity: line.quantity,
           unitPriceCents: line.unitPriceCents,
+          serviceFeeCents: line.serviceFeeCents,
         })
         .returning({ id: orderItems.id });
-      // O preço de cada lote fica preso aqui: quem estiver pagando quando o lote virar paga o preço reservado.
+      // O preço de cada lote (e a taxa de serviço dele) fica preso aqui: quem estiver pagando quando o lote virar paga o reservado.
       for (const part of line.lots) {
         await tx.insert(orderItemLots).values({
           orderItemId: item!.id,
@@ -568,6 +601,7 @@ export async function createOrder(
           lotId: part.lotId,
           quantity: part.quantity,
           unitPriceCents: part.unitPriceCents,
+          unitServiceFeeCents: part.unitServiceFeeCents,
         });
       }
       await tx.insert(reservations).values({

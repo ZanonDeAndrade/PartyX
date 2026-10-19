@@ -180,13 +180,16 @@ export async function ticketDetail(deps: PeopleDeps, id: string) {
   const [t] = (
     await deps.db.execute<Record<string, unknown>>(sql`
       select t.id, t.short_code, t.status::text as status, t.holder_name, t.issued_at, t.used_at, t.cancelled_at, t.cancel_reason,
-             ty.name as type_name, ty.price_cents, e.id as event_id, e.name as event_name, e.starts_at,
+             ty.name as type_name, coalesce(il.unit_price_cents, oi.unit_price_cents) as price_cents,
+             coalesce(il.unit_service_fee_cents, oi.service_fee_cents / oi.quantity) as service_fee_cents, e.id as event_id, e.name as event_name, e.starts_at,
              o.id as order_id, o.number as order_number, o.status::text as order_status, o.paid_at,
              u.id as buyer_id, u.name as buyer_name, u.email as buyer_email, u.cpf as buyer_cpf,
              h.id as holder_id, h.name as holder_account_name, h.email as holder_email, h.cpf as holder_cpf,
              v.name as validator_name
         from tickets t
         join ticket_types ty on ty.id = t.ticket_type_id
+        join order_items oi on oi.id = t.order_item_id
+        left join order_item_lots il on il.order_item_id = t.order_item_id and il.lot_id = t.lot_id
         join events e on e.id = t.event_id
         join orders o on o.id = t.order_id
         join users u on u.id = o.user_id
@@ -214,7 +217,9 @@ export async function ticketDetail(deps: PeopleDeps, id: string) {
       status: t.status as string,
       holderName: t.holder_name as string,
       typeName: t.type_name as string,
+      // Valor PAGO por este ingresso (o do lote dele, não o preço atual do tipo) e a taxa de serviço dele (D-90).
       priceCents: num(t.price_cents),
+      serviceFeeCents: num(t.service_fee_cents),
       issuedAt: iso(t.issued_at)!,
       event: { id: t.event_id as string, name: t.event_name as string, startsAt: iso(t.starts_at)! },
       order: {

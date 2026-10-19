@@ -301,6 +301,19 @@ cmd_conferir() {
       legal_ok "$k" || { echo "Recuso: $legal_dir/$k.txt ausente $where (texto de menores)." >&2; exit 1; }
     done
   fi
+  # Taxa de serviço (D-90): a release que cobra a taxa (migração 0017 na tag) só sobe com os Termos de Uso 1.3 e a Política de
+  # Cancelamento 1.1, que falam dela; os textos anteriores diziam que não havia taxa (infra/producao/textos-taxa.py).
+  local fee_migration="drizzle/0017_taxa_de_servico.sql"
+  if { [ -n "${RELEASE:-}" ] && git cat-file -e "refs/tags/$RELEASE:$fee_migration" 2>/dev/null; } || { [ -z "${RELEASE:-}" ] && [ -f "$fee_migration" ]; }; then
+    local fee_tmp; fee_tmp="$(mktemp -d)"
+    for k in termos-de-uso cancelamento; do
+      if [ -n "${RELEASE:-}" ]; then git show "refs/tags/$RELEASE:$legal_dir/$k.txt" > "$fee_tmp/$k.txt" 2>/dev/null || : > "$fee_tmp/$k.txt"
+      else cat "$legal_dir/$k.txt" > "$fee_tmp/$k.txt" 2>/dev/null || : > "$fee_tmp/$k.txt"; fi
+    done
+    python3 -I infra/producao/textos-taxa.py "$fee_tmp/termos-de-uso.txt" "$fee_tmp/cancelamento.txt" "${TERMS_VERSION:-}" "${CANCELLATION_VERSION:-}" \
+      || { rm -rf "$fee_tmp"; echo "Recuso: a release cobra a taxa de serviço e os textos legais $where não são os da taxa (Termos 1.3, Política 1.1)." >&2; exit 1; }
+    rm -rf "$fee_tmp"
+  fi
   if [ "$SALES_OPEN" = "true" ]; then   # travas extras para ABRIR A VENDA (go-live)
     [ "$PAYMENT_GATEWAY" != "none" ] || { echo "Recuso: venda aberta sem gateway real." >&2; exit 1; }
     for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE GO_LIVE_CONFIRMED; do [ -n "${!v:-}" ] || { echo "Recuso: $v é obrigatório para abrir a venda." >&2; exit 1; }; done
@@ -428,6 +441,25 @@ cmd_candidata() {
   echo "candidata aprovada no teste rápido. Para colocar no ar: ./infra/producao/deploy.sh virar"
 }
 
+# Texto legal com versão nova vale a partir da virada (D-90: Termos 1.3 e Política de Cancelamento 1.1, "vigência na data da virada"):
+# se a candidata troca a versão de um texto, a data dele precisa ser a de hoje em São Paulo. Senão, ajuste a data no env e refaça a
+# candidata. Mesma versão (publicação que não mexe nos textos): nada a conferir.
+legal_dates_on_switch() {
+  local current="$1" target="$2" today; today="$(TZ=America/Sao_Paulo date +%F)"
+  local env_of='import json,sys; c=json.load(sys.stdin)["spec"]["containers"][0]; print("\n".join(e["name"] + "=" + e["value"] for e in c.get("env", []) if "value" in e))'
+  local cur tgt kind v d cv
+  cur="$(g run revisions describe "$current" --region="$REGION" --format=json | python3 -I -c "$env_of")"
+  tgt="$(g run revisions describe "$target" --region="$REGION" --format=json | python3 -I -c "$env_of")"
+  for kind in TERMS PRIVACY CANCELLATION; do
+    v="$(printf '%s\n' "$tgt" | sed -n "s/^${kind}_VERSION=//p")"; d="$(printf '%s\n' "$tgt" | sed -n "s/^${kind}_DATE=//p")"
+    cv="$(printf '%s\n' "$cur" | sed -n "s/^${kind}_VERSION=//p")"
+    if [ -n "$v" ] && [ "$v" != "$cv" ] && [ "$d" != "$today" ]; then
+      echo "Recuso: a candidata publica ${kind}_VERSION=$v (antes ${cv:-nenhuma}) com vigência $d, e a virada é hoje ($today). Troque ${kind}_DATE no $ENV_FILE para $today e refaça a candidata." >&2
+      exit 1
+    fi
+  done
+}
+
 # Passa 100% do tráfego para a candidata. A revisão anterior continua existindo: o comando de volta sai impresso aqui.
 cmd_virar() {
   load_env_file
@@ -438,6 +470,7 @@ cmd_virar() {
     | python3 -I -c 'import json,sys; print(next((t["revisionName"] for t in json.load(sys.stdin)["status"]["traffic"] if t.get("tag")=="'"$CANDIDATE_TAG"'"), ""))')"
   [ -n "$target" ] || { echo "Recuso: não há revisão com a tag $CANDIDATE_TAG (rode 'candidata' antes)." >&2; exit 1; }
   [ "$target" != "$current" ] || { echo "A candidata $target já recebe 100% do tráfego." ; return 0; }
+  legal_dates_on_switch "$current" "$target"
   echo "Atual: $current -> nova: $target"
   echo "ROLLBACK, se precisar: PROJECT=$PROJECT REVISAO=$current ./infra/producao/deploy.sh rollback"
   g run services update-traffic "$SERVICE" --region="$REGION" --to-revisions="$target=100" --quiet

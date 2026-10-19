@@ -220,6 +220,8 @@ async function compose(
       venue: events.venue,
       allowsMinors: events.allowsMinors,
       id: orders.id,
+      totalCents: orders.totalCents,
+      serviceFeeCents: orders.serviceFeeCents,
     })
     .from(orders)
     .innerJoin(events, eq(events.id, orders.eventId))
@@ -247,6 +249,10 @@ async function compose(
     units: total === 1 ? '1 ingresso' : `${total} ingressos`,
     paidAt: formatEventDateTime(order.paidAt).replace(' ', ' às '),
     lines: units.map(u => `${u.n} × ${u.type}`),
+    // Comprovante (D-90): valor dos ingressos e taxa de serviço separados, guardados no pedido. Sem taxa, a linha da taxa não aparece.
+    ticketsAmount: formatBRL(order.totalCents - order.serviceFeeCents),
+    serviceFee: order.serviceFeeCents > 0 ? formatBRL(order.serviceFeeCents) : null,
+    totalPaid: formatBRL(order.totalCents),
     // Página do site que exige entrar na conta e baixa a autorização do pedido (o e-mail nunca leva o PDF nem dado do menor).
     minorAuthorizationUrl: order.allowsMinors ? `${ctx.baseUrl}/autorizacao-menor/pedido/${order.id}` : null,
   };

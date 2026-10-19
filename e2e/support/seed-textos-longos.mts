@@ -20,7 +20,7 @@ const URL_LONGA =
 const DESC = `${LONG('Testetesteteste', 300)}\n\nMais informações: ${URL_LONGA}\n\nTraga seu documento 🎉🎶🍾✨🔥🥳👯‍♀️🇧🇷\nSegunda linha digitada pelo admin, depois de uma quebra.`;
 export const BUYER_EMAIL = 'compradora.com.um.endereco.de.email.bem.comprido.para.testar.a.quebra@partyx.test';
 
-const db = await createTestDatabase(testDatabaseUrl());
+const db = await createTestDatabase(testDatabaseUrl(), { serviceFee: { rateBps: 500, minCents: 0 } });
 const q = (t: string, p: unknown[] = []) => db.pool.query(t, p);
 const hash = await argon2Hasher.hash('festa2026');
 const user = async (name: string, email: string, cpf: string | null, role: string) =>

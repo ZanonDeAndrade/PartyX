@@ -200,6 +200,8 @@ export interface ReconcileRunOptions {
    */
   reversalIntervalSeconds?: number;
   reversalLimit?: number;
+  /** Tarifas do gateway dos pedidos pagos ainda sem elas (relatório da taxa de serviço, D-90): até tantos por execução. Padrão: 100. */
+  feesLimit?: number;
 }
 
 export interface RunSummary {
@@ -208,6 +210,8 @@ export interface RunSummary {
   orders: { checked: number; failed: number; outcomes: Partial<Record<ReconcileOutcome, number>> };
   /** Reconsulta dos pedidos pagos (estorno ou contestação sem webhook). */
   paid: { checked: number; failed: number; outcomes: Partial<Record<ReconcileOutcome, number>> };
+  /** Tarifa e líquido do gateway gravados nos pedidos pagos (D-90). */
+  fees: { checked: number; filled: number; failed: number };
 }
 
 /**
@@ -259,7 +263,53 @@ export async function runReconciliation(deps: ReconcileDeps, options: ReconcileR
   // fora desta execução justamente o pedido que ninguém abriu e cujas tarefas falharam. A aprovação de um pedido ainda "pendente" com
   // reserva vencida já segue o caminho tardio (emite se houver estoque, senão "pago sem estoque").
   const expired = await expireOverdue(deps);
-  return { expired, events, orders: open, paid };
+  const fees = await fillGatewayFees(deps, options.feesLimit ?? 100);
+  return { expired, events, orders: open, paid, fees };
+}
+
+/**
+ * Grava a tarifa e o líquido que o gateway informa nos pedidos pagos que ainda não têm (D-90; relatório "a taxa cobre a tarifa?").
+ * Só pedidos pagos há mais de 10 minutos (a busca do gateway indexa com atraso). Sem resposta, tenta de novo na próxima execução,
+ * até 3 dias depois do pagamento; depois disso marca como consultado, e o relatório mostra "não informada".
+ */
+async function fillGatewayFees(deps: ReconcileDeps, limit: number) {
+  const summary = { checked: 0, filled: 0, failed: 0 };
+  const lookup = deps.gateway.paymentFees?.bind(deps.gateway);
+  if (!lookup) return summary;
+  const now = deps.clock.now();
+  const rows = await deps.db
+    .select({ id: orders.id, paidAt: orders.paidAt })
+    .from(orders)
+    .where(
+      and(
+        isNull(orders.gatewayFeeCheckedAt),
+        sql`${orders.gatewayPaymentId} is not null`,
+        sql`${orders.status} in ('pago', 'estornado', 'contestado', 'pago_sem_estoque')`,
+        lt(orders.paidAt, new Date(now.getTime() - 10 * 60_000)),
+      ),
+    )
+    .orderBy(asc(orders.paidAt))
+    .limit(limit);
+  for (const row of rows) {
+    summary.checked++;
+    try {
+      const fees = await lookup(row.id);
+      const giveUp = row.paidAt!.getTime() < now.getTime() - 3 * 86_400_000;
+      if (!fees && !giveUp) continue;
+      await deps.db
+        .update(orders)
+        .set({ gatewayFeeCents: fees?.feeCents ?? null, gatewayNetCents: fees?.netCents ?? null, gatewayFeeCheckedAt: now })
+        .where(eq(orders.id, row.id));
+      if (fees) summary.filled++;
+    } catch (error) {
+      summary.failed++;
+      logger.warn('tarifa do gateway não consultada', {
+        orderId: row.id,
+        error: error instanceof GatewayError ? 'gateway_indisponivel' : 'erro_interno',
+      });
+    }
+  }
+  return summary;
 }
 
 async function reconsultAll(deps: ReconcileDeps, rows: { gateway_payment_id: string }[]) {

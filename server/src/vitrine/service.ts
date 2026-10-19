@@ -17,6 +17,8 @@ import {
 import { reservedByType } from '../events/service';
 import { bannerSrcSet, shareImageUrl } from '../media/banner';
 import type { Clock } from '../providers/clock';
+import { unitServiceFee } from '../domain/serviceFee';
+import { currentServiceFee } from '../settings/serviceFee';
 
 export interface VitrineDeps {
   db: Db;
@@ -48,6 +50,8 @@ export interface PublicTicketType {
   name: string;
   /** Preço do lote à venda. Nulo quando nenhum lote está à venda (o do próximo não aparece antes de ele abrir). */
   priceCents: number | null;
+  /** Taxa de serviço de cada ingresso a esse preço (D-90). Zero: a página não mostra taxa. Nula junto com o preço. */
+  serviceFeeCents: number | null;
   /** Lote à venda, quando o tipo vende em lotes (mais de um). Tipo de lote único: nulo, como antes dos lotes. */
   lot: { name: string; position: number } | null;
   /** Unidades que ainda restam no lote à venda, quando há próximo lote (para avisar que o excedente sai do próximo). */
@@ -261,6 +265,7 @@ export async function previewById(
 async function detail(deps: VitrineDeps, row: EventRow, preview: boolean): Promise<PublicEventDetail> {
   const { now, byEvent } = await load(deps, [row]);
   const types = byEvent.get(row.id) ?? [];
+  const fee = await currentServiceFee(deps.db);
   const base = strip(card(row, types, now));
   const ended = row.status === 'encerrado';
   return {
@@ -286,10 +291,12 @@ async function detail(deps: VitrineDeps, row: EventRow, preview: boolean): Promi
       const available = inLots ? (current?.available ?? 0) : availableQuantity(t);
       // Nenhum lote à venda e um aguardando a data: "Próximo lote: em breve", sem o preço dele.
       const betweenLots = inLots && !current && t.lots.waitingStart && state === 'em_breve';
+      const priceCents = inLots ? (current?.priceCents ?? null) : t.priceCents;
       return {
         id: t.id,
         name: t.name,
-        priceCents: inLots ? (current?.priceCents ?? null) : t.priceCents,
+        priceCents,
+        serviceFeeCents: priceCents === null ? null : unitServiceFee(priceCents, fee),
         lot: current && t.lots.lotCount > 1 ? { name: current.name, position: current.position } : null,
         lotRemaining: current && t.lots.hasNext && state === 'a_venda' ? available : null,
         lastUnits: Boolean(current && t.lastUnitsNotice && state === 'a_venda' && lastUnits(available, current.capacity)),

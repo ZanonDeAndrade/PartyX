@@ -117,7 +117,7 @@ export function createApp({ config, clock, pingDatabase, extraApiRoutes, auth, j
       });
     });
   }
-  if (auth) app.route('/api', publicRoutes({ db: auth.db, clock, config }));
+  if (auth) app.route('/api', publicRoutes({ db: auth.db, clock, config, gateway: auth.gateway }));
   // Webhook do gateway e rotinas do Scheduler: sem sessão, sem CSRF. Registradas ANTES do contexto de autenticação.
   if (auth)
     app.route(

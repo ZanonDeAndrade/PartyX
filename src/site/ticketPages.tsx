@@ -28,6 +28,10 @@ import { useSession } from './session';
 import { useFetch } from './useFetch';
 
 /** Leva o visitante ao login e de volta (como no checkout). */
+/** Valor do ingresso e taxa de serviço separados (D-90): "R$ 30,00 + R$ 1,58 de taxa de serviço"; sem taxa, só o valor. */
+const ticketValue = (t: TicketSummary) =>
+  t.serviceFeeCents ? `${brl(t.priceCents ?? 0)} + ${brl(t.serviceFeeCents)} de taxa de serviço` : brl(t.priceCents ?? 0);
+
 export function useLoggedIn(returnTo: string): boolean {
   const { go } = useRouter();
   const session = useSession();
@@ -201,6 +205,7 @@ function WalletGroup({ items: raw }: { items: TicketSummary[] }) {
                 <small>
                   <span className="px-mono">{t.shortCode}</span>
                   <span>{t.receivedFrom ? `Recebido de ${t.receivedFrom.name}` : t.holderName}</span>
+                  {t.priceCents !== undefined ? <span className="px-nowrap">{ticketValue(t)}</span> : null}
                 </small>
               </span>
               <StatusBadge status={t.status} />
@@ -413,6 +418,12 @@ export function TicketPage({ id }: { id: string }) {
                 <dt>Tipo</dt>
                 <dd>{t.typeName}</dd>
               </div>
+              {t.priceCents !== undefined ? (
+                <div>
+                  <dt>Valor</dt>
+                  <dd>{ticketValue(t)}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt>Titular</dt>
                 <dd>{t.holderName}</dd>

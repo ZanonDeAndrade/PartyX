@@ -26,7 +26,7 @@ A PartyX não responde por prejuízos em negociações feitas fora da Plataforma
 
 # 4. Evento cancelado, adiado ou alterado pela PartyX
 
-Se o Evento for cancelado pela PartyX, o valor integral de todos os ingressos é devolvido aos titulares originais dos pedidos, pelo mesmo meio de pagamento, e a PartyX avisa os compradores pela Plataforma e por e-mail.
+Se o Evento for cancelado pela PartyX, o valor total pago, com a taxa de serviço, é devolvido aos titulares originais dos pedidos, pelo mesmo meio de pagamento, e a PartyX avisa os compradores pela Plataforma e por e-mail.
 
 Se o Evento for adiado, os ingressos continuam valendo para a nova data. Quem não puder comparecer na nova data pode pedir o reembolso integral em até 30 dias depois do anúncio.
 
@@ -48,6 +48,6 @@ Pedidos de reembolso, nos casos previstos nesta Política, devem ser feitos pelo
 
 O reembolso é feito pela PartyX, pelo Mercado Pago, no mesmo meio de pagamento usado na compra. No Pix, o valor volta para a conta de origem. No cartão, o estorno aparece na fatura conforme o prazo da operadora, que pode levar até duas faturas.
 
-Como não há taxa de conveniência, o reembolso, quando devido, corresponde ao valor total pago.
+O reembolso, quando devido, corresponde ao valor total pago: o valor do ingresso mais a taxa de serviço. Se só um ingresso do pedido for reembolsado, voltam o valor dele e a taxa de serviço dele.
 
 Nada nesta Política limita os direitos garantidos pelo Código de Defesa do Consumidor.

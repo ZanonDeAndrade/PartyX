@@ -200,7 +200,16 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const expected = (await sql("select coalesce(sum(total_cents),0)::int as s from orders where status = 'pago'"))
         .rows[0].s as number;
       expect(expected).toBe(108000);
-      expect(r.totals).toEqual({ tickets: 9, cents: expected });
+      // Sem taxa de serviço neste banco (0%, D-90): total cobrado = valor dos ingressos. A tarifa do gateway ainda não foi lida.
+      expect(r.totals).toEqual({
+        tickets: 9,
+        cents: expected,
+        serviceFeeCents: 0,
+        chargedCents: expected,
+        gatewayFeeCents: 0,
+        gatewayNetCents: 0,
+        ordersWithoutGatewayFee: 4,
+      });
       expect(r.reconciliation).toMatchObject({ ok: true, ordersCents: expected, itemsCents: expected, orders: 4 });
       expect(r.byEvent.map((e: any) => [e.eventName, e.tickets, e.cents])).toEqual([
         ['Evento A', 6, 60000],
@@ -223,7 +232,16 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       expect((await get(`eventId=${a.id}`)).totals.cents).toBe(28000);
       expect((await get(`eventId=${b.id}`)).totals.cents).toBe(16000);
       const vip = await get(`typeId=${a.types.VIP}`);
-      expect(vip.totals).toEqual({ tickets: 1, cents: 20000 });
+      // Com filtro de tipo, a tarifa do gateway (do pedido inteiro) não se divide: nula.
+      expect(vip.totals).toEqual({
+        tickets: 1,
+        cents: 20000,
+        serviceFeeCents: 0,
+        chargedCents: 20000,
+        gatewayFeeCents: null,
+        gatewayNetCents: null,
+        ordersWithoutGatewayFee: null,
+      });
       expect(vip.reconciliation.ok).toBeNull(); // com filtro de tipo a conciliação por pedido não se aplica
       expect((await get('from=2026-12-11&to=2026-12-11')).totals.cents).toBe(20000); // 23h30 BRT ainda é dia 11
       expect((await get('from=2026-12-12&to=2026-12-12')).totals.cents).toBe(16000);
@@ -240,10 +258,10 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const adm = await session();
       const r = await json(await adm.get('/admin/reports/sales'));
       expect(r.totals.cents).toBe(16000);
-      expect(r.reversals.refunded).toEqual({ orders: 1, tickets: 1, cents: 8000 });
-      expect(r.reversals.contested).toEqual({ orders: 1, tickets: 1, cents: 20000 });
+      expect(r.reversals.refunded).toEqual({ orders: 1, tickets: 1, cents: 8000, serviceFeeCents: 0 });
+      expect(r.reversals.contested).toEqual({ orders: 1, tickets: 1, cents: 20000, serviceFeeCents: 0 });
       expect(r.reversals).toMatchObject({ netCents: 16000, grossCents: 44000 });
-      expect(r.exceptions.paidWithoutStock).toEqual({ orders: 1, tickets: 3, cents: 24000 });
+      expect(r.exceptions.paidWithoutStock).toEqual({ orders: 1, tickets: 3, cents: 24000, serviceFeeCents: 0 });
     });
 
     it('ingresso cancelado pelo administrador dentro de um pedido ainda pago continua no total (o pedido segue pago até o gateway estornar)', async () => {
@@ -252,7 +270,7 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const adm = await session();
       const t = (await sql('select id from tickets where order_id = $1 limit 1', [o.id])).rows[0].id;
       await adm.post(`/admin/tickets/${t}/cancel`, { reason: 'cancelamento de teste', confirm: true });
-      expect((await json(await adm.get('/admin/reports/sales'))).totals).toEqual({ tickets: 2, cents: 16000 });
+      expect((await json(await adm.get('/admin/reports/sales'))).totals).toMatchObject({ tickets: 2, cents: 16000, chargedCents: 16000 });
     });
 
     it('a série diária soma o total', async () => {
@@ -263,8 +281,8 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const adm = await session();
       const r = await json(await adm.get('/admin/reports/sales'));
       expect(r.daily).toEqual([
-        { day: '2026-12-10', tickets: 3, cents: 36000 },
-        { day: '2026-12-11', tickets: 2, cents: 16000 },
+        { day: '2026-12-10', tickets: 3, cents: 36000, serviceFeeCents: 0 },
+        { day: '2026-12-11', tickets: 2, cents: 16000, serviceFeeCents: 0 },
       ]);
       expect(r.daily.reduce((t: number, d: any) => t + d.cents, 0)).toBe(r.totals.cents);
     });

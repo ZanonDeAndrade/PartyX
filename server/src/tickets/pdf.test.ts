@@ -17,6 +17,8 @@ const ticket = (
   receivedFrom: null,
   transferUntil: '2026-12-12T23:00:00.000Z',
   minorTermPending: false,
+  priceCents: 3000,
+  serviceFeeCents: 158,
   qrPayload: 'PX1.1.' + 'a'.repeat(32) + '.' + 'b'.repeat(24) + '.' + 'c'.repeat(22),
   ...over,
   event: {
@@ -49,6 +51,15 @@ describe('PDF do ingresso com texto longo', () => {
     expect(pdf.pages).toBe(1);
     expect(pdf.flat[0]).toContain('Festa');
     expect(pdf.flat[0]).toContain('PX-ABCD-2345');
+  });
+
+  it.skipIf(!HAS_POPPLER)('valor do ingresso e taxa de serviço separados (D-90); sem taxa, só o valor', async () => {
+    // `flat` é o texto da página sem espaços.
+    const com = readPdf(await renderTicketsPdf([ticket()], 'Teste')).flat[0]!;
+    expect(com).toContain('ValorR$30,00+R$1,58detaxadeserviço');
+    const sem = readPdf(await renderTicketsPdf([ticket({ serviceFeeCents: 0 })], 'Teste')).flat[0]!;
+    expect(sem).toContain('ValorR$30,00Titular');
+    expect(sem).not.toContain('taxadeserviço');
   });
 
   it.skipIf(!HAS_POPPLER)(

@@ -11,7 +11,7 @@ import {
   type PaymentGateway,
 } from '../gateway';
 import { createMpHttp, type MpHttpOptions } from './http';
-import { amountFromCents, ORDER_ID, snapshotFrom, type MpOrder } from './mapping';
+import { amountFromCents, centsFromAmount, ORDER_ID, snapshotFrom, type MpOrder, type MpPaymentSearchResult } from './mapping';
 import { verifySignature } from './signature';
 
 /**
@@ -198,6 +198,29 @@ export function createMercadoPagoGateway(o: MercadoPagoOptions): MercadoPagoGate
         if (page >= Number(res.paging?.total_pages ?? 1)) break;
       }
       return found;
+    },
+
+    /**
+     * Tarifa e líquido pela busca de pagamentos (`GET /v1/payments/search?external_reference=`): a Orders API não traz `fee_details`
+     * (conferido no ambiente de teste em 18/10/2026, `fee.sandbox.test.ts`), e `/v1/payments/{id}` não aceita o id do pagamento da
+     * order. Soma as tarifas pagas pela PartyX (`fee_payer: collector`). Mais de um pagamento aprovado (cobrança em dobro): nulo.
+     */
+    async paymentFees(orderId: string) {
+      const params = new URLSearchParams({ external_reference: orderId, sort: 'date_created', criteria: 'desc', limit: '20' });
+      const res = await http.request<{ results?: MpPaymentSearchResult[] | null }>({
+        method: 'GET',
+        path: `/v1/payments/search?${params.toString()}`,
+        idempotent: true,
+      });
+      const approved = (res.results ?? []).filter(
+        p => p.status === 'approved' && (p.external_reference === undefined || p.external_reference === orderId),
+      );
+      if (approved.length !== 1) return null;
+      const payment = approved[0]!;
+      const fees = (payment.fee_details ?? []).filter(f => f.fee_payer === 'collector').map(f => centsFromAmount(f.amount));
+      if (fees.some(f => Number.isNaN(f))) return null;
+      const net = centsFromAmount(payment.transaction_details?.net_received_amount);
+      return { feeCents: fees.reduce((t, f) => t + f, 0), netCents: Number.isNaN(net) ? null : net };
     },
 
     async verifyNotification({ headers, rawBody, query }): Promise<NotificationCheck> {

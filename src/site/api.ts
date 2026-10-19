@@ -26,6 +26,8 @@ export interface TicketTypeView {
   name: string;
   /** Preço do lote à venda; nulo quando nenhum lote está à venda (o do próximo não aparece antes de ele abrir). */
   priceCents: number | null;
+  /** Taxa de serviço de cada ingresso a esse preço (D-90). Zero ou ausente: a página não mostra taxa. */
+  serviceFeeCents?: number | null;
   /** Lote à venda, quando o tipo vende em lotes; nulo no tipo de lote único. */
   lot?: { name: string; position: number } | null;
   /** Unidades que restam no lote à venda quando há próximo lote (o excedente sai do próximo, com o preço dele). */
@@ -74,6 +76,8 @@ export interface SiteInfo {
   turnstileSiteKey: string | null;
   /** Dados e contatos públicos da PartyX (configuração do servidor). Cada campo nulo enquanto a PartyX não informar. */
   partyx: PartyxInfo;
+  /** O que o checkout aceita hoje (bloco "Formas de pagamento" da página do evento). `maxInstallments` 1 = à vista. */
+  payment?: { pix: boolean; card: boolean; maxInstallments: number };
 }
 
 export interface PartyxInfo {
@@ -226,6 +230,8 @@ export interface OrderLineLot {
   quantity: number;
   unitPriceCents: number;
   subtotalCents: number;
+  /** Taxa de serviço de cada ingresso deste lote (D-90). */
+  unitServiceFeeCents?: number;
 }
 export interface OrderLine {
   ticketTypeId: string;
@@ -233,6 +239,8 @@ export interface OrderLine {
   quantity: number;
   unitPriceCents: number;
   subtotalCents: number;
+  /** Taxa de serviço das unidades da linha (D-90). */
+  serviceFeeCents?: number;
   /** Lotes de onde saíram as unidades. Vazio em pedido anterior aos lotes. */
   lots?: OrderLineLot[];
 }
@@ -240,6 +248,10 @@ export interface OrderLine {
 export interface Summary {
   event: { slug: string; name: string; startsAt: string; venue: string; allowsMinors?: boolean };
   items: OrderLine[];
+  /** Valor dos ingressos, sem a taxa de serviço (D-90). */
+  ticketsCents?: number;
+  serviceFeeCents?: number;
+  /** Ingressos mais taxa de serviço: o que o comprador paga. */
   totalCents: number;
   units: number;
   coupon: { code: string } | null;
@@ -257,6 +269,9 @@ export interface OrderView {
   /** Comprador com 16 ou 17 anos na data do evento. */
   buyerMinor?: boolean;
   items: OrderLine[];
+  /** Valor dos ingressos e taxa de serviço guardada no pedido (D-90; zero nos pedidos anteriores). */
+  ticketsCents?: number;
+  serviceFeeCents?: number;
   totalCents: number;
   coupon: { code: string } | null;
   paymentMethod: 'pix' | 'cartao' | null;
@@ -328,6 +343,9 @@ export interface TicketSummary {
   transferUntil: string;
   /** Recebido com 16 ou 17 anos: o QR e o PDF esperam o aceite do Termo de Ciência. */
   minorTermPending: boolean;
+  /** Valor pago por este ingresso e a taxa de serviço dele (D-90). */
+  priceCents?: number;
+  serviceFeeCents?: number;
 }
 /** Detalhe: o conteúdo do QR só vem aqui, e nunca para ingresso cancelado. */
 export interface TicketDetail extends TicketSummary {
@@ -462,6 +480,7 @@ export interface AdminOrderRow {
   situation: string;
   paymentMethod: 'pix' | 'cartao' | null;
   totalCents: number;
+  serviceFeeCents?: number;
   createdAt: string;
   paidAt: string | null;
   event: { id: string; name: string };
@@ -529,12 +548,28 @@ export interface AdminOrderDetail {
   situation: string;
   paymentMethod: string | null;
   gatewayPaymentId: string | null;
+  /** Valores (D-90): ingressos, taxa de serviço (porcentagem e mínimo usados neste pedido), total e o que volta num estorno total. */
+  ticketsCents?: number;
+  serviceFeeCents?: number;
+  serviceFeeRateBps?: number;
+  serviceFeeMinCents?: number;
   totalCents: number;
+  refundCents?: number;
+  /** Tarifa e líquido do Mercado Pago; nulos até a rotina diária consultar. */
+  gatewayFeeCents?: number | null;
+  gatewayNetCents?: number | null;
   createdAt: string;
   paidAt: string | null;
   event: { id: string; name: string };
   buyer: { id: string; name: string; email: string; phone: string | null; cpf: string | null };
-  items: { name: string; quantity: number; unitPriceCents: number; subtotalCents: number }[];
+  items: {
+    name: string;
+    quantity: number;
+    unitPriceCents: number;
+    subtotalCents: number;
+    unitServiceFeeCents?: number;
+    serviceFeeCents?: number;
+  }[];
   tickets: {
     id: string;
     shortCode: string;
@@ -544,6 +579,8 @@ export interface AdminOrderDetail {
     usedAt: string | null;
     cancelledAt: string | null;
     cancelReason: string | null;
+    priceCents?: number;
+    serviceFeeCents?: number;
   }[];
   trail: { action: string; entity: string; at: string; actor: string | null; reason: string | null }[];
   gatewayEvents: {
@@ -711,7 +748,9 @@ export interface AdminTicketDetail {
     status: 'valido' | 'utilizado' | 'cancelado';
     holderName: string;
     typeName: string;
+    /** Valor pago por este ingresso (o do lote dele) e a taxa de serviço dele (D-90). */
     priceCents: number;
+    serviceFeeCents?: number;
     issuedAt: string;
     event: { id: string; name: string; startsAt: string };
     order: { id: string; number: number; status: OrderStatus; paidAt: string | null };
@@ -766,6 +805,20 @@ export interface EventsMeta {
   gateWindow: { beforeHours: number; afterHours: number };
   reservationMinutes: number;
   maxTicketsPerOrder: number;
+  /** Taxa de serviço em vigor (D-90), para a prévia do total do comprador no cadastro de tipo e de lote. */
+  serviceFee?: ServiceFeeRule;
+}
+
+/** Taxa de serviço (D-90): porcentagem em centésimos de ponto percentual (500 = 5%) e mínimo em centavos. */
+export interface ServiceFeeRule {
+  rateBps: number;
+  minCents: number;
+}
+export interface ServiceFeeSettings extends ServiceFeeRule {
+  updatedAt: string;
+  updatedBy: string | null;
+  /** Eventos à venda agora: mudar a taxa com algum à venda vale só para os pedidos novos (o painel avisa; a trilha registra). */
+  eventsOnSale: number;
 }
 
 export interface EventInputBody {
@@ -845,14 +898,35 @@ export interface SalesReport {
     typeId: string;
     typeName: string;
     tickets: number;
+    /** Valor dos ingressos, sem a taxa de serviço. */
     cents: number;
+    serviceFeeCents?: number;
     /** Vendas por lote dentro do tipo, na ordem dos lotes. */
-    lots?: { lotId: string; lotName: string; tickets: number; cents: number }[];
+    lots?: { lotId: string; lotName: string; tickets: number; cents: number; serviceFeeCents?: number }[];
   }[];
-  byEvent: { eventId: string; eventName: string; tickets: number; cents: number }[];
-  totals: { tickets: number; cents: number };
-  reconciliation: { ok: boolean | null; ordersCents: number; itemsCents: number; orders: number };
-  daily: { day: string; tickets: number; cents: number }[];
+  byEvent: {
+    eventId: string;
+    eventName: string;
+    tickets: number;
+    cents: number;
+    serviceFeeCents?: number;
+    chargedCents?: number;
+    gatewayFeeCents?: number;
+    gatewayNetCents?: number;
+    ordersWithoutGatewayFee?: number;
+  }[];
+  totals: {
+    tickets: number;
+    cents: number;
+    serviceFeeCents?: number;
+    chargedCents?: number;
+    /** Nulos com filtro de tipo (a tarifa é do pedido inteiro). */
+    gatewayFeeCents?: number | null;
+    gatewayNetCents?: number | null;
+    ordersWithoutGatewayFee?: number | null;
+  };
+  reconciliation: { ok: boolean | null; ordersCents: number; itemsCents: number; serviceFeeCents?: number; orders: number };
+  daily: { day: string; tickets: number; cents: number; serviceFeeCents?: number }[];
   reversals: { refunded: Bucket; contested: Bucket; grossCents: number; netCents: number };
   exceptions: { paidWithoutStock: Bucket };
   notes: string[];
@@ -1042,6 +1116,11 @@ export const api = {
       get<AdminOverview>(`/admin/overview${month ? `?month=${month}` : ''}`, signal),
     events: (signal?: AbortSignal) => get<{ events: AdminEventRow[] }>('/admin/events', signal).then(r => r.events),
     eventsMeta: (signal?: AbortSignal) => get<EventsMeta>('/admin/events/meta', signal),
+    /** Configurações (D-90): taxa de serviço. Mudar vale para pedidos novos. */
+    serviceFee: (signal?: AbortSignal) =>
+      get<{ serviceFee: ServiceFeeSettings }>('/admin/settings/service-fee', signal).then(r => r.serviceFee),
+    updateServiceFee: (rule: ServiceFeeRule) =>
+      request<{ serviceFee: ServiceFeeSettings }>('PUT', '/admin/settings/service-fee', rule).then(r => r.serviceFee),
     event: (id: string, signal?: AbortSignal) =>
       get<{ event: AdminEvent; ticketTypes: AdminTicketType[] }>(`/admin/events/${encodeURIComponent(id)}`, signal),
     eventPreview: (id: string, signal?: AbortSignal) =>

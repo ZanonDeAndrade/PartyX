@@ -1,14 +1,14 @@
-﻿Código;Tipo;Titular;CPF (mascarado);E-mail do comprador;Pedido;Situação do ingresso;Entrou em;Validador;Motivo do cancelamento
-PX-K4VU-N4TN;Pista;APRO Ana Souza Fictícia;***.007.001-**;ana.roteiro@partyx.test;PX-10001;Utilizado;13/10/2026 19:15;Rafael Validador Fictício;
-PX-526H-G737;VIP;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;PX-10002;Utilizado;13/10/2026 19:15;Rafael Validador Fictício;
-PX-7258-PSDF;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;PX-10002;Cancelado;;;Roteiro 11.2: caso cancelado
-PX-VVJC-RRXV;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;PX-10002;Utilizado;13/10/2026 19:15;Rafael Validador Fictício;
-PX-FFAG-N3BE;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;PX-10005;Cancelado;;;Roteiro 11.2: pedido do comprador registrado pela PartyX
-PX-R26A-MSYB;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;PX-10005;Válido;;;
+﻿Código;Tipo;Titular;CPF do titular (mascarado);E-mail do titular;Transferido;Pedido;Situação do ingresso;Entrou em;Validador;Motivo do cancelamento
+PX-QEYX-VADU;Pista;APRO Ana Souza Fictícia;***.007.001-**;ana.roteiro@partyx.test;Não;PX-10001;Utilizado;19/10/2026 09:17;Rafael Validador Fictício;
+PX-9LVG-4J6X;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;Não;PX-10002;Utilizado;19/10/2026 09:17;Rafael Validador Fictício;
+PX-PMVL-D57X;VIP;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;Não;PX-10002;Cancelado;;;Roteiro 11.2: caso cancelado
+PX-Y9WQ-QQRH;Pista;APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;Não;PX-10002;Utilizado;19/10/2026 09:17;Rafael Validador Fictício;
+PX-B68R-GJF5;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;Não;PX-10005;Cancelado;;;Roteiro 11.2: pedido do comprador registrado pela PartyX
+PX-XDZF-UPVM;Pista;APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;Não;PX-10005;Válido;;;
 
 Total de ingressos listados;6
 Válidos;1
 Utilizados;3
 Cancelados;2
 Filtros aplicados;"Evento: Festival Roteiro E2E; Situação: todas"
-Gerado em;13/10/2026 19:15
+Gerado em;19/10/2026 09:17

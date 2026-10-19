@@ -84,13 +84,55 @@ export function SalesReportPage() {
               <h2 className="px-h3">Vendido no período</h2>
               <p className="px-kpi">
                 {brl(r.totals.cents)}
-                <small>{r.totals.tickets} ingressos</small>
+                <small>{r.totals.tickets} ingressos, sem a taxa de serviço</small>
               </p>
+              <ul className="px-minilist">
+                <li>
+                  Taxa de serviço: <b>{brl(r.totals.serviceFeeCents ?? 0)}</b>
+                </li>
+                <li>
+                  Total cobrado dos compradores: <b>{brl(r.totals.chargedCents ?? r.totals.cents)}</b>
+                </li>
+              </ul>
               <p className={r.reconciliation.ok === false ? 'px-error' : 'px-ok'}>
                 {r.reconciliation.ok === false
-                  ? `Atenção: os itens somam ${brl(r.reconciliation.itemsCents)} e os pedidos pagos ${brl(r.reconciliation.ordersCents)}.`
+                  ? `Atenção: os itens somam ${brl(r.reconciliation.itemsCents)}, a taxa de serviço ${brl(r.reconciliation.serviceFeeCents ?? 0)} e os pedidos pagos ${brl(r.reconciliation.ordersCents)}.`
                   : `Confere com a soma de ${r.reconciliation.orders} pedido(s) pago(s): ${brl(r.reconciliation.ordersCents)}.`}
               </p>
+            </section>
+            <section className="px-panel" aria-label="Taxa de serviço e tarifa do Mercado Pago">
+              <h2 className="px-h3">Taxa de serviço x tarifa do Mercado Pago</h2>
+              {r.totals.gatewayFeeCents === null || r.totals.gatewayFeeCents === undefined ? (
+                <p className="px-muted">A tarifa é do pedido inteiro: não se divide por tipo de ingresso.</p>
+              ) : (
+                <>
+                  <p className="px-kpi">
+                    {brl((r.totals.serviceFeeCents ?? 0) - r.totals.gatewayFeeCents)}
+                    <small>
+                      {(r.totals.serviceFeeCents ?? 0) >= r.totals.gatewayFeeCents
+                        ? '= taxa cobrada menos a tarifa paga (a taxa cobriu a tarifa)'
+                        : '= taxa cobrada menos a tarifa paga (a taxa não cobriu a tarifa)'}
+                    </small>
+                  </p>
+                  <ul className="px-minilist">
+                    <li>
+                      Taxa de serviço cobrada: <b>{brl(r.totals.serviceFeeCents ?? 0)}</b>
+                    </li>
+                    <li>
+                      Tarifa do Mercado Pago: <b>{brl(r.totals.gatewayFeeCents)}</b>
+                    </li>
+                    <li>
+                      Líquido recebido do Mercado Pago: <b>{brl(r.totals.gatewayNetCents ?? 0)}</b>
+                    </li>
+                    {r.totals.ordersWithoutGatewayFee ? (
+                      <li>
+                        Pedidos pagos ainda sem a tarifa informada: <b>{r.totals.ordersWithoutGatewayFee}</b> (a rotina diária
+                        consulta)
+                      </li>
+                    ) : null}
+                  </ul>
+                </>
+              )}
             </section>
             <section className="px-panel" aria-label="Receita líquida">
               <h2 className="px-h3">Receita líquida</h2>
@@ -127,7 +169,9 @@ export function SalesReportPage() {
                   <th>Evento</th>
                   <th>Tipo</th>
                   <th>Ingressos</th>
-                  <th>Valor</th>
+                  <th>Valor dos ingressos</th>
+                  <th>Taxa de serviço</th>
+                  <th>Total cobrado</th>
                 </tr>
               </thead>
               <tbody>
@@ -141,6 +185,8 @@ export function SalesReportPage() {
                         <td>{l.typeName}</td>
                         <td>{l.tickets}</td>
                         <td className="px-nowrap">{brl(l.cents)}</td>
+                        <td className="px-nowrap">{brl(l.serviceFeeCents ?? 0)}</td>
+                        <td className="px-nowrap">{brl(l.cents + (l.serviceFeeCents ?? 0))}</td>
                       </tr>
                       {lots.map(x => (
                         <tr key={x.lotId} className="px-lot-row">
@@ -151,6 +197,8 @@ export function SalesReportPage() {
                           </td>
                           <td>{x.tickets}</td>
                           <td className="px-nowrap">{brl(x.cents)}</td>
+                          <td className="px-nowrap">{brl(x.serviceFeeCents ?? 0)}</td>
+                          <td className="px-nowrap">{brl(x.cents + (x.serviceFeeCents ?? 0))}</td>
                         </tr>
                       ))}
                     </Fragment>
@@ -164,6 +212,8 @@ export function SalesReportPage() {
                         </th>
                         <td>{e.tickets}</td>
                         <td className="px-nowrap">{brl(e.cents)}</td>
+                        <td className="px-nowrap">{brl(e.serviceFeeCents ?? 0)}</td>
+                        <td className="px-nowrap">{brl(e.chargedCents ?? e.cents)}</td>
                       </tr>
                     ))
                   : null}
@@ -176,6 +226,12 @@ export function SalesReportPage() {
                   </td>
                   <td className="px-nowrap">
                     <b>{brl(r.totals.cents)}</b>
+                  </td>
+                  <td className="px-nowrap">
+                    <b>{brl(r.totals.serviceFeeCents ?? 0)}</b>
+                  </td>
+                  <td className="px-nowrap">
+                    <b>{brl(r.totals.chargedCents ?? r.totals.cents)}</b>
                   </td>
                 </tr>
               </tbody>

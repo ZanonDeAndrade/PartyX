@@ -38,6 +38,8 @@ function useRequireLogin(returnTo: string) {
 interface AsideData {
   event: { name: string; startsAt: string; venue: string };
   items: LineWithLots[];
+  /** Taxa de serviço do pedido (D-90). Zero ou ausente: sem linha de taxa. */
+  serviceFeeCents?: number;
   totalCents: number;
   coupon: { code: string } | null;
 }
@@ -48,6 +50,7 @@ interface LineWithLots {
   quantity: number;
   unitPriceCents?: number;
   subtotalCents: number;
+  serviceFeeCents?: number;
   lots?: OrderLineLot[];
 }
 
@@ -66,6 +69,7 @@ function linesByLot(items: LineWithLots[]) {
           quantity: i.quantity,
           unitPriceCents: i.unitPriceCents ?? Math.round(i.subtotalCents / i.quantity),
           subtotalCents: i.subtotalCents,
+          unitServiceFeeCents: lots[0]?.unitServiceFeeCents ?? Math.round((i.serviceFeeCents ?? 0) / i.quantity),
         },
       ];
     return lots.map(l => ({
@@ -74,6 +78,7 @@ function linesByLot(items: LineWithLots[]) {
       quantity: l.quantity,
       unitPriceCents: l.unitPriceCents,
       subtotalCents: l.subtotalCents,
+      unitServiceFeeCents: l.unitServiceFeeCents ?? 0,
     }));
   });
 }
@@ -135,6 +140,12 @@ function CheckoutShell({
                     <span className="px-nowrap">{brl(i.subtotalCents)}</span>
                   </li>
                 ))}
+                {aside.serviceFeeCents ? (
+                  <li>
+                    <span>Taxa de serviço</span>
+                    <span className="px-nowrap">{brl(aside.serviceFeeCents)}</span>
+                  </li>
+                ) : null}
                 {aside.coupon ? (
                   <li className="px-ck-promo">
                     <span className="px-nowrap">Promoter</span>
@@ -418,7 +429,10 @@ export function CheckoutPage({ slug }: { slug: string }) {
                   <span>
                     <b>{i.quantity} ×</b> {i.name}
                   </span>
-                  <small>{brl(i.unitPriceCents)} cada</small>
+                  <small>
+                    {brl(i.unitPriceCents)} cada
+                    {i.unitServiceFeeCents ? ` + ${brl(i.unitServiceFeeCents)} de taxa de serviço` : ''}
+                  </small>
                 </span>
                 <b className="px-nowrap">{brl(i.subtotalCents)}</b>
               </li>

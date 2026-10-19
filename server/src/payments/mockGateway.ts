@@ -143,6 +143,19 @@ export function createMockGateway(clock: Clock): MockGateway {
       return { ...found.snapshot };
     },
 
+    /**
+     * Tarifa FICTÍCIA do pagamento aprovado do pedido (Pix 0,99%, cartão 4,98%, arredondada ao centavo), para o relatório da taxa de
+     * serviço funcionar no ambiente local e nos testes. Não é a tarifa de provedor nenhum.
+     */
+    async paymentFees(orderId: string) {
+      takeFailure();
+      const approved = [...payments.values()].filter(p => p.snapshot.orderRef === orderId && p.snapshot.status === 'aprovado');
+      if (approved.length !== 1) return null;
+      const { amountCents, method } = approved[0]!.snapshot;
+      const feeCents = Math.round((amountCents * (method === 'pix' ? 99 : 498)) / 10_000);
+      return { feeCents, netCents: amountCents - feeCents };
+    },
+
     async verifyNotification({ headers, rawBody }): Promise<NotificationCheck> {
       const header = headers.get('x-mock-signature');
       if (!header) return { valid: false, reason: 'assinatura_ausente' };

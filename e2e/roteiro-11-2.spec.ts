@@ -116,9 +116,9 @@ const ticketsOf = (orderId: string) =>
   );
 const orderRow = async (orderId: string) =>
   (
-    await sql<{ status: string; paid_at: Date | null; promoter: string | null; total_cents: number }>(
+    await sql<{ status: string; paid_at: Date | null; promoter: string | null; total_cents: number; service_fee_cents: number }>(
       S.db,
-      `select o.status, o.paid_at, p.coupon_code as promoter, o.total_cents
+      `select o.status, o.paid_at, p.coupon_code as promoter, o.total_cents, o.service_fee_cents
          from orders o left join promoters p on p.id = o.promoter_id where o.id = $1`,
       [orderId],
     )
@@ -437,9 +437,12 @@ item(8, 'Compra com cupom de promoter válido e com cupom inválido', async () =
   await expect(page.getByRole('heading', { name: 'Compra confirmada' })).toBeVisible({ timeout: 30_000 });
   const o = await orderRow(id);
   expect(o.promoter).toBe(R.duda);
-  expect(o.total_cents).toBe(2 * 8000); // sem desconto: o código só atribui a venda
-  expect(total).toContain('160,00');
-  note(8, `Código ${R.duda} aceito: "aplicado. Total inalterado."; pedido pago atribuído ao promoter ${R.duda} com total R$ 160,00 (sem desconto).`);
+  // Sem desconto: o código só atribui a venda. Taxa de serviço de 5% por ingresso (D-90): 8000 × 500 / 9500 = 421,05 → R$ 4,22.
+  expect(o.service_fee_cents).toBe(2 * 422);
+  expect(o.total_cents).toBe(2 * 8000 + 2 * 422);
+  expect(total).toContain('Taxa de serviço');
+  expect(total).toContain('168,44');
+  note(8, `Código ${R.duda} aceito: "aplicado. Total inalterado."; pedido pago atribuído ao promoter ${R.duda}: ingressos R$ 160,00 (sem desconto) + taxa de serviço R$ 8,44 = R$ 168,44.`);
 });
 
 // ------------------------------------------------------------------------------------------------------------------------
@@ -741,7 +744,7 @@ item(18, 'Relatórios: vendas por evento, por tipo, por promoter, mensal da taxa
   await page.waitForLoadState('networkidle');
   const promo = await sql<{ n: number; cents: number }>(
     S.db,
-    `select count(t.id)::int as n, (select sum(total_cents) from orders o2 join promoters p2 on p2.id = o2.promoter_id
+    `select count(t.id)::int as n, (select sum(total_cents - service_fee_cents) from orders o2 join promoters p2 on p2.id = o2.promoter_id
                                      where p2.coupon_code = $1 and o2.status = 'pago')::int as cents
        from tickets t join orders o on o.id = t.order_id join promoters p on p.id = o.promoter_id
       where p.coupon_code = $1 and o.status = 'pago'`,
@@ -751,7 +754,7 @@ item(18, 'Relatórios: vendas por evento, por tipo, por promoter, mensal da taxa
   await expect(dudaRow).toContainText(String(promo[0]!.n));
   await expect(dudaRow).toContainText((promo[0]!.cents / 100).toFixed(2).replace('.', ','));
   await shot(page, '18-relatorio-promoters');
-  note(18, `Promoters: ${R.duda} com ${promo[0]!.n} ingressos e R$ ${brl(promo[0]!.cents)} atribuídos (sem desconto); linha "${(await dudaRow.innerText()).replace(/\s+/g, ' ')}".`);
+  note(18, `Promoters: ${R.duda} com ${promo[0]!.n} ingressos e R$ ${brl(promo[0]!.cents)} atribuídos (valor dos ingressos, sem a taxa de serviço e sem desconto); linha "${(await dudaRow.innerText()).replace(/\s+/g, ' ')}".`);
 
   await page.goto(`${S.base}/admin/relatorios/taxa-mensal`);
   await page.waitForLoadState('networkidle');

@@ -146,9 +146,10 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
           'ticket_transfers',
           'ticket_minor_acceptances',
           'cancellation_acceptances',
+          'service_fee_settings',
         ]),
       );
-      expect(tables).toHaveLength(24);
+      expect(tables).toHaveLength(25);
     });
 
     it('0016: titular do ingresso preenchido com o comprador (também para quem não o informa); histórico só de inclusão', async () => {
@@ -188,7 +189,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(17);
+      expect(r.rows[0].n).toBe(18);
     });
   });
 
@@ -728,7 +729,7 @@ describe.skipIf(!ADMIN_URL)('papel da aplicação (partyx_app)', () => {
 describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
   it('reverte na ordem inversa e recusa reverter fora de ordem', async () => {
     const { rollbackLastMigration } = await import('./migrate');
-    const db = await createTestDatabase(ADMIN_URL!);
+    const db = await createTestDatabase(ADMIN_URL!); // sem opção: a taxa fica como a migração 0017 grava (0%)
     try {
       const tag0 = '0000_schema_inicial';
       const tag1 = '0001_regras_de_integridade';
@@ -747,6 +748,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag14 = '0014_cor_de_destaque';
       const tag15 = '0015_capa_desfocada';
       const tag16 = '0016_transferencia_e_aceite_da_politica';
+      const tag17 = '0017_taxa_de_servico';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag15)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
@@ -759,6 +761,40 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag12)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag13)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag14)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag16)).rejects.toThrow(/não é a última/);
+
+      // 0017: nasce com 0% e mínimo 0 (sem taxa até o painel gravar); recusa com pedido que tem taxa de serviço; sem ele, apaga a
+      // configuração e as colunas, e o
+      // pedido continua com o total.
+      const q17 = db.pool.query.bind(db.pool);
+      expect((await q17('select rate_bps, min_cents from service_fee_settings')).rows).toEqual([{ rate_bps: 0, min_cents: 0 }]);
+      const u17 = (
+        await q17("insert into users (name,email,cpf,password_hash,role) values ('Ana','ana17@partyx.test','52998224725','x','cliente') returning id")
+      ).rows[0].id;
+      const ev17 = (
+        await q17("insert into events (slug,name,starts_at,venue,address,description,age_rating) values ('ev-17','E',now()+interval '9 days','L','A','D','Livre') returning id")
+      ).rows[0].id;
+      const o17 = (
+        await q17('insert into orders (user_id,event_id,total_cents,service_fee_cents,service_fee_rate_bps) values ($1,$2,3158,158,500) returning id', [u17, ev17])
+      ).rows[0].id;
+      await expect(q17('update orders set service_fee_cents = 3158 where id = $1', [o17])).rejects.toThrow(/orders_service_fee_valid/);
+      await expect(rollbackLastMigration(db.url, tag17)).rejects.toThrow(/pedidos com taxa de serviço/);
+      await q17('update orders set service_fee_cents = 0 where id = $1', [o17]);
+      await rollbackLastMigration(db.url, tag17);
+      expect((await q17("select to_regclass('service_fee_settings') as t")).rows[0].t).toBeNull();
+      expect(
+        (await q17("select count(*)::int as n from information_schema.columns where column_name in ('service_fee_cents','unit_service_fee_cents','gateway_fee_cents','gateway_net_cents')")).rows[0].n,
+      ).toBe(0);
+      expect((await q17('select total_cents from orders where id = $1', [o17])).rows[0].total_cents).toBe(3158);
+      await q17('alter table orders disable trigger orders_forbid_delete');
+      await q17('delete from orders where id = $1', [o17]);
+      await q17('alter table orders enable trigger orders_forbid_delete');
+      await q17('delete from events where id = $1', [ev17]);
+      await q17('delete from users where id = $1', [u17]).catch(async () => {
+        await q17('alter table users disable trigger users_forbid_delete');
+        await q17('delete from users where id = $1', [u17]);
+        await q17('alter table users enable trigger users_forbid_delete');
+      });
 
       // 0016: recusa com transferência gravada (quem é o titular de cada ingresso); sem ela, apaga as três tabelas e o titular do
       // ingresso, e o ingresso continua (do comprador, como antes).
@@ -1023,8 +1059,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0016 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0017 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag17);
       await rollbackLastMigration(db.url, tag16);
       await rollbackLastMigration(db.url, tag15);
       await rollbackLastMigration(db.url, tag14);
@@ -1102,7 +1139,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       r = await db.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'");
-      expect(r.rows[0].n).toBe(24); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013) + as três da 0016
+      expect(r.rows[0].n).toBe(25); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013) + as três da 0016 + service_fee_settings (0017)
     } finally {
       await db.drop();
     }

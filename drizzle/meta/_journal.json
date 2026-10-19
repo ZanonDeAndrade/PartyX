@@ -120,6 +120,13 @@
       "when": 1792095049450,
       "tag": "0016_transferencia_e_aceite_da_politica",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792378024833,
+      "tag": "0017_taxa_de_servico",
+      "breakpoints": true
     }
   ]
 }

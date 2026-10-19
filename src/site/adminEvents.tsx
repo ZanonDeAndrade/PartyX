@@ -26,6 +26,7 @@ import {
   timeOf,
   zonedInputsToIso,
 } from './format';
+import { formatRate, unitServiceFee } from './serviceFee';
 import { EventView } from './pages';
 import { IconBack } from './icons';
 import { Link, useLeaveGuard, useRouter } from './router';
@@ -1902,7 +1903,18 @@ function TicketTypesPanel({
                   <dl className="px-adm-stats">
                     <div>
                       <dt>{t.lots.length > 1 ? 'Preço do lote à venda' : 'Preço'}</dt>
-                      <dd>{t.lots.some(l => l.status === 'a_venda') ? brl(t.priceCents) : '—'}</dd>
+                      <dd>
+                        {t.lots.some(l => l.status === 'a_venda') ? (
+                          <>
+                            {brl(t.priceCents)}
+                            {meta?.serviceFee && unitServiceFee(t.priceCents, meta.serviceFee) > 0 ? (
+                              <small> + {brl(unitServiceFee(t.priceCents, meta.serviceFee))} taxa</small>
+                            ) : null}
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </dd>
                     </div>
                     <div>
                       <dt>Capacidade</dt>
@@ -2002,6 +2014,26 @@ const TYPE_FIELD: Record<string, string> = {
   salesStartAt: 'startDate',
   salesEndAt: 'endDate',
 };
+
+/**
+ * Dica do campo de valor: o aviso de preço travado (quando houver) e, enquanto o valor é digitado, a taxa de serviço e o total do
+ * comprador (D-90), pela taxa em vigor que o servidor informa (`meta.serviceFee`). O administrador informa só o valor do ingresso.
+ */
+function priceHint(locked: string | null, price: string, meta: EventsMeta): ReactNode {
+  const cents = price ? centsFromMasked(price) : 0;
+  const fee = meta.serviceFee && cents > 0 ? unitServiceFee(cents, meta.serviceFee) : 0;
+  const feeText =
+    fee > 0
+      ? `Taxa de serviço ${brl(fee)} (${formatRate(meta.serviceFee!.rateBps)}): o comprador paga ${brl(cents + fee)}.`
+      : null;
+  if (!locked && !feeText) return undefined;
+  return (
+    <>
+      {locked ? <span>{locked} </span> : null}
+      {feeText ? <span aria-live="polite">{feeText}</span> : null}
+    </>
+  );
+}
 
 function TicketTypeDialog({
   event,
@@ -2175,7 +2207,11 @@ function TicketTypeDialog({
               id="tt-price"
               label="Valor"
               error={errors.price}
-              hint={priceLocked ? 'O lote já tem vendas: o preço não muda. Para outro preço, crie um novo lote.' : undefined}
+              hint={priceHint(
+                priceLocked ? 'O lote já tem vendas: o preço não muda. Para outro preço, crie um novo lote.' : null,
+                form.price,
+                meta,
+              )}
             >
               <div className="px-money">
                 <span aria-hidden="true">R$</span>
@@ -2188,7 +2224,7 @@ function TicketTypeDialog({
                   disabled={priceLocked}
                   onChange={e => set('price', e.target.value ? maskedFromCents(centsFromMasked(e.target.value)) : '')}
                   aria-label="Valor em reais"
-                  {...described('tt-price', errors.price, priceLocked)}
+                  {...described('tt-price', errors.price, priceHint(priceLocked ? 'x' : null, form.price, meta))}
                 />
               </div>
             </FormField>
@@ -2728,7 +2764,7 @@ function LotDialog({
             id="lot-price"
             label="Valor"
             error={errors.price}
-            hint={priceLocked ? 'O lote já tem vendas: o preço não muda.' : undefined}
+            hint={priceHint(priceLocked ? 'O lote já tem vendas: o preço não muda.' : null, form.price, meta)}
           >
             <div className="px-money">
               <span aria-hidden="true">R$</span>
@@ -2741,7 +2777,7 @@ function LotDialog({
                 disabled={priceLocked}
                 onChange={e => set('price', e.target.value ? maskedFromCents(centsFromMasked(e.target.value)) : '')}
                 aria-label="Valor em reais"
-                {...described('lot-price', errors.price, priceLocked)}
+                {...described('lot-price', errors.price, priceHint(priceLocked ? 'x' : null, form.price, meta))}
               />
             </div>
           </FormField>

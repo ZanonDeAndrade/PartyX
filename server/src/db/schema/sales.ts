@@ -63,6 +63,21 @@ export const orders = pgTable(
      * a conta. A portaria mostra o aviso de menor em todos os ingressos do pedido. Recalculado se a PartyX corrigir a data de nascimento.
      */
     buyerMinor: boolean('buyer_minor').notNull().default(false),
+    /**
+     * Taxa de serviço da PartyX (D-90, 0017): soma das taxas por ingresso, já dentro de `total_cents` (o valor dos ingressos é
+     * `total_cents - service_fee_cents`). Porcentagem (centésimos de ponto percentual) e mínimo usados no pedido, para mudar a taxa
+     * depois não alterar o pedido. Zero nos pedidos anteriores à taxa.
+     */
+    serviceFeeCents: integer('service_fee_cents').notNull().default(0),
+    serviceFeeRateBps: integer('service_fee_rate_bps').notNull().default(0),
+    serviceFeeMinCents: integer('service_fee_min_cents').notNull().default(0),
+    /**
+     * Tarifa cobrada pelo Mercado Pago (`fee_details`) e líquido recebido (`net_received_amount`) neste pagamento, lidos pela busca de
+     * pagamentos (a Orders API não informa). Relatório da taxa de serviço. Nulos: ainda não consultados ou não informados.
+     */
+    gatewayFeeCents: integer('gateway_fee_cents'),
+    gatewayNetCents: integer('gateway_net_cents'),
+    gatewayFeeCheckedAt: instant('gateway_fee_checked_at'),
     paidAt: instant('paid_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -84,6 +99,14 @@ export const orders = pgTable(
       sql`${t.status} not in ('pago', 'estornado', 'contestado', 'pago_sem_estoque') or ${t.paidAt} is not null`,
     ),
     check('orders_pending_not_paid', sql`${t.status} <> 'pendente' or ${t.paidAt} is null`),
+    check(
+      'orders_service_fee_valid',
+      sql`${t.serviceFeeCents} >= 0 and ${t.serviceFeeCents} < ${t.totalCents} and ${t.serviceFeeRateBps} >= 0 and ${t.serviceFeeMinCents} >= 0`,
+    ),
+    check(
+      'orders_gateway_fee_valid',
+      sql`(${t.gatewayFeeCents} is null or ${t.gatewayFeeCents} >= 0) and (${t.gatewayNetCents} is null or ${t.gatewayNetCents} >= 0)`,
+    ),
   ],
 );
 
@@ -98,6 +121,8 @@ export const orderItems = pgTable(
     quantity: integer('quantity').notNull(),
     /** Preço no momento da compra, em centavos. */
     unitPriceCents: integer('unit_price_cents').notNull(),
+    /** Taxa de serviço das unidades do item (soma das taxas por ingresso dos lotes, 0017). */
+    serviceFeeCents: integer('service_fee_cents').notNull().default(0),
   },
   t => [
     foreignKey({
@@ -116,6 +141,7 @@ export const orderItems = pgTable(
     unique('order_items_ref_key').on(t.id, t.orderId, t.ticketTypeId, t.eventId),
     check('order_items_quantity_positive', sql`${t.quantity} > 0`),
     check('order_items_price_positive', sql`${t.unitPriceCents} > 0`),
+    check('order_items_service_fee_nonnegative', sql`${t.serviceFeeCents} >= 0`),
   ],
 );
 
@@ -135,6 +161,8 @@ export const orderItemLots = pgTable(
     lotId: uuid('lot_id').notNull(),
     quantity: integer('quantity').notNull(),
     unitPriceCents: integer('unit_price_cents').notNull(),
+    /** Taxa de serviço de cada ingresso deste lote, presa junto com o preço (0017). */
+    unitServiceFeeCents: integer('unit_service_fee_cents').notNull().default(0),
   },
   t => [
     foreignKey({
@@ -152,6 +180,7 @@ export const orderItemLots = pgTable(
     index('order_item_lots_order_idx').on(t.orderId),
     check('order_item_lots_quantity_positive', sql`${t.quantity} > 0`),
     check('order_item_lots_price_positive', sql`${t.unitPriceCents} > 0`),
+    check('order_item_lots_service_fee_nonnegative', sql`${t.unitServiceFeeCents} >= 0`),
   ],
 );
 

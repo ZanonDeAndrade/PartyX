@@ -336,6 +336,8 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
           supportWhatsapp: null,
           supportHours: null,
         },
+        // Sem gateway neste teste: nada a mostrar no bloco "Formas de pagamento" (D-90).
+        payment: { pix: false, card: false, maxInstallments: 1 },
       });
     });
   });

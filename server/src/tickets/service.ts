@@ -1,6 +1,16 @@
-import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
-import { events, orders, ticketLots, ticketTransfers, ticketTypes, tickets, users } from '../db/schema';
+import {
+  events,
+  orderItemLots,
+  orderItems,
+  orders,
+  ticketLots,
+  ticketTransfers,
+  ticketTypes,
+  tickets,
+  users,
+} from '../db/schema';
 import { typeWithLotName } from '../events/lots';
 import { AppError } from '../domain/errors';
 import { maskName } from '../domain/identity';
@@ -36,6 +46,9 @@ export interface TicketSummary {
   transferUntil: string;
   /** Recebido com 16 ou 17 anos e o Termo de Ciência ainda não aceito: o QR e o PDF esperam o aceite. */
   minorTermPending: boolean;
+  /** Valor pago por este ingresso (o do lote de onde ele saiu) e a taxa de serviço dele (D-90; zero nos pedidos anteriores). */
+  priceCents: number;
+  serviceFeeCents: number;
 }
 
 /**
@@ -68,6 +81,10 @@ const columns = {
   buyerId: orders.userId,
   holderUserId: tickets.holderUserId,
   minorTermPending: minorTermPendingSql,
+  // Preço e taxa presos no lote do item (0013, 0017). Sem a linha do lote (tipo sem lotes), o do item: sem lote a taxa é a mesma em
+  // todas as unidades, então a do item dividida pela quantidade é exata.
+  priceCents: sql<number>`coalesce(${orderItemLots.unitPriceCents}, ${orderItems.unitPriceCents})`.mapWith(Number),
+  serviceFeeCents: sql<number>`coalesce(${orderItemLots.unitServiceFeeCents}, ${orderItems.serviceFeeCents} / ${orderItems.quantity})`.mapWith(Number),
 };
 
 type Row = {
@@ -90,6 +107,8 @@ type Row = {
   buyerId: string;
   holderUserId: string;
   minorTermPending: boolean;
+  priceCents: number;
+  serviceFeeCents: number;
 };
 
 type Received = Map<string, { name: string; at: string }>;
@@ -135,6 +154,8 @@ const summary = (r: Row, from?: Received): TicketSummary => ({
   receivedFrom: from?.get(r.id) ?? null,
   transferUntil: new Date(r.startsAt.getTime() - TRANSFER_DEADLINE_MS).toISOString(),
   minorTermPending: r.minorTermPending,
+  priceCents: r.priceCents,
+  serviceFeeCents: r.serviceFeeCents,
 });
 
 /** QR só de ingresso que não está cancelado e cujo titular não tem o Termo de Ciência pendente. */
@@ -147,7 +168,9 @@ const base = (db: Db) =>
     .innerJoin(orders, eq(orders.id, tickets.orderId))
     .innerJoin(events, eq(events.id, tickets.eventId))
     .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
-    .leftJoin(ticketLots, eq(ticketLots.id, tickets.lotId));
+    .leftJoin(ticketLots, eq(ticketLots.id, tickets.lotId))
+    .innerJoin(orderItems, eq(orderItems.id, tickets.orderItemId))
+    .leftJoin(orderItemLots, and(eq(orderItemLots.orderItemId, tickets.orderItemId), eq(orderItemLots.lotId, tickets.lotId)));
 
 /**
  * Meus ingressos (RF-42): os que estão na conta, comprados ou recebidos numa transferência (D-87), do evento mais próximo ao mais

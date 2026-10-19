@@ -1,10 +1,10 @@
 ﻿Comprador;CPF (mascarado);E-mail;Pedidos;Ingressos;Cancelados;Entraram;Valor pago (R$)
-APRO Ana Souza Fictícia;***.007.001-**;ana.roteiro@partyx.test;1;1;0;1;80,00
-APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;1;2;1;2;310,00
-APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;1;1;1;0;160,00
+APRO Ana Souza Fictícia;***.007.001-**;ana.roteiro@partyx.test;1;1;0;1;84,22
+APRO Bruno Lima Fictício;***.007.002-**;bruno.roteiro@partyx.test;1;2;1;2;326,34
+APRO Davi Cupom Fictício;***.007.004-**;davi.roteiro@partyx.test;1;1;1;0;168,44
 
 Total de compradores listados;3
 Ingressos (não cancelados);4
-Soma do valor pago (R$);550,00
+Soma do valor pago (R$);579,00
 Filtros aplicados;Evento: Festival Roteiro E2E
-Gerado em;13/10/2026 19:15
+Gerado em;19/10/2026 09:17

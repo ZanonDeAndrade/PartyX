@@ -181,6 +181,11 @@ export interface PurchaseData {
   units: string;
   paidAt: string;
   lines: string[];
+  /** Valor dos ingressos (sem a taxa de serviço), já formatado. */
+  ticketsAmount: string;
+  /** Taxa de serviço do pedido, formatada; nula quando o pedido não tem taxa (a linha não aparece). */
+  serviceFee: string | null;
+  totalPaid: string;
   /** Evento que permite menores de 16 e 17 anos: endereço da página que baixa a autorização do pedido (exige entrar na conta). */
   minorAuthorizationUrl?: string | null;
 }
@@ -199,6 +204,9 @@ export function composeCompra(data: PurchaseData, ctx: MailContext): Composed {
       { label: 'Local', value: data.venue },
       { label: 'Pedido', value: data.orderNumber },
       ...data.lines.map((line, i) => ({ label: i === 0 ? 'Ingressos' : '', value: line })),
+      { label: 'Valor dos ingressos', value: data.ticketsAmount },
+      ...(data.serviceFee ? [{ label: 'Taxa de serviço', value: data.serviceFee }] : []),
+      { label: 'Total pago', value: data.totalPaid },
     ],
     cta: { label: 'Acessar meus ingressos', url: `${ctx.baseUrl}/meus-ingressos` },
     ...(data.minorAuthorizationUrl

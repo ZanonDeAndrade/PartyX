@@ -40,6 +40,7 @@ import {
 } from '../media/banner';
 import { previewById } from '../vitrine/service';
 import { parseJson } from './validate';
+import { currentServiceFee } from '../settings/serviceFee';
 
 const text = z.string().max(6000);
 const instant = z.iso.datetime({ offset: true }).transform(s => new Date(s));
@@ -138,7 +139,7 @@ export function eventsRoutes(deps: AuthDeps) {
    * limites: banner (tamanho, formatos, largura), classificações, tamanhos de texto, valor e quantidade máximos, reserva e limite por compra.
    * Registrada antes de `/admin/events/:id`.
    */
-  app.get('/admin/events/meta', c =>
+  app.get('/admin/events/meta', async c =>
     c.json({
       banner: {
         maxBytes: BANNER_MAX_BYTES,
@@ -164,6 +165,8 @@ export function eventsRoutes(deps: AuthDeps) {
       },
       reservationMinutes: deps.config.RESERVATION_MINUTES,
       maxTicketsPerOrder: deps.config.MAX_TICKETS_PER_ORDER,
+      // Taxa de serviço em vigor (D-90): o cadastro de tipo e de lote mostra a taxa e o total do comprador enquanto o valor é digitado.
+      serviceFee: await currentServiceFee(deps.db),
     }),
   );
   app.get('/admin/events/:id', async c => c.json(await getEvent(evDeps, uuid(c.req.param('id'), 'Evento'))));

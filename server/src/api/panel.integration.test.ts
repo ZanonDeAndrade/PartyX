@@ -615,7 +615,7 @@ describe.skipIf(!ADMIN_URL)('painel administrativo (integração)', () => {
       expect(res.status).toBe(200);
       const body = await json(res);
       expect(body).toMatchObject({ cancelled: 1, alreadyCancelled: 0, used: 0 });
-      expect(body.guidance).toMatch(/cliente faz o estorno no painel do gateway/);
+      expect(body.guidance).toMatch(/a PartyX estorna no painel do Mercado Pago o valor pago pelo ingresso com a taxa de serviço dele/);
 
       const t = (await sql('select status, cancelled_at, cancel_reason from tickets where id = $1', [o.tickets[0]!.id]))
         .rows[0];

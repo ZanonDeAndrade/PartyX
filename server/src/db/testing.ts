@@ -2,8 +2,14 @@ import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { runMigrations } from './migrate';
 
-/** Banco descartável para testes de integração: um banco novo por arquivo de teste, removido no fim. */
-export async function createTestDatabase(adminUrl: string, options: { migrate?: boolean } = {}) {
+/**
+ * Banco descartável para testes de integração: um banco novo por arquivo de teste, removido no fim. `serviceFee`: taxa de serviço do
+ * banco (sem a opção, fica o que a migração 0017 grava: 0%); os testes da taxa pedem a que querem (ex.: 5%).
+ */
+export async function createTestDatabase(
+  adminUrl: string,
+  options: { migrate?: boolean; serviceFee?: { rateBps: number; minCents: number } } = {},
+) {
   const name = `partyx_test_${randomBytes(6).toString('hex')}`;
   const admin = new pg.Client({ connectionString: adminUrl });
   await admin.connect();
@@ -20,6 +26,13 @@ export async function createTestDatabase(adminUrl: string, options: { migrate?: 
     const setup = new pg.Client({ connectionString: url.toString() });
     await setup.connect();
     await setup.query(`alter table users alter column birth_date set default date '1990-01-01'`);
+    // Taxa de serviço (D-90): a migração grava 0% (produção começa sem taxa), então os testes anteriores à taxa conferem total =
+    // preço × quantidade sem mexer em nada; os testes da taxa pedem a que querem (`serviceFee`), gravada aqui como o painel gravaria.
+    if (options.serviceFee)
+      await setup.query('update service_fee_settings set rate_bps = $1, min_cents = $2', [
+        options.serviceFee.rateBps,
+        options.serviceFee.minCents,
+      ]);
     await setup.end();
   }
 

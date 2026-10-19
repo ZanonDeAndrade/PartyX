@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
+import { formatBRL } from '../domain/money';
 import { formatInEventZone } from '../domain/time';
 import type { TicketDetail } from './service';
 
@@ -163,6 +164,13 @@ function page(
   const holderSize = fitFontSize(doc, holder, 'Helvetica-Bold', [15, 12.5, 11], holderW, 2);
   doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Tipo', M, fields);
   doc.fillColor(INK).font('Helvetica-Bold').fontSize(typeSize).text(typeName, M, fields + 13, { width: 230 });
+  // Valor pago e taxa de serviço deste ingresso (D-90), embaixo do tipo. Sem taxa, só o valor.
+  const price =
+    t.serviceFeeCents > 0
+      ? `${formatBRL(t.priceCents)} + ${formatBRL(t.serviceFeeCents)} de taxa de serviço`
+      : formatBRL(t.priceCents);
+  doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Valor', M, doc.y + 8);
+  doc.fillColor(INK).font('Helvetica-Bold').fontSize(11).text(toLatin1(price), M, undefined, { width: 230 });
   const typeEnd = doc.y;
   doc.fillColor(MUTED).font('Helvetica').fontSize(10).text('Titular', 300, fields);
   doc.fillColor(INK).font('Helvetica-Bold').fontSize(holderSize).text(holder, 300, fields + 13, { width: holderW });

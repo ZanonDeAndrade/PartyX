@@ -38,17 +38,18 @@ describe('infra/env-check.py', () => {
   it('arquivo de produção do repositório: venda ABERTA com o visual aprovado, cadastro aberto com os textos, sem protótipo, sem lista de e-mail', () => {
     // Cadastro aberto por autorização de 14/10/2026 (docs/registros/autorizacao-cadastro-producao-2026-10-14.md), com Termos e
     // Privacidade publicados (D-84; 1.2 e a Política de Cancelamento, Troca e Reembolso 1.0 em 15/10/2026, D-87). Venda aberta na
-    // release-2026-10-18 (autorizacao-abertura-vendas-2026-10-15.md), com o visual aprovado por escrito em 18/10/2026 (CA-33).
+    // release-2026-10-18 (autorizacao-abertura-vendas-2026-10-15.md), com o visual aprovado por escrito em 18/10/2026 (CA-33). Termos
+    // 1.3 e Política 1.1 com a taxa de serviço (D-90), na release da taxa, com vigência na data da virada.
     for (const [name, value] of [
       ['SALES_OPEN', 'true'],
       ['VISUAL_APPROVED', 'true'],
       ['SIGNUP_OPEN', 'true'],
-      ['TERMS_VERSION', '1.2'],
-      ['TERMS_DATE', '2026-10-15'],
+      ['TERMS_VERSION', '1.3'],
+      ['TERMS_DATE', '2026-10-19'],
       ['PRIVACY_VERSION', '1.2'],
       ['PRIVACY_DATE', '2026-10-15'],
-      ['CANCELLATION_VERSION', '1.0'],
-      ['CANCELLATION_DATE', '2026-10-15'],
+      ['CANCELLATION_VERSION', '1.1'],
+      ['CANCELLATION_DATE', '2026-10-19'],
       ['MINOR_TERM_VERSION', '1.0'],
       ['MINOR_AUTHORIZATION_VERSION', '1.0'],
       ['RETENTION_SESSIONS_DAYS', '180'],

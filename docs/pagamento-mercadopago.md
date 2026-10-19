@@ -121,6 +121,21 @@ este site ou pague por Pix." e o botão "Pagar com Pix", que gera o Pix na hora.
 vier antes de `onReady` ou se nada ficar pronto em 10 s. Se o Brick ficar pronto depois, o formulário volta. Sem Pix (reserva curta,
 D-03), o aviso pede para desativar o bloqueio e recarregar. Registro: `docs/registros/cartao-csp-e-bloqueio-2026-10-18.md`.
 
+## Taxa de serviço e tarifa do Mercado Pago (D-90, 18/10/2026)
+
+- O valor enviado ao Mercado Pago (`total_amount` e `transactions.payments[].amount`) é o **total do pedido**: ingressos mais a taxa de
+  serviço da PartyX, o mesmo no Pix e no cartão. A conferência na reconsulta continua pelo total. Regra e números em
+  `docs/registros/taxa-de-servico.md`.
+- **Tarifa real:** a Orders API (`GET /v1/orders/{id}`) não traz `fee_details` (só `total_amount`, `total_paid_amount` e os valores do
+  pagamento). Conferido no ambiente de teste em 18/10/2026 (`server/src/payments/mercadopago/fee.sandbox.test.ts`, `npm run
+  test:sandbox`): `GET /v1/payments/search?external_reference=<id do pedido>` devolve o pagamento com `fee_details` (`mercadopago_fee`,
+  `fee_payer: collector`) e `transaction_details.net_received_amount`; `GET /v1/payments/{id}` com o id do pagamento da order responde 404
+  (com o `id` numérico que a busca devolve, responde 200 com os mesmos campos). Confirmado em produção em 19/10/2026, só com GET e com a
+  credencial de produção, no PX-10001 (Pix de R$ 1,00): a Orders API devolveu `total_amount` e `total_paid_amount` 1.00 sem tarifa; a
+  Payments API devolveu `fee_details` com `mercadopago_fee` 0.01 e `net_received_amount` 0.99.
+  O adaptador (`paymentFees`) soma as tarifas pagas pela PartyX do único pagamento aprovado; com mais de um (cobrança em dobro), não grava.
+  A rotina diária grava em `orders.gateway_fee_cents` e `orders.gateway_net_cents`.
+
 ## Provas no ambiente de teste (11/10/2026, servidor local + túnel temporário autorizado)
 
 Evidências só com ids e estados (ids de order de teste começam com `ORDTST`).

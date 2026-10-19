@@ -28,6 +28,7 @@ import { eventsRoutes } from './events';
 import { panelRoutes } from './panel';
 import { paymentAdminRoutes } from './paymentAdmin';
 import { reportRoutes } from './reports';
+import { settingsRoutes } from './settings';
 import { privacyRoutes } from './privacy';
 import { teamRoutes } from './team';
 import { ticketRoutes } from './tickets';
@@ -248,6 +249,7 @@ export function authRoutes(deps: AuthDeps) {
   app.route('/', gateRoutes(deps));
   app.route('/', panelRoutes(deps));
   app.route('/', reportRoutes(deps));
+  app.route('/', settingsRoutes(deps));
   app.route('/', exportRoutes(deps));
   app.route('/', privacyRoutes(deps));
 

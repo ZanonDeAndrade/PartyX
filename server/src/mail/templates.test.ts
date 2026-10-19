@@ -24,6 +24,9 @@ const purchase: PurchaseData = {
   units: '3 ingressos',
   paidAt: '05/10/2026 às 14:22',
   lines: ['2 × Pista', '1 × VIP'],
+  ticketsAmount: 'R$ 150,00',
+  serviceFee: 'R$ 7,92',
+  totalPaid: 'R$ 157,92',
 };
 
 describe('e-mails (RF-36, RF-67)', () => {
@@ -95,6 +98,24 @@ describe('e-mails (RF-36, RF-67)', () => {
     }
     expect(m.html).toContain('href="https://partyx.exemplo.test/meus-ingressos"');
     expect(m.text).toContain('é preciso entrar na sua conta para ver os QR Codes');
+  });
+
+  it('compra (D-90): valor dos ingressos, taxa de serviço e total pago separados; sem taxa, a linha da taxa não aparece', () => {
+    const m = composeCompra(purchase, ctx);
+    for (const [label, value] of [
+      ['Valor dos ingressos', 'R$ 150,00'],
+      ['Taxa de serviço', 'R$ 7,92'],
+      ['Total pago', 'R$ 157,92'],
+    ] as const) {
+      expect(m.text).toMatch(new RegExp(`${label}\\W+${value.replace('$', '\\$')}`));
+      expect(m.html).toContain(label);
+      expect(m.html).toContain(value);
+    }
+    expect(m.text).not.toMatch(/Mercado Pago/);
+    const semTaxa = composeCompra({ ...purchase, ticketsAmount: 'R$ 150,00', serviceFee: null, totalPaid: 'R$ 150,00' }, ctx);
+    expect(semTaxa.text).not.toContain('Taxa de serviço');
+    expect(semTaxa.html).not.toContain('Taxa de serviço');
+    expect(semTaxa.text).toContain('Total pago');
   });
 
   it('texto longo sem espaço (evento, local, tipo, comprador) quebra no HTML: blocos com quebra e tabelas de largura fixa', () => {

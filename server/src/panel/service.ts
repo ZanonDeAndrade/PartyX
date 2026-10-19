@@ -1,7 +1,18 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { writeAudit } from '../db/audit';
-import { auditLog, events, orders, paymentEvents, ticketLots, ticketTypes, tickets, users } from '../db/schema';
+import {
+  auditLog,
+  events,
+  orderItemLots,
+  orderItems,
+  orders,
+  paymentEvents,
+  ticketLots,
+  ticketTypes,
+  tickets,
+  users,
+} from '../db/schema';
 import { typeWithLotName } from '../events/lots';
 import { maskCpf } from '../domain/cpf';
 import { AppError } from '../domain/errors';
@@ -221,7 +232,8 @@ export async function listOrders(deps: PanelDeps, f: OrderFilter) {
   const where = sql.join(conds, sql` and `);
   const offset = (f.page - 1) * f.pageSize;
   const rows = await deps.db.execute<Record<string, unknown>>(sql`
-    select o.id, o.number, o.status::text as status, o.payment_method::text as payment_method, o.total_cents, o.created_at, o.paid_at,
+    select o.id, o.number, o.status::text as status, o.payment_method::text as payment_method, o.total_cents, o.service_fee_cents,
+           o.created_at, o.paid_at,
            e.id as event_id, e.name as event_name, u.name as buyer_name, u.email as buyer_email, u.cpf as buyer_cpf,
            (select count(*) from tickets t where t.order_id = o.id)::int as tickets,
            (select count(*) from tickets t where t.order_id = o.id and t.status = 'cancelado')::int as cancelled,
@@ -246,6 +258,7 @@ export async function listOrders(deps: PanelDeps, f: OrderFilter) {
       situation: PAYMENT_SITUATION[r.status as string] ?? (r.status as string),
       paymentMethod: (r.payment_method as string | null) ?? null,
       totalCents: num(r.total_cents),
+      serviceFeeCents: num(r.service_fee_cents),
       createdAt: new Date(r.created_at as string).toISOString(),
       paidAt: r.paid_at ? new Date(r.paid_at as string).toISOString() : null,
       event: { id: r.event_id as string, name: r.event_name as string },
@@ -270,6 +283,11 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
       paymentMethod: orders.paymentMethod,
       gatewayPaymentId: orders.gatewayPaymentId,
       totalCents: orders.totalCents,
+      serviceFeeCents: orders.serviceFeeCents,
+      serviceFeeRateBps: orders.serviceFeeRateBps,
+      serviceFeeMinCents: orders.serviceFeeMinCents,
+      gatewayFeeCents: orders.gatewayFeeCents,
+      gatewayNetCents: orders.gatewayNetCents,
       createdAt: orders.createdAt,
       paidAt: orders.paidAt,
       eventId: events.id,
@@ -288,9 +306,15 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
   if (!order) throw new AppError(404, 'nao_encontrado', 'Pedido não encontrado.');
 
   // Uma linha por lote (0013): "Pista · 1º lote" e "Pista · 2º lote" quando a compra se dividiu; "Lote único" mostra só o tipo.
-  const items = await deps.db.execute<{ name: string; quantity: number; unit_price_cents: number }>(sql`
+  const items = await deps.db.execute<{
+    name: string;
+    quantity: number;
+    unit_price_cents: number;
+    unit_service_fee_cents: number;
+  }>(sql`
     select case when l.name is null or l.name = 'Lote único' then t.name else t.name || ' · ' || l.name end as name,
-           coalesce(il.quantity, i.quantity) as quantity, coalesce(il.unit_price_cents, i.unit_price_cents) as unit_price_cents
+           coalesce(il.quantity, i.quantity) as quantity, coalesce(il.unit_price_cents, i.unit_price_cents) as unit_price_cents,
+           coalesce(il.unit_service_fee_cents, i.service_fee_cents / i.quantity) as unit_service_fee_cents
       from order_items i
       join ticket_types t on t.id = i.ticket_type_id
       left join order_item_lots il on il.order_item_id = i.id
@@ -306,10 +330,15 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
       usedAt: tickets.usedAt,
       cancelledAt: tickets.cancelledAt,
       cancelReason: tickets.cancelReason,
+      // Valor pago por este ingresso e a taxa de serviço dele (D-90): o que volta num reembolso só deste ingresso.
+      priceCents: sql<number>`coalesce(${orderItemLots.unitPriceCents}, ${orderItems.unitPriceCents})`.mapWith(Number),
+      serviceFeeCents: sql<number>`coalesce(${orderItemLots.unitServiceFeeCents}, ${orderItems.serviceFeeCents} / ${orderItems.quantity})`.mapWith(Number),
     })
     .from(tickets)
     .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
     .leftJoin(ticketLots, eq(ticketLots.id, tickets.lotId))
+    .innerJoin(orderItems, eq(orderItems.id, tickets.orderItemId))
+    .leftJoin(orderItemLots, and(eq(orderItemLots.orderItemId, tickets.orderItemId), eq(orderItemLots.lotId, tickets.lotId)))
     .where(eq(tickets.orderId, orderId))
     .orderBy(ticketTypes.name, tickets.unitIndex);
 
@@ -352,7 +381,16 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
     situation: PAYMENT_SITUATION[order.status] ?? order.status,
     paymentMethod: order.paymentMethod,
     gatewayPaymentId: order.gatewayPaymentId,
+    // Valores (D-90): ingressos, taxa de serviço (com a porcentagem e o mínimo usados neste pedido) e total. O reembolso previsto na
+    // Política devolve o total pago, com a taxa. Tarifa e líquido do Mercado Pago: nulos até a rotina diária consultar.
+    ticketsCents: order.totalCents - order.serviceFeeCents,
+    serviceFeeCents: order.serviceFeeCents,
+    serviceFeeRateBps: order.serviceFeeRateBps,
+    serviceFeeMinCents: order.serviceFeeMinCents,
     totalCents: order.totalCents,
+    refundCents: order.totalCents,
+    gatewayFeeCents: order.gatewayFeeCents,
+    gatewayNetCents: order.gatewayNetCents,
     createdAt: order.createdAt.toISOString(),
     paidAt: order.paidAt?.toISOString() ?? null,
     event: { id: order.eventId, name: order.eventName },
@@ -368,6 +406,8 @@ export async function orderDetail(deps: PanelDeps, orderId: string) {
       quantity: num(i.quantity),
       unitPriceCents: num(i.unit_price_cents),
       subtotalCents: num(i.quantity) * num(i.unit_price_cents),
+      unitServiceFeeCents: num(i.unit_service_fee_cents),
+      serviceFeeCents: num(i.quantity) * num(i.unit_service_fee_cents),
     })),
     tickets: orderTickets.map(t => ({
       ...t,
@@ -574,7 +614,7 @@ function checkCancel(input: CancelInput) {
 }
 
 export const CANCEL_GUIDANCE =
-  'O ingresso foi cancelado na plataforma e a portaria passa a recusá-lo. A PartyX não devolve dinheiro: se houver reembolso, o cliente faz o estorno no painel do gateway. O pedido, o ingresso e a data do pagamento continuam registrados e o ingresso segue contando na taxa mensal. O estoque não é reposto (decisão D-14 pendente).';
+  'O ingresso foi cancelado na plataforma e a portaria passa a recusá-lo. A plataforma não devolve dinheiro: se a Política prevê reembolso, a PartyX estorna no painel do Mercado Pago o valor pago pelo ingresso com a taxa de serviço dele (o detalhe do pedido mostra quanto). O pedido, o ingresso e a data do pagamento continuam registrados e o ingresso segue contando na taxa mensal. O estoque não é reposto (decisão D-14 pendente).';
 
 /**
  * Cancela ingressos (RF-62). Só ingresso **válido**: um que já entrou não pode ser cancelado (a entrada aconteceu), e o que já

@@ -862,3 +862,11 @@ body.px-dark .px-preview-bar a {
   margin-left: var(--px-s-2);
   vertical-align: middle;
 }
+
+/* Campo com a unidade depois do número (porcentagem da taxa de serviço, Configurações). */
+.px-money-suffix span {
+  padding: 0 14px 0 4px;
+}
+.px-field .px-money-suffix input {
+  padding-left: 14px;
+}

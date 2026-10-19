@@ -46,7 +46,7 @@ Para excluir sua conta, faça o pedido à PartyX pelos canais de atendimento, co
 
 # 4. Compra de ingressos
 
-Preço: você paga apenas o valor dos ingressos mostrado na tela de compra. Não há taxa de conveniência nem taxa de serviço.
+Preço e taxa de serviço: cada ingresso tem o seu valor e uma taxa de serviço cobrada pela PartyX, calculada por ingresso. Os dois aparecem separados na página do Evento e na tela de compra, com o total do pedido, antes do pagamento.
 
 Meia-entrada: os ingressos vendidos na Plataforma são de valor integral. A Plataforma não oferece venda de meia-entrada.
 
@@ -64,7 +64,7 @@ Dados do cartão: são digitados diretamente nos campos do Mercado Pago. A Party
 
 Confirmação: a compra só é concluída quando o Mercado Pago confirma o pagamento à PartyX. Telas ou comprovantes exibidos no navegador não substituem essa confirmação. Pagamento recusado não gera ingresso e libera a reserva.
 
-Pagamento confirmado depois de vencida a reserva: os ingressos são emitidos se ainda houver disponibilidade. Se não houver, nenhum ingresso é emitido e a PartyX devolve o valor integral pelo Mercado Pago.
+Pagamento confirmado depois de vencida a reserva: os ingressos são emitidos se ainda houver disponibilidade. Se não houver, nenhum ingresso é emitido e a PartyX devolve pelo Mercado Pago o valor total pago, com a taxa de serviço.
 
 Cobrança em duplicidade: se o mesmo pedido for cobrado mais de uma vez, a cobrança a mais não gera ingresso e é estornada pela PartyX.
 
@@ -88,7 +88,7 @@ Programação: atrações, horários e local são de responsabilidade da PartyX 
 
 Não há cancelamento nem reembolso por desistência do comprador, em nenhum prazo. Em vez disso, o titular pode transferir o ingresso para outra pessoa, como explica a Política de Cancelamento, Troca e Reembolso, que faz parte destes Termos.
 
-O reembolso só ocorre nos casos previstos nessa Política: Evento cancelado, adiado ou alterado pela PartyX, entrada recusada por erro da PartyX e cobranças indevidas. Quando devido, o reembolso é feito pela PartyX, pelo Mercado Pago, no mesmo meio de pagamento usado na compra, e vai para quem fez o pedido, mesmo que o ingresso tenha sido transferido.
+O reembolso só ocorre nos casos previstos nessa Política: Evento cancelado, adiado ou alterado pela PartyX, entrada recusada por erro da PartyX e cobranças indevidas. Quando devido, o reembolso corresponde ao valor total pago, com a taxa de serviço, e é feito pela PartyX, pelo Mercado Pago, no mesmo meio de pagamento usado na compra, e vai para quem fez o pedido, mesmo que o ingresso tenha sido transferido.
 
 Ingresso cancelado ou estornado deixa de valer para entrada. Ingresso já utilizado não pode ser cancelado.
 
