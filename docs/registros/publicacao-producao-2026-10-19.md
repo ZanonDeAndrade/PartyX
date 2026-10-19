@@ -131,3 +131,20 @@ Release `release-2026-10-19d` (commit `ef071cf`), com OK do responsável: "coloq
 
 **Voltar atrás:** `PROJECT=partyx-producao REVISAO=partyx-00050-pey ./infra/producao/deploy.sh rollback` (mesmo banco; volta o bloco sem logos).
 
+## Quinta publicação do dia: troca da vitrine para o evento e de volta (17:29 UTC)
+
+Release `release-2026-10-19e` (commit `7a0aa49`; código em `16ca1a0`), com OK do responsável: "Variante A [...] depois faça commit e
+deploy em produção". As logos das formas de pagamento já estavam no ar desde a quarta publicação; na fila havia só esta mudança. Registro
+do recurso: matriz de requisitos, seção "Vitrine para o evento e de volta (19/10/2026)".
+
+| Campo | Valor |
+|---|---|
+| Migração | nenhuma (backup do dia `partyx-20261019T140403Z.dump` presente no bucket, depois da última migração) |
+| Imagem | `partyx-api:release-2026-10-19e-7a0aa49` (Cloud Build `6c69bae1`, 1 min 47 s) |
+| Revisão | `partyx-00054-nor`, 100% desde 17:29 UTC (14:29 BRT); anterior `partyx-00052-saf` |
+| `env.prod.yaml` | sem mudança (Termos 1.5) |
+| Conferências | candidata e domínio: teste rápido 15 de 15; Playwright só de navegação (vitrine, evento, voltar) em Chromium e Firefox a 1280 e 390 px: troca `ida` e `volta`, capa compartilhada em 420 ms, rolagem igual na volta, sem rolagem lateral, sem erro de página nem 5xx; CSS servido com as regras novas; logs da revisão desde a virada sem 5xx nem erro |
+| Testes locais | lint, typecheck, `npm run test:db` 1223 + 4, build; e2e transições 19, cronômetro 8, busca 4, abertura 51, cor 8 |
+
+**Voltar atrás:** `PROJECT=partyx-producao REVISAO=partyx-00052-saf ./infra/producao/deploy.sh rollback` (mesmo banco; volta a troca
+anterior).
