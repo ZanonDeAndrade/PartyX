@@ -89,3 +89,28 @@ Termos 1.4 descrevem uma taxa que ainda não é cobrada; fazer antes de 20/10 01
 **Voltar atrás:** `PROJECT=partyx-producao REVISAO=partyx-00046-gul ./infra/producao/deploy.sh rollback` (Termos voltam para 1.3).
 Se a porcentagem já estiver gravada no painel, voltar os Termos deixa a taxa cobrada sem o número escrito: nesse caso, gravar 0% antes.
 
+## Terceira publicação do dia: desconto por promoter e Termos de Uso 1.5 (14:06 UTC)
+
+Release `release-2026-10-19c` (commit `bf3c188`, branch `feature/desconto-promoter`), com OK do responsável: "dou o ok para fazer commit
+e deploy"; Termos 1.5 aprovados pelo Bernardo (informado pelo responsável). Registro do recurso: `desconto-por-promoter.md` (D-91).
+
+| Campo | Valor |
+|---|---|
+| Migração | `0018_desconto_por_promoter` (só expande; reversão recusa com pedido com desconto) |
+| Imagem | `partyx-api:release-2026-10-19c-bf3c188` (Cloud Build `76e06c98`, 1 min 53 s; Termos da tag com sha256 `2308e7d87b6e3941`) |
+| Backup sob demanda | `partyx-backup-48rxf`, cópia `partyx-20261019T140403Z.dump` (130.889 bytes), `check-backup.sh` OK, antes da migração |
+| Migração aplicada | `partyx-migrate-47mbp`; leitura do banco: 19 migrações, `promoter_discount_events` e 12 colunas novas, 6 regras novas, nenhum pedido com desconto |
+| Revisão | `partyx-00050-pey`, 100% desde 14:06 UTC (11:06 BRT); anterior `partyx-00048-zik` |
+| `env.prod.yaml` | `TERMS_VERSION 1.5`, vigência 2026-10-19; Política 1.1 e Privacidade 1.2 sem mudança |
+| Conferências | candidata: teste rápido 15 de 15, bateria 48 de 48, Chromium e Firefox ok; domínio: teste rápido 15 de 15, bateria 48 de 48 (Termos 1.5 com os trechos novos, porcentagem da taxa na API do evento, API de promoters sem login 401), Chromium e Firefox ok; logs desde a virada sem 5xx nem erro |
+| Testes locais | lint, typecheck, `npm test` com banco 1220 + 4, `check:migrations` 19, build, 13 suítes e2e (875 passaram, 1 pulado, o Brick) |
+
+**Para o responsável:**
+
+- Nenhum promoter de produção tem desconto: todos nasceram como "nenhum". O desconto só existe depois de configurado no painel.
+- **A taxa de serviço em produção continua em 0%** (lida no banco depois da migração). Os Termos 1.5 não citam mais a porcentagem: ela
+  aparece na página do evento e na tela de compra quando for gravada no painel (Configurações).
+
+**Voltar atrás:** `PROJECT=partyx-producao REVISAO=partyx-00048-zik ./infra/producao/deploy.sh rollback` (Termos voltam para 1.4;
+convive com a 0018 enquanto nenhum pedido tiver desconto: a revisão anterior ignora as colunas novas).
+

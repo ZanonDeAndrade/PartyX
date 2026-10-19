@@ -584,3 +584,9 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00048-zik`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00046-gul ./infra/producao/deploy.sh rollback` (Termos 1.3; com a taxa já gravada, gravar 0% antes).
 
+## 35. Vigésima terceira publicação: desconto por promoter e Termos de Uso 1.5 (19/10/2026)
+
+**Publicado:** revisão `partyx-00050-pey` (tag `release-2026-10-19c`, commit `bf3c188`), 100% desde 19/10 14:06 UTC (11:06 BRT), com a migração `0018_desconto_por_promoter` (execução `partyx-migrate-47mbp`, depois do backup sob demanda `partyx-backup-48rxf` conferido) e os Termos de Uso 1.5 (vigência 19/10). Desconto por promoter (D-91): porcentagem ou valor fixo por ingresso, eventos, prazo e limite de usos; total zero recusado; taxa sobre o valor descontado. Teste rápido 15 de 15; bateria pelo domínio 48 de 48. Registros: `docs/registros/publicacao-producao-2026-10-19.md` e `docs/registros/desconto-por-promoter.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00050-pey`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00048-zik ./infra/producao/deploy.sh rollback` (Termos 1.4; convive com a 0018 enquanto nenhum pedido tiver desconto).
+

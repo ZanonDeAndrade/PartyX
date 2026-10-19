@@ -60,4 +60,4 @@ uso segurado pelo pedido pendente, prazo pela criação do pedido, recusa quando
 - A Política de Cancelamento 1.1 diz que "voltam o valor dele e a taxa de serviço dele" quando um ingresso é reembolsado. Com desconto,
   "o valor dele" é o valor pago por ele (preço menos desconto), que é o que o painel mostra. Se a PartyX quiser deixar isso explícito, é
   uma Política 1.2, com OK dela.
-- Publicação (candidata com backup antes da migração 0018; virada com OK do responsável).
+- Publicado em 19/10/2026 14:06 UTC na revisão `partyx-00050-pey` (`publicacao-producao-2026-10-19.md`).
