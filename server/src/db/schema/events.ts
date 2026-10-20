@@ -96,6 +96,11 @@ export const events = pgTable(
      * os tons legíveis (texto, links, linhas, foco) e aplica por variável CSS; nunca entra em CSS como texto livre.
      */
     accentColor: text('accent_color'),
+    /**
+     * Evento privado (D-92, 0019): só compra quem está autorizado na lista do evento (`event_access`). O evento continua na vitrine e na
+     * busca, com o selo. Desligar libera a compra para todos e mantém a lista.
+     */
+    isPrivate: boolean('is_private').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

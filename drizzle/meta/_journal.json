@@ -134,6 +134,13 @@
       "when": 1792416111729,
       "tag": "0018_desconto_por_promoter",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792466499633,
+      "tag": "0019_evento_privado",
+      "breakpoints": true
     }
   ]
 }

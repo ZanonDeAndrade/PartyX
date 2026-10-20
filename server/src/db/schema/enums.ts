@@ -43,6 +43,9 @@ export const emailTemplate = pgEnum('email_template', [
   'transferencia_enviada',
   'transferencia_recebida',
   'transferencia_desfeita',
+  // Evento privado (D-92, 0019): solicitação de acesso recebida e acesso liberado. A recusa não manda e-mail.
+  'acesso_solicitado',
+  'acesso_liberado',
 ]);
 export const emailStatus = pgEnum('email_status', ['pendente', 'enviado', 'falhou']);
 
@@ -57,3 +60,8 @@ export const lotLeftover = pgEnum('lot_leftover', ['passar', 'descartar']);
 export const promoterDiscountKind = pgEnum('promoter_discount_kind', ['nenhum', 'percentual', 'fixo']);
 /** Onde o desconto do promoter vale: em todos os eventos ou só nos escolhidos (`promoter_discount_events`). */
 export const promoterDiscountScope = pgEnum('promoter_discount_scope', ['todos', 'eventos']);
+
+/** Evento privado (D-92, 0019): situação de uma pessoa na lista de autorizados do evento. */
+export const eventAccessStatus = pgEnum('event_access_status', ['autorizada', 'pendente', 'recusada']);
+/** De onde veio a linha da lista: cadastrada pelo painel ou solicitação feita pela própria conta na página do evento. */
+export const eventAccessOrigin = pgEnum('event_access_origin', ['painel', 'solicitacao']);

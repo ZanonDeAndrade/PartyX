@@ -16,7 +16,9 @@ export type EmailTemplate =
   | 'pagamento_sem_estoque'
   | 'transferencia_enviada'
   | 'transferencia_recebida'
-  | 'transferencia_desfeita';
+  | 'transferencia_desfeita'
+  | 'acesso_solicitado'
+  | 'acesso_liberado';
 
 /** O que a mensagem significa: modelo, destinatário e os dados usados para compor. */
 export interface EmailMessage {

@@ -148,9 +148,10 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
           'cancellation_acceptances',
           'service_fee_settings',
           'promoter_discount_events',
+          'event_access',
         ]),
       );
-      expect(tables).toHaveLength(26);
+      expect(tables).toHaveLength(27);
     });
 
     it('0016: titular do ingresso preenchido com o comprador (também para quem não o informa); histórico só de inclusão', async () => {
@@ -190,7 +191,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(19);
+      expect(r.rows[0].n).toBe(20);
     });
   });
 
@@ -751,6 +752,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag16 = '0016_transferencia_e_aceite_da_politica';
       const tag17 = '0017_taxa_de_servico';
       const tag18 = '0018_desconto_por_promoter';
+      const tag19 = '0019_evento_privado';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag15)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
@@ -765,6 +767,58 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag14)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag16)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag17)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag18)).rejects.toThrow(/não é a última/);
+
+      // 0019: evento nasce aberto a todos; a lista confere e-mail em minúsculas, CPF só por dígitos, uma linha por e-mail, CPF e conta no
+      // evento, solicitação sempre com conta e decisão sempre com data; a reversão recusa com evento privado ou com alguém na lista.
+      const q19 = db.pool.query.bind(db.pool);
+      const u19 = (
+        await q19("insert into users (name,email,cpf,password_hash,role) values ('Caio','caio19@partyx.test','39053344705','x','cliente') returning id")
+      ).rows[0].id;
+      const ev19 = (
+        await q19("insert into events (slug,name,starts_at,venue,address,description,age_rating) values ('ev-19','E',now()+interval '9 days','L','A','D','Livre') returning id, is_private")
+      ).rows[0];
+      expect(ev19.is_private).toBe(false);
+      const add19 = (cols: string, vals: string) => q19(`insert into event_access (event_id, ${cols}) values ($1, ${vals})`, [ev19.id]);
+      await expect(add19('status, origin', "'pendente', 'painel'")).rejects.toThrow(/event_access_identifies/);
+      await expect(add19('email_normalized, status, origin, decided_at', "'Caio@X.co', 'autorizada', 'painel', now()")).rejects.toThrow(
+        /event_access_email_format/,
+      );
+      await expect(add19('cpf, status, origin, decided_at', "'390.533.447-05', 'autorizada', 'painel', now()")).rejects.toThrow();
+      await expect(add19('email_normalized, status, origin', "'caio@x.co', 'autorizada', 'painel'")).rejects.toThrow(
+        /event_access_decided_has_time/,
+      );
+      await expect(add19('email_normalized, status, origin', "'caio@x.co', 'pendente', 'solicitacao'")).rejects.toThrow(
+        /event_access_request_has_user/,
+      );
+      await add19('email_normalized, cpf, status, origin, decided_at', "'caio@x.co', '39053344705', 'autorizada', 'painel', now()");
+      await expect(add19('email_normalized, status, origin, decided_at', "'caio@x.co', 'autorizada', 'painel', now()")).rejects.toThrow(
+        /event_access_email_key/,
+      );
+      await expect(add19('cpf, status, origin, decided_at', "'39053344705', 'autorizada', 'painel', now()")).rejects.toThrow(
+        /event_access_cpf_key/,
+      );
+      await q19("insert into event_access (event_id, user_id, status, origin) values ($1, $2, 'pendente', 'solicitacao')", [ev19.id, u19]);
+      await expect(
+        q19("insert into event_access (event_id, user_id, status, origin) values ($1, $2, 'pendente', 'solicitacao')", [ev19.id, u19]),
+      ).rejects.toThrow(/event_access_user_key/);
+      await q19('update events set is_private = true where id = $1', [ev19.id]);
+      await expect(rollbackLastMigration(db.url, tag19)).rejects.toThrow(/há evento privado/);
+      await q19('update events set is_private = false where id = $1', [ev19.id]);
+      await expect(rollbackLastMigration(db.url, tag19)).rejects.toThrow(/pessoas na lista de autorizados/);
+      await q19('delete from event_access where event_id = $1', [ev19.id]);
+      await rollbackLastMigration(db.url, tag19);
+      expect((await q19("select to_regclass('event_access') as t")).rows[0].t).toBeNull();
+      expect(
+        (await q19("select count(*)::int as n from information_schema.columns where table_name = 'events' and column_name = 'is_private'")).rows[0].n,
+      ).toBe(0);
+      expect((await q19("select count(*)::int as n from pg_type where typname in ('event_access_status','event_access_origin')")).rows[0].n).toBe(0);
+      await q19('delete from events where id = $1', [ev19.id]);
+      await q19('delete from users where id = $1', [u19]).catch(async () => {
+        await q19('alter table users disable trigger users_forbid_delete');
+        await q19('delete from users where id = $1', [u19]);
+        await q19('alter table users enable trigger users_forbid_delete');
+      });
 
       // 0018: promoter nasce sem desconto; recusa com pedido que tem desconto; sem ele, apaga o desconto dos promoters, a tabela de
       // eventos do desconto e as colunas, e o pedido continua com o total.
@@ -1106,8 +1160,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0018 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0019 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag19);
       await rollbackLastMigration(db.url, tag18);
       await rollbackLastMigration(db.url, tag17);
       await rollbackLastMigration(db.url, tag16);
@@ -1187,7 +1242,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       r = await db.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'");
-      expect(r.rows[0].n).toBe(26); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013) + as três da 0016 + service_fee_settings (0017) + promoter_discount_events (0018)
+      expect(r.rows[0].n).toBe(27); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013) + as três da 0016 + service_fee_settings (0017) + promoter_discount_events (0018) + event_access (0019)
     } finally {
       await db.drop();
     }
