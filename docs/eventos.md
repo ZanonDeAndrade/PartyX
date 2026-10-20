@@ -21,6 +21,14 @@ Implementado em 01/10/2026 (Prompt 07): RF-11 a RF-19 e CA-07 a CA-11 (parte API
 
 Datas chegam em ISO 8601 **com fuso** (`2026-12-12T22:00:00-03:00`); sem fuso é recusada. Preço em centavos inteiros. Erros no formato de sempre; 422 traz `detalhes: [{ campo, mensagem }]`.
 
+## Evento privado (D-92, 20/10/2026)
+
+Chave `isPrivate` no `PATCH /admin/events/:id` (trilha `evento.privado`). Lista de autorizados, só administrador: `POST
+/admin/events/:id/access/search` (busca no corpo), `POST /admin/events/:id/access`, `POST /admin/events/:id/access/import`, `DELETE
+/admin/access/:id`, `POST /admin/access/decide`, `GET /admin/access-requests`, `GET /admin/access-requests/count` e `GET
+/admin/exports/events/:id/access.csv`. Comprador: `GET /events/:slug/access` (só a própria situação) e `POST
+/events/:slug/access-request`. Regras e testes em `registros/evento-privado.md`.
+
 ## Regras
 
 - **Estados do evento:** rascunho → publicado → encerrado; encerrado → publicado só por "Reabrir evento" (abaixo). Encerrar tira o destaque; evento encerrado não aceita edição, tipo novo nem banner. Nada é apagado.

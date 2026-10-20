@@ -17,7 +17,14 @@ function textCheck(terms: string, cancellation: string, termsVersion: string, ca
   writeFileSync(path.join(dir, 'c.txt'), cancellation);
   const r = spawnSync(
     'python3',
-    ['-I', path.join(ROOT, 'infra/producao/textos-taxa.py'), path.join(dir, 't.txt'), path.join(dir, 'c.txt'), termsVersion, cancellationVersion],
+    [
+      '-I',
+      path.join(ROOT, 'infra/producao/textos-taxa.py'),
+      path.join(dir, 't.txt'),
+      path.join(dir, 'c.txt'),
+      termsVersion,
+      cancellationVersion,
+    ],
     { encoding: 'utf8' },
   );
   return { status: r.status, err: r.stderr };
@@ -54,9 +61,13 @@ describe('textos legais da release da taxa de serviço', () => {
 
 function discountCheck(terms: string, termsVersion: string) {
   writeFileSync(path.join(dir, 'td.txt'), terms);
-  const r = spawnSync('python3', ['-I', path.join(ROOT, 'infra/producao/textos-desconto.py'), path.join(dir, 'td.txt'), termsVersion], {
-    encoding: 'utf8',
-  });
+  const r = spawnSync(
+    'python3',
+    ['-I', path.join(ROOT, 'infra/producao/textos-desconto.py'), path.join(dir, 'td.txt'), termsVersion],
+    {
+      encoding: 'utf8',
+    },
+  );
   return { status: r.status, err: r.stderr };
 }
 
@@ -95,7 +106,11 @@ chmodSync(path.join(dir, 'gcloud'), 0o755);
 
 const revision = (env: Record<string, string>) =>
   JSON.stringify({
-    spec: { containers: [{ env: [...Object.entries(env).map(([name, value]) => ({ name, value })), { name: 'S', valueFrom: {} }] }] },
+    spec: {
+      containers: [
+        { env: [...Object.entries(env).map(([name, value]) => ({ name, value })), { name: 'S', valueFrom: {} }] },
+      ],
+    },
   });
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 
@@ -111,15 +126,69 @@ function virar(nova: Record<string, string>) {
       PROJECT: 'partyx-teste',
       FAKE_GCLOUD_LOG: log,
       FAKE_SERVICE: JSON.stringify({
-        status: { traffic: [{ percent: 100, revisionName: 'rev-antiga' }, { tag: 'candidata', revisionName: 'rev-nova' }] },
+        status: {
+          traffic: [
+            { percent: 100, revisionName: 'rev-antiga' },
+            { tag: 'candidata', revisionName: 'rev-nova' },
+          ],
+        },
       }),
-      FAKE_REV_ANTIGA: revision({ TERMS_VERSION: '1.2', TERMS_DATE: '2026-10-15', CANCELLATION_VERSION: '1.0', CANCELLATION_DATE: '2026-10-15' }),
+      FAKE_REV_ANTIGA: revision({
+        TERMS_VERSION: '1.2',
+        TERMS_DATE: '2026-10-15',
+        CANCELLATION_VERSION: '1.0',
+        CANCELLATION_DATE: '2026-10-15',
+      }),
       FAKE_REV_NOVA: revision(nova),
     },
   });
   const calls = readFileSync(log, 'utf8').split('\n').filter(Boolean);
   return { status: r.status, err: r.stderr, switched: calls.some(c => c.includes('update-traffic')) };
 }
+
+function privateCheck(privacy: string, terms: string, privacyVersion: string, termsVersion: string) {
+  writeFileSync(path.join(dir, 'pp.txt'), privacy);
+  writeFileSync(path.join(dir, 'pt.txt'), terms);
+  const r = spawnSync(
+    'python3',
+    [
+      '-I',
+      path.join(ROOT, 'infra/producao/textos-privado.py'),
+      path.join(dir, 'pp.txt'),
+      path.join(dir, 'pt.txt'),
+      privacyVersion,
+      termsVersion,
+    ],
+    { encoding: 'utf8' },
+  );
+  return { status: r.status, err: r.stderr };
+}
+
+describe('textos legais da release do evento privado (D-92)', () => {
+  const privacy = readFileSync(path.join(ROOT, 'conteudo-legal/privacidade.txt'), 'utf8');
+  const terms = readFileSync(path.join(ROOT, 'conteudo-legal/termos-de-uso.txt'), 'utf8');
+  // Os trechos da proposta (docs/registros/evento-privado-textos-propostos.md), ainda não aprovados nem publicados.
+  const privacyNew = `${privacy}\nEventos privados: quando um Evento é privado, a lista de pessoas autorizadas a comprar, com o e-mail ou o CPF.\n\nLista de autorizados e solicitações de acesso de Eventos privados: 6 meses após o Evento, e depois apagadas automaticamente.\n`;
+  const termsNew = `${terms}\nEvento privado: a PartyX pode tornar um Evento privado.\n\nEm Evento privado, a transferência só pode ser feita para uma conta autorizada pela PartyX para aquele Evento.\n`;
+
+  it('os textos publicados hoje (Privacidade 1.2, Termos 1.5) são recusados: a release com a 0019 espera a aprovação, um motivo por linha', () => {
+    const r = privateCheck(privacy, terms, '1.2', '1.5');
+    expect(r.status).toBe(1);
+    expect(r.err).toContain('PRIVACY_VERSION=1.2');
+    expect(r.err).toContain('TERMS_VERSION=1.5');
+    expect(r.err).toContain('não fala da lista de autorizados');
+    expect(r.err).toContain('não diz que a lista é apagada 6 meses após o Evento');
+    expect(r.err).toContain('não têm a cláusula do Evento privado');
+    expect(r.err).toContain('a transferência em Evento privado só vale para conta autorizada');
+  });
+
+  it('com os trechos propostos e as versões novas, passa; texto novo com versão antiga, não', () => {
+    expect(privateCheck(privacyNew, termsNew, '1.3', '1.6').status).toBe(0);
+    expect(privateCheck(privacyNew, termsNew, '1.2', '1.6').err).toContain('PRIVACY_VERSION=1.2');
+    expect(privateCheck(privacyNew, termsNew, '1.3', '').err).toContain('TERMS_VERSION=(vazio)');
+    expect(privateCheck(privacyNew, termsNew, '1.10', '2.0').status).toBe(0);
+  });
+});
 
 describe('deploy.sh virar: texto legal de versão nova vale a partir da virada', () => {
   it('versão nova com a data de hoje: vira', () => {
@@ -129,14 +198,24 @@ describe('deploy.sh virar: texto legal de versão nova vale a partir da virada',
   });
 
   it('versão nova com outra data (candidata montada noutro dia): recusa antes de mexer no tráfego', () => {
-    const r = virar({ TERMS_VERSION: '1.3', TERMS_DATE: '2026-01-01', CANCELLATION_VERSION: '1.1', CANCELLATION_DATE: today });
+    const r = virar({
+      TERMS_VERSION: '1.3',
+      TERMS_DATE: '2026-01-01',
+      CANCELLATION_VERSION: '1.1',
+      CANCELLATION_DATE: today,
+    });
     expect(r.status).toBe(1);
     expect(r.err).toContain('TERMS_VERSION=1.3 (antes 1.2) com vigência 2026-01-01');
     expect(r.switched).toBe(false);
   });
 
   it('mesma versão de antes (publicação que não mexe nos textos): a data antiga não importa', () => {
-    const r = virar({ TERMS_VERSION: '1.2', TERMS_DATE: '2026-10-15', CANCELLATION_VERSION: '1.0', CANCELLATION_DATE: '2026-10-15' });
+    const r = virar({
+      TERMS_VERSION: '1.2',
+      TERMS_DATE: '2026-10-15',
+      CANCELLATION_VERSION: '1.0',
+      CANCELLATION_DATE: '2026-10-15',
+    });
     expect(r.err).not.toContain('Recuso: a candidata publica');
     expect(r.switched).toBe(true);
   });

@@ -325,6 +325,19 @@ cmd_conferir() {
       || { rm -rf "$disc_tmp"; echo "Recuso: a release dá desconto pelo código do promoter e os Termos de Uso $where não são os do desconto (1.5)." >&2; exit 1; }
     rm -rf "$disc_tmp"
   fi
+  # Evento privado (D-92): a release com a lista de autorizados (migração 0019 na tag) só sobe com a Política de Privacidade e os
+  # Termos de Uso que falam dela (infra/producao/textos-privado.py; proposta em docs/registros/evento-privado-textos-propostos.md).
+  local private_migration="drizzle/0019_evento_privado.sql"
+  if { [ -n "${RELEASE:-}" ] && git cat-file -e "refs/tags/$RELEASE:$private_migration" 2>/dev/null; } || { [ -z "${RELEASE:-}" ] && [ -f "$private_migration" ]; }; then
+    local priv_tmp; priv_tmp="$(mktemp -d)"
+    for k in privacidade termos-de-uso; do
+      if [ -n "${RELEASE:-}" ]; then git show "refs/tags/$RELEASE:$legal_dir/$k.txt" > "$priv_tmp/$k.txt" 2>/dev/null || : > "$priv_tmp/$k.txt"
+      else cat "$legal_dir/$k.txt" > "$priv_tmp/$k.txt" 2>/dev/null || : > "$priv_tmp/$k.txt"; fi
+    done
+    python3 -I infra/producao/textos-privado.py "$priv_tmp/privacidade.txt" "$priv_tmp/termos-de-uso.txt" "${PRIVACY_VERSION:-}" "${TERMS_VERSION:-}" \
+      || { rm -rf "$priv_tmp"; echo "Recuso: a release tem o evento privado e os textos legais $where não falam dele (Privacidade 1.3, Termos 1.6)." >&2; exit 1; }
+    rm -rf "$priv_tmp"
+  fi
   if [ "$SALES_OPEN" = "true" ]; then   # travas extras para ABRIR A VENDA (go-live)
     [ "$PAYMENT_GATEWAY" != "none" ] || { echo "Recuso: venda aberta sem gateway real." >&2; exit 1; }
     for v in TERMS_VERSION TERMS_DATE PRIVACY_VERSION PRIVACY_DATE CANCELLATION_VERSION CANCELLATION_DATE GO_LIVE_CONFIRMED; do [ -n "${!v:-}" ] || { echo "Recuso: $v é obrigatório para abrir a venda." >&2; exit 1; }; done
