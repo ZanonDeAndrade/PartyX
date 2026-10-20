@@ -672,16 +672,20 @@ describe.skipIf(!ADMIN_URL)('evento privado (integração)', () => {
         note: 'Lista fechada',
       });
       const data = await exportSubjectData({ db: createDrizzle(testDb.pool), clock, hasher: argon2Hasher }, p.id);
-      expect(data.privateEventAccess).toEqual([
-        expect.objectContaining({ event: 'Festa Fechada', status: 'autorizada', origin: 'painel', note: null }),
-        expect.objectContaining({
-          event: 'Festa Fechada',
-          status: 'recusada',
-          origin: 'solicitacao',
-          note: 'Lista fechada',
-        }),
-      ]);
-      expect(data.privateEventAccess[1]?.decidedAt).toEqual(expect.any(String));
+      // Mesmo relógio falso nas duas linhas: a ordem entre elas não é garantida.
+      expect(data.privateEventAccess).toHaveLength(2);
+      expect(data.privateEventAccess).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ event: 'Festa Fechada', status: 'autorizada', origin: 'painel', note: null }),
+          expect.objectContaining({
+            event: 'Festa Fechada',
+            status: 'recusada',
+            origin: 'solicitacao',
+            note: 'Lista fechada',
+            decidedAt: expect.any(String),
+          }),
+        ]),
+      );
       expect(JSON.stringify(data.privateEventAccess)).not.toContain(admin.id);
     });
 
