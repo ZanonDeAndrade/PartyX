@@ -1,6 +1,6 @@
 # Evento privado (D-92): textos legais e resumo diário
 
-**Situação: APROVADOS, ainda não publicados.** Em 20/10/2026 o responsável informou que ele e o Bernardo aprovaram os textos, com três
+**Situação: APROVADOS pelo Bernardo por WhatsApp em 20/10/2026 (informado pelo responsável), com vigência em 20/10/2026.** Em 20/10/2026 o responsável informou que ele e o Bernardo aprovaram os textos, com três
 ajustes: o trecho da seção 7 da Política de Privacidade entra; a avaliação de legítimo interesse fica em `lia-evento-privado.md`, para o
 Bernardo assinar como encarregado; e o painel avisa, junto da observação da decisão, que ela fica na trilha e pode ser pedida pela
 pessoa (também em `../manual-do-painel.md`, com a recomendação de cadastrar só quem pediu acesso). A Política de Cancelamento 1.2 recebe

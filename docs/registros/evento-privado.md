@@ -15,6 +15,11 @@ seção 7), os Termos de Uso 1.6 e a Política de Cancelamento 1.2 (`evento-priv
 interesse em `lia-evento-privado.md` (a assinar pelo Bernardo, como encarregado), o aviso junto da observação da decisão e a orientação
 no `../manual-do-painel.md`.
 
+**Aprovação do Bernardo (20/10/2026):** o responsável informou que o Bernardo aprovou, por WhatsApp, em 20/10/2026, o evento privado e
+os três textos (Política de Privacidade 1.3, Termos de Uso 1.6 e Política de Cancelamento 1.2), com vigência em 20/10/2026. A
+assinatura da avaliação de legítimo interesse vem depois, em PDF, e não trava a publicação. A mensagem fica com o responsável, fora do
+repositório.
+
 ## Regras
 
 | Regra | Como ficou |
@@ -69,7 +74,7 @@ no `../manual-do-painel.md`.
 
 ## Pendente
 
-- Assinatura do Bernardo, como encarregado, na avaliação de legítimo interesse (`lia-evento-privado.md`).
-- Vigência dos textos: `env.prod.yaml` está com 20/10/2026; se a virada for noutro dia, trocar as três datas e refazer a candidata.
+- Assinatura do Bernardo, como encarregado, na avaliação de legítimo interesse (`lia-evento-privado.md`), em PDF; não trava a
+  publicação.
 - Resumo diário de solicitações: só proposto (`evento-privado-textos-propostos.md`).
 - Não publicado: sem push e sem deploy. A migração 0019 não está no Neon.
