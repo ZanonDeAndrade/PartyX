@@ -40,17 +40,18 @@ describe('infra/env-check.py', () => {
     // Privacidade publicados (D-84; 1.2 e a Política de Cancelamento, Troca e Reembolso 1.0 em 15/10/2026, D-87). Venda aberta na
     // release-2026-10-18 (autorizacao-abertura-vendas-2026-10-15.md), com o visual aprovado por escrito em 18/10/2026 (CA-33). Termos
     // 1.3 e Política 1.1 com a taxa de serviço (D-90), na release da taxa, com vigência na data da virada; Termos 1.4 com a
-    // porcentagem aprovada (7,5%), no mesmo dia; Termos 1.5 com o desconto por promoter (D-91), na release dele.
+    // porcentagem aprovada (7,5%), no mesmo dia; Termos 1.5 com o desconto por promoter (D-91), na release dele; Privacidade 1.3,
+    // Termos 1.6 e Política 1.2 com o evento privado (D-92), na release dele.
     for (const [name, value] of [
       ['SALES_OPEN', 'true'],
       ['VISUAL_APPROVED', 'true'],
       ['SIGNUP_OPEN', 'true'],
-      ['TERMS_VERSION', '1.5'],
-      ['TERMS_DATE', '2026-10-19'],
-      ['PRIVACY_VERSION', '1.2'],
-      ['PRIVACY_DATE', '2026-10-15'],
-      ['CANCELLATION_VERSION', '1.1'],
-      ['CANCELLATION_DATE', '2026-10-19'],
+      ['TERMS_VERSION', '1.6'],
+      ['TERMS_DATE', '2026-10-20'],
+      ['PRIVACY_VERSION', '1.3'],
+      ['PRIVACY_DATE', '2026-10-20'],
+      ['CANCELLATION_VERSION', '1.2'],
+      ['CANCELLATION_DATE', '2026-10-20'],
       ['MINOR_TERM_VERSION', '1.0'],
       ['MINOR_AUTHORIZATION_VERSION', '1.0'],
       ['RETENTION_SESSIONS_DAYS', '180'],

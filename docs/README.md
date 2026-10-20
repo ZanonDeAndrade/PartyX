@@ -14,6 +14,7 @@ Preparação do plano de desenvolvimento (Prompt 01). Tudo aqui é registro e ra
 | `eventos.md` | Rotas, regras, banner, capacidade e decisões de eventos, tipos e promoters |
 | `relatorios.md` | Vendas, promoters e taxa mensal: bases, regras, conciliação e o que falta confirmar |
 | `painel.md` | Visão geral, pedidos, compradores, ingressos, entradas ao vivo e cancelamento de ingresso |
+| `manual-do-painel.md` | Manual para quem administra a PartyX, em linguagem simples (em construção: por ora, o evento privado) |
 | `operacao/README.md` | Rotinas, suporte, alertas, cobrança sem automação, capacidade, encerramento e 9 runbooks |
 | `../README-DEPLOY.md` | Roteiro de produção de custo mínimo: decisões e medições, passo a passo, deploy, rollback, dias de evento, custo e checklist manual |
 | `backup.md` | Backup diário, restauração em banco isolado, RPO, plano do Neon, alertas e o que não foi verificado |

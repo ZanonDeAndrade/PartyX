@@ -1,11 +1,15 @@
-# Evento privado (D-92): textos legais propostos e resumo diário
+# Evento privado (D-92): textos legais e resumo diário
 
-**Situação: PROPOSTA, não publicada.** Nada aqui está em `conteudo-legal/` nem em `infra/producao/env.prod.yaml`. Os textos vão ao
-Bernardo pelo responsável; só depois da aprovação escrita eles entram no repositório, com versão e data novas e novo aceite. Os números
-de versão abaixo são sugestão (hoje: Termos de Uso 1.5, Política de Privacidade 1.2).
+**Situação: APROVADOS, ainda não publicados.** Em 20/10/2026 o responsável informou que ele e o Bernardo aprovaram os textos, com três
+ajustes: o trecho da seção 7 da Política de Privacidade entra; a avaliação de legítimo interesse fica em `lia-evento-privado.md`, para o
+Bernardo assinar como encarregado; e o painel avisa, junto da observação da decisão, que ela fica na trilha e pode ser pedida pela
+pessoa (também em `../manual-do-painel.md`, com a recomendação de cadastrar só quem pediu acesso). A Política de Cancelamento 1.2 recebe
+a frase da transferência. A aprovação escrita fica com o responsável, fora do repositório.
 
-A trava do `deploy.sh conferir` (`infra/producao/textos-privado.py`) recusa publicar uma release com a migração 0019 enquanto os dois
-textos não estiverem no repositório com o conteúdo do evento privado.
+Os textos estão em `conteudo-legal/` (Privacidade 1.3, Termos de Uso 1.6, Política de Cancelamento 1.2) e em
+`infra/producao/env.prod.yaml`, com vigência prevista em 20/10/2026 (trocar para o dia da virada, se for outro). Quem aceitou as versões
+anteriores aceita as novas no próximo login ou checkout. A trava do `deploy.sh conferir` (`infra/producao/textos-privado.py`) recusa
+publicar uma release com a migração 0019 sem os três textos.
 
 ## 1. Política de Privacidade (proposta de versão 1.3)
 
@@ -28,17 +32,16 @@ textos não estiverem no repositório com o conteúdo do evento privado.
 > Lista de autorizados e solicitações de acesso de Eventos privados: 6 meses após o Evento, e depois apagadas automaticamente. Os
 > registros de auditoria dessas decisões guardam o e-mail e o CPF apenas parcialmente ocultos.
 
-### Na seção 7, "Seus direitos e como exercê-los" (se a PartyX quiser deixar explícito)
+### Na seção 7, "Seus direitos e como exercê-los", depois de "Exclusão da conta" (incluído por decisão de 20/10/2026)
 
 > A exclusão dos seus dados também retira você das listas de autorizados e das solicitações de acesso de Eventos privados.
 
 ### Pontos para o Bernardo decidir
 
-1. **Base legal.** A proposta usa execução de contrato para quem solicita e legítimo interesse para quem a PartyX cadastra. O legítimo
-   interesse pede que a PartyX registre por que o uso é necessário e proporcional (avaliação de legítimo interesse). Confirmar com quem
-   assessora a PartyX.
-2. **Pessoa cadastrada antes de ter conta.** A PartyX passa a guardar o e-mail ou o CPF de alguém que ainda não aceitou a Política.
-   Recomendação: cadastrar só quem pediu para participar ou concordou com isso, e não usar a lista para nenhum outro fim.
+1. **Base legal.** Execução de contrato para quem solicita e legítimo interesse para quem a PartyX cadastra. **Decidido:** a
+   avaliação de legítimo interesse está em `lia-evento-privado.md`, para a assinatura do Bernardo como encarregado.
+2. **Pessoa cadastrada antes de ter conta.** **Decidido:** cadastrar só quem pediu acesso ou concordou em participar; orientação no
+   manual do painel e na LIA.
 3. **Prazo de 6 meses depois do Evento.** Decidido pelo responsável no pedido da D-92; a limpeza diária já aplica.
 
 ## 2. Termos de Uso (proposta de versão 1.6)
@@ -56,10 +59,11 @@ textos não estiverem no repositório com o conteúdo do evento privado.
 
 > Em Evento privado, a transferência só pode ser feita para uma conta autorizada pela PartyX para aquele Evento.
 
-### Ponto para o Bernardo decidir
+### Política de Cancelamento, Troca e Reembolso 1.2 (decidido)
 
-A Política de Cancelamento, Troca e Reembolso 1.1 (seção 2) descreve a transferência sem essa condição. Os Termos têm precedência e a
-regra está no sistema; se a PartyX quiser a frase também na Política, é uma versão 1.2 dela, com o mesmo texto acima.
+Na seção 2, no fim do parágrafo da conta de destino, a mesma frase:
+
+> Em Evento privado, a transferência só pode ser feita para uma conta autorizada pela PartyX para aquele Evento.
 
 ## 3. Resumo diário de solicitações (proposta, não aplicada)
 

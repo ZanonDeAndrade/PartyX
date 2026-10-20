@@ -151,6 +151,17 @@ for (const width of [360, 390, 1280]) {
     await a.page.locator('#acesso-q').fill('diego');
     await a.page.getByRole('button', { name: 'Buscar', exact: true }).click();
     await expect(table.locator('tbody tr')).toHaveCount(1);
+
+    // Decisão: a observação avisa que fica na trilha e pode ser pedida pela pessoa.
+    await table.locator('tbody tr').first().getByRole('checkbox').check();
+    const bar = a.page.getByRole('group', { name: 'Decisão para as pessoas marcadas' });
+    await expect(bar).toContainText('a pessoa pode pedir uma cópia. Não escreva motivos pessoais.');
+    await expect(a.page.locator('#acesso-obs')).toHaveAttribute('aria-describedby', 'acesso-obs-dica');
+    await noSideScroll(a.page);
+    // Os avisos dos passos anteriores cobririam a barra na captura.
+    for (const close of await a.page.getByRole('button', { name: 'Fechar aviso' }).all()) await close.click();
+    await expect(a.page.locator('.px-toast')).toHaveCount(0);
+    await bar.screenshot({ path: path.join(IMG, `painel-decisao-${width}.png`) });
     await a.ctx.close();
   });
 
@@ -237,7 +248,7 @@ for (const width of [360, 390, 1280]) {
     await s.page.goto(`${R.base}/eventos/${ev.slug}`, { waitUntil: 'networkidle' });
     await expect(side(s.page)).toContainText('Solicitação não aprovada');
     await expect(side(s.page).getByRole('button', { name: 'Solicitar acesso a este evento' })).toHaveCount(0);
-    await expect(side(s.page)).not.toContainText('Lista fechada'); // a observação é só do painel
+    await expect(side(s.page)).not.toContainText('Lista fechada'); // a página do evento não mostra a observação
     await noSideScroll(s.page);
     await shot(s.page, 'evento-recusada', width);
     await s.ctx.close();

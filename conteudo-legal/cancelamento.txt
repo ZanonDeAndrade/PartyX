@@ -8,7 +8,7 @@ Os ingressos não são cancelados nem reembolsados por desistência do comprador
 
 O titular pode transferir o ingresso para outra pessoa, sem custo, pela área "Meus ingressos", até 2 horas antes do início do Evento.
 
-A pessoa que vai receber o ingresso precisa ter uma conta na Plataforma, com seus próprios dados. Na transferência, o titular informa o e-mail ou o CPF da conta de destino e confirma a operação.
+A pessoa que vai receber o ingresso precisa ter uma conta na Plataforma, com seus próprios dados. Na transferência, o titular informa o e-mail ou o CPF da conta de destino e confirma a operação. Em Evento privado, a transferência só pode ser feita para uma conta autorizada pela PartyX para aquele Evento.
 
 Depois da transferência, o ingresso passa para a conta do novo titular, em nome dele. O QR Code e o código anteriores são cancelados e um novo QR Code é gerado. Capturas de tela, impressões ou PDFs do ingresso antigo deixam de valer.
 

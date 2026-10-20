@@ -3,7 +3,7 @@ import { createApp } from '../app';
 import { loadConfig } from '../config';
 import { createDrizzle } from '../db/client';
 import { createTestDatabase } from '../db/testing';
-import { anonymizeSubject } from '../privacy/service';
+import { anonymizeSubject, exportSubjectData } from '../privacy/service';
 import { purgeExpired } from '../privacy/retention';
 import { createFakeClock } from '../providers/clock';
 import { MemoryEmailSender } from '../providers/email';
@@ -656,6 +656,33 @@ describe.skipIf(!ADMIN_URL)('evento privado (integração)', () => {
       expect(await rows(later)).toHaveLength(1);
       // A trilha fica (sem dado pessoal inteiro).
       expect((await audits('acesso.adicionar')).length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('a cópia dos dados do titular traz as linhas dele, com a observação da decisão, sem quem decidiu', async () => {
+      const admin = await person('administrador');
+      const ev1 = await event();
+      const ev2 = await event();
+      const p = await person();
+      await admin.raw('POST', `/admin/events/${ev1.id}/access`, { cpf: p.cpf });
+      await request(p, ev2);
+      const [pending] = await rows(ev2);
+      await admin.raw('POST', '/admin/access/decide', {
+        ids: [pending.id],
+        decision: 'recusar',
+        note: 'Lista fechada',
+      });
+      const data = await exportSubjectData({ db: createDrizzle(testDb.pool), clock, hasher: argon2Hasher }, p.id);
+      expect(data.privateEventAccess).toEqual([
+        expect.objectContaining({ event: 'Festa Fechada', status: 'autorizada', origin: 'painel', note: null }),
+        expect.objectContaining({
+          event: 'Festa Fechada',
+          status: 'recusada',
+          origin: 'solicitacao',
+          note: 'Lista fechada',
+        }),
+      ]);
+      expect(data.privateEventAccess[1]?.decidedAt).toEqual(expect.any(String));
+      expect(JSON.stringify(data.privateEventAccess)).not.toContain(admin.id);
     });
 
     it('a anonimização do titular apaga as linhas dele (conta, e-mail e CPF)', async () => {

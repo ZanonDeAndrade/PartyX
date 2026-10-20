@@ -10,6 +10,11 @@ responsável, fora do repositório.
 conta e 30 por IP por hora; `?voltar=` só com caminho relativo do próprio site; S-02 da auditoria feito antes, em commit próprio
 (`correcao-s02-2026-10-20.md`); textos legais só como proposta para o Bernardo.
 
+**Textos aprovados (20/10/2026):** o responsável informou que ele e o Bernardo aprovaram a Política de Privacidade 1.3 (com o trecho da
+seção 7), os Termos de Uso 1.6 e a Política de Cancelamento 1.2 (`evento-privado-textos-propostos.md`), com a avaliação de legítimo
+interesse em `lia-evento-privado.md` (a assinar pelo Bernardo, como encarregado), o aviso junto da observação da decisão e a orientação
+no `../manual-do-painel.md`.
+
 ## Regras
 
 | Regra | Como ficou |
@@ -25,12 +30,12 @@ conta e 30 por IP por hora; `?voltar=` só com caminho relativo do próprio site
 | Cada linha | Situação (autorizada, pendente, recusada), origem (cadastrada pelo painel ou solicitação), se já tem conta, datas, quem decidiu e a observação. CPF sempre mascarado nas telas e no CSV |
 | Solicitação | Na página do evento: sem login, "Entrar para solicitar acesso" (volta ao evento); logado e fora da lista, "Solicitar acesso a este evento" (um toque, com os dados da conta, sem formulário); depois, "Solicitação enviada. Você recebe um e-mail quando for aprovada"; recusada, "Solicitação não aprovada"; autorizada, compra normal. Uma por conta por evento (trava por evento e índice único). Vale antes de as vendas abrirem; evento encerrado ou que já aconteceu não aceita |
 | Recusada (premissa 4) | Não solicita de novo pela tela; o painel pode aprovar a mesma linha depois |
-| Aprovação | Na aba "Acesso" e na página "Solicitações" (menu com contador de pendentes; card na Visão geral), uma a uma ou várias, com observação opcional (só o painel vê). Trilha `acesso.solicitar`, `acesso.adicionar`, `acesso.importar`, `acesso.aprovar`, `acesso.recusar`, `acesso.remover`, com e-mail e CPF mascarados |
+| Aprovação | Na aba "Acesso" e na página "Solicitações" (menu com contador de pendentes; card na Visão geral), uma a uma ou várias, com observação opcional (a página do evento não mostra; o campo avisa que ela fica na trilha, que a pessoa pode pedir uma cópia e que não se escrevem motivos pessoais). Trilha `acesso.solicitar`, `acesso.adicionar`, `acesso.importar`, `acesso.aprovar`, `acesso.recusar`, `acesso.remover`, com e-mail e CPF mascarados |
 | E-mails (premissa 3) | "Solicitação recebida" para quem solicitou; "Acesso liberado", com o link do evento, só quando uma solicitação é aprovada (quem foi cadastrado pelo painel não recebe e-mail); nada na recusa. Sem e-mail ao Bernardo a cada solicitação; resumo diário só proposto |
 | Transferência | Ingresso de evento privado só vai para conta autorizada: 403 `destino_nao_autorizado` na prévia e na confirmação ("Este evento é privado e essa conta não está autorizada pelo organizador. Peça para a pessoa solicitar acesso na página do evento."). O "desfazer" pelo painel continua. A mensagem revela a quem já sabe o e-mail ou CPF que a conta não está autorizada (premissa 5, aceita) |
 | Privacidade | A página só recebe a situação da própria conta (`GET /api/events/:slug/access`); nenhuma resposta diz se outra pessoa está na lista |
 | Limites | 10 solicitações por conta por hora, somando os eventos (no banco), e 30 por IP por hora (por instância); 429 `muitas_requisicoes` |
-| Retenção | A lista e as solicitações são apagadas 6 meses depois do fim do evento (ou do início, sem fim), pela limpeza diária das 04:05 (`purge-retention`), sempre, sem variável. A anonimização de um titular apaga as linhas da conta, do e-mail e do CPF dele. A trilha fica, com e-mail e CPF mascarados |
+| Retenção | A lista e as solicitações são apagadas 6 meses depois do fim do evento (ou do início, sem fim), pela limpeza diária das 04:05 (`purge-retention`), sempre, sem variável. A anonimização de um titular apaga as linhas da conta, do e-mail e do CPF dele. A trilha fica, com e-mail e CPF mascarados. A cópia dos dados do titular traz as linhas dele (evento, situação, origem, datas e observação, sem quem decidiu) |
 | Equipe | Contas de administrador e validador não solicitam (só cliente compra); a página explica |
 
 ## Onde está no sistema
@@ -42,7 +47,8 @@ conta e 30 por IP por hora; `?voltar=` só com caminho relativo do próprio site
 | Servidor | `server/src/events/access.ts`, `server/src/api/eventAccess.ts`; chave em `events/service.ts` e `api/events.ts`; pedido em `orders/service.ts`; transferência em `tickets/transfer.ts`; vitrine em `vitrine/service.ts`; e-mails em `mail/templates.ts` e `mail/outbox.ts`; CSV em `exports/service.ts` e `api/exports.ts`; retenção em `privacy/retention.ts`; anonimização em `privacy/service.ts` |
 | Painel | `src/site/adminAccess.tsx` (aba Acesso, página Solicitações, contador, card), `adminEvents.tsx` (chave e aba), `adminPages.tsx` (menu e Visão geral), `areas/admin.tsx` (rota `/admin/solicitacoes`) |
 | Site | `src/site/pages.tsx` (selo, caixa de acesso e barra do celular), `components.tsx` (selo no cartão), `icons.tsx`, `checkoutPages.tsx` (erro com volta ao evento), `session.tsx` (`safeReturnPath`) |
-| Deploy | Trava `infra/producao/textos-privado.py` no `deploy.sh conferir`: release com a 0019 só sobe com a Política de Privacidade 1.3 e os Termos de Uso 1.6 que falam do evento privado |
+| Textos e deploy | `conteudo-legal/` com Privacidade 1.3, Termos de Uso 1.6 e Política de Cancelamento 1.2; `env.prod.yaml` com as versões e a vigência; trava `infra/producao/textos-privado.py` no `deploy.sh conferir`: release com a 0019 só sobe com os três textos que falam do evento privado |
+| LGPD e manual | `lia-evento-privado.md` (avaliação de legítimo interesse) e `../manual-do-painel.md` (seção do evento privado) |
 
 ## Testes
 
@@ -63,7 +69,7 @@ conta e 30 por IP por hora; `?voltar=` só com caminho relativo do próprio site
 
 ## Pendente
 
-- Textos legais: Política de Privacidade 1.3 e Termos de Uso 1.6 **propostos** em `evento-privado-textos-propostos.md`, para o Bernardo.
-  Sem eles a trava do deploy recusa a release com a 0019.
-- Resumo diário de solicitações: só proposto (mesmo arquivo).
+- Assinatura do Bernardo, como encarregado, na avaliação de legítimo interesse (`lia-evento-privado.md`).
+- Vigência dos textos: `env.prod.yaml` está com 20/10/2026; se a virada for noutro dia, trocar as três datas e refazer a candidata.
+- Resumo diário de solicitações: só proposto (`evento-privado-textos-propostos.md`).
 - Não publicado: sem push e sem deploy. A migração 0019 não está no Neon.

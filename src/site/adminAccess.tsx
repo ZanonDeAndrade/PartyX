@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { ConfirmDialog, errorText, fieldErrors, FormField } from './adminEvents';
+import { ConfirmDialog, described, errorText, fieldErrors, FormField } from './adminEvents';
 import { ExportLink, Gate, Loading, Pager, TableWrap, useAdmin } from './adminPages';
 import { api, type AccessImportResult, type AccessRow, type AccessStatus, type AdminEvent } from './api';
 import { toast, usePageTitle } from './components';
@@ -52,6 +52,9 @@ function AccessBadge({ status }: { status: AccessStatus }) {
   return <span className={`px-badge px-badge-${STATUS_TONE[status]}`}>{STATUS_LABEL[status]}</span>;
 }
 
+// A observação vai para a trilha de auditoria e entra na cópia dos dados que a pessoa pode pedir (LGPD, art. 18).
+const NOTE_HINT = 'Fica na trilha de auditoria e a pessoa pode pedir uma cópia. Não escreva motivos pessoais.';
+
 /** Aprovar ou recusar o que está marcado, com observação opcional. */
 function DecisionBar({ ids, onDone }: { ids: string[]; onDone: () => void }) {
   const [note, setNote] = useState('');
@@ -82,8 +85,14 @@ function DecisionBar({ ids, onDone }: { ids: string[]; onDone: () => void }) {
       <p>
         <b>{ids.length}</b> {ids.length === 1 ? 'pessoa marcada' : 'pessoas marcadas'}
       </p>
-      <FormField id="acesso-obs" label="Observação (opcional)" hint="Só o painel vê. Fica na trilha de auditoria.">
-        <input id="acesso-obs" value={note} maxLength={500} onChange={e => setNote(e.target.value)} />
+      <FormField id="acesso-obs" label="Observação (opcional)" hint={NOTE_HINT}>
+        <input
+          id="acesso-obs"
+          value={note}
+          maxLength={500}
+          onChange={e => setNote(e.target.value)}
+          {...described('acesso-obs', undefined, NOTE_HINT)}
+        />
       </FormField>
       {error ? (
         <p className="px-notice px-notice-err" role="alert">

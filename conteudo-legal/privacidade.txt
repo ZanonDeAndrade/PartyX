@@ -28,6 +28,8 @@ Ingressos: nome do titular, códigos, situação, datas de emissão e de cancela
 
 Transferências: conta de origem, conta de destino, ingresso, data e hora.
 
+Eventos privados: quando um Evento é privado, a lista de pessoas autorizadas a comprar, com o e-mail ou o CPF e, se informado, o nome de cada pessoa; as solicitações de acesso feitas pela sua conta; a situação de cada pessoa (autorizada, pendente ou recusada), as datas, a observação da PartyX sobre a decisão e quem decidiu.
+
 Portaria: cada leitura de ingresso, com o resultado, a forma de validação (câmera ou busca manual), o horário e o validador.
 
 Segurança: sessões de login (IP, navegador e datas), tentativas de login (e-mail e IP) e códigos de recuperação de senha, guardados apenas em forma cifrada.
@@ -49,6 +51,8 @@ Guardar a prova do seu aceite e os registros de compra, cancelamento e estorno p
 Proteger sua conta e a Plataforma, prevenir fraudes, bloquear tentativas repetidas e limitar acessos abusivos. Base legal: legítimo interesse (LGPD, art. 7º, IX), sempre no limite do necessário.
 
 Enviar e-mails ligados à sua conta e às suas compras, como criação de conta, recuperação de senha e confirmação de compra. Base legal: execução de contrato (LGPD, art. 7º, V).
+
+Controlar quem pode comprar e receber ingressos de um Evento privado, analisar e responder às solicitações de acesso e avisar por e-mail que a sua solicitação foi recebida e que o acesso foi liberado. Base legal: execução de contrato e de procedimentos preliminares a pedido do titular (LGPD, art. 7º, V), quando você solicita acesso; e legítimo interesse da PartyX, como organizadora, de controlar a entrada nos próprios Eventos (LGPD, art. 7º, IX), quando a PartyX inclui uma pessoa na lista, sempre limitado a esse controle. A lista não é mostrada a outras pessoas: a página do Evento informa a cada conta apenas a própria situação.
 
 Não usamos seus dados para publicidade, marketing, perfis de comportamento ou decisões automatizadas, e não vendemos dados a ninguém.
 
@@ -102,6 +106,8 @@ Registros de acesso ao site: guardados pelos provedores de infraestrutura pelo p
 
 Termo de Autorização e Responsabilidade em papel: 6 meses após o Evento, e depois destruído.
 
+Lista de autorizados e solicitações de acesso de Eventos privados: 6 meses após o Evento, e depois apagadas automaticamente. Os registros de auditoria dessas decisões guardam o e-mail e o CPF apenas parcialmente ocultos.
+
 Backups: cópias diárias cifradas, guardadas por 35 dias e depois apagadas.
 
 Medidas de segurança: conexão cifrada (HTTPS) em todo o site; senhas guardadas com hash Argon2id; limites de tentativas e bloqueios automáticos; permissões por função, conferidas no servidor; CPF mascarado nas telas e exportações da equipe; registros de operação sem dados sensíveis; trilha de auditoria que não pode ser alterada; backups diários cifrados; e QR Codes assinados digitalmente, impossíveis de adivinhar.
@@ -117,6 +123,8 @@ Como pedir: envie o pedido para partyx992@gmail.com. Para proteger você, a Part
 Cópia dos dados: você recebe um arquivo com seu cadastro, aceites, pedidos, ingressos, e-mails enviados e sessões.
 
 Exclusão da conta: seus dados de identificação são apagados ou anonimizados, incluindo nome, e-mail, CPF, telefone, senha, IP e navegador. Por obrigação legal e para defesa de direitos, continuam guardados, sem identificá-lo, os pedidos, os valores, os ingressos, as entradas e as datas dos aceites. Ingressos válidos para eventos futuros continuam valendo. A exclusão não pode ser feita enquanto houver pedido aguardando pagamento. Cópias de segurança são apagadas no ciclo normal de 35 dias, e os registros do próprio Mercado Pago seguem a política dele.
+
+A exclusão dos seus dados também retira você das listas de autorizados e das solicitações de acesso de Eventos privados.
 
 Você também pode apresentar reclamação à Autoridade Nacional de Proteção de Dados (ANPD).
 

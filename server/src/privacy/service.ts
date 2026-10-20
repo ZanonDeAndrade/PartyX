@@ -206,6 +206,20 @@ export async function exportSubjectData(deps: PrivacyDeps, userId: string) {
     })
     .from(ticketMinorAcceptances)
     .where(eq(ticketMinorAcceptances.userId, userId));
+  // Evento privado (D-92): as linhas da lista e das solicitações da conta, do e-mail ou do CPF dela, com a observação da decisão.
+  // Quem decidiu fica de fora (é a equipe da PartyX).
+  const accessRows = await deps.db.execute<{
+    event: string;
+    status: string;
+    origin: string;
+    note: string | null;
+    created_at: Date | string;
+    decided_at: Date | string | null;
+  }>(sql`
+    select e.name as event, a.status::text as status, a.origin::text as origin, a.note, a.created_at, a.decided_at
+      from event_access a join events e on e.id = a.event_id
+     where a.user_id = ${userId} or a.email_normalized = ${u.email}${u.cpf ? sql` or a.cpf = ${u.cpf}` : sql``}
+     order by a.created_at, a.id`);
   const mailRows = await deps.db
     .select({ template: emailLog.template, status: emailLog.status, sentAt: emailLog.sentAt })
     .from(emailLog)
@@ -288,6 +302,14 @@ export async function exportSubjectData(deps: PrivacyDeps, userId: string) {
       acceptedAt: m.acceptedAt.toISOString(),
       ip: m.ip,
       userAgent: m.userAgent,
+    })),
+    privateEventAccess: accessRows.rows.map(a => ({
+      event: a.event,
+      status: a.status,
+      origin: a.origin,
+      note: a.note,
+      createdAt: new Date(a.created_at).toISOString(),
+      decidedAt: a.decided_at === null ? null : new Date(a.decided_at).toISOString(),
     })),
     emails: mailRows.map(m => ({ template: m.template, status: m.status, sentAt: iso(m.sentAt) })),
     sessions: sessionRows.map(s => ({

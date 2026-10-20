@@ -34,8 +34,8 @@ describe('textos legais da release da taxa de serviço', () => {
   const terms = readFileSync(path.join(ROOT, 'conteudo-legal/termos-de-uso.txt'), 'utf8');
   const cancellation = readFileSync(path.join(ROOT, 'conteudo-legal/cancelamento.txt'), 'utf8');
 
-  it('os textos do repositório (Termos 1.5, com o desconto por promoter, e Política 1.1) passam', () => {
-    expect(textCheck(terms, cancellation, '1.5', '1.1')).toEqual({ status: 0, err: '' });
+  it('os textos do repositório (Termos 1.6 e Política 1.2) passam', () => {
+    expect(textCheck(terms, cancellation, '1.6', '1.2')).toEqual({ status: 0, err: '' });
   });
 
   it('os textos anteriores, que diziam não haver taxa, são recusados, um motivo por linha', () => {
@@ -73,8 +73,8 @@ function discountCheck(terms: string, termsVersion: string) {
 
 describe('Termos de Uso da release do desconto por promoter (D-91)', () => {
   const terms = readFileSync(path.join(ROOT, 'conteudo-legal/termos-de-uso.txt'), 'utf8');
-  it('os Termos do repositório (1.5) passam', () => {
-    expect(discountCheck(terms, '1.5')).toEqual({ status: 0, err: '' });
+  it('os Termos do repositório (1.6, que mantêm o desconto) passam', () => {
+    expect(discountCheck(terms, '1.6')).toEqual({ status: 0, err: '' });
   });
   it('os Termos 1.4, que diziam que o código não dá desconto, são recusados, um motivo por linha', () => {
     const r = discountCheck(
@@ -146,9 +146,17 @@ function virar(nova: Record<string, string>) {
   return { status: r.status, err: r.stderr, switched: calls.some(c => c.includes('update-traffic')) };
 }
 
-function privateCheck(privacy: string, terms: string, privacyVersion: string, termsVersion: string) {
+function privateCheck(
+  privacy: string,
+  terms: string,
+  cancellation: string,
+  privacyVersion: string,
+  termsVersion: string,
+  cancellationVersion: string,
+) {
   writeFileSync(path.join(dir, 'pp.txt'), privacy);
   writeFileSync(path.join(dir, 'pt.txt'), terms);
+  writeFileSync(path.join(dir, 'pc.txt'), cancellation);
   const r = spawnSync(
     'python3',
     [
@@ -156,8 +164,10 @@ function privateCheck(privacy: string, terms: string, privacyVersion: string, te
       path.join(ROOT, 'infra/producao/textos-privado.py'),
       path.join(dir, 'pp.txt'),
       path.join(dir, 'pt.txt'),
+      path.join(dir, 'pc.txt'),
       privacyVersion,
       termsVersion,
+      cancellationVersion,
     ],
     { encoding: 'utf8' },
   );
@@ -165,28 +175,50 @@ function privateCheck(privacy: string, terms: string, privacyVersion: string, te
 }
 
 describe('textos legais da release do evento privado (D-92)', () => {
+  // Privacidade 1.3, Termos 1.6 e Cancelamento 1.2, aprovados pelo Bernardo em 20/10/2026.
   const privacy = readFileSync(path.join(ROOT, 'conteudo-legal/privacidade.txt'), 'utf8');
   const terms = readFileSync(path.join(ROOT, 'conteudo-legal/termos-de-uso.txt'), 'utf8');
-  // Os trechos da proposta (docs/registros/evento-privado-textos-propostos.md), ainda não aprovados nem publicados.
-  const privacyNew = `${privacy}\nEventos privados: quando um Evento é privado, a lista de pessoas autorizadas a comprar, com o e-mail ou o CPF.\n\nLista de autorizados e solicitações de acesso de Eventos privados: 6 meses após o Evento, e depois apagadas automaticamente.\n`;
-  const termsNew = `${terms}\nEvento privado: a PartyX pode tornar um Evento privado.\n\nEm Evento privado, a transferência só pode ser feita para uma conta autorizada pela PartyX para aquele Evento.\n`;
+  const cancellation = readFileSync(path.join(ROOT, 'conteudo-legal/cancelamento.txt'), 'utf8');
+  // Os textos anteriores: sem nenhuma linha que fale do evento privado.
+  const before = (text: string) =>
+    text
+      .split('\n')
+      .filter(l => !/eventos? privados?/i.test(l))
+      .join('\n');
 
-  it('os textos publicados hoje (Privacidade 1.2, Termos 1.5) são recusados: a release com a 0019 espera a aprovação, um motivo por linha', () => {
-    const r = privateCheck(privacy, terms, '1.2', '1.5');
+  it('os textos do repositório (Privacidade 1.3, Termos 1.6, Cancelamento 1.2) passam', () => {
+    expect(privateCheck(privacy, terms, cancellation, '1.3', '1.6', '1.2')).toEqual({ status: 0, err: '' });
+  });
+
+  it('os textos anteriores (Privacidade 1.2, Termos 1.5, Cancelamento 1.1) são recusados, um motivo por linha', () => {
+    const r = privateCheck(before(privacy), before(terms), before(cancellation), '1.2', '1.5', '1.1');
     expect(r.status).toBe(1);
     expect(r.err).toContain('PRIVACY_VERSION=1.2');
     expect(r.err).toContain('TERMS_VERSION=1.5');
+    expect(r.err).toContain('CANCELLATION_VERSION=1.1');
     expect(r.err).toContain('não fala da lista de autorizados');
     expect(r.err).toContain('não diz que a lista é apagada 6 meses após o Evento');
     expect(r.err).toContain('não têm a cláusula do Evento privado');
-    expect(r.err).toContain('a transferência em Evento privado só vale para conta autorizada');
+    expect(r.err).toContain(
+      'os Termos de Uso não dizem que a transferência em Evento privado só vale para conta autorizada',
+    );
+    expect(r.err).toContain('a Política de Cancelamento não diz que a transferência em Evento privado só vale');
+    expect(r.err.trim().split('\n')).toHaveLength(8);
   });
 
-  it('com os trechos propostos e as versões novas, passa; texto novo com versão antiga, não', () => {
-    expect(privateCheck(privacyNew, termsNew, '1.3', '1.6').status).toBe(0);
-    expect(privateCheck(privacyNew, termsNew, '1.2', '1.6').err).toContain('PRIVACY_VERSION=1.2');
-    expect(privateCheck(privacyNew, termsNew, '1.3', '').err).toContain('TERMS_VERSION=(vazio)');
-    expect(privateCheck(privacyNew, termsNew, '1.10', '2.0').status).toBe(0);
+  it('texto novo com versão antiga ou vazia no env: recusa; versões posteriores passam', () => {
+    expect(privateCheck(privacy, terms, cancellation, '1.2', '1.6', '1.2').err).toContain('PRIVACY_VERSION=1.2');
+    expect(privateCheck(privacy, terms, cancellation, '1.3', '', '1.2').err).toContain('TERMS_VERSION=(vazio)');
+    expect(privateCheck(privacy, terms, cancellation, '1.3', '1.6', '1.1').err).toContain('CANCELLATION_VERSION=1.1');
+    expect(privateCheck(privacy, terms, cancellation, '1.10', '2.0', '1.2').status).toBe(0);
+  });
+
+  it('só a Política de Cancelamento sem a frase da transferência: recusa só por ela', () => {
+    const r = privateCheck(privacy, terms, before(cancellation), '1.3', '1.6', '1.2');
+    expect(r.status).toBe(1);
+    expect(r.err.trim()).toBe(
+      'Recuso: a Política de Cancelamento não diz que a transferência em Evento privado só vale para conta autorizada.',
+    );
   });
 });
 

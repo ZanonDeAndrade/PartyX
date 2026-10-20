@@ -30,7 +30,7 @@ export const eventAccess = pgTable(
     name: text('name'),
     status: eventAccessStatus('status').notNull(),
     origin: eventAccessOrigin('origin').notNull(),
-    /** Observação opcional da aprovação ou da recusa (só o painel vê). */
+    /** Observação opcional da aprovação ou da recusa: não aparece na página do evento, mas entra na cópia dos dados do titular. */
     note: text('note'),
     decidedAt: instant('decided_at'),
     decidedBy: uuid('decided_by').references(() => users.id),

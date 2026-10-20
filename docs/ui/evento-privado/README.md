@@ -8,6 +8,7 @@ a 360, 390 e 1280 px, depois das animações de entrada. As de página inteira m
 | `painel-chave-*.png` | Chave "Evento privado" na edição do evento |
 | `painel-acesso-*.png` | Aba Acesso: pessoa adicionada, lista colada com a linha recusada, tabela com CPF mascarado |
 | `painel-solicitacoes-*.png` | Página Solicitações, antes da aprovação |
+| `painel-decisao-*.png` | Barra de decisão com o aviso da observação (trilha de auditoria, cópia a pedido da pessoa, sem motivos pessoais) |
 | `vitrine-selo-*.png` | Cartão da busca com o selo |
 | `evento-sem-login-*.png` | Página do evento sem login: "Entrar para solicitar acesso" |
 | `evento-solicitar-*.png` | Logado e fora da lista: "Solicitar acesso a este evento" |
