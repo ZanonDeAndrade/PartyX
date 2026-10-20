@@ -143,6 +143,8 @@ export function authRoutes(deps: AuthDeps) {
     if (meta.ip && registerLimiter.hit(meta.ip)) throw tooMany();
     // Limite GLOBAL (no banco, sem depender de IP): confere antes e só conta depois de criar a conta.
     await assertGlobalOpen(deps, 'cadastro', deps.config.GLOBAL_SIGNUPS_PER_HOUR);
+    // Respostas "já tem cadastro" (S-02): o teto fecha o cadastro para todos, novo ou repetido, para a resposta não virar oráculo.
+    await assertGlobalOpen(deps, 'cadastro_existente', deps.config.GLOBAL_SIGNUP_DUPLICATES_PER_HOUR);
     if (!body.accept) {
       throw new AppError(422, 'dados_invalidos', 'Alguns campos precisam de ajuste.', [
         { campo: 'accept', mensagem: 'Para criar a conta, aceite os Termos de Uso e a Política de Privacidade.' },

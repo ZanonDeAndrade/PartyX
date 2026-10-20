@@ -16,6 +16,7 @@ import { dateKeyInEventZone } from '../domain/time';
 import { enqueueEmail, processSoon } from '../mail/outbox';
 import { signupBlockers } from '../legal/documents';
 import { logger } from '../logger';
+import { recordGlobal } from './globalLimits';
 import { loginBlock, recordLoginAttempt } from './limits';
 import { createSession, revokeSession, revokeUserSessions } from './sessions';
 import type { AuthDeps, AuthUser, RequestMeta } from './types';
@@ -93,7 +94,8 @@ export async function register(deps: AuthDeps, input: RegisterInput, meta: Reque
   if (pwProblem) errors.push({ campo: 'password', mensagem: pwProblem });
   if (errors.length) throw invalid(errors);
 
-  // E-mail e CPF repetidos (CA-02). A mensagem é explícita porque o critério exige "mensagem clara"; o endpoint tem limite de taxa.
+  // E-mail e CPF repetidos (CA-02). A mensagem é explícita porque o critério exige "mensagem clara"; o endpoint tem limite de taxa e
+  // cada resposta destas conta no teto global `cadastro_existente` (S-02), conferido pela rota antes de todo cadastro.
   const dup = await deps.db
     .select({ email: users.email, cpf: users.cpf })
     .from(users)
@@ -104,6 +106,7 @@ export async function register(deps: AuthDeps, input: RegisterInput, meta: Reque
       dupErrors.push({ campo: 'email', mensagem: 'Este e-mail já tem cadastro. Entre ou recupere sua senha.' });
     if (dup.some(d => d.cpf === cpf))
       dupErrors.push({ campo: 'cpf', mensagem: 'Este CPF já tem cadastro. Entre com sua conta ou fale com a PartyX.' });
+    await recordGlobal(deps, 'cadastro_existente');
     throw invalid(dupErrors);
   }
 
@@ -140,6 +143,7 @@ export async function register(deps: AuthDeps, input: RegisterInput, meta: Reque
     // Duas requisições simultâneas com o mesmo e-mail ou CPF: o banco decide.
     const { code, constraint } = pgError(error);
     if (code === '23505') {
+      await recordGlobal(deps, 'cadastro_existente');
       throw invalid([
         constraint?.includes('cpf')
           ? { campo: 'cpf', mensagem: 'Este CPF já tem cadastro. Entre com sua conta ou fale com a PartyX.' }

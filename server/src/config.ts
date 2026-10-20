@@ -162,6 +162,8 @@ const schema = z
      * Limites globais compartilhados no banco. Ajuste os tetos para a capacidade do evento antes da abertura.
      */
     GLOBAL_SIGNUPS_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(1000),
+    /** Respostas "já tem cadastro" por hora, no total (S-02). Atingido, o cadastro inteiro fecha até a janela andar. */
+    GLOBAL_SIGNUP_DUPLICATES_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(100),
     SIGNUPS_PER_IP_PER_HOUR: z.coerce.number().int().min(1).max(10000).default(100),
     GLOBAL_RECOVERIES_PER_HOUR: z.coerce.number().int().min(1).max(100000).default(60),
     GATE_SCANS_PER_MINUTE: z.coerce.number().int().min(1).max(100000).default(3000),

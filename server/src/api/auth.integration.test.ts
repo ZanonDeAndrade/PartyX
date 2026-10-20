@@ -941,6 +941,58 @@ describe.skipIf(!ADMIN_URL)('autenticação (integração)', () => {
       }
     });
 
+    it('S-02: cada resposta "já tem cadastro" conta no teto global; atingido, TODO cadastro (novo ou repetido) responde 429 igual, sem oráculo', async () => {
+      const dups = build({ cfg: config({ GLOBAL_SIGNUP_DUPLICATES_PER_HOUR: '4' }) });
+      const send = (body: unknown, ip: string) =>
+        dups.request('/api/auth/register', {
+          method: 'POST',
+          headers: { origin: ORIGIN, 'content-type': 'application/json', 'x-forwarded-for': ip },
+          body: JSON.stringify(body),
+        });
+      const known = person({ cpf: cpfFor(1) });
+      expect((await send(known, '198.51.100.1')).status).toBe(201);
+      // Contas novas não gastam o teto de repetidos.
+      for (let i = 2; i <= 6; i++) expect((await send(person({ cpf: cpfFor(i) }), `198.51.100.${i}`)).status).toBe(201);
+      // Abaixo do teto, a mensagem clara do CA-02 continua, campo a campo.
+      for (let k = 0; k < 4; k++) {
+        const res = await send({ ...known, email: `outra${k}@partyx.test` }, `192.0.2.${k + 1}`);
+        expect(res.status).toBe(422);
+        expect(JSON.stringify(await res.json())).toContain('Este CPF já tem cadastro');
+      }
+      const a = stderr();
+      try {
+        // Teto atingido: o CPF já cadastrado e um CPF novo recebem a MESMA resposta, de IPs diferentes; nada é criado.
+        const again = await send({ ...known, email: 'mais@partyx.test' }, '203.0.113.1');
+        const fresh = await send(person({ cpf: cpfFor(50) }), '203.0.113.2');
+        expect([again.status, fresh.status]).toEqual([429, 429]);
+        const [e1, e2] = [await errorOf(again), await errorOf(fresh)];
+        expect(e1).toEqual(e2);
+        expect(e1.codigo).toBe('limite_global');
+        expect(await users()).toBe(6);
+        for (let k = 0; k < 10; k++) await send(person({ cpf: cpfFor(60 + k) }), `203.0.113.${10 + k}`);
+        const lines = a.alerts();
+        expect(lines).toHaveLength(1); // um alerta por balde, não por recusa
+        expect(lines[0]).toContain('"kind":"cadastro_existente"');
+        expect(lines[0]).toContain('"limitPerHour":4');
+        expect(lines.join('')).not.toMatch(/@partyx\.test|\d{11}/);
+      } finally {
+        a.spy.mockRestore();
+      }
+      // A janela desliza: uma hora depois o cadastro volta.
+      clock.advance(61 * 60_000);
+      expect((await send(person({ cpf: cpfFor(51) }), '203.0.113.3')).status).toBe(201);
+    });
+
+    it('S-02: a corrida de dois cadastros iguais (o banco decide) também conta como resposta "já tem cadastro"', async () => {
+      const p = person({ cpf: cpfFor(7) });
+      const res = await Promise.all([1, 2].map(i => signup(7, `198.51.100.${70 + i}`, { email: p.email })));
+      expect(res.map(r => r.status).sort()).toEqual([201, 422]);
+      const n = await sql(
+        "select coalesce(sum(count), 0)::int as n from global_limit_counters where kind = 'cadastro_existente'",
+      );
+      expect(n.rows[0].n).toBe(1);
+    });
+
     it('com o Turnstile DESLIGADO (padrão) o cadastro e a recuperação não pedem token e a tela não recebe chave nem script', async () => {
       const site = (await (await limited.request('/api/public/site')).json()) as { turnstileSiteKey: string | null };
       expect(site.turnstileSiteKey).toBeNull();

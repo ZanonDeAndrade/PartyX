@@ -183,6 +183,7 @@ Mesmo no pior caso para todos os pedidos: 1.000 pedidos = 22 mil operações; 10
 | Limite | Padrão | Como conta |
 |---|---|---|
 | **Cadastros** novos, no total | **1000 por hora** (`GLOBAL_SIGNUPS_PER_HOUR`) | Confere **antes** e só conta **depois** de criar a conta. Tentativa inválida (CPF repetido, senha fraca, sem aceite) **não** gasta o limite |
+| **Respostas "já tem cadastro"**, no total (S-02, 20/10/2026) | **100 por hora** (`GLOBAL_SIGNUP_DUPLICATES_PER_HOUR`) | Conta cada resposta de e-mail ou CPF já cadastrado (também a corrida que o banco decide). Confere **antes** de todo cadastro: atingido, o cadastro inteiro (novo ou repetido) responde o mesmo 429 até a janela andar, sem oráculo. Abaixo do teto, a mensagem clara do CA-02 continua |
 | **Pedidos de recuperação** de senha, no total | **60 por hora** (`GLOBAL_RECOVERIES_PER_HOUR`) | Conta cada pedido aceito, de forma atômica (uma trava por tipo no banco), com o mesmo 202 exista a conta ou não |
 | **Por conta**, na recuperação (já existia) | 3 por hora | Dentro do global; vale com IP forjado |
 | Por IP (camada rápida) | cadastro 100/h no código (`SIGNUPS_PER_IP_PER_HOUR`; em produção 50/h desde 18/10/2026, antes 10/h), recuperação 20/h por instância | Compartilhar NAT ainda pode concentrar usuários; acompanhar os 429 em uma abertura |

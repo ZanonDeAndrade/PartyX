@@ -287,6 +287,15 @@ describe('loadConfig', () => {
       for (const bad of ['0', '-1', 'muitos', '1000000'])
         expect(() => loadConfig({ GLOBAL_SIGNUPS_PER_HOUR: bad }), bad).toThrow(/GLOBAL_SIGNUPS_PER_HOUR/);
     });
+
+    it('teto de respostas "já tem cadastro" (S-02): 100 por hora por padrão, configurável, sempre positivo', () => {
+      expect(loadConfig({}).GLOBAL_SIGNUP_DUPLICATES_PER_HOUR).toBe(100);
+      expect(loadConfig({ GLOBAL_SIGNUP_DUPLICATES_PER_HOUR: '250' }).GLOBAL_SIGNUP_DUPLICATES_PER_HOUR).toBe(250);
+      for (const bad of ['0', '-1', 'muitos', '1000000'])
+        expect(() => loadConfig({ GLOBAL_SIGNUP_DUPLICATES_PER_HOUR: bad }), bad).toThrow(
+          /GLOBAL_SIGNUP_DUPLICATES_PER_HOUR/,
+        );
+    });
   });
 
   it('exige domínio público em produção e recusa protótipo nesse ambiente', () => {

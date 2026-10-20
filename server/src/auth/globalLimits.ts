@@ -14,10 +14,13 @@ import type { Clock } from '../providers/clock';
  * Duas formas de contar, de propósito:
  * - **cadastro:** confere ANTES e só conta DEPOIS de criar a conta. Tentativa inválida (CPF repetido, senha fraca) não gasta o limite, então
  *   lixo enviado em massa não bloqueia quem se cadastra de verdade.
+ * - **cadastro_existente** (S-02 da auditoria de 19/10/2026): conta cada resposta "este e-mail/CPF já tem cadastro". Confere ANTES de todo
+ *   cadastro, novo ou repetido: atingido o teto, o cadastro inteiro responde 429 até a janela andar, então a diferença entre "já existe" e
+ *   "criado" deixa de servir para varrer CPFs e e-mails em massa. A mensagem explícita do CA-02 continua abaixo do teto.
  * - **recuperação:** conta cada pedido aceito, de forma atômica (trava por tipo). Não dá para contar só os "com sucesso": a resposta é a mesma exista
  *   a conta ou não (para não revelar quem tem conta).
  */
-export type LimitKind = 'cadastro' | 'recuperacao' | 'portaria_leitura' | 'portaria_busca';
+export type LimitKind = 'cadastro' | 'cadastro_existente' | 'recuperacao' | 'portaria_leitura' | 'portaria_busca';
 
 export const BUCKET_MS = 10 * 60_000;
 export const WINDOW_MS = 60 * 60_000;
@@ -63,7 +66,7 @@ const tooMany = (kind: LimitKind) =>
   new AppError(
     429,
     'limite_global',
-    kind === 'cadastro'
+    kind === 'cadastro' || kind === 'cadastro_existente'
       ? 'Muitos cadastros neste momento. Tente de novo em alguns minutos.'
       : kind === 'recuperacao'
         ? 'Muitos pedidos de recuperação neste momento. Tente de novo em alguns minutos.'
@@ -78,7 +81,7 @@ export async function assertGlobalOpen(deps: Deps, kind: LimitKind, limit: numbe
   throw tooMany(kind);
 }
 
-/** Cadastro: conta uma conta criada. */
+/** Cadastro: conta uma conta criada (`cadastro`) ou uma resposta de cadastro repetido (`cadastro_existente`). */
 export async function recordGlobal(deps: Deps, kind: LimitKind): Promise<void> {
   const now = deps.clock.now();
   await deps.db.execute(sql`
