@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { accentPalette, accentVars } from './accent';
-import { api, minorAuthorizationUrl, type EventCard, type EventDetail, type SiteInfo } from './api';
+import { api, ApiError, minorAuthorizationUrl, type EventCard, type EventDetail, type MyAccess, type SiteInfo } from './api';
 import { takeEmbedded } from './embedded';
 import { loadCart, saveCart } from './cart';
 import {
@@ -13,6 +13,7 @@ import {
   EventCardView,
   Layout,
   PartyxContact,
+  PrivateTag,
   SkeletonSwap,
   usePageTitle,
 } from './components';
@@ -26,6 +27,7 @@ import { IconCheck, IconClose, IconLink, IconShare } from './icons';
 import { cascade, Roll } from './motion';
 import { eventLinkProps, pendingEvent, prefetchedEvent } from './prefetch';
 import { enteringByViewTransition, eventEntrance, Link, useRouter } from './router';
+import { useSession } from './session';
 import { useFetch } from './useFetch';
 
 /**
@@ -84,6 +86,11 @@ export function HomePage() {
           />
           <div className="px-wrap px-hero-in" style={heroStyle}>
             <p className="px-hero-tag">Em destaque</p>
+            {featured.privado ? (
+              <p className="px-hero-private">
+                <PrivateTag />
+              </p>
+            ) : null}
             <h2 className="px-hero-title">
               <Link to={`/eventos/${featured.slug}`} {...eventLinkProps(featured, () => go(`/eventos/${featured.slug}`))}>
                 {featured.name}
@@ -104,7 +111,7 @@ export function HomePage() {
                 className="px-btn px-btn-pri px-btn-lg"
                 {...eventLinkProps(featured, () => go(`/eventos/${featured.slug}`))}
               >
-                {featured.sale.kind === 'open' ? 'Comprar ingressos' : 'Ver evento'}
+                {featured.sale.kind === 'open' && !featured.privado ? 'Comprar ingressos' : 'Ver evento'}
               </Link>
               {fromCents !== null ? (
                 <span className="px-hero-price">
@@ -309,8 +316,184 @@ function ShareDialog({ event, onClose }: { event: EventDetail; onClose: () => vo
 }
 
 /** Seleção de tipo e quantidade (RF-28). O limite mostrado vem do servidor, que também o impõe (CA-15). */
-function TicketPicker({ event, notices }: { event: EventDetail; notices: React.ReactNode }) {
+/**
+ * Evento privado (D-92): o que a conta pode fazer na página. A situação vem só da própria conta (`GET /events/:slug/access`); quem
+ * decide de verdade é o servidor no resumo e no pedido. Na pré-visualização do painel, nada é consultado.
+ */
+type PrivateGate =
+  | { kind: 'livre' }
+  | { kind: 'carregando' }
+  | { kind: 'entrar' }
+  | { kind: 'equipe' }
+  | { kind: 'falhou' }
+  | { kind: 'conta'; access: MyAccess };
+
+function usePrivateGate(event: EventDetail, preview: boolean) {
+  const session = useSession();
+  const privado = Boolean(event.privado) && !preview;
+  const cliente = session.status === 'user' && session.user?.role === 'cliente';
+  const [access, setAccess] = useState<MyAccess | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!privado || !cliente) return;
+    const ctl = new AbortController();
+    setFailed(false);
+    api
+      .eventAccess(event.slug, ctl.signal)
+      .then(setAccess)
+      .catch(() => {
+        if (!ctl.signal.aborted) setFailed(true);
+      });
+    return () => ctl.abort();
+  }, [privado, cliente, event.slug, attempt]);
+  let gate: PrivateGate;
+  if (!privado) gate = { kind: 'livre' };
+  else if (session.status === 'loading') gate = { kind: 'carregando' };
+  else if (session.status === 'anon') gate = { kind: 'entrar' };
+  else if (!cliente) gate = { kind: 'equipe' };
+  else if (failed) gate = { kind: 'falhou' };
+  else if (!access) gate = { kind: 'carregando' };
+  else gate = access.situacao === 'livre' ? { kind: 'livre' } : { kind: 'conta', access };
+  const locked = gate.kind !== 'livre' && !(gate.kind === 'conta' && gate.access.situacao === 'autorizada');
+  return { gate, locked, setAccess, retry: () => setAttempt(a => a + 1) };
+}
+
+function PrivateAccessBox({
+  event,
+  gate,
+  onAccess,
+  onRetry,
+}: {
+  event: EventDetail;
+  gate: PrivateGate;
+  onAccess: (a: MyAccess) => void;
+  onRetry: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const ended = event.sale.kind === 'ended';
+  const back = `/eventos/${event.slug}`;
+  const ask = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      onAccess(await api.requestEventAccess(event.slug));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Não foi possível enviar a solicitação. Tente de novo.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const lead = (
+    <span>Só compra quem o organizador autorizar. A autorização vale para a sua conta.</span>
+  );
+  let body: React.ReactNode = null;
+  let action: React.ReactNode = null;
+  if (gate.kind === 'carregando') body = <p aria-busy="true">Conferindo seu acesso…</p>;
+  else if (gate.kind === 'falhou')
+    body = (
+      <p className="px-notice px-notice-err" role="alert">
+        Não foi possível conferir seu acesso.{' '}
+        <button type="button" className="px-link" onClick={onRetry}>
+          Tentar de novo
+        </button>
+      </p>
+    );
+  else if (gate.kind === 'equipe')
+    body = (
+      <div className="px-notice px-notice-neu" role="status">
+        <b>Evento privado</b>
+        <span>A compra é só para contas de cliente autorizadas pelo organizador.</span>
+      </div>
+    );
+  else if (gate.kind === 'entrar') {
+    body = (
+      <div className="px-notice px-notice-info" role="status">
+        <b>Evento privado</b>
+        {lead}
+      </div>
+    );
+    if (!ended)
+      action = (
+        <Link to={`/entrar?voltar=${encodeURIComponent(back)}`} className="px-btn px-btn-pri px-btn-lg px-continue">
+          Entrar para solicitar acesso
+        </Link>
+      );
+  } else if (gate.kind === 'conta') {
+    const { situacao, podeSolicitar } = gate.access;
+    if (situacao === 'pendente')
+      body = (
+        <div className="px-notice px-notice-info" role="status" aria-live="polite">
+          <b>Solicitação enviada.</b>
+          <span>Você recebe um e-mail quando for aprovada.</span>
+        </div>
+      );
+    else if (situacao === 'recusada')
+      body = (
+        <div className="px-notice px-notice-neu" role="status">
+          <b>Solicitação não aprovada</b>
+          <span>
+            A autorização é decisão do organizador. Em caso de dúvida, <PartyxContact />.
+          </span>
+        </div>
+      );
+    else if (podeSolicitar) {
+      body = (
+        <div className="px-notice px-notice-info" role="status">
+          <b>Evento privado</b>
+          {lead}
+        </div>
+      );
+      action = (
+        <button
+          type="button"
+          className="px-btn px-btn-pri px-btn-lg px-continue"
+          disabled={busy}
+          aria-disabled={busy}
+          onClick={ask}
+        >
+          {busy ? 'Enviando…' : 'Solicitar acesso a este evento'}
+        </button>
+      );
+    } else
+      body = (
+        <div className="px-notice px-notice-neu" role="status">
+          <b>Evento privado</b>
+          <span>Este evento não aceita mais solicitações de acesso.</span>
+        </div>
+      );
+  }
+  return (
+    <div className="px-private-box">
+      {body}
+      {action}
+      {error ? (
+        <p className="px-notice px-notice-err" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {action && gate.kind === 'conta' ? (
+        <p className="px-fine">
+          A solicitação usa os dados da sua conta, sem formulário. O organizador decide quem pode comprar; você recebe um
+          e-mail quando for aprovada.
+        </p>
+      ) : null}
+      {action ? (
+        <div className="px-mobbar">
+          <div>
+            <small>Evento privado</small>
+          </div>
+          {action}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TicketPicker({ event, notices, preview }: { event: EventDetail; notices: React.ReactNode; preview: boolean }) {
   const { go } = useRouter();
+  const { gate, locked, setAccess, retry } = usePrivateGate(event, preview);
   const [site, setSite] = useState<SiteInfo | null>(null);
   const [qty, setQty] = useState<Record<string, number>>(() => {
     const cart = loadCart();
@@ -349,7 +532,7 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
     go(`/checkout/${event.slug}`);
   };
   const salesClosed = site !== null && !site.salesOpen;
-  const hasBuyable = buyable.size > 0;
+  const hasBuyable = buyable.size > 0 && !locked;
   const blocked = units === 0 || salesClosed;
 
   return (
@@ -359,6 +542,11 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
         {hasBuyable ? <span>Até {limit} por pedido</span> : null}
       </div>
       {notices}
+      {gate.kind === 'conta' && gate.access.situacao === 'autorizada' ? (
+        <p className="px-notice px-notice-info" role="status">
+          Sua conta está autorizada para este evento privado.
+        </p>
+      ) : null}
       {event.ticketTypes.length === 0 ? <p className="px-muted">Nenhum ingresso cadastrado.</p> : null}
       <ul className="px-types">
         {event.ticketTypes.map(t => {
@@ -380,7 +568,7 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
                 {t.note ? <p className="px-type-note">{t.note}</p> : null}
                 {t.nextLot ? <p className="px-type-note">Próximo lote: em breve.</p> : null}
               </div>
-              {t.canBuy ? (
+              {t.canBuy && !locked ? (
                 <div className="px-stepper" role="group" aria-label={`Quantidade de ${t.name}`}>
                   <button
                     type="button"
@@ -409,6 +597,9 @@ function TicketPicker({ event, notices }: { event: EventDetail; notices: React.R
           );
         })}
       </ul>
+      {locked ? (
+        <PrivateAccessBox event={event} gate={gate} onAccess={setAccess} onRetry={retry} />
+      ) : null}
       {hasBuyable ? (
         <>
           {units > 0 ? (
@@ -693,6 +884,12 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
       <div className="px-wrap px-event">
         <article className="px-event-main">
           <div className="px-event-title">
+            {event.privado ? (
+              <p className={`px-event-private${IN}`} style={at(2, 2)}>
+                <PrivateTag />
+                <span>Só compra quem o organizador autorizar.</span>
+              </p>
+            ) : null}
             <dl className="px-facts">
               <div className={IN.trim() || undefined} style={at(2, 2)}>
                 <dt>Quando</dt>
@@ -783,6 +980,7 @@ export function EventView({ event, preview = false }: { event: EventDetail; prev
         >
           <TicketPicker
             event={event}
+            preview={preview}
             notices={
               <>
                 {sale.kind === 'soon' ? (

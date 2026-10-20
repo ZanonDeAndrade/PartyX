@@ -1774,3 +1774,50 @@ html[data-vt='volta']::view-transition-new(*.px-card-stub) {
   }
 }
 
+
+/* Evento privado (D-92): selo na vitrine, na busca, no destaque e na página; caixa de acesso no lugar da compra. */
+.px-private-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid var(--px-violet-line);
+  border-radius: var(--px-r-pill);
+  color: var(--px-lilac);
+  font-size: var(--px-t-xs);
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.px-card-body .px-private-tag {
+  margin-bottom: var(--px-s-2);
+}
+.px-hero-private {
+  margin: 0 0 var(--px-s-3);
+}
+.px-hero-private .px-private-tag {
+  background: rgb(11 11 16 / 0.72);
+}
+.px-event-private {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--px-s-2) var(--px-s-3);
+  margin: 0 0 var(--px-s-4);
+  color: var(--px-on-ink-2);
+  font-size: var(--px-t-sm);
+}
+.px-private-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--px-s-3);
+  margin-top: var(--px-s-3);
+}
+.px-private-box .px-notice {
+  margin: 0;
+}
+.px-event-side .px-private-box a.px-btn-pri {
+  color: var(--px-on-accent) !important;
+}

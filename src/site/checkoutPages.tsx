@@ -291,7 +291,7 @@ export function CheckoutPage({ slug }: { slug: string }) {
   const [coupon, setCoupon] = useState('');
   const [applied, setApplied] = useState('');
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [error, setError] = useState<{ message: string; coupon?: string } | null>(null);
+  const [error, setError] = useState<{ message: string; coupon?: string; privado?: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   // Regras de menores: caixa do Termo de Ciência (nunca pré-marcada) e o texto dele, quando a pessoa terá 16 ou 17 anos.
@@ -319,7 +319,7 @@ export function CheckoutPage({ slug }: { slug: string }) {
         const couponRefused = e instanceof ApiError && (e.code === 'cupom_invalido' || e.code === 'cupom_recusado');
         if (!couponRefused) setSummary(null);
         if (couponRefused) setError({ message: '', coupon: e.fields.couponCode ?? e.message });
-        else setError({ message: stockMessage(e) });
+        else setError({ message: stockMessage(e), privado: e instanceof ApiError && e.code === 'evento_privado' });
       } finally {
         setLoading(false);
       }
@@ -409,7 +409,7 @@ export function CheckoutPage({ slug }: { slug: string }) {
         }
         await load(applied);
       }
-      setError({ message: stockMessage(e) });
+      setError({ message: stockMessage(e), privado: e instanceof ApiError && e.code === 'evento_privado' });
     } finally {
       setBusy(false);
     }
@@ -441,6 +441,12 @@ export function CheckoutPage({ slug }: { slug: string }) {
       {error?.message ? (
         <p className="px-notice px-notice-warn" role="alert">
           <b>Atenção.</b> {error.message}
+          {error.privado ? (
+            <>
+              {' '}
+              <Link to={`/eventos/${slug}`}>Voltar ao evento para solicitar acesso</Link>
+            </>
+          ) : null}
         </p>
       ) : null}
       {loading ? <p aria-busy="true">Conferindo disponibilidade…</p> : null}

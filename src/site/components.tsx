@@ -11,7 +11,7 @@ import {
 import { accentPalette, stubVars } from './accent';
 import { api, type EventCard, type MaintenanceContact, type SaleKind, type SiteInfo, type TypeState } from './api';
 import { brl, dateParts, eventPath, searchPath, timeOf } from './format';
-import { IconClose, IconMenu, IconSearch } from './icons';
+import { IconClose, IconLock, IconMenu, IconSearch } from './icons';
 import { useReveal } from './motion';
 import { eventLinkProps } from './prefetch';
 import { Link, useRouter } from './router';
@@ -539,6 +539,16 @@ export function DateStub({
   );
 }
 
+/** Selo de evento privado (D-92): na vitrine, na busca e na página. Só quem o organizador autorizar compra. */
+export function PrivateTag() {
+  return (
+    <span className="px-private-tag">
+      <IconLock size={14} />
+      Evento privado
+    </span>
+  );
+}
+
 const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /**
@@ -549,6 +559,7 @@ const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 export function EventCardView({ event, priority = false }: { event: EventCard; priority?: boolean }) {
   const { go } = useRouter();
   const open = event.sale.kind === 'open';
+  const privado = Boolean(event.privado);
   const when = dateParts(event.startsAt);
   const reveal = useReveal(`card:${event.slug}`);
   const path = eventPath(event.slug);
@@ -557,7 +568,7 @@ export function EventCardView({ event, priority = false }: { event: EventCard; p
       <Link
         to={path}
         className="px-card-link"
-        aria-label={`${event.name}, ${event.sale.label}`}
+        aria-label={`${event.name}, ${event.sale.label}${privado ? ', evento privado' : ''}`}
         {...eventLinkProps(event, () => go(path))}
       >
         <div className="px-card-media">
@@ -576,6 +587,7 @@ export function EventCardView({ event, priority = false }: { event: EventCard; p
           <DateStub iso={event.startsAt} accent={event.accentColor} />
         </div>
         <div className="px-card-body">
+          {privado ? <PrivateTag /> : null}
           <h3 className="px-card-title">
             {event.name}
           </h3>
@@ -591,8 +603,8 @@ export function EventCardView({ event, priority = false }: { event: EventCard; p
             ) : (
               <p className="px-price px-price-off">{event.sale.label}</p>
             )}
-            <span className={`px-cta ${open ? 'px-cta-pri' : ''}`} aria-hidden="true">
-              {open ? 'Comprar' : 'Ver evento'}
+            <span className={`px-cta ${open && !privado ? 'px-cta-pri' : ''}`} aria-hidden="true">
+              {open && !privado ? 'Comprar' : 'Ver evento'}
             </span>
           </div>
         </div>

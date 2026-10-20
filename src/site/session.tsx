@@ -109,9 +109,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-/** Só caminhos internos: evita que `?voltar=` leve a outro site depois do login. */
+/**
+ * Só caminhos relativos do próprio site: evita que `?voltar=` leve a outro site depois do login (20/10/2026). Começa com uma barra, sem
+ * "//" em lugar nenhum, sem barra invertida, sem espaço nem caractere de controle (o navegador remove tabulação e quebra de linha da
+ * URL, e "/\t/x" viraria "//x"), sem esquema ("algo:") antes da busca e sem trocar de origem ao resolver. Qualquer outro valor volta
+ * para a vitrine.
+ */
 export function safeReturnPath(value: string | null | undefined, fallback = '/'): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return fallback;
+  if (!value || value.length > 2000 || !value.startsWith('/')) return fallback;
+  if (value.includes('//') || value.includes('\\') || /[\s\p{Cc}]/u.test(value)) return fallback;
+  const path = value.split(/[?#]/, 1)[0]!;
+  if (path.includes(':')) return fallback;
+  try {
+    const base = 'https://partyx.invalid';
+    const url = new URL(value, base);
+    if (url.origin !== base) return fallback;
+  } catch {
+    return fallback;
+  }
   return value;
 }
 

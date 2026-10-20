@@ -33,6 +33,12 @@ export const IconSearch = (p: IconProps) => (
     <path d="M15.5 15.5 21 21" />
   </Svg>
 );
+/** Cadeado do selo "Evento privado" (D-92). */
+export const IconLock = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4" />
+  </Svg>
+);
 export const IconMenu = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 6h18M3 12h18M3 18h12" />
