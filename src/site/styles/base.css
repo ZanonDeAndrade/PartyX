@@ -634,6 +634,55 @@ input[type='time']::-webkit-date-and-time-value {
 .px-check label {
   font-weight: 500;
 }
+.px-switch {
+  display: flex;
+  gap: var(--px-s-3);
+  align-items: center;
+  min-height: var(--px-touch);
+}
+/* Chave liga/desliga (evento privado, D-92): o checkbox nativo vira um trilho com botão, sem perder teclado nem leitor de tela. */
+.px-switch input {
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  border: 2px solid var(--px-text-3);
+  border-radius: var(--px-r-pill);
+  background: var(--px-line-2);
+  cursor: pointer;
+  transition: background-color var(--px-dur-1) var(--px-ease-out), border-color var(--px-dur-1) var(--px-ease-out);
+}
+.px-switch input::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--px-paper);
+  box-shadow: var(--px-sh-1);
+  transition: transform var(--px-dur-1) var(--px-ease-out);
+}
+.px-switch input:checked {
+  background: var(--px-violet);
+  border-color: var(--px-violet);
+}
+.px-switch input:checked::before {
+  transform: translateX(18px);
+}
+.px-switch label {
+  font-weight: 600;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .px-switch input,
+  .px-switch input::before {
+    transition: none;
+  }
+}
 .px-ro-grid {
   display: grid;
   gap: var(--px-s-3);

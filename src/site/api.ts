@@ -19,6 +19,52 @@ export interface EventCard {
   sale: { kind: SaleKind; label: string; minPriceCents: number | null; startsAt: string | null };
   /** Cor de destaque (`#RRGGBB`, 0014); nula: o roxo da PartyX. Na vitrine, só o bloco da data; na página, o destaque inteiro. */
   accentColor?: string | null;
+  /** Evento privado (D-92): só o selo. A situação da conta vem de `api.eventAccess`. */
+  privado?: boolean;
+}
+
+/** Situação da própria conta num evento (D-92). `livre`: evento aberto; `nenhuma`: privado e a conta não está na lista. */
+export type MyAccessStatus = 'livre' | 'autorizada' | 'pendente' | 'recusada' | 'nenhuma';
+export interface MyAccess {
+  privado: boolean;
+  situacao: MyAccessStatus;
+  podeSolicitar: boolean;
+}
+
+export type AccessStatus = 'autorizada' | 'pendente' | 'recusada';
+/** Linha da lista de autorizados no painel (D-92). CPF sempre mascarado. */
+export interface AccessRow {
+  id: string;
+  eventId: string;
+  name: string | null;
+  email: string | null;
+  cpf: string | null;
+  status: AccessStatus;
+  origin: 'painel' | 'solicitacao';
+  hasAccount: boolean;
+  note: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  updatedAt: string;
+}
+export interface AccessList {
+  event: { id: string; name: string; slug: string; isPrivate: boolean };
+  people: AccessRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  counts: Record<AccessStatus, number>;
+}
+export interface AccessImportResult {
+  adicionadas: number;
+  atualizadas: number;
+  jaAutorizadas: number;
+  erros: { line: number; message: string }[];
+  repetidas: number[];
+}
+export interface AccessRequestRow extends AccessRow {
+  event: { id: string; name: string; slug: string; startsAt: string };
 }
 
 export interface TicketTypeView {
@@ -650,6 +696,8 @@ export interface AdminEventRow {
   countdownEnabled: boolean;
   /** Cor de destaque da página do evento (`#RRGGBB`); nula: o roxo da PartyX. */
   accentColor: string | null;
+  /** Evento privado (D-92): só compra quem está autorizado na lista do evento. */
+  isPrivate: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -902,6 +950,7 @@ export interface EventInputBody {
   allowsMinors: boolean;
   countdownEnabled: boolean;
   accentColor: string | null;
+  isPrivate: boolean;
 }
 export interface TicketTypeBody {
   name: string;
@@ -1106,6 +1155,12 @@ export const api = {
     get<{ events: EventCard[]; filtering: boolean }>(`/public/events${q ? `?${new URLSearchParams({ q })}` : ''}`, signal),
   event: (slug: string, signal?: AbortSignal) =>
     withClock(async () => (await get<{ event: EventDetail }>(`/public/events/${encodeURIComponent(slug)}`, signal)).event),
+  /** Evento privado (D-92): só a situação da própria conta. */
+  eventAccess: async (slug: string, signal?: AbortSignal) =>
+    (await get<{ access: MyAccess }>(`/events/${encodeURIComponent(slug)}/access`, signal)).access,
+  requestEventAccess: async (slug: string) =>
+    (await request<{ access: MyAccess & { criada: boolean } }>('POST', `/events/${encodeURIComponent(slug)}/access-request`))
+      .access,
 
   me: (signal?: AbortSignal) =>
     get<{ user: SessionUser; csrfToken: string; pendingConsent?: boolean }>('/auth/me', signal),
@@ -1278,6 +1333,27 @@ export const api = {
       ).then(r => ({ ...r, rows: r.orders })),
     order: (id: string, signal?: AbortSignal) =>
       get<{ order: AdminOrderDetail }>(`/admin/orders/${id}`, signal).then(r => r.order),
+    /** Lista de autorizados (D-92). A busca vai no corpo: pode ser um CPF. */
+    accessList: (eventId: string, filter: { q?: string; status?: AccessStatus; page?: number }, signal?: AbortSignal) =>
+      request<AccessList>('POST', `/admin/events/${encodeURIComponent(eventId)}/access/search`, filter, signal),
+    addAccess: (eventId: string, body: { email?: string; cpf?: string; name?: string }) =>
+      request<{ resultado: 'adicionada' | 'atualizada' | 'ja_autorizada'; id: string }>(
+        'POST',
+        `/admin/events/${encodeURIComponent(eventId)}/access`,
+        body,
+      ),
+    importAccess: (eventId: string, text: string) =>
+      request<AccessImportResult>('POST', `/admin/events/${encodeURIComponent(eventId)}/access/import`, { text }),
+    removeAccess: (id: string) => request<{ removida: boolean }>('DELETE', `/admin/access/${encodeURIComponent(id)}`),
+    decideAccess: (ids: string[], decision: 'aprovar' | 'recusar', note?: string) =>
+      request<{ alteradas: number }>('POST', '/admin/access/decide', { ids, decision, note: note || null }),
+    accessRequests: (page: number, signal?: AbortSignal) =>
+      get<{ requests: AccessRequestRow[]; total: number; page: number; pageSize: number }>(
+        `/admin/access-requests${page > 1 ? `?page=${page}` : ''}`,
+        signal,
+      ),
+    accessRequestsCount: (signal?: AbortSignal) =>
+      get<{ pendentes: number }>('/admin/access-requests/count', signal).then(r => r.pendentes),
     buyers: (eventId: string, query: string, signal?: AbortSignal) =>
       get<{ page: number; pageSize: number; total: number; buyers: AdminBuyerRow[] }>(
         `/admin/events/${eventId}/buyers?${query}`,

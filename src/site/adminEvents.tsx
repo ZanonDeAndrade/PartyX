@@ -12,6 +12,7 @@ import {
   type FieldProblem,
 } from './api';
 import { AccentField } from './adminAccent';
+import { AccessPanel } from './adminAccess';
 import { BuyersPanel, ContingencyPanel, Gate, LiveEntriesPanel, Loading, TicketsPanel, useAdmin } from './adminPages';
 import { normalizeHex } from './accent';
 import { ACCENT_FORMAT_ERROR } from './accentPresets';
@@ -970,6 +971,8 @@ interface EventForm {
   countdownEnabled: boolean;
   /** Cor de destaque como digitada; vazia: o roxo da PartyX. */
   accentColor: string;
+  /** Evento privado (D-92): só compra quem está na lista de autorizados. */
+  isPrivate: boolean;
 }
 const EMPTY_FORM: EventForm = {
   name: '',
@@ -986,6 +989,7 @@ const EMPTY_FORM: EventForm = {
   allowsMinors: false,
   countdownEnabled: true,
   accentColor: '',
+  isPrivate: false,
 };
 function formOf(e: AdminEvent): EventForm {
   const { date, time } = isoToZonedInputs(e.startsAt);
@@ -1005,6 +1009,7 @@ function formOf(e: AdminEvent): EventForm {
     allowsMinors: e.allowsMinors,
     countdownEnabled: e.countdownEnabled,
     accentColor: e.accentColor ?? '',
+    isPrivate: e.isPrivate,
   };
 }
 const SERVER_FIELD: Record<string, string> = { startsAt: 'date', slug: 'name', endsAt: 'endDate' };
@@ -1158,6 +1163,7 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
       allowsMinors: form.allowsMinors,
       countdownEnabled: form.countdownEnabled,
       accentColor: normalizeHex(form.accentColor),
+      isPrivate: form.isPrivate,
     };
     let current: AdminEvent;
     try {
@@ -1401,6 +1407,25 @@ function EventFormBody({ meta, existing }: { meta: EventsMeta; existing: AdminEv
           do fim, ou com o evento encerrado, o cronômetro some.
         </small>
       </fieldset>
+      <fieldset className="px-field-wide px-fieldset">
+        <legend>Quem pode comprar</legend>
+        <div className="px-switch">
+          <input
+            id="ev-isPrivate"
+            type="checkbox"
+            role="switch"
+            checked={form.isPrivate}
+            onChange={e => set('isPrivate', e.target.checked)}
+            aria-describedby="ev-isPrivate-ajuda"
+          />
+          <label htmlFor="ev-isPrivate">Evento privado</label>
+        </div>
+        <small id="ev-isPrivate-ajuda" className="px-muted">
+          Ligado: só compra quem estiver autorizado na aba Acesso do evento; o evento continua na vitrine e na busca, com o
+          selo "Evento privado", e quem não está na lista pode solicitar acesso. Ligar com vendas em andamento não cancela
+          pedidos já pagos. Desligado: a compra fica livre para todos e a lista é mantida.
+        </small>
+      </fieldset>
       <div className="px-check px-field-wide">
         <input
           id="ev-isFeatured"
@@ -1565,10 +1590,11 @@ export function AdminEventPreviewPage({ id }: { id: string }) {
 
 // ---------- ADM04: detalhe do evento ----------
 
-type Tab = 'informacoes' | 'tipos' | 'entradas' | 'ingressos' | 'compradores' | 'contingencia';
+type Tab = 'informacoes' | 'tipos' | 'acesso' | 'entradas' | 'ingressos' | 'compradores' | 'contingencia';
 const TABS: [Tab, string][] = [
   ['informacoes', 'Informações'],
   ['tipos', 'Tipos de ingresso'],
+  ['acesso', 'Acesso'],
   ['entradas', 'Entradas ao vivo'],
   ['ingressos', 'Ingressos'],
   ['compradores', 'Compradores'],
@@ -1697,6 +1723,7 @@ export function AdminEventPage({ id }: { id: string }) {
               onChanged={() => setVersion(v => v + 1)}
             />
           ) : null}
+          {tab === 'acesso' ? <AccessPanel event={ev} /> : null}
           {tab === 'entradas' ? <LiveEntriesPanel eventId={id} /> : null}
           {tab === 'ingressos' ? <TicketsPanel eventId={id} /> : null}
           {tab === 'compradores' ? <BuyersPanel eventId={id} /> : null}
@@ -1795,6 +1822,10 @@ function EventInfoPanel({ event }: { event: AdminEvent }) {
         <div>
           <dt>Destaque na página inicial</dt>
           <dd>{event.isFeatured ? 'Sim' : 'Não'}</dd>
+        </div>
+        <div>
+          <dt>Quem pode comprar</dt>
+          <dd>{event.isPrivate ? 'Evento privado: só quem está autorizado na aba Acesso' : 'Todos'}</dd>
         </div>
         <div>
           <dt>Endereço da página</dt>

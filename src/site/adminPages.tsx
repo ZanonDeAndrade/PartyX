@@ -10,6 +10,7 @@ import {
   type OrderStatus,
   type SalesGroup,
 } from './api';
+import { PendingAccessCard, usePendingAccess } from './adminAccess';
 import { Layout, usePageTitle } from './components';
 import { brl, dateShort, timeOf } from './format';
 import { formatRate } from './serviceFee';
@@ -42,6 +43,7 @@ export type AdminTab =
   | 'entradas'
   | 'equipe'
   | 'excecoes'
+  | 'solicitacoes'
   | 'configuracoes'
   | 'conta';
 
@@ -91,7 +93,17 @@ const NAV_END: { tab: AdminTab; label: string; to: string }[] = [
 ];
 
 /** Itens do painel: no computador, coluna lateral; no celular, dentro da gaveta. */
-function AdminNav({ active, open, onNavigate }: { active: AdminTab; open: number; onNavigate?: () => void }) {
+function AdminNav({
+  active,
+  open,
+  pendingAccess,
+  onNavigate,
+}: {
+  active: AdminTab;
+  open: number;
+  pendingAccess: number;
+  onNavigate?: () => void;
+}) {
   const { loc } = useRouter();
   const session = useSession();
   const { go } = useRouter();
@@ -106,7 +118,18 @@ function AdminNav({ active, open, onNavigate }: { active: AdminTab; open: number
   return (
     <nav className="px-adm-nav" aria-label="Painel">
       <ul>
-        {NAV.map(n => item(n.tab, n.label, n.to))}
+        {NAV.slice(0, 2).map(n => item(n.tab, n.label, n.to))}
+        {item(
+          'solicitacoes',
+          'Solicitações',
+          '/admin/solicitacoes',
+          pendingAccess > 0 ? (
+            <span className="px-badge px-badge-warn" aria-label={`${pendingAccess} pendentes`}>
+              {pendingAccess}
+            </span>
+          ) : null,
+        )}
+        {NAV.slice(2).map(n => item(n.tab, n.label, n.to))}
         <li>
           <span className={`px-adm-nav-group${active === 'relatorios' ? ' px-adm-nav-group-on' : ''}`}>Relatórios</span>
           <ul>
@@ -154,10 +177,17 @@ function AdminNav({ active, open, onNavigate }: { active: AdminTab; open: number
 function AdminShell({ children, active }: { children: ReactNode; active: AdminTab }) {
   const pending = useOpenExceptions();
   const open = pending.semEstoque + pending.duplicadas;
+  const pendingAccess = usePendingAccess();
   const [drawer, setDrawer] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const label =
-    [...NAV, ...NAV_END, { tab: 'excecoes', label: 'Exceções' }, { tab: 'conta', label: 'Minha conta' }].find(
+    [
+      ...NAV,
+      ...NAV_END,
+      { tab: 'solicitacoes', label: 'Solicitações' },
+      { tab: 'excecoes', label: 'Exceções' },
+      { tab: 'conta', label: 'Minha conta' },
+    ].find(
       n => n.tab === active,
     )?.label ?? (active === 'relatorios' ? 'Relatórios' : 'Painel');
   useEffect(() => {
@@ -175,7 +205,7 @@ function AdminShell({ children, active }: { children: ReactNode; active: AdminTa
     <Layout>
       <div className="px-wrap px-adm-layout">
         <aside className="px-adm-side">
-          <AdminNav active={active} open={open} />
+          <AdminNav active={active} open={open} pendingAccess={pendingAccess} />
         </aside>
         <div className="px-adm-main">
           <div className="px-adm-mobilebar">
@@ -241,7 +271,7 @@ function AdminShell({ children, active }: { children: ReactNode; active: AdminTa
                 <IconClose />
               </button>
             </div>
-            <AdminNav active={active} open={open} onNavigate={() => setDrawer(false)} />
+            <AdminNav active={active} open={open} pendingAccess={pendingAccess} onNavigate={() => setDrawer(false)} />
           </div>
         </div>
       ) : null}
@@ -417,6 +447,7 @@ export function AdminOverviewPage() {
           <div className="px-kpis">
             <Kpi title={`Hoje (${data.today.split('-').reverse().join('/')})`} group={data.day} />
             <Kpi title={`Mês ${data.month.split('-').reverse().join('/')}`} group={data.monthSales} />
+            <PendingAccessCard />
           </div>
           <div className="px-field px-inline">
             <label htmlFor="mes">Mês</label>

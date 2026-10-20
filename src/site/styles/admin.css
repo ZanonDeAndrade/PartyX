@@ -881,3 +881,67 @@ body.px-dark .px-preview-bar a {
   max-height: 14rem;
   overflow-y: auto;
 }
+
+/* Evento privado (D-92): aba Acesso e página Solicitações. */
+.px-access-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--px-s-2) var(--px-s-5);
+  margin: 0 0 var(--px-s-4);
+}
+.px-access-tools {
+  display: grid;
+  gap: var(--px-s-3);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .px-access-tools {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.px-access-tools .px-panel {
+  margin: 0;
+}
+.px-access-tools .px-h3 {
+  margin: 0;
+}
+.px-access-import > summary {
+  min-height: var(--px-touch);
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  cursor: pointer;
+}
+.px-access-import[open] > summary {
+  margin-bottom: var(--px-s-3);
+}
+.px-access-import .px-notice {
+  margin-top: var(--px-s-3);
+}
+.px-access-bar {
+  position: sticky;
+  top: var(--px-s-2);
+  z-index: var(--px-z-sticky);
+  border-color: var(--px-violet-line);
+  box-shadow: var(--px-sh-2);
+}
+.px-access-bar p {
+  margin: 0 0 var(--px-s-3);
+}
+.px-access-all {
+  margin: var(--px-s-3) 0;
+  min-height: var(--px-touch);
+  align-items: center;
+}
+.px-access-table td:first-child input {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--px-violet);
+}
+.px-access-table .px-adm-actions {
+  margin: 0;
+}
+.px-access-table p {
+  margin: var(--px-s-1) 0 0;
+}
