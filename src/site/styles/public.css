@@ -1821,3 +1821,7 @@ html[data-vt='volta']::view-transition-new(*.px-card-stub) {
 .px-event-side .px-private-box a.px-btn-pri {
   color: var(--px-on-accent) !important;
 }
+/* Na barra fixa do celular, a ação divide a linha com o texto (fora dela, o botão ocupa a largura do painel). */
+.px-mobbar .px-continue {
+  width: auto;
+}

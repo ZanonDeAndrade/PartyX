@@ -143,7 +143,7 @@ function AddPersonForm({ eventId, onAdded }: { eventId: string; onAdded: () => v
   };
   return (
     <form className="px-panel px-form-grid px-access-add" onSubmit={submit} noValidate>
-      <h3 className="px-h3">Adicionar pessoa</h3>
+      <h3 className="px-h3 px-field-wide">Adicionar pessoa</h3>
       <FormField id="acesso-email" label="E-mail" error={errors.email}>
         <input
           id="acesso-email"
@@ -170,7 +170,7 @@ function AddPersonForm({ eventId, onAdded }: { eventId: string; onAdded: () => v
           onChange={e => setForm({ ...form, name: e.target.value })}
         />
       </FormField>
-      <div>
+      <div className="px-field-wide">
         <button type="submit" className="px-btn px-btn-pri" disabled={busy}>
           {busy ? 'Adicionando…' : 'Adicionar'}
         </button>
@@ -209,12 +209,13 @@ function ImportForm({ eventId, onImported }: { eventId: string; onImported: () =
         <FormField
           id="acesso-lista"
           label="Uma pessoa por linha"
+          wide
           hint="Em cada linha, e-mail ou CPF e, se quiser, o nome, separados por vírgula, ponto e vírgula ou tabulação (o que sai de uma planilha). Até 1.000 linhas."
           error={error}
         >
           <textarea id="acesso-lista" rows={6} value={text} onChange={e => setText(e.target.value)} />
         </FormField>
-        <div>
+        <div className="px-field-wide">
           <button type="submit" className="px-btn px-btn-pri" disabled={busy || !text.trim()}>
             {busy ? 'Importando…' : 'Importar'}
           </button>
@@ -475,31 +476,37 @@ function AccessTableRow({
       </td>
       {eventCell}
       <td>
-        {row.name ?? <span className="px-muted">Sem nome</span>}
-        {row.email ? (
-          <>
-            <br />
-            <span className="px-muted px-break">{row.email}</span>
-          </>
-        ) : null}
-        <br />
-        <span className="px-small px-muted">{row.hasAccount ? 'Tem conta na PartyX' : 'Ainda sem conta'}</span>
+        <div>
+          {row.name ?? <span className="px-muted">Sem nome</span>}
+          {row.email ? (
+            <>
+              <br />
+              <span className="px-muted px-break">{row.email}</span>
+            </>
+          ) : null}
+          <br />
+          <span className="px-small px-muted">{row.hasAccount ? 'Tem conta na PartyX' : 'Ainda sem conta'}</span>
+        </div>
       </td>
       <td className="px-nowrap">{row.cpf ?? <span className="px-muted">Não informado</span>}</td>
       <td>
-        <AccessBadge status={row.status} />
-        {row.note ? <p className="px-small px-muted">{row.note}</p> : null}
+        <div>
+          <AccessBadge status={row.status} />
+          {row.note ? <p className="px-small px-muted">{row.note}</p> : null}
+        </div>
       </td>
       <td>{ORIGIN_LABEL[row.origin]}</td>
       <td className="px-small">
-        {row.origin === 'solicitacao' ? 'Solicitada' : 'Cadastrada'} em {when(row.createdAt)}
-        {row.decidedAt && !(row.origin === 'painel' && row.decidedAt === row.createdAt) ? (
-          <>
-            <br />
-            {row.status === 'recusada' ? 'Recusada' : 'Autorizada'} em {when(row.decidedAt)}
-            {row.decidedBy ? ` por ${row.decidedBy}` : ''}
-          </>
-        ) : null}
+        <div>
+          {row.origin === 'solicitacao' ? 'Solicitada' : 'Cadastrada'} em {when(row.createdAt)}
+          {row.decidedAt && !(row.origin === 'painel' && row.decidedAt === row.createdAt) ? (
+            <>
+              <br />
+              {row.status === 'recusada' ? 'Recusada' : 'Autorizada'} em {when(row.decidedAt)}
+              {row.decidedBy ? ` por ${row.decidedBy}` : ''}
+            </>
+          ) : null}
+        </div>
       </td>
       <td>
         <div className="px-adm-actions">
@@ -596,9 +603,11 @@ export function AdminAccessRequestsPage() {
                       onChanged={reload}
                       eventCell={
                         <td>
-                          <Link to={`/admin/eventos/${r.event.id}?aba=acesso`}>{r.event.name}</Link>
-                          <br />
-                          <span className="px-small px-muted">{dateShort(r.event.startsAt)}</span>
+                          <div>
+                            <Link to={`/admin/eventos/${r.event.id}?aba=acesso`}>{r.event.name}</Link>
+                            <br />
+                            <span className="px-small px-muted">{dateShort(r.event.startsAt)}</span>
+                          </div>
                         </td>
                       }
                     />
