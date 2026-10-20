@@ -43,6 +43,8 @@ export interface PublicEventCard {
   sale: { kind: EventSale['kind']; label: string; minPriceCents: number | null; startsAt: string | null };
   /** Cor de destaque (`#RRGGBB`) ou nula (o roxo da PartyX). Na vitrine, só o bloco da data usa; na página, o destaque inteiro. */
   accentColor: string | null;
+  /** Evento privado (D-92): só o selo. Nada da lista sai daqui; a situação da conta vem de `GET /events/:slug/access`. */
+  privado: boolean;
 }
 
 export interface PublicTicketType {
@@ -182,6 +184,7 @@ function card(e: EventRow, types: ReturnType<typeof inputOf>[], now: Date): Publ
     bannerPlaceholder: e.bannerUrl ? e.bannerPlaceholder : null,
     isFeatured: e.isFeatured,
     accentColor: e.accentColor,
+    privado: e.isPrivate,
     sale: {
       kind: sale.kind,
       label: sale.label,

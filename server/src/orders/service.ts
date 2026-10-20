@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import type { Tx } from '../db/audit';
+import { assertMayBuy } from '../events/access';
 import {
   events,
   cancellationAcceptances,
@@ -297,6 +298,8 @@ export async function quote(deps: OrdersDeps, input: CheckoutInput, userId?: str
   shapeOrThrow(deps, input.items);
   const now = deps.clock.now();
   const event = await loadEvent(deps.db, input.eventSlug);
+  // Evento privado (D-92): só a conta autorizada vê o resumo; janelas, lotes, capacidade e menores seguem conferidos abaixo.
+  await assertMayBuy(deps.db, event, userId);
   const rows = await loadTypes(
     deps.db,
     event.id,
@@ -581,6 +584,9 @@ export async function createOrder(
   const orderId = await deps.db.transaction(async tx => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`order-user:${userId}`}, 0))`);
     const event = await loadEvent(tx, input.eventSlug);
+    // Evento privado (D-92): a autorização vale na criação do pedido. Pedido pendente criado antes de ligar a chave (ou de a pessoa sair
+    // da lista) pode ser pago; pedido pago nunca é cancelado por isso.
+    await assertMayBuy(tx, event, userId);
     // Regras do comprador (novo aceite, data de nascimento, idade na data do evento, termo de menor) ANTES de mexer em qualquer
     // pedido ou reserva: uma recusa aqui não solta a reserva de um pedido anterior.
     const buyer = await checkBuyer(tx, deps.config, userId, event);

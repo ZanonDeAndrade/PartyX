@@ -17,6 +17,7 @@ const card = (over: Partial<PublicEventCard> = {}): PublicEventCard => ({
   isFeatured: true,
   sale: { kind: 'open', label: 'À venda', minPriceCents: 4000, startsAt: null },
   accentColor: null,
+  privado: false,
   ...over,
 });
 

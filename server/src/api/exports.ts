@@ -9,6 +9,7 @@ import { renderContingencyPdf } from '../exports/contingency';
 import {
   auditExport,
   contingencyCsv,
+  exportEventAccess,
   exportEventBuyers,
   exportEventTickets,
   exportFee,
@@ -117,6 +118,15 @@ export function exportRoutes(deps: AuthDeps) {
     const f = parse(z.object({ q: z.string().max(100).optional() }), query(c, 'q'));
     const id = eventId(c);
     return sendCsv(c, 'compradores', await exportEventBuyers(ed, id, f.q), id);
+  });
+
+  app.get('/admin/exports/events/:id/access.csv', async c => {
+    const f = parse(
+      z.object({ status: z.enum(['autorizada', 'pendente', 'recusada']).optional() }),
+      query(c, 'status'),
+    );
+    const id = eventId(c);
+    return sendCsv(c, 'autorizados', await exportEventAccess(ed, id, f.status), id);
   });
 
   app.get('/admin/exports/sales.csv', async c => {

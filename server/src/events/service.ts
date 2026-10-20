@@ -73,6 +73,7 @@ const eventSnapshot = (e: EventRow) => ({
   archivedAt: e.archivedAt?.toISOString() ?? null,
   countdownEnabled: e.countdownEnabled,
   accentColor: e.accentColor,
+  isPrivate: e.isPrivate,
 });
 
 export interface EventInput {
@@ -92,6 +93,8 @@ export interface EventInput {
   countdownEnabled?: boolean;
   /** Cor de destaque da página do evento, `#RRGGBB`; nula ou vazia: o roxo da PartyX (0014). */
   accentColor?: string | null;
+  /** Evento privado (D-92, 0019): só compra quem está autorizado na lista. Ausente na criação: aberto a todos. */
+  isPrivate?: boolean;
 }
 
 /**
@@ -156,6 +159,7 @@ function checkEvent(input: Partial<EventInput>, required: boolean) {
   }
   if (input.allowsMinors !== undefined) out.allowsMinors = input.allowsMinors;
   if (input.countdownEnabled !== undefined) out.countdownEnabled = input.countdownEnabled;
+  if (input.isPrivate !== undefined) out.isPrivate = input.isPrivate;
   if (input.accentColor !== undefined) {
     const color = checkAccentColor(input.accentColor);
     if ('problem' in color) errors.push({ campo: 'accentColor', mensagem: color.problem });
@@ -200,6 +204,7 @@ export async function createEvent(deps: EventsDeps, actor: Actor, input: EventIn
             allowsMinors: data.allowsMinors ?? false,
             countdownEnabled: data.countdownEnabled ?? true,
             accentColor: data.accentColor ?? null,
+            isPrivate: data.isPrivate ?? false,
             createdAt: now,
             updatedAt: now,
           })
@@ -261,6 +266,18 @@ export async function updateEvent(deps: EventsDeps, actor: Actor, id: string, in
       after: eventSnapshot(after!),
       at: now,
     });
+    // A chave do evento privado (D-92) tem linha própria na trilha. Ligar com vendas em andamento não cancela nada; desligar libera a
+    // compra para todos e mantém a lista.
+    if (before.isPrivate !== after!.isPrivate)
+      await writeAudit(tx, {
+        actorId: actor.id,
+        action: 'evento.privado',
+        entity: 'event',
+        entityId: id,
+        before: { privado: before.isPrivate },
+        after: { privado: after!.isPrivate },
+        at: now,
+      });
     return after!;
   });
 }

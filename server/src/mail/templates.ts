@@ -369,4 +369,63 @@ export function composeTransferenciaDesfeita(data: TransferData & { returned: bo
   };
 }
 
+export interface AccessData {
+  name: string;
+  eventName: string;
+  eventDate: string;
+  eventTime: string;
+  venue: string;
+  slug: string;
+}
+
+/** Evento privado (D-92): a solicitação de acesso entrou na fila do organizador. */
+export function composeAcessoSolicitado(data: AccessData, ctx: MailContext): Composed {
+  const l: Layout = {
+    preheader: `Recebemos seu pedido de acesso a ${data.eventName}.`,
+    title: 'Solicitação recebida',
+    paragraphs: [
+      `Olá, ${data.name}.`,
+      `Recebemos sua solicitação de acesso ao evento privado ${data.eventName}. O organizador decide quem pode comprar. Você recebe um e-mail quando a solicitação for aprovada.`,
+    ],
+    details: [
+      { label: 'Evento', value: data.eventName },
+      { label: 'Data', value: `${data.eventDate} às ${data.eventTime}` },
+      { label: 'Local', value: data.venue },
+    ],
+    cta: { label: 'Ver o evento', url: `${ctx.baseUrl}/eventos/${data.slug}` },
+    footnote:
+      'A aprovação é decisão do organizador e não há prazo garantido. Uma solicitação não reserva ingresso: a compra só começa depois da aprovação, dentro das vendas do evento.',
+  };
+  return {
+    subject: subjectWith(ctx, `Solicitação recebida · ${data.eventName}`),
+    text: text(l, ctx),
+    html: html(l, ctx),
+  };
+}
+
+/** Evento privado (D-92): a solicitação foi aprovada; leva à página do evento, onde a compra fica liberada para a conta. */
+export function composeAcessoLiberado(data: AccessData, ctx: MailContext): Composed {
+  const l: Layout = {
+    preheader: `Sua conta pode comprar ingressos para ${data.eventName}.`,
+    title: 'Acesso liberado',
+    paragraphs: [
+      `Olá, ${data.name}.`,
+      `O organizador aprovou sua solicitação para o evento privado ${data.eventName}. Entre na sua conta e compre pela página do evento.`,
+    ],
+    details: [
+      { label: 'Evento', value: data.eventName },
+      { label: 'Data', value: `${data.eventDate} às ${data.eventTime}` },
+      { label: 'Local', value: data.venue },
+    ],
+    cta: { label: 'Ir para o evento', url: `${ctx.baseUrl}/eventos/${data.slug}` },
+    footnote:
+      'A liberação vale só para a sua conta. Os ingressos seguem as vendas, os lotes e a capacidade do evento; a aprovação não reserva ingresso.',
+  };
+  return {
+    subject: subjectWith(ctx, `Acesso liberado · ${data.eventName}`),
+    text: text(l, ctx),
+    html: html(l, ctx),
+  };
+}
+
 export type { EmailTemplate };

@@ -4,7 +4,17 @@ import { and, eq, sql } from 'drizzle-orm';
 import type { Config } from '../config';
 import type { Db } from '../db/client';
 import type { Tx } from '../db/audit';
-import { emailLog, events, orders, ticketLots, ticketTransfers, ticketTypes, tickets, users } from '../db/schema';
+import {
+  emailLog,
+  eventAccess,
+  events,
+  orders,
+  ticketLots,
+  ticketTransfers,
+  ticketTypes,
+  tickets,
+  users,
+} from '../db/schema';
 import { maskName } from '../domain/identity';
 import { typeWithLotName } from '../events/lots';
 import { formatInEventZone, formatEventDateTime } from '../domain/time';
@@ -12,6 +22,8 @@ import { logger } from '../logger';
 import type { Clock } from '../providers/clock';
 import type { EmailSender, EmailTemplate, OutgoingEmail } from '../providers/email';
 import {
+  composeAcessoLiberado,
+  composeAcessoSolicitado,
   composeCadastro,
   composeCompra,
   composePagamentoSemEstoque,
@@ -205,6 +217,39 @@ async function compose(
         : row.template === 'transferencia_recebida'
           ? composeTransferenciaRecebida(data, ctx)
           : composeTransferenciaDesfeita({ ...data, returned: side === 'volta' }, ctx);
+    return { ...composed, to: user.email, data: { name, eventName: data.eventName } };
+  }
+
+  if (row.template === 'acesso_solicitado' || row.template === 'acesso_liberado') {
+    // Chave `acesso:<id da linha>:<recebida|liberada>` (events/access.ts). A linha some com a remoção pelo painel ou com a limpeza dos
+    // 6 meses: aí o e-mail deixou de fazer sentido. "Acesso liberado" só enquanto a conta continua autorizada.
+    const [, entryId] = row.idempotencyKey.split(':');
+    if (!entryId) return { skip: 'sem_solicitacao' };
+    const [a] = await deps.db
+      .select({
+        status: eventAccess.status,
+        userId: eventAccess.userId,
+        eventName: events.name,
+        startsAt: events.startsAt,
+        venue: events.venue,
+        slug: events.slug,
+      })
+      .from(eventAccess)
+      .innerJoin(events, eq(events.id, eventAccess.eventId))
+      .where(eq(eventAccess.id, entryId))
+      .limit(1);
+    if (!a || a.userId !== row.userId) return { skip: 'sem_solicitacao' };
+    if (row.template === 'acesso_liberado' && a.status !== 'autorizada') return { skip: 'acesso_nao_autorizado' };
+    const data = {
+      name,
+      eventName: a.eventName,
+      eventDate: formatInEventZone(a.startsAt, { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      eventTime: formatInEventZone(a.startsAt, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
+      venue: a.venue,
+      slug: a.slug,
+    };
+    const composed =
+      row.template === 'acesso_solicitado' ? composeAcessoSolicitado(data, ctx) : composeAcessoLiberado(data, ctx);
     return { ...composed, to: user.email, data: { name, eventName: data.eventName } };
   }
 

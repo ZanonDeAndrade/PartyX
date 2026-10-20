@@ -25,6 +25,7 @@ import { emailAdminRoutes } from './emailAdmin';
 import { exportRoutes } from './exports';
 import { gateRoutes } from './gate';
 import { eventsRoutes } from './events';
+import { eventAccessRoutes } from './eventAccess';
 import { panelRoutes } from './panel';
 import { paymentAdminRoutes } from './paymentAdmin';
 import { reportRoutes } from './reports';
@@ -244,6 +245,7 @@ export function authRoutes(deps: AuthDeps) {
   // Equipe e demais rotas do administrador (Prompt 06). Compartilham a sessão carregada acima.
   app.route('/', teamRoutes(deps));
   app.route('/', eventsRoutes(deps));
+  app.route('/', eventAccessRoutes(deps));
   app.route('/', checkoutRoutes(deps));
   app.route('/', paymentAdminRoutes(deps));
   app.route('/', ticketRoutes(deps));

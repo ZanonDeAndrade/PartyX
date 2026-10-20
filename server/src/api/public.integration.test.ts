@@ -186,6 +186,7 @@ describe.skipIf(!ADMIN_URL)('vitrine pública (integração)', () => {
         'bannerUrl',
         'isFeatured',
         'name',
+        'privado',
         'sale',
         'slug',
         'startsAt',

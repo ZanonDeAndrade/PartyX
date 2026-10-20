@@ -3,6 +3,8 @@ import { maintenancePage } from '../ops/maintenance';
 import { loadConfig } from '../config';
 import { replyToFor } from './outbox';
 import {
+  composeAcessoLiberado,
+  composeAcessoSolicitado,
   composeCadastro,
   composeCompra,
   composePagamentoSemEstoque,
@@ -296,6 +298,35 @@ describe('e-mails (RF-36, RF-67)', () => {
           loadConfig({ PARTYX_SUPPORT_EMAIL: 'atendimento@exemplo.test', EMAIL_REPLY_TO: 'sac@exemplo.test' }),
         ),
       ).toBe('sac@exemplo.test');
+    });
+  });
+
+  describe('evento privado (D-92)', () => {
+    const access = {
+      name: 'Marina',
+      eventName: 'Festa <Fechada>',
+      eventDate: '12/12/2026',
+      eventTime: '22:00',
+      venue: 'Casa "1"',
+      slug: 'festa-fechada',
+    };
+    it('"Solicitação recebida": avisa que a aprovação é do organizador e leva ao evento, sem prometer ingresso', () => {
+      const m = composeAcessoSolicitado(access, ctx);
+      expect(m.subject).toBe('Solicitação recebida · Festa <Fechada>');
+      expect(m.text).toContain('Você recebe um e-mail quando a solicitação for aprovada.');
+      expect(m.text).toContain('https://partyx.exemplo.test/eventos/festa-fechada');
+      expect(m.text).toContain('não reserva ingresso');
+      expect(m.html).toContain('Festa &lt;Fechada&gt;');
+      expect(m.html).not.toContain('Festa <Fechada>');
+      expect(`${m.subject}${m.text}${m.html}`).not.toContain('—');
+    });
+    it('"Acesso liberado": link do evento e aviso de que vale só para a conta', () => {
+      const m = composeAcessoLiberado(access, ctx);
+      expect(m.subject).toBe('Acesso liberado · Festa <Fechada>');
+      expect(m.text).toContain('https://partyx.exemplo.test/eventos/festa-fechada');
+      expect(m.text).toContain('A liberação vale só para a sua conta.');
+      expect(m.html).toContain('Casa &quot;1&quot;');
+      expect(`${m.subject}${m.text}${m.html}`).not.toContain('—');
     });
   });
 });

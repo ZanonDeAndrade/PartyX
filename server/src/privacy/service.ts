@@ -409,6 +409,11 @@ export async function anonymizeSubject(deps: PrivacyDeps, adminId: string, userI
     await tx.delete(sessions).where(eq(sessions.userId, userId));
     await tx.delete(passwordResets).where(eq(passwordResets.userId, userId));
     await tx.delete(loginAttempts).where(eq(loginAttempts.emailNormalized, oldEmail));
+    // Lista de autorizados de eventos privados (D-92): as linhas da conta, do e-mail ou do CPF dela saem (servem só ao controle de acesso).
+    const accessRemoved = await tx.execute<{ id: string }>(sql`
+      delete from event_access
+       where user_id = ${userId} or email_normalized = ${oldEmail}${u.cpf ? sql` or cpf = ${u.cpf}` : sql``}
+      returning id`);
 
     // A trilha de auditoria não guarda dado pessoal: só quem pediu, o protocolo da PartyX e contagens.
     await writeAudit(tx, {
@@ -417,7 +422,13 @@ export async function anonymizeSubject(deps: PrivacyDeps, adminId: string, userI
       entity: 'user',
       entityId: userId,
       before: null,
-      after: { protocolo: reference, ordersKept: orderIds.length, ticketsAnonymized, validFutureTickets: validFuture },
+      after: {
+        protocolo: reference,
+        ordersKept: orderIds.length,
+        ticketsAnonymized,
+        validFutureTickets: validFuture,
+        accessRemoved: accessRemoved.rows.length,
+      },
       reason,
       at: now,
     });

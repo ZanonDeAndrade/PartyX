@@ -59,6 +59,7 @@ const eventFields = {
   allowsMinors: z.boolean(),
   countdownEnabled: z.boolean(),
   accentColor: z.string().max(20).nullable(),
+  isPrivate: z.boolean(),
 };
 const createEventBody = z.object({
   ...eventFields,
@@ -68,6 +69,7 @@ const createEventBody = z.object({
   allowsMinors: eventFields.allowsMinors.optional(),
   countdownEnabled: eventFields.countdownEnabled.optional(),
   accentColor: eventFields.accentColor.optional(),
+  isPrivate: eventFields.isPrivate.optional(),
   slug: text.optional(),
 });
 const updateEventBody = z.object(eventFields).partial();

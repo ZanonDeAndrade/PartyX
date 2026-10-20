@@ -7,6 +7,7 @@ import { events, orders, ticketMinorAcceptances, ticketTransfers, tickets, users
 import { ADULT_AGE, ageOnEvent, MIN_AGE, purchaseAge } from '../domain/age';
 import { isValidCpf, onlyDigits } from '../domain/cpf';
 import { AppError } from '../domain/errors';
+import { assertRecipientAuthorized } from '../events/access';
 import { isEmailFormat, maskName, normalizeEmail } from '../domain/identity';
 import { newShortCode, newTicketCode, signQr } from '../domain/ticketCode';
 import { legalVersion, minorDocsBlockers } from '../legal/documents';
@@ -52,6 +53,7 @@ type Held = {
   archivedAt: Date | null;
   startsAt: Date;
   allowsMinors: boolean;
+  isPrivate: boolean;
 };
 
 const heldColumns = {
@@ -68,6 +70,7 @@ const heldColumns = {
   archivedAt: events.archivedAt,
   startsAt: events.startsAt,
   allowsMinors: events.allowsMinors,
+  isPrivate: events.isPrivate,
 };
 
 async function loadHeld(db: Db | Tx, ticketId: string, lock: boolean): Promise<Held | undefined> {
@@ -116,7 +119,7 @@ async function findRecipient(
   config: TransferDeps['config'],
   senderId: string,
   raw: string,
-  event: { startsAt: Date; allowsMinors: boolean },
+  event: { eventId: string; isPrivate: boolean; startsAt: Date; allowsMinors: boolean },
 ): Promise<Recipient> {
   const value = raw.trim();
   let where;
@@ -148,6 +151,8 @@ async function findRecipient(
       'Não encontramos uma conta de cliente com esse e-mail ou CPF. Quem recebe precisa ter conta na PartyX.',
     );
   if (user.id === senderId) throw new AppError(422, 'mesma_conta', 'Este ingresso já está na sua conta.');
+  // Evento privado (D-92): só para conta autorizada na lista do evento, na prévia e na confirmação.
+  await assertRecipientAuthorized(db, { id: event.eventId, isPrivate: event.isPrivate }, user.id);
   if (!user.birthDate)
     throw new AppError(
       409,

@@ -4,6 +4,7 @@ import { auditLog, events } from '../db/schema';
 import { maskCpf } from '../domain/cpf';
 import { AppError } from '../domain/errors';
 import { formatEventDateTime } from '../domain/time';
+import { listAccess } from '../events/access';
 import { eventBuyers, eventTickets, listOrders, PAYMENT_SITUATION, type OrderFilter } from '../panel/service';
 import { feeReport, promoterOrders, promoterRanking, salesReport, type RankMetric } from '../reports/service';
 import type { Clock } from '../providers/clock';
@@ -218,6 +219,45 @@ export async function exportEventBuyers(deps: ExportDeps, eventId: string, q?: s
     ],
   );
   return { filename: safeFilename('compradores', name), csv, rows: rows.length, filters: { eventId, q: Boolean(q) } };
+}
+
+const ACCESS_STATUS_TEXT = { autorizada: 'Autorizada', pendente: 'Pendente', recusada: 'Recusada' } as const;
+const ACCESS_ORIGIN_TEXT = { painel: 'Cadastrada pelo painel', solicitacao: 'Solicitação' } as const;
+
+/** Lista de autorizados do evento privado (D-92), com o CPF mascarado como no resto do painel. Filtro só pela situação. */
+export async function exportEventAccess(
+  deps: ExportDeps,
+  eventId: string,
+  status?: 'autorizada' | 'pendente' | 'recusada',
+): Promise<CsvExport> {
+  const list = await listAccess(deps, eventId, { status, all: true });
+  const when = (iso: string | null) => (iso ? formatEventDateTime(new Date(iso)) : '');
+  const csv = toCsv(
+    ['Nome', 'E-mail', 'CPF (mascarado)', 'Situação', 'Origem', 'Conta na PartyX', 'Cadastrada em', 'Decidida em', 'Decidida por', 'Observação'],
+    list.people.map(p => [
+      p.name ?? '',
+      p.email ?? '',
+      p.cpf ?? '',
+      ACCESS_STATUS_TEXT[p.status],
+      ACCESS_ORIGIN_TEXT[p.origin],
+      p.hasAccount ? 'Sim' : 'Não',
+      when(p.createdAt),
+      when(p.decidedAt),
+      p.decidedBy ?? '',
+      p.note ?? '',
+    ]),
+    [
+      ['Total listado', int(list.people.length)],
+      ['Filtros aplicados', `Evento: ${list.event.name}${status ? `; Situação: ${ACCESS_STATUS_TEXT[status]}` : ''}`],
+      ['Gerado em', stamp(deps)],
+    ],
+  );
+  return {
+    filename: safeFilename('autorizados', list.event.name),
+    csv,
+    rows: list.people.length,
+    filters: { eventId, status: status ?? null },
+  };
 }
 
 // ---------- relatórios ----------
