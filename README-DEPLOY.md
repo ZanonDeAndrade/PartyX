@@ -597,3 +597,9 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00052-saf`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00050-pey ./infra/producao/deploy.sh rollback` (mesmo banco).
 
+## 37. Vigésima quinta publicação: troca da vitrine para o evento e de volta (19/10/2026)
+
+**Publicado:** revisão `partyx-00054-nor` (tag `release-2026-10-19e`, commit `7a0aa49`), 100% desde 19/10 17:29 UTC (14:29 BRT), sem migração, mesmo `env.prod.yaml`. Variante A escolhida pelo responsável: a capa do cartão vira a capa da página em 420 ms (e encolhe de volta), a vitrine esmaece e sobe 8 px, as peças do evento sobem 12 px em cascata de 40 ms; menos movimento só esmaece 150 ms; tempos em `--px-vt-*` (`tokens.css`). Teste rápido 15 de 15 pela candidata e pelo domínio; Chromium e Firefox a 1280 e 390 px. Registro: `docs/registros/publicacao-producao-2026-10-19.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00054-nor`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00052-saf ./infra/producao/deploy.sh rollback` (mesmo banco).
+
