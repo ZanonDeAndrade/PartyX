@@ -1,10 +1,10 @@
 import type { Db } from '../db/client';
 import { monthKeyInEventZone } from '../domain/time';
-import { feeReport, FEE_PER_TICKET_CENTS } from '../reports/service';
+import { feeReport } from '../reports/service';
 import { formatMoney } from '../exports/csv';
 
 /**
- * Extrato mensal da taxa por ingresso (Anexo II, rotina mensal até o dia 5; Cl. 6.3). **Só gera o relatório.** Não emite
+ * Extrato mensal da taxa por ingresso (Anexo II, rotina mensal até o dia 5; Cl. 6.3; D-93). **Só gera o relatório.** Não emite
  * boleto, não cobra, não envia nada a ninguém e não suspende nada: boleto, cobrança e suspensão não fazem parte do escopo
  * automatizado e dependem de decisão humana (docs/operacao/README.md).
  */
@@ -20,9 +20,14 @@ export async function feeStatement(db: Db, month: string) {
   return {
     month: report.month,
     criterion: report.criterion,
-    feePerTicketCents: FEE_PER_TICKET_CENTS,
+    notice: report.notice,
+    periods: report.periods,
     units: report.units,
     feeCents: report.feeCents,
+    pixUnits: report.pixUnits,
+    cardUnits: report.cardUnits,
+    otherUnits: report.otherUnits,
+    cardUnitsInFee: report.cardUnitsInFee,
     orders: report.originOrders,
     byEvent: report.byEvent,
     byCurrentStatus: report.byCurrentStatus,
@@ -46,12 +51,18 @@ export function renderFeeStatement(s: FeeStatement, opts: { generatedAt: Date; m
     '',
     `**Critério (Cl. 6.3):** ${s.criterion}`,
     '',
+    '**Regra do repasse:**',
+    '',
+    ...s.notice.map(line => `- ${line}`),
+    '',
     '| Item | Valor |',
     '|---|---|',
-    `| Ingressos emitidos de pedidos aprovados no mês | ${s.units} |`,
+    `| Ingressos pagos por Pix | ${s.pixUnits} |`,
+    `| Ingressos pagos por cartão | ${s.cardUnits} (${s.cardUnitsInFee === 0 ? 'só para informação, sem valor' : `${s.cardUnitsInFee} entram pela regra do período`}) |`,
+    ...(s.otherUnits > 0 ? [`| Ingressos com outra forma ou sem forma informada | ${s.otherUnits} |`] : []),
+    `| Ingressos no repasse | ${s.units} |`,
     `| Pedidos de origem | ${s.orders} |`,
-    `| Valor por ingresso | ${brl(s.feePerTicketCents)} |`,
-    `| **Taxa do mês** | **${brl(s.feeCents)}** |`,
+    `| **Total a repassar** | **${brl(s.feeCents)}** |`,
   ];
   if (opts.monthlyFeeCents !== undefined) {
     lines.push(
@@ -61,10 +72,19 @@ export function renderFeeStatement(s: FeeStatement, opts: { generatedAt: Date; m
   } else {
     lines.push('| Mensalidade | não informada: some o valor do contrato na emissão do boleto |');
   }
-  lines.push('', '## Por evento', '', '| Evento | Ingressos | Taxa |', '|---|---|---|');
-  for (const e of s.byEvent) lines.push(`| ${e.eventName} | ${e.units} | ${brl(e.feeCents)} |`);
-  if (s.byEvent.length === 0) lines.push('| (nenhum) | 0 | R$ 0,00 |');
-  lines.push('', '## Situação atual desses ingressos (todos contam)', '', '| Situação | Ingressos |', '|---|---|');
+  lines.push(
+    '',
+    '## Por período',
+    '',
+    '| Período | Valor por ingresso | Pix | Cartão | No repasse | Valor |',
+    '|---|---|---|---|---|---|',
+  );
+  for (const p of s.periods)
+    lines.push(`| ${p.label} | ${brl(p.perTicketCents)} | ${p.pixUnits} | ${p.cardUnits} | ${p.units} | ${brl(p.feeCents)} |`);
+  lines.push('', '## Por evento', '', '| Evento | Pix | Cartão | No repasse | Valor |', '|---|---|---|---|---|');
+  for (const e of s.byEvent) lines.push(`| ${e.eventName} | ${e.pixUnits} | ${e.cardUnits} | ${e.units} | ${brl(e.feeCents)} |`);
+  if (s.byEvent.length === 0) lines.push('| (nenhum) | 0 | 0 | 0 | R$ 0,00 |');
+  lines.push('', '## Situação atual dos ingressos no repasse (todas contam)', '', '| Situação | Ingressos |', '|---|---|');
   for (const r of s.byCurrentStatus) lines.push(`| ${r.label} | ${r.units} |`);
   if (s.byCurrentStatus.length === 0) lines.push('| (nenhuma) | 0 |');
   lines.push(

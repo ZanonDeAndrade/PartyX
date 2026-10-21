@@ -1,5 +1,6 @@
 import { sql, type SQL } from 'drizzle-orm';
 import type { Db } from '../db/client';
+import { countsInFee, periodLabel, periodNotice, type ContractFeePeriod } from '../domain/contractFee';
 import { AppError } from '../domain/errors';
 import { EVENT_TIMEZONE } from '../domain/time';
 import { checkFilter } from '../panel/service';
@@ -10,11 +11,11 @@ import { treatedSql } from '../payments/exceptions';
  *
  * Bases, todas pela data **original** da aprovação (`paid_at`) no fuso do evento:
  * - **Vendas e promoters:** pedidos com status `pago`.
- * - **Taxa mensal (Cl. 6.3):** ingressos **emitidos** cujo pedido teve `paid_at` no mês, **qualquer que seja a situação atual**
- *   do ingresso ou do pedido. Cancelado, reembolsado, estornado e contestado continuam contando, R$ 1,00 cada.
+ * - **Taxa mensal (Cl. 6.3; D-93):** ingressos **emitidos** cujo pedido teve `paid_at` no mês, **qualquer que seja a situação atual**
+ *   do ingresso ou do pedido. Cancelado, reembolsado, estornado e contestado continuam contando. O valor por ingresso e as formas de
+ *   pagamento que entram são os da regra de `contract_fee_rules` vigente no `paid_at` (desde 21/10/2026, R$ 1,00 só de pedido por Pix).
  * Valor sempre em centavos inteiros. Taxas do gateway não entram (D-04).
  */
-export const FEE_PER_TICKET_CENTS = 100; // Cláusula 6ª do contrato: R$ 1,00 por ingresso
 
 const TZ = EVENT_TIMEZONE;
 const num = (v: unknown): number => Number(v ?? 0);
@@ -367,39 +368,141 @@ export async function promoterOrders(deps: ReportDeps, promoterId: string, f: Pe
   };
 }
 
-// ---------- taxa mensal (RF-60, CA-29) ----------
+// ---------- taxa mensal (RF-60, CA-29; D-93) ----------
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+const CRITERION =
+  'Ingressos vendidos no mês = ingressos emitidos de pedidos aprovados cuja data original de aprovação (paid_at) está no mês, no fuso do evento, independentemente da situação atual do ingresso ou do pedido. Cancelados, reembolsados e estornados continuam contando (Cl. 6.3). O valor por ingresso e as formas de pagamento que entram no repasse são os da regra do contrato vigente na data da aprovação (regra de cada período).';
+
 /** Situação atual do ingresso, no texto do relatório. Todas contam na taxa. */
 const CURRENT = sql`case
-    when o.status = 'estornado' then 'Cancelado (estorno)'
-    when o.status = 'contestado' then 'Cancelado (contestação)'
-    when t.status = 'cancelado' then 'Cancelado (administrador)'
-    when t.status = 'utilizado' then 'Utilizado'
+    when u.order_status = 'estornado' then 'Cancelado (estorno)'
+    when u.order_status = 'contestado' then 'Cancelado (contestação)'
+    when u.ticket_status = 'cancelado' then 'Cancelado (administrador)'
+    when u.ticket_status = 'utilizado' then 'Utilizado'
     else 'Válido' end`;
+
+/**
+ * Períodos do mês (`p`), um por regra de `contract_fee_rules` vigente nele, de `starts` (incluído) a `ends` (excluído), com a virada do
+ * mês no fuso do evento; e os ingressos emitidos de pedidos aprovados no mês (`u`), cada um no período do seu `paid_at`, com a forma de
+ * pagamento gravada e se entra no repasse (`counted`).
+ */
+function feeUnits(month: string): SQL {
+  return sql`with bounds as (
+      select (${month}::text || '-01')::timestamp at time zone ${TZ} as m_start,
+             ((${month}::text || '-01')::date + interval '1 month')::timestamp at time zone ${TZ} as m_end),
+    rules as (
+      select r.effective_from, lead(r.effective_from) over (order by r.effective_from) as next_from,
+             r.per_ticket_cents, r.methods, r.reference
+        from contract_fee_rules r),
+    p as (
+      select (row_number() over (order by r.effective_from))::int as idx,
+             greatest(r.effective_from, b.m_start) as starts,
+             least(coalesce(r.next_from, 'infinity'::timestamptz), b.m_end) as ends,
+             r.per_ticket_cents, r.methods, r.reference
+        from rules r cross join bounds b
+       where r.effective_from < b.m_end and coalesce(r.next_from, 'infinity'::timestamptz) > b.m_start),
+    u as (
+      select t.id as ticket_id, t.short_code, t.status::text as ticket_status, t.event_id,
+             o.id as order_id, o.number, o.status::text as order_status, o.paid_at, o.payment_method::text as payment_method,
+             p.idx, p.per_ticket_cents,
+             (p.methods is null or coalesce(o.payment_method = any(p.methods), false)) as counted
+        from tickets t
+        join orders o on o.id = t.order_id
+        join p on o.paid_at >= p.starts and o.paid_at < p.ends)`;
+}
+
+type Method = 'pix' | 'cartao';
+const method = (v: unknown): Method | null => (v === 'pix' || v === 'cartao' ? v : null);
 
 export async function feeReport(deps: ReportDeps, month: string, page: number, pageSize: number) {
   if (!MONTH.test(month))
     throw new AppError(422, 'dados_invalidos', 'Mês inválido.', [{ campo: 'month', mensagem: 'Use AAAA-MM.' }]);
   const inMonth = sql`o.paid_at is not null and to_char(o.paid_at at time zone ${TZ}, 'YYYY-MM') = ${month}`;
+  const units = feeUnits(month);
 
-  // Cada ingresso emitido conta uma vez, pelo identificador da unidade, qualquer que seja a situação atual.
-  const total = await deps.db.execute<{ units: number; orders: number }>(sql`
-    select count(t.id)::int as units, count(distinct o.id)::int as orders
-      from tickets t join orders o on o.id = t.order_id where ${inMonth}`);
-  const units = num(total.rows[0]?.units);
+  // Um período por regra vigente no mês, com os ingressos por forma de pagamento e os que entram no repasse.
+  const byPeriod = await deps.db.execute<{
+    starts: Date;
+    ends: Date;
+    per_ticket_cents: number;
+    methods: string[] | null;
+    reference: string;
+    pix: number;
+    card: number;
+    other: number;
+    counted: number;
+    m_start: Date;
+  }>(sql`${units}
+    select (select b.m_start from bounds b) as m_start, p.starts, p.ends, p.per_ticket_cents, p.methods::text[] as methods, p.reference,
+           count(u.ticket_id) filter (where u.payment_method = 'pix')::int as pix,
+           count(u.ticket_id) filter (where u.payment_method = 'cartao')::int as card,
+           count(u.ticket_id) filter (where u.payment_method is null)::int as other,
+           count(u.ticket_id) filter (where u.counted)::int as counted
+      from p left join u on u.idx = p.idx
+     group by p.idx, p.starts, p.ends, p.per_ticket_cents, p.methods, p.reference
+     order by p.idx`);
+  const periods = byPeriod.rows.map(r => {
+    const period: ContractFeePeriod = {
+      startsAt: new Date(r.starts),
+      endsAt: new Date(r.ends),
+      perTicketCents: num(r.per_ticket_cents),
+      methods: r.methods === null ? null : r.methods.map(m => method(m)).filter((m): m is Method => m !== null),
+      reference: r.reference,
+    };
+    return {
+      startsAt: period.startsAt.toISOString(),
+      endsAt: period.endsAt.toISOString(),
+      label: periodLabel(period),
+      notice: periodNotice(period),
+      perTicketCents: period.perTicketCents,
+      methods: period.methods,
+      reference: period.reference,
+      pixUnits: num(r.pix),
+      cardUnits: num(r.card),
+      otherUnits: num(r.other),
+      units: num(r.counted),
+      feeCents: num(r.counted) * period.perTicketCents,
+      cardInFee: countsInFee(period.methods, 'cartao'),
+    };
+  });
+  // A regra original vale desde 1970 e a tabela só aceita inclusão: um mês sem regra é defeito, não mês sem taxa.
+  const monthStart = byPeriod.rows[0] ? new Date(byPeriod.rows[0].m_start).getTime() : Number.NaN;
+  if (periods.length === 0 || new Date(periods[0]!.startsAt).getTime() !== monthStart)
+    throw new Error(`relatório da taxa: nenhuma regra em contract_fee_rules cobre o início de ${month}`);
+  const sum = (f: (p: (typeof periods)[number]) => number) => periods.reduce((t, p) => t + f(p), 0);
+  const counted = sum(p => p.units);
+  const fee = sum(p => p.feeCents);
 
-  const byStatus = await deps.db.execute<{ label: string; units: number }>(sql`
-    select ${CURRENT} as label, count(*)::int as units
-      from tickets t join orders o on o.id = t.order_id where ${inMonth} group by 1 order by 2 desc, 1`);
-  const byEvent = await deps.db.execute<{ id: string; name: string; units: number }>(sql`
-    select e.id, e.name, count(t.id)::int as units
-      from tickets t join orders o on o.id = t.order_id join events e on e.id = t.event_id
-     where ${inMonth} group by e.id, e.name order by e.name`);
+  const origin = await deps.db.execute<{ orders: number }>(sql`${units}
+    select count(distinct u.order_id)::int as orders from u where u.counted`);
 
-  // Conciliação: quantas unidades os itens dos pedidos pagos no mês previam, contra quantos ingressos existem.
+  const byStatus = await deps.db.execute<{ label: string; units: number }>(sql`${units}
+    select ${CURRENT} as label, count(*)::int as units from u where u.counted group by 1 order by 2 desc, 1`);
+  const byEvent = await deps.db.execute<{
+    id: string;
+    name: string;
+    pix: number;
+    card: number;
+    other: number;
+    counted: number;
+    fee: number;
+  }>(sql`${units}
+    select e.id, e.name,
+           count(*) filter (where u.payment_method = 'pix')::int as pix,
+           count(*) filter (where u.payment_method = 'cartao')::int as card,
+           count(*) filter (where u.payment_method is null)::int as other,
+           count(*) filter (where u.counted)::int as counted,
+           coalesce(sum(u.per_ticket_cents) filter (where u.counted), 0)::int as fee
+      from u join events e on e.id = u.event_id
+     group by e.id, e.name order by e.name`);
+
+  // Conciliação: quantas unidades os itens dos pedidos pagos no mês previam, contra quantos ingressos existem (todas as formas).
   // Pedido pago sem estoque nunca gera ingresso e é exceção para análise, não venda.
+  const issued = await deps.db.execute<{ units: number }>(sql`
+    select count(t.id)::int as units from tickets t join orders o on o.id = t.order_id where ${inMonth}`);
+  const issuedUnits = num(issued.rows[0]?.units);
   const recon = await deps.db.execute<{ expected: number; orders: number }>(sql`
     select coalesce(sum((select sum(i.quantity) from order_items i where i.order_id = o.id)), 0)::int as expected, count(*)::int as orders
       from orders o where ${inMonth} and o.status in ('pago', 'estornado', 'contestado', 'cancelado')`);
@@ -442,34 +545,43 @@ export async function feeReport(deps: ReportDeps, month: string, page: number, p
       from orders o where ${inMonth} and o.status in ('pago', 'estornado', 'contestado') group by o.status`);
   const rev = (s: string) => num(revenue.rows.find(r => r.status === s)?.cents);
 
-  const detail = await deps.db.execute<Record<string, unknown>>(sql`
-    select t.id, t.short_code, o.id as order_id, o.number, e.name as event_name, o.paid_at, ${CURRENT} as current_status,
-           count(*) over()::int as total_rows
-      from tickets t join orders o on o.id = t.order_id join events e on e.id = t.event_id
-     where ${inMonth}
-     order by o.paid_at, o.number, t.short_code
+  const detail = await deps.db.execute<Record<string, unknown>>(sql`${units}
+    select u.ticket_id, u.short_code, u.order_id, u.number, e.name as event_name, u.paid_at, ${CURRENT} as current_status,
+           u.payment_method, u.counted, u.per_ticket_cents, count(*) over()::int as total_rows
+      from u join events e on e.id = u.event_id
+     order by u.paid_at, u.number, u.short_code
      limit ${pageSize} offset ${(page - 1) * pageSize}`);
 
-  const fee = units * FEE_PER_TICKET_CENTS;
   return {
     month,
-    criterion:
-      'Ingressos vendidos no mês = ingressos emitidos de pedidos aprovados cuja data original de aprovação (paid_at) está no mês, no fuso do evento, independentemente da situação atual do ingresso ou do pedido. Cancelados, reembolsados e estornados continuam contando (Cl. 6.3).',
-    feePerTicketCents: FEE_PER_TICKET_CENTS,
-    units,
+    criterion: CRITERION,
+    /** Aviso do topo: uma linha por período, gerada da regra (valor, formas e referência). */
+    notice: periods.map(p => p.notice),
+    periods,
+    /** Ingressos no repasse e total a repassar. */
+    units: counted,
     feeCents: fee,
-    originOrders: num(total.rows[0]?.orders),
+    /** Todos os ingressos emitidos no mês, por forma de pagamento gravada (informação; quem entra é definido pela regra). */
+    pixUnits: sum(p => p.pixUnits),
+    cardUnits: sum(p => p.cardUnits),
+    otherUnits: sum(p => p.otherUnits),
+    /** Ingressos pagos por cartão que entram no repasse (só nos períodos cuja regra aceita cartão, como a original). */
+    cardUnitsInFee: sum(p => (p.cardInFee ? p.cardUnits : 0)),
+    originOrders: num(origin.rows[0]?.orders),
     byCurrentStatus: byStatus.rows.map(r => ({ label: r.label, units: num(r.units) })),
     byEvent: byEvent.rows.map(r => ({
       eventId: r.id,
       eventName: r.name,
-      units: num(r.units),
-      feeCents: num(r.units) * FEE_PER_TICKET_CENTS,
+      pixUnits: num(r.pix),
+      cardUnits: num(r.card),
+      otherUnits: num(r.other),
+      units: num(r.counted),
+      feeCents: num(r.fee),
     })),
     reconciliation: {
       expectedUnits: expected,
-      issuedUnits: units,
-      ok: expected === units && anomalies.length === 0,
+      issuedUnits,
+      ok: expected === issuedUnits && anomalies.length === 0,
       // Pedido aprovado no mês sem nenhum ingresso e que NÃO é "pago sem estoque": algo a investigar antes de cobrar.
       anomalies: anomalies.map(o => ({
         orderId: o.id,
@@ -500,13 +612,16 @@ export async function feeReport(deps: ReportDeps, month: string, page: number, p
     pageSize,
     total: detail.rows[0] ? num(detail.rows[0].total_rows) : 0,
     units_detail: detail.rows.map(r => ({
-      ticketId: r.id as string,
+      ticketId: r.ticket_id as string,
       shortCode: r.short_code as string,
       orderId: r.order_id as string,
       orderNumber: num(r.number),
       eventName: r.event_name as string,
       paidAt: iso(r.paid_at),
       current: r.current_status as string,
+      method: method(r.payment_method),
+      inFee: Boolean(r.counted),
+      feeCents: r.counted ? num(r.per_ticket_cents) : 0,
     })),
   };
 }

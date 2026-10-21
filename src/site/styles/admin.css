@@ -945,3 +945,16 @@ body.px-dark .px-preview-bar a {
 .px-access-table p {
   margin: var(--px-s-1) 0 0;
 }
+
+/* Taxa mensal (D-93): três indicadores lado a lado só com espaço para os valores; o aviso da regra lista um período por linha. */
+@media (min-width: 1100px) {
+  .px-kpis-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.px-fee-rule ul {
+  margin: 0;
+  padding-left: 1.1em;
+  display: grid;
+  gap: 4px;
+}

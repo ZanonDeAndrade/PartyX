@@ -118,3 +118,12 @@ Cada arquivo de teste cria um banco novo, aplica as migrações e o remove no fi
 | `checkins.minor_authorization_received` | Escolha do validador num pedido de comprador menor: `true` (menor com a autorização) ou `false` (18+) | Só em entrada válida |
 
 Reversão (`rollback/0009...down.sql`) recusa se já houver aceite de menor ou confirmação na portaria. No banco de **teste**, `users.birth_date` ganha o padrão 1990-01-01 só para as fixtures antigas (`db/testing.ts`); produção não tem padrão.
+
+## 0020: regra da taxa da contratada (21/10/2026, D-93)
+
+| Tabela | Finalidade | Observações |
+|---|---|---|
+| `contract_fee_rules` | Regra da taxa da contratada por ingresso (Cl. 6.3): início da vigência, valor por ingresso, formas de pagamento que entram (nula = qualquer) e referência | Cada linha vale até o início da seguinte. Nasce com a regra original (desde sempre, R$ 1,00, qualquer forma) e a da D-93 (desde 21/10/2026 00:00 em Brasília, R$ 1,00, só Pix). Só inclusão (alterar, apagar e truncar recusados), nunca com início antes do mês corrente no fuso de Brasília; o `partyx_app` só lê |
+
+Reversão (`rollback/0020...down.sql`) recusa se houver regra além das duas da migração.
+

@@ -9,6 +9,7 @@ import { MemoryEmailSender } from '../providers/email';
 import { argon2Hasher } from '../providers/passwordHasher';
 import { createMockGateway, type MockGateway } from '../payments/mockGateway';
 import { backfillTickets, createTicketIssuer, issueForOrder } from '../tickets/issuer';
+import { transferTicket } from '../tickets/transfer';
 
 const ADMIN_URL = process.env.TEST_DATABASE_URL;
 const PASSWORD = 'festa2026';
@@ -54,6 +55,34 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
     return { raw, get: (p: string) => raw('GET', p), post: (p: string, b: unknown = {}) => raw('POST', p, b) };
   }
   const json = async <T = any>(res: Response) => (await res.json()) as T;
+  /** Lê o CSV como o Excel leria: sem BOM, separador ";", aspas duplicadas (como em exports.integration.test.ts). */
+  const parseCsv = (text: string): string[][] => {
+    const body = text.replace(/^\uFEFF/, '');
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let cell = '';
+    let quoted = false;
+    for (let i = 0; i < body.length; i++) {
+      const ch = body[i]!;
+      if (quoted) {
+        if (ch === '"' && body[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else if (ch === '"') quoted = false;
+        else cell += ch;
+      } else if (ch === '"') quoted = true;
+      else if (ch === ';') {
+        row.push(cell);
+        cell = '';
+      } else if (ch === '\n') {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = '';
+      } else if (ch !== '\r') cell += ch;
+    }
+    return rows;
+  };
 
   async function event(name = 'Noite Neon Verão', status = 'publicado') {
     const id = (
@@ -90,6 +119,8 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       items?: [keyof typeof PRICE, number][];
       promoterId?: string;
       noTickets?: boolean;
+      /** Forma de pagamento gravada (D-93); padrão Pix. Nulo: pedido sem forma informada. */
+      method?: 'pix' | 'cartao' | null;
     } = {},
   ) {
     const i = ++n;
@@ -109,8 +140,8 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       : (o.paidAt ?? '2026-12-10T15:00:00Z');
     const orderId = (
       await sql(
-        `insert into orders (user_id,event_id,total_cents,status,paid_at,payment_method,created_at,promoter_id) values ($1,$2,$3,$4,$5,'pix',$6,$7) returning id`,
-        [userId, e.id, total, status, paidAt, paidAt ?? '2026-12-10T14:00:00Z', o.promoterId ?? null],
+        `insert into orders (user_id,event_id,total_cents,status,paid_at,payment_method,created_at,promoter_id) values ($1,$2,$3,$4,$5,$8,$6,$7) returning id`,
+        [userId, e.id, total, status, paidAt, paidAt ?? '2026-12-10T14:00:00Z', o.promoterId ?? null, o.method === undefined ? 'pix' : o.method],
       )
     ).rows[0].id as string;
     const orderItems: { orderItemId: string; ticketTypeId: string; quantity: number }[] = [];
@@ -452,7 +483,7 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const adm = await session();
       const r = await fee(adm);
       expect(r.units).toBe(2 + 1 + 2 + 3 + 1);
-      expect(r).toMatchObject({ feePerTicketCents: 100, feeCents: 900, month: '2026-12' });
+      expect(r).toMatchObject({ feeCents: 900, month: '2026-12', pixUnits: 9, cardUnits: 0 });
       const by = Object.fromEntries(r.byCurrentStatus.map((s: any) => [s.label, s.units]));
       expect(by).toEqual({
         Válido: 3,
@@ -563,8 +594,8 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       const adm = await session();
       const r = await fee(adm);
       expect(r.byEvent).toEqual([
-        { eventId: a.id, eventName: 'Evento A', units: 2, feeCents: 200 },
-        { eventId: b.id, eventName: 'Evento B', units: 3, feeCents: 300 },
+        { eventId: a.id, eventName: 'Evento A', pixUnits: 2, cardUnits: 0, otherUnits: 0, units: 2, feeCents: 200 },
+        { eventId: b.id, eventName: 'Evento B', pixUnits: 3, cardUnits: 0, otherUnits: 0, units: 3, feeCents: 300 },
       ]);
       expect(r.byEvent.reduce((t: number, x: any) => t + x.units, 0)).toBe(r.units);
       expect(r.originOrders).toBe(2);
@@ -649,6 +680,232 @@ describe.skipIf(!ADMIN_URL)('relatórios e taxa mensal (integração)', () => {
       await sql("update orders set status = 'estornado' where id = $1", [o.id]);
       const second = await fee(adm);
       expect([second.units, second.feeCents]).toEqual([first.units, first.feeCents]);
+    });
+  });
+
+  describe('taxa por forma de pagamento (D-93, aditivo de 21/10/2026)', () => {
+    const fee = async (adm: Awaited<ReturnType<typeof session>>, month: string) =>
+      json(await adm.get(`/admin/reports/fee?month=${month}&pageSize=200`));
+    const brl = (text: string) => text.replace(/\u00a0/g, ' ');
+
+    it('a partir de 21/10/2026 só o pedido pago por Pix entra; o cartão aparece só para informação, sem valor', async () => {
+      const e = await event();
+      const pix = await order(e, { paidAt: '2026-11-10T15:00:00Z', items: [['Pista', 2]], method: 'pix' });
+      const card = await order(e, { paidAt: '2026-11-10T16:00:00Z', items: [['VIP', 3]], method: 'cartao' });
+      const adm = await session();
+      const r = await fee(adm, '2026-11');
+      expect(r).toMatchObject({ units: 2, feeCents: 200, pixUnits: 2, cardUnits: 3, otherUnits: 0, cardUnitsInFee: 0, originOrders: 1 });
+      expect(r.periods).toEqual([
+        expect.objectContaining({
+          label: 'De 01/11/2026 a 30/11/2026',
+          perTicketCents: 100,
+          methods: ['pix'],
+          reference: 'Aditivo ao contrato de 21/10/2026, D-93',
+          pixUnits: 2,
+          cardUnits: 3,
+          units: 2,
+          feeCents: 200,
+          cardInFee: false,
+        }),
+      ]);
+      expect(r.notice.map(brl)).toEqual([
+        'De 01/11/2026 a 30/11/2026: R$ 1,00 por ingresso de pedido pago por Pix; ingressos pagos por cartão não entram no repasse e aparecem só para informação (Aditivo ao contrato de 21/10/2026, D-93).',
+      ]);
+      expect(r.byEvent).toEqual([
+        { eventId: e.id, eventName: e.name, pixUnits: 2, cardUnits: 3, otherUnits: 0, units: 2, feeCents: 200 },
+      ]);
+      expect(r.byCurrentStatus).toEqual([{ label: 'Válido', units: 2 }]);
+      const detail = (id: string) => r.units_detail.filter((u: any) => u.orderId === id);
+      expect(detail(pix.id).map((u: any) => [u.method, u.inFee, u.feeCents])).toEqual([
+        ['pix', true, 100],
+        ['pix', true, 100],
+      ]);
+      expect(detail(card.id).map((u: any) => [u.method, u.inFee, u.feeCents])).toEqual([
+        ['cartao', false, 0],
+        ['cartao', false, 0],
+        ['cartao', false, 0],
+      ]);
+      // A conciliação continua sobre todos os ingressos emitidos, de qualquer forma.
+      expect(r.reconciliation).toMatchObject({ expectedUnits: 5, issuedUnits: 5, ok: true });
+    });
+
+    it('virada da vigência: pago em 20/10 às 23:59:59 de Brasília segue a regra antiga; às 00:00:00 de 21/10 já é a nova', async () => {
+      const e = await event();
+      await order(e, { paidAt: '2026-10-21T02:59:59Z', items: [['Pista', 1]], method: 'pix' });
+      await order(e, { paidAt: '2026-10-21T02:59:59Z', items: [['Pista', 2]], method: 'cartao' });
+      await order(e, { paidAt: '2026-10-21T03:00:00Z', items: [['Pista', 4]], method: 'pix' });
+      await order(e, { paidAt: '2026-10-21T03:00:00Z', items: [['Pista', 8]], method: 'cartao' });
+      const adm = await session();
+      const r = await fee(adm, '2026-10');
+      expect(
+        r.periods.map((p: any) => [p.label, p.methods, p.pixUnits, p.cardUnits, p.units, p.feeCents, p.cardInFee]),
+      ).toEqual([
+        ['De 01/10/2026 a 20/10/2026', null, 1, 2, 3, 300, true],
+        ['De 21/10/2026 a 31/10/2026', ['pix'], 4, 8, 4, 400, false],
+      ]);
+      expect(r).toMatchObject({ units: 7, feeCents: 700, pixUnits: 5, cardUnits: 10, cardUnitsInFee: 2 });
+      expect(brl(r.notice[0])).toBe(
+        'De 01/10/2026 a 20/10/2026: R$ 1,00 por ingresso, qualquer forma de pagamento (Contrato, Cláusula 6ª, regra original).',
+      );
+      expect(brl(r.notice[1])).toMatch(/^De 21\/10\/2026 a 31\/10\/2026: R\$ 1,00 por ingresso de pedido pago por Pix; ingressos pagos por cartão não entram/);
+      const at = (paidAt: string, method: string) =>
+        r.units_detail.filter((u: any) => u.paidAt === paidAt && u.method === method).map((u: any) => u.inFee);
+      expect(at('2026-10-21T02:59:59.000Z', 'cartao')).toEqual([true, true]);
+      expect(at('2026-10-21T03:00:00.000Z', 'cartao')).toEqual(Array(8).fill(false));
+    });
+
+    it('meses misturados: setembro inteiro na regra original, outubro dividido e novembro só na nova', async () => {
+      const e = await event();
+      await order(e, { paidAt: '2026-09-15T15:00:00Z', items: [['Pista', 1]], method: 'pix' });
+      await order(e, { paidAt: '2026-09-15T16:00:00Z', items: [['Pista', 2]], method: 'cartao' });
+      await order(e, { paidAt: '2026-10-05T15:00:00Z', items: [['Pista', 1]], method: 'cartao' });
+      await order(e, { paidAt: '2026-10-25T15:00:00Z', items: [['Pista', 5]], method: 'cartao' });
+      await order(e, { paidAt: '2026-10-25T16:00:00Z', items: [['Pista', 1]], method: 'pix' });
+      await order(e, { paidAt: '2026-11-03T15:00:00Z', items: [['Pista', 3]], method: 'cartao' });
+      const adm = await session();
+      const sep = await fee(adm, '2026-09');
+      // Setembro dá o mesmo que dava antes do aditivo: todo ingresso conta, R$ 1,00 cada.
+      expect(sep).toMatchObject({ units: 3, feeCents: 300, pixUnits: 1, cardUnits: 2, cardUnitsInFee: 2 });
+      expect(sep.periods.map((p: any) => [p.label, p.methods])).toEqual([['De 01/09/2026 a 30/09/2026', null]]);
+      const oct = await fee(adm, '2026-10');
+      expect(oct).toMatchObject({ units: 2, feeCents: 200, pixUnits: 1, cardUnits: 6, cardUnitsInFee: 1 });
+      const nov = await fee(adm, '2026-11');
+      expect(nov).toMatchObject({ units: 0, feeCents: 0, pixUnits: 0, cardUnits: 3, cardUnitsInFee: 0 });
+      expect(nov.byEvent).toEqual([
+        { eventId: e.id, eventName: e.name, pixUnits: 0, cardUnits: 3, otherUnits: 0, units: 0, feeCents: 0 },
+      ]);
+    });
+
+    it('estorno, contestação e cancelamento continuam contando no Pix depois de 21/10; no cartão nunca entram', async () => {
+      const e = await event();
+      const pix = await order(e, { paidAt: '2026-11-10T15:00:00Z', items: [['Pista', 2]], method: 'pix' });
+      await sql(
+        "update tickets set status = 'cancelado', cancelled_at = now(), cancel_reason = 'cancelamento' where id = (select id from tickets where order_id = $1 limit 1)",
+        [pix.id],
+      );
+      await order(e, { paidAt: '2026-11-11T15:00:00Z', status: 'estornado', items: [['Pista', 3]], method: 'pix' });
+      await order(e, { paidAt: '2026-11-12T15:00:00Z', status: 'contestado', items: [['Pista', 1]], method: 'pix' });
+      await order(e, { paidAt: '2026-11-13T15:00:00Z', status: 'estornado', items: [['VIP', 2]], method: 'cartao' });
+      await order(e, { paidAt: '2026-11-14T15:00:00Z', items: [['Pista', 1]], method: 'cartao' });
+      const adm = await session();
+      const r = await fee(adm, '2026-11');
+      expect(r).toMatchObject({ units: 6, feeCents: 600, pixUnits: 6, cardUnits: 3 });
+      expect(Object.fromEntries(r.byCurrentStatus.map((x: any) => [x.label, x.units]))).toEqual({
+        Válido: 1,
+        'Cancelado (administrador)': 1,
+        'Cancelado (estorno)': 3,
+        'Cancelado (contestação)': 1,
+      });
+      // A receita continua com todas as formas (é separada da taxa).
+      expect(r.revenue).toMatchObject({ refundedCents: 3 * 8000 + 2 * 20000, contestedCents: 8000 });
+    });
+
+    it('transferência: o ingresso Pix transferido conta uma vez, no pedido de origem; o de cartão transferido segue fora', async () => {
+      const e = await event();
+      const pix = await order(e, { paidAt: '2026-11-10T15:00:00Z', items: [['Pista', 2]], method: 'pix' });
+      const card = await order(e, { paidAt: '2026-11-10T16:00:00Z', items: [['Pista', 1]], method: 'cartao' });
+      await sql("insert into users (name,email,cpf,password_hash,role) values ('Rita Souza','rita.d93@partyx.test','52998224725',$1,'cliente')", [hash]);
+      const deps = { db: createDrizzle(testDb.pool), clock, config };
+      const first = (o: { id: string }) =>
+        sql('select id from tickets where order_id = $1 order by unit_index limit 1', [o.id]).then(x => x.rows[0].id as string);
+      await transferTicket(deps, pix.userId, await first(pix), 'rita.d93@partyx.test');
+      await transferTicket(deps, card.userId, await first(card), 'rita.d93@partyx.test');
+      expect((await sql("select count(*)::int as n from ticket_transfers")).rows[0].n).toBe(2);
+      const adm = await session();
+      const r = await fee(adm, '2026-11');
+      expect(r).toMatchObject({ units: 2, feeCents: 200, pixUnits: 2, cardUnits: 1 });
+      expect(r.units_detail.filter((u: any) => u.orderId === pix.id)).toHaveLength(2);
+    });
+
+    it('desconto do promoter não muda a conta: R$ 1,00 por ingresso do pedido Pix', async () => {
+      const e = await event();
+      const o = await order(e, { paidAt: '2026-11-10T15:00:00Z', items: [['Pista', 3]], method: 'pix' });
+      await sql(
+        "update orders set discount_cents = 1500, discount_kind = 'fixo', discount_value = 500, coupon_code = 'ANA10' where id = $1",
+        [o.id],
+      );
+      const adm = await session();
+      expect(await fee(adm, '2026-11')).toMatchObject({ units: 3, feeCents: 300 });
+    });
+
+    it('pedido sem forma gravada: entra na regra original, fica fora na nova e aparece à parte', async () => {
+      const e = await event();
+      await order(e, { paidAt: '2026-10-10T15:00:00Z', items: [['Pista', 1]], method: null });
+      await order(e, { paidAt: '2026-11-10T15:00:00Z', items: [['Pista', 2]], method: null });
+      const adm = await session();
+      expect(await fee(adm, '2026-10')).toMatchObject({ units: 1, otherUnits: 1 });
+      const nov = await fee(adm, '2026-11');
+      expect(nov).toMatchObject({ units: 0, feeCents: 0, otherUnits: 2 });
+      expect(nov.units_detail.map((u: any) => [u.method, u.inFee])).toEqual([
+        [null, false],
+        [null, false],
+      ]);
+    });
+
+    it('as regras ficam no banco, só inclusão e nunca num mês fechado; uma regra nova muda os meses dela sem código', async () => {
+      expect(
+        (await sql("select effective_from, per_ticket_cents, methods::text[] as methods, reference from contract_fee_rules order by effective_from"))
+          .rows,
+      ).toEqual([
+        { effective_from: new Date('1970-01-01T00:00:00Z'), per_ticket_cents: 100, methods: null, reference: 'Contrato, Cláusula 6ª, regra original' },
+        { effective_from: new Date('2026-10-21T03:00:00Z'), per_ticket_cents: 100, methods: ['pix'], reference: 'Aditivo ao contrato de 21/10/2026, D-93' },
+      ]);
+      await expect(sql('update contract_fee_rules set per_ticket_cents = 0')).rejects.toThrow(/apenas inclusão/);
+      await expect(sql('delete from contract_fee_rules')).rejects.toThrow(/apenas inclusão/);
+      await expect(sql('truncate contract_fee_rules')).rejects.toThrow(/apenas inclusão/);
+      await expect(
+        sql("insert into contract_fee_rules (effective_from, per_ticket_cents, methods, reference) values ('2026-09-01 00:00 America/Sao_Paulo', 0, null, 'Retroativo')"),
+      ).rejects.toThrow(/mês já fechado/);
+      await expect(
+        sql("insert into contract_fee_rules (effective_from, per_ticket_cents, methods, reference) values ('2099-01-01 00:00 America/Sao_Paulo', 100, '{}', 'Sem forma')"),
+      ).rejects.toThrow(/contract_fee_rules_methods_not_empty/);
+      await sql(
+        "insert into contract_fee_rules (effective_from, per_ticket_cents, methods, reference) values ('2099-01-01 00:00 America/Sao_Paulo', 150, '{pix,cartao}', 'Aditivo de teste')",
+      );
+      const e = await event();
+      await order(e, { paidAt: '2098-12-31T15:00:00Z', items: [['Pista', 2]], method: 'cartao' });
+      await order(e, { paidAt: '2099-01-10T15:00:00Z', items: [['Pista', 2]], method: 'cartao' });
+      await order(e, { paidAt: '2099-01-10T16:00:00Z', items: [['Pista', 1]], method: 'pix' });
+      const adm = await session();
+      expect(await fee(adm, '2098-12')).toMatchObject({ units: 0, feeCents: 0 });
+      const jan = await fee(adm, '2099-01');
+      expect(jan).toMatchObject({ units: 3, feeCents: 450, cardUnitsInFee: 2 });
+      expect(brl(jan.notice[0])).toBe('De 01/01/2099 a 31/01/2099: R$ 1,50 por ingresso de pedido pago por Pix ou cartão (Aditivo de teste).');
+    });
+
+    it('CSV e tela dão os mesmos números; o CSV traz forma, repasse e valor por ingresso e a regra no rodapé', async () => {
+      const e = await event();
+      await order(e, { paidAt: '2026-10-20T15:00:00Z', items: [['Pista', 1]], method: 'cartao' });
+      await order(e, { paidAt: '2026-10-25T15:00:00Z', items: [['Pista', 2]], method: 'pix' });
+      await order(e, { paidAt: '2026-10-25T16:00:00Z', items: [['VIP', 1]], method: 'cartao' });
+      const adm = await session();
+      const screen = await fee(adm, '2026-10');
+      const csv = parseCsv(await (await adm.get('/admin/exports/fee.csv?month=2026-10')).text());
+      expect(csv[0]).toEqual([
+        'Código do ingresso',
+        'Pedido',
+        'Evento',
+        'Pagamento aprovado em',
+        'Forma de pagamento',
+        'Situação atual',
+        'Entra no repasse',
+        'Valor no repasse (R$)',
+      ]);
+      const blank = csv.findIndex(r => r.length === 1 && r[0] === '');
+      expect(csv.slice(1, blank).map(r => r.slice(4))).toEqual([
+        ['Cartão', 'Válido', 'sim', '1,00'],
+        ['Pix', 'Válido', 'sim', '1,00'],
+        ['Pix', 'Válido', 'sim', '1,00'],
+        ['Cartão', 'Válido', 'não', '0,00'],
+      ]);
+      const footer = csv.slice(blank + 1);
+      const f = (k: string) => footer.filter(r => r[0] === k).map(r => r[1]);
+      expect(f('Regra do repasse').map(x => brl(x!))).toEqual(screen.notice.map(brl));
+      expect(f('Ingressos pagos por Pix')).toEqual(['2']);
+      expect(f('Ingressos no repasse (unidades)')).toEqual([String(screen.units)]);
+      expect(f('Total a repassar (R$)')).toEqual(['3,00']);
+      expect(f('De 21/10/2026 a 31/10/2026')).toEqual(['2 por Pix; 1 por cartão; 2 no repasse; R$ 2,00']);
+      expect(screen).toMatchObject({ units: 3, feeCents: 300, pixUnits: 2, cardUnits: 2, cardUnitsInFee: 1 });
     });
   });
 });

@@ -1662,7 +1662,7 @@ describe.skipIf(!ADMIN_URL)('webhook, conciliação e confirmação de pagamento
       const fee = async () => json(await admin.get('/admin/reports/fee?month=2026-10'));
       const r = await fee();
       expect(r.units).toBe(2); // só os ingressos de B
-      expect(r.feeCents).toBe(2 * r.feePerTicketCents);
+      expect(r.feeCents).toBe(2 * 100); // 10/10/2026: regra original, R$ 1,00 por ingresso de qualquer forma
       expect(r.exceptions.title).toBe('Exceções para análise');
       expect(r.exceptions.paidWithoutStock).toEqual([
         expect.objectContaining({ orderId: pa.orderId, units: 2, totalCents: 18000, gatewayRef: pa.paymentId, treated: false }),

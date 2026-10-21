@@ -109,3 +109,9 @@ Classificar cada apontamento em até 2 dias úteis após a descrição suficient
 | 05/10/2026 | Fechamento interno para homologação, versão `0.26-interna` | **Não pronto.** Homologação publicada desatualizada (revisão de 01/10), gateway sandbox ausente (D-01), backup e restauração não executados, insumos do cliente pendentes. 90 de 106 itens aprovados em ambiente local, 0 falhos, 6 não executados, 10 bloqueados por cliente. Ver `../fechamento-interno.md` |
 | 05/10/2026 | Comunicação formal de entrega | **Não enviada.** Minuta em `../homologacao/minuta-comunicacao-entrega.md`. Os 10 dias corridos **não começaram** |
 | 05/10/2026 | Pedido do responsável para publicar a versão atual em produção | Esclarecido que produção não existe e que autorização de produção equivale a aceite (Cl. 5.4). Decisão registrada: **preparar produção com vendas fechadas, sem go-live e sem aceite**. Nada criado nem publicado. Ver `../producao.md` |
+
+## L10. Aditivos ao contrato
+
+| Data | Aditivo | Vigência | Arquivo | Registro |
+|---|---|---|---|---|
+| 21/10/2026 | Taxa da contratada (Cláusula 6ª): R$ 1,00 por ingresso só quando o pedido for pago por Pix; ingressos pagos por cartão não entram no repasse (D-93) | Pedidos pagos a partir de 21/10/2026 00:00 em Brasília | Guardado pelo responsável, fora do repositório | `taxa-por-pix-d93.md`, `decisoes-pendentes.md` (D-93) |

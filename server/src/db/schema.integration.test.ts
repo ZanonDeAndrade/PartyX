@@ -149,9 +149,10 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
           'service_fee_settings',
           'promoter_discount_events',
           'event_access',
+          'contract_fee_rules',
         ]),
       );
-      expect(tables).toHaveLength(27);
+      expect(tables).toHaveLength(28);
     });
 
     it('0016: titular do ingresso preenchido com o comprador (também para quem não o informa); histórico só de inclusão', async () => {
@@ -191,7 +192,7 @@ describe.skipIf(!ADMIN_URL)('esquema do PostgreSQL (integração)', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       const r = await q('select count(*)::int as n from drizzle.__drizzle_migrations');
-      expect(r.rows[0].n).toBe(20);
+      expect(r.rows[0].n).toBe(21);
     });
   });
 
@@ -753,6 +754,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const tag17 = '0017_taxa_de_servico';
       const tag18 = '0018_desconto_por_promoter';
       const tag19 = '0019_evento_privado';
+      const tag20 = '0020_regra_taxa_contratada';
       await expect(rollbackLastMigration(db.url, tag0)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag15)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag5)).rejects.toThrow(/não é a última/);
@@ -768,6 +770,22 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       await expect(rollbackLastMigration(db.url, tag16)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag17)).rejects.toThrow(/não é a última/);
       await expect(rollbackLastMigration(db.url, tag18)).rejects.toThrow(/não é a última/);
+      await expect(rollbackLastMigration(db.url, tag19)).rejects.toThrow(/não é a última/);
+
+      // 0020: nasce com a regra original e a da D-93; só inclusão; a reversão recusa com regra a mais (uma mudança de contrato gravada
+      // depois) e, sem ela, apaga a tabela e as funções dos gatilhos.
+      const q20 = db.pool.query.bind(db.pool);
+      expect((await q20('select count(*)::int as n from contract_fee_rules')).rows[0].n).toBe(2);
+      await q20("insert into contract_fee_rules (effective_from, per_ticket_cents, methods, reference) values ('2099-01-01 00:00 America/Sao_Paulo', 100, null, 'Teste')");
+      await expect(rollbackLastMigration(db.url, tag20)).rejects.toThrow(/além das duas da 0020/);
+      await q20('alter table contract_fee_rules disable trigger contract_fee_rules_no_delete');
+      await q20("delete from contract_fee_rules where reference = 'Teste'");
+      await q20('alter table contract_fee_rules enable trigger contract_fee_rules_no_delete');
+      await rollbackLastMigration(db.url, tag20);
+      expect((await q20("select to_regclass('contract_fee_rules') as t")).rows[0].t).toBeNull();
+      expect(
+        (await q20("select count(*)::int as n from pg_proc where proname in ('contract_fee_rules_append_only','contract_fee_rules_open_month')")).rows[0].n,
+      ).toBe(0);
 
       // 0019: evento nasce aberto a todos; a lista confere e-mail em minúsculas, CPF só por dígitos, uma linha por e-mail, CPF e conta no
       // evento, solicitação sempre com conta e decisão sempre com data; a reversão recusa com evento privado ou com alguém na lista.
@@ -1160,8 +1178,9 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
         expect(new Date(after[slug].updated_at).getTime(), slug).toBe(new Date(byslug[slug].updated_at).getTime());
       const trig = await db.pool.query("select tgenabled from pg_trigger where tgname = 'events_set_updated_at'");
       expect(trig.rows[0].tgenabled).toBe('O'); // gatilho religado
-      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0019 de volta: elas saem antes da 0006
+      expect(await widthsColumn()).toBe(1); // a reaplicação trouxe da 0007 à 0020 de volta: elas saem antes da 0006
       expect(await declineColumns()).toBe(3);
+      await rollbackLastMigration(db.url, tag20);
       await rollbackLastMigration(db.url, tag19);
       await rollbackLastMigration(db.url, tag18);
       await rollbackLastMigration(db.url, tag17);
@@ -1242,7 +1261,7 @@ describe.skipIf(!ADMIN_URL)('reversão de migrações', () => {
       const { runMigrations } = await import('./migrate');
       await runMigrations(db.url);
       r = await db.pool.query("select count(*)::int as n from information_schema.tables where table_schema = 'public'");
-      expect(r.rows[0].n).toBe(27); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013) + as três da 0016 + service_fee_settings (0017) + promoter_discount_events (0018) + event_access (0019)
+      expect(r.rows[0].n).toBe(28); // 18 até a 0008 + minor_term_acceptances (0009) + ticket_lots e order_item_lots (0013) + as três da 0016 + service_fee_settings (0017) + promoter_discount_events (0018) + event_access (0019) + contract_fee_rules (0020)
     } finally {
       await db.drop();
     }
