@@ -20,6 +20,11 @@ os três textos (Política de Privacidade 1.3, Termos de Uso 1.6 e Política de 
 assinatura da avaliação de legítimo interesse vem depois, em PDF, e não trava a publicação. A mensagem fica com o responsável, fora do
 repositório.
 
+**Publicação (20/10/2026):** com OK do responsável ("coloque no ar"), release `release-2026-10-20` (commit `f312704`), migração 0019
+aplicada no Neon antes da candidata, revisão `partyx-00056-lac` com 100% do tráfego desde 23:00 UTC (20:00 em Brasília). Na virada nenhum
+evento era privado; o `teste01-2` continua aberto a todos. Depois dela, o fluxo foi usado de ponta a ponta no `teste02`, de teste
+(chave, lista, solicitação, aprovação, os dois e-mails), e o evento foi encerrado sem pedidos. Registro: `publicacao-producao-2026-10-20.md`.
+
 ## Regras
 
 | Regra | Como ficou |
@@ -77,4 +82,3 @@ repositório.
 - Assinatura do Bernardo, como encarregado, na avaliação de legítimo interesse (`lia-evento-privado.md`), em PDF; não trava a
   publicação.
 - Resumo diário de solicitações: só proposto (`evento-privado-textos-propostos.md`).
-- Não publicado: sem push e sem deploy. A migração 0019 não está no Neon.

@@ -603,3 +603,8 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00054-nor`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00052-saf ./infra/producao/deploy.sh rollback` (mesmo banco).
 
+## 38. Vigésima sexta publicação: evento privado (D-92), Privacidade 1.3, Termos 1.6 e Cancelamento 1.2 (20/10/2026)
+
+**Publicado:** revisão `partyx-00056-lac` (tag `release-2026-10-20`, commit `f312704`), 100% desde 20/10 23:00 UTC (20:00 BRT), com a migração `0019_evento_privado` (só expande; backup `partyx-20261020T141001Z.dump` antes) e `env.prod.yaml` com Termos 1.6, Privacidade 1.3 e Cancelamento 1.2, vigência 2026-10-20. Chave "Evento privado" por evento, aba Acesso e página Solicitações no painel; compra e transferência só para conta autorizada, conferidas no servidor; nenhum evento privado na virada (depois dela, o `teste02`, de teste, ficou privado e foi encerrado). Também o S-02 (teto de 100 respostas "já tem cadastro" por hora). Teste rápido 15 de 15 pela candidata e pelo domínio; bateria 58 de 58 nos dois; Chromium e Firefox a 390 px. Registros: `docs/registros/publicacao-producao-2026-10-20.md` e `docs/registros/evento-privado.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00056-lac`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00054-nor ./infra/producao/deploy.sh rollback` (mesmo banco; a revisão anterior abre a compra de qualquer evento privado a todos).
