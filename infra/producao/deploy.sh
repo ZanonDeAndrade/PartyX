@@ -266,6 +266,18 @@ cmd_conferir() {
     [ "$account" != "TESTE" ] || { echo "Recuso: mp-access-token é de usuário de TESTE do Mercado Pago." >&2; exit 1; }
     [[ "$account" =~ ^[0-9]+$ ]] || { echo "Recuso: não foi possível conferir a conta do mp-access-token na API do Mercado Pago." >&2; exit 1; }
     [ "$account" = "$MP_COLLECTOR_ID" ] || { echo "Recuso: MP_COLLECTOR_ID do $ENV_FILE difere da conta do mp-access-token." >&2; exit 1; }
+    # Formas de pagamento ativas na conta (GET /v1/payment_methods, só leitura): a venda usa Pix e cartão; sem Pix ou sem nenhum cartão
+    # de crédito ativo, recusa. Mostra só os códigos das formas (pix, visa, master...).
+    local methods
+    methods="$(g secrets versions access latest --secret=mp-access-token \
+      | { IFS= read -r t || [ -n "$t" ]; printf 'header = "Authorization: Bearer %s"\n' "$t"; } \
+      | curl -sS --max-time 15 -K - https://api.mercadopago.com/v1/payment_methods \
+      | python3 -I -c 'import json,sys
+d=json.load(sys.stdin); a=[m for m in d if isinstance(m,dict) and m.get("status")=="active"]
+kind=lambda t: ",".join(sorted(str(m.get("id")) for m in a if m.get("payment_type_id")==t)) or "-"
+print("pix=%s credito=%s debito=%s" % ("sim" if any(m.get("id")=="pix" for m in a) else "nao", kind("credit_card"), kind("debit_card")))' 2>/dev/null || true)"
+    echo "   Mercado Pago, formas ativas na conta: ${methods:-sem resposta}"
+    [[ "$methods" == pix=sim\ credito=[!-]* ]] || { echo "Recuso: a conta do mp-access-token não tem Pix e cartão de crédito ativos (ou a API não respondeu)." >&2; exit 1; }
   fi
   # Turnstile: opcional e desligado por padrão (README-DEPLOY 8b). Ligado, exige a chave do site (arquivo) e a secreta (segredo).
   if [ "$TURNSTILE_ENABLED" = "true" ]; then

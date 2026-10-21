@@ -280,6 +280,13 @@ no terminal do responsável (digitação oculta; formato `APP_USR-`; o token con
 mostrar o id; a Public Key conferida na API pública; cada valor gravado como versão nova, sem desativar as antigas), depois
 `candidata` e `virar`. As versões antigas só são desativadas depois de 24 horas sem erro.
 
+**Troca de conta do Mercado Pago (21/10/2026):** `bash infra/producao/trocar-credenciais-mp.sh --nova-conta` aceita o token de outra
+conta: mostra o id e o apelido (ou o e-mail mascarado) vindos de `/users/me`, pede "sim", grava os três segredos e imprime o id para
+atualizar o `MP_COLLECTOR_ID` no `env.prod.yaml` (commit antes da candidata; o `conferir` recusa se o id não for o da conta do token).
+Na aplicação da conta nova, em **Modo produtivo**: Webhooks > Configurar notificações, URL `https://partyx.com.br/api/webhooks/payments`
+e evento **Order (Mercado Pago)** (traz também a contestação); salvar pode gerar uma assinatura nova, que precisa ser a gravada. O
+`conferir` também lê as formas de pagamento ativas na conta (`/v1/payment_methods`) e recusa sem Pix ou sem cartão de crédito.
+
 **Ligar em produção** (só com autorização expressa; continua com as vendas fechadas até o go-live):
 
 ```bash
