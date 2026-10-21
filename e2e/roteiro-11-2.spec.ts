@@ -759,19 +759,24 @@ item(18, 'Relatórios: vendas por evento, por tipo, por promoter, mensal da taxa
   await page.goto(`${S.base}/admin/relatorios/taxa-mensal`);
   await page.waitForLoadState('networkidle');
   const month = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit' }).format(new Date());
+  // Pela regra vigente no paid_at de cada pedido (D-93: desde 21/10/2026 só o Pix entra no repasse; antes, qualquer forma).
   const fee = await sql<{ n: number; cancelados: number }>(
     S.db,
     `select count(t.id)::int as n, count(t.id) filter (where t.status = 'cancelado')::int as cancelados
        from tickets t join orders o on o.id = t.order_id
-      where to_char(o.paid_at at time zone 'America/Sao_Paulo', 'YYYY-MM') = $1`,
+       cross join lateral (select r.methods from contract_fee_rules r where r.effective_from <= o.paid_at
+                            order by r.effective_from desc limit 1) rule
+      where to_char(o.paid_at at time zone 'America/Sao_Paulo', 'YYYY-MM') = $1
+        and (rule.methods is null or coalesce(o.payment_method = any(rule.methods), false))`,
     [month],
   );
   const [y, m] = month.split('-');
-  const card = page.getByRole('region', { name: 'Ingressos apurados' });
-  await expect(card).toContainText(new RegExp(`apurados em ${m}/${y}\\s*${fee[0]!.n}\\s*unidades`));
+  const card = page.getByRole('region', { name: 'Total a repassar' });
+  await expect(card).toContainText(`Total a repassar em ${m}/${y}`);
+  await expect(card).toContainText(new RegExp(`${fee[0]!.n} ingresso\\(s\\) no repasse`));
   expect(fee[0]!.cancelados).toBeGreaterThan(0);
   await shot(page, '18-relatorio-taxa-mensal');
-  note(18, `Taxa mensal (${m}/${y}): ${fee[0]!.n} ingressos pelo mês de paid_at, dos quais ${fee[0]!.cancelados} cancelados (continuam contando); a tela mostra o mesmo número.`);
+  note(18, `Taxa mensal (${m}/${y}): ${fee[0]!.n} ingressos no repasse pelo mês de paid_at e pela regra da data do pagamento, dos quais ${fee[0]!.cancelados} cancelados (continuam contando); a tela mostra o mesmo número.`);
 });
 
 // ------------------------------------------------------------------------------------------------------------------------

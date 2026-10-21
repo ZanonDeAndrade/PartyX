@@ -8,7 +8,7 @@ import { listAccess } from '../events/access';
 import { eventBuyers, eventTickets, listOrders, PAYMENT_SITUATION, type OrderFilter } from '../panel/service';
 import { feeReport, promoterOrders, promoterRanking, salesReport, type RankMetric } from '../reports/service';
 import type { Clock } from '../providers/clock';
-import { int, money, safeFilename, toCsv, type Cell } from './csv';
+import { formatMoney, int, money, safeFilename, toCsv, type Cell } from './csv';
 
 /**
  * Exportações (RF-63, RF-64, CA-31, seção 15.1). Os dados vêm **das mesmas consultas das telas**, com os mesmos filtros, então
@@ -447,6 +447,9 @@ export async function exportPromoterOrders(
   };
 }
 
+/** Forma de pagamento gravada no pedido, no CSV da taxa (D-93). */
+const FEE_METHOD = { pix: 'Pix', cartao: 'Cartão', outra: 'Outra ou não informada' } as const;
+
 export async function exportFee(deps: ExportDeps, month: string): Promise<CsvExport> {
   const rows = await collect(async page => {
     const r = await feeReport({ db: deps.db }, month, page, PAGE);
@@ -454,13 +457,43 @@ export async function exportFee(deps: ExportDeps, month: string): Promise<CsvExp
   });
   const summary = await feeReport({ db: deps.db }, month, 1, 1);
   const csv = toCsv(
-    ['Código do ingresso', 'Pedido', 'Evento', 'Pagamento aprovado em', 'Situação atual'],
-    rows.map(u => [u.shortCode, `PX-${u.orderNumber}`, u.eventName, when(u.paidAt), u.current]),
+    [
+      'Código do ingresso',
+      'Pedido',
+      'Evento',
+      'Pagamento aprovado em',
+      'Forma de pagamento',
+      'Situação atual',
+      'Entra no repasse',
+      'Valor no repasse (R$)',
+    ],
+    rows.map(u => [
+      u.shortCode,
+      `PX-${u.orderNumber}`,
+      u.eventName,
+      when(u.paidAt),
+      FEE_METHOD[u.method ?? 'outra'],
+      u.current,
+      u.inFee ? 'sim' : 'não',
+      money(u.feeCents),
+    ]),
     [
       ['Mês de aprovação', month.split('-').reverse().join('/')],
-      ['Ingressos apurados (unidades)', int(summary.units)],
-      ['Valor por ingresso (R$)', money(summary.feePerTicketCents)],
-      ['Valor da taxa no mês (R$)', money(summary.feeCents)],
+      ...summary.notice.map((line): Cell[] => ['Regra do repasse', line]),
+      ...summary.periods.map((p): Cell[] => [
+        p.label,
+        `${p.pixUnits} por Pix; ${p.cardUnits} por cartão; ${p.units} no repasse; R$ ${formatMoney(p.feeCents)}`,
+      ]),
+      ['Ingressos pagos por Pix', int(summary.pixUnits)],
+      [
+        summary.cardUnitsInFee === 0
+          ? 'Ingressos pagos por cartão (só para informação, sem valor)'
+          : 'Ingressos pagos por cartão (entram só nos períodos cuja regra aceita cartão)',
+        int(summary.cardUnits),
+      ],
+      ...(summary.otherUnits > 0 ? [['Ingressos com outra forma ou sem forma informada', int(summary.otherUnits)] as Cell[]] : []),
+      ['Ingressos no repasse (unidades)', int(summary.units)],
+      ['Total a repassar (R$)', money(summary.feeCents)],
       ['Pedidos de origem', int(summary.originOrders)],
       [
         'Conciliação',

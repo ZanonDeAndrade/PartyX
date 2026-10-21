@@ -406,7 +406,11 @@ export function PromoterReportPage() {
   );
 }
 
-// ---------- taxa mensal (RF-60) ----------
+// ---------- taxa mensal (RF-60; D-93) ----------
+
+/** Forma de pagamento gravada no pedido (D-93: desde 21/10/2026 só o Pix entra no repasse). */
+const METHOD = { pix: 'Pix', cartao: 'cartão' } as const;
+const METHOD_TITLE = { pix: 'Pix', cartao: 'Cartão' } as const;
 
 export function FeeReportPage() {
   usePageTitle('Taxa mensal · PartyX');
@@ -437,29 +441,111 @@ export function FeeReportPage() {
       <Loading state={state} retry={retry} />
       {r ? (
         <>
-          <Note tone="info">
+          <div className="px-notice px-notice-info px-fee-rule" role="note" aria-labelledby="regra-repasse">
+            <b id="regra-repasse">Regra do repasse em {m}/{y}</b>
+            <ul>
+              {r.notice.map(line => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+          <Note>
             <b>Critério.</b> {r.criterion}
           </Note>
-          <div className="px-kpis">
-            <section className="px-panel" aria-label="Ingressos apurados">
+          <div className="px-kpis px-kpis-3">
+            <section className="px-panel" aria-label="Total a repassar">
               <h2 className="px-h3">
-                Ingressos apurados em {m}/{y}
+                Total a repassar em {m}/{y}
               </h2>
-              <p className="px-kpi">
-                {r.units}
-                <small>unidades (não pedidos) · {r.originOrders} pedido(s) de origem</small>
-              </p>
-            </section>
-            <section className="px-panel" aria-label="Valor da taxa">
-              <h2 className="px-h3">Valor da taxa</h2>
               <p className="px-kpi">
                 {brl(r.feeCents)}
                 <small>
-                  {r.units} × {brl(r.feePerTicketCents)} (Cláusula 6ª)
+                  {r.units} ingresso(s) no repasse · {r.originOrders} pedido(s) de origem
+                </small>
+              </p>
+            </section>
+            <section className="px-panel" aria-label="Ingressos por Pix">
+              <h2 className="px-h3">Ingressos por Pix</h2>
+              <p className="px-kpi">
+                {r.pixUnits}
+                <small>unidades (não pedidos)</small>
+              </p>
+            </section>
+            <section className="px-panel" aria-label="Ingressos por cartão">
+              <h2 className="px-h3">Ingressos por cartão</h2>
+              <p className="px-kpi">
+                {r.cardUnits}
+                <small>
+                  {r.cardUnitsInFee === 0
+                    ? 'só para informação, sem valor'
+                    : `${r.cardUnitsInFee} entram pela regra do período`}
                 </small>
               </p>
             </section>
           </div>
+          {r.otherUnits > 0 ? (
+            <Note tone="err">
+              {r.otherUnits} ingresso(s) de pedido com outra forma de pagamento ou sem forma informada: ficam fora do repasse nos
+              períodos cuja regra exige uma forma. Confira o pedido.
+            </Note>
+          ) : null}
+
+          <h2 className="px-h3">Por período</h2>
+          <TableWrap>
+            <table className="px-table">
+              <thead>
+                <tr>
+                  <th>Período</th>
+                  <th>Regra</th>
+                  <th>Pix</th>
+                  <th>Cartão</th>
+                  <th>No repasse</th>
+                  <th>Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {r.periods.map(p => (
+                  <tr key={p.startsAt}>
+                    <td>{p.label}</td>
+                    <td>
+                      <span>
+                        {brl(p.perTicketCents)} por ingresso,{' '}
+                        {p.methods === null ? 'qualquer forma' : `só ${p.methods.map(x => METHOD[x]).join(' ou ')}`}
+                        <br />
+                        <small className="px-muted">{p.reference}</small>
+                      </span>
+                    </td>
+                    <td>{p.pixUnits}</td>
+                    <td>
+                      <span>
+                        {p.cardUnits}
+                        {p.cardInFee ? null : <small className="px-muted"> (informação)</small>}
+                      </span>
+                    </td>
+                    <td>{p.units}</td>
+                    <td className="px-nowrap">{brl(p.feeCents)}</td>
+                  </tr>
+                ))}
+                <tr className="px-total-row">
+                  <th scope="row" colSpan={2}>
+                    Total
+                  </th>
+                  <td>
+                    <b>{r.pixUnits}</b>
+                  </td>
+                  <td>
+                    <b>{r.cardUnits}</b>
+                  </td>
+                  <td>
+                    <b>{r.units}</b>
+                  </td>
+                  <td className="px-nowrap">
+                    <b>{brl(r.feeCents)}</b>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </TableWrap>
 
           <section aria-labelledby="conc">
             <h2 id="conc" className="px-h3">
@@ -467,7 +553,7 @@ export function FeeReportPage() {
             </h2>
             <p className={r.reconciliation.ok ? 'px-ok' : 'px-error'} role="status">
               {r.reconciliation.ok
-                ? `Confere: ${r.reconciliation.issuedUnits} ingressos emitidos para ${r.reconciliation.expectedUnits} unidades previstas pelos pedidos aprovados.`
+                ? `Confere: ${r.reconciliation.issuedUnits} ingressos emitidos para ${r.reconciliation.expectedUnits} unidades previstas pelos pedidos aprovados (todas as formas de pagamento).`
                 : `Divergência: ${r.reconciliation.issuedUnits} ingressos emitidos para ${r.reconciliation.expectedUnits} unidades previstas. Investigue antes de cobrar.`}
             </p>
             {r.reconciliation.anomalies.map(a => (
@@ -478,9 +564,9 @@ export function FeeReportPage() {
             ))}
           </section>
 
-          <h2 className="px-h3">Situação atual das unidades apuradas</h2>
+          <h2 className="px-h3">Situação atual dos ingressos no repasse</h2>
           <p className="px-small px-muted">
-            Todas as situações contam na taxa, inclusive cancelados, reembolsados e estornados.
+            Todas as situações contam, inclusive cancelados, reembolsados e estornados.
           </p>
           <TableWrap>
             <table className="px-table">
@@ -513,20 +599,30 @@ export function FeeReportPage() {
               <thead>
                 <tr>
                   <th>Evento</th>
-                  <th>Unidades</th>
-                  <th>Taxa</th>
+                  <th>Pix</th>
+                  <th>Cartão</th>
+                  <th>No repasse</th>
+                  <th>Valor</th>
                 </tr>
               </thead>
               <tbody>
                 {r.byEvent.map(e => (
                   <tr key={e.eventId}>
                     <td>{e.eventName}</td>
+                    <td>{e.pixUnits}</td>
+                    <td>{e.cardUnits}</td>
                     <td>{e.units}</td>
                     <td className="px-nowrap">{brl(e.feeCents)}</td>
                   </tr>
                 ))}
                 <tr className="px-total-row">
                   <th scope="row">Total</th>
+                  <td>
+                    <b>{r.pixUnits}</b>
+                  </td>
+                  <td>
+                    <b>{r.cardUnits}</b>
+                  </td>
                   <td>
                     <b>{r.units}</b>
                   </td>
@@ -608,7 +704,7 @@ export function FeeReportPage() {
               </li>
             </ul>
             <p className="px-small px-muted">
-              A taxa é devida por unidade emitida, não sobre a receita. Cobrança e boleto acontecem fora do sistema.
+              A taxa é devida por ingresso no repasse, não sobre a receita. Cobrança e boleto acontecem fora do sistema.
             </p>
           </section>
 
@@ -621,7 +717,9 @@ export function FeeReportPage() {
                   <th>Pedido</th>
                   <th>Evento</th>
                   <th>Pagamento aprovado em</th>
+                  <th>Forma</th>
                   <th>Situação atual</th>
+                  <th>No repasse</th>
                 </tr>
               </thead>
               <tbody>
@@ -635,7 +733,9 @@ export function FeeReportPage() {
                     <td className="px-nowrap">
                       {dateShort(u.paidAt)} {timeOf(u.paidAt)}
                     </td>
+                    <td className="px-nowrap">{u.method ? METHOD_TITLE[u.method] : 'Não informada'}</td>
                     <td>{u.current}</td>
+                    <td className="px-nowrap">{u.inFee ? `Sim, ${brl(u.feeCents)}` : 'Não'}</td>
                   </tr>
                 ))}
               </tbody>

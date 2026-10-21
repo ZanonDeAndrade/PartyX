@@ -350,14 +350,18 @@ export function TableWrap({ children }: { children: ReactNode }) {
     if (!table) return;
     const labels: string[] = [];
     table.querySelectorAll('thead th').forEach(th => labels.push(th.textContent?.trim() ?? ''));
+    // A coluna conta toda célula da linha, inclusive o `th` do rótulo (ex.: "Total" no começo da linha de total).
     table.querySelectorAll('tbody tr').forEach(tr => {
       let col = 0;
-      tr.querySelectorAll('td').forEach(td => {
-        const span = td.colSpan || 1;
-        if (span === 1 && labels[col]) td.setAttribute('data-label', labels[col]!);
-        else td.removeAttribute('data-label');
+      for (const cell of tr.children) {
+        if (!(cell instanceof HTMLTableCellElement)) continue;
+        const span = cell.colSpan || 1;
+        if (cell.tagName === 'TD') {
+          if (span === 1 && labels[col]) cell.setAttribute('data-label', labels[col]!);
+          else cell.removeAttribute('data-label');
+        }
         col += span;
-      });
+      }
     });
   });
   return (

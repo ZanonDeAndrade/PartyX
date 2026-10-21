@@ -79,6 +79,11 @@ describe.skipIf(!ADMIN_URL)('papel da aplicação e migração 0002 (integraçã
     // Lista de autorizados do evento privado (D-92, 0019): o painel remove pessoas e a limpeza diária apaga a lista 6 meses depois.
     expect(await can('DELETE', 'event_access')).toBe(true);
     expect(await can('UPDATE', 'event_access')).toBe(true);
+    // Regra da taxa da contratada (D-93, 0020): a aplicação só lê; mudar o contrato é migração.
+    expect(await can('SELECT', 'contract_fee_rules')).toBe(true);
+    expect(await can('INSERT', 'contract_fee_rules')).toBe(false);
+    expect(await can('UPDATE', 'contract_fee_rules')).toBe(false);
+    expect(await can('DELETE', 'contract_fee_rules')).toBe(false);
     const attrs = (await d.pool.query("select rolsuper, rolcreatedb, rolcreaterole, rolbypassrls from pg_roles where rolname = $1", [APP_ROLE])).rows[0];
     expect(attrs).toEqual({ rolsuper: false, rolcreatedb: false, rolcreaterole: false, rolbypassrls: false });
     const member = await d.pool.query("select count(*)::int as n from pg_auth_members m join pg_roles r on r.oid = m.member where r.rolname = $1", [APP_ROLE]);

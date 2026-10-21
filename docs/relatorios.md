@@ -17,14 +17,24 @@ Datas em AAAA-MM-DD, **no fuso do evento**, com as duas pontas incluídas; filtr
 
 ## Taxa mensal (RF-60, CA-29)
 
-**Regra (Cl. 6.3):** ingressos vendidos no mês = ingressos **emitidos** cujo pedido teve `paid_at` (a data **original** da aprovação) dentro do mês, no fuso do evento, **independentemente da situação atual do ingresso ou do pedido**. Cancelados, reembolsados, estornados e contestados continuam contando, **R$ 1,00 cada** (`FEE_PER_TICKET_CENTS = 100`). Valor = unidades × 100, em centavos inteiros.
+**Regra (Cl. 6.3):** ingressos vendidos no mês = ingressos **emitidos** cujo pedido teve `paid_at` (a data **original** da aprovação) dentro do mês, no fuso do evento, **independentemente da situação atual do ingresso ou do pedido**. Cancelados, reembolsados, estornados e contestados continuam contando. Valor = ingressos no repasse × valor por ingresso, em centavos inteiros.
+
+**Regra por forma de pagamento (D-93, aditivo de 21/10/2026):** o valor por ingresso e as formas que entram vêm da tabela `contract_fee_rules`, pela regra vigente no `paid_at` de cada pedido. Até 20/10/2026: R$ 1,00 por ingresso, qualquer forma (regra original). Desde 21/10/2026 00:00 em Brasília: R$ 1,00 por ingresso **só de pedido pago por Pix**; os pagos por cartão aparecem só para informação. Um mês com duas regras (outubro de 2026) mostra um período por regra. Registro: `registros/taxa-por-pix-d93.md`.
+
+**Próxima mudança de contrato (sem código):** uma migração só de dados, por exemplo `drizzle/00NN_regra_taxa_AAAA_MM.sql`, com a linha `-- expand-contract: ...` e um INSERT; a tabela recusa início antes do mês corrente (Brasília), alteração e exclusão. A reversão desativa o gatilho de exclusão só para apagar a própria linha, e recusa se a regra já começou a valer:
+
+```sql
+INSERT INTO "contract_fee_rules" ("effective_from", "per_ticket_cents", "methods", "reference")
+VALUES ('2027-01-01 00:00:00 America/Sao_Paulo', 120, ARRAY['pix']::"payment_method"[], 'Aditivo ao contrato de DD/MM/AAAA, D-NN');
+```
 
 O que o relatório mostra, como a documentação pede ("explicar ao cliente e visível no relatório"):
 
 - **Período e critério** em texto, no topo da tela.
-- **Unidades** (não pedidos) e **valor da taxa**, com a conta (`9 × R$ 1,00`).
-- **Situação atual** das unidades apuradas: Válido, Utilizado, Cancelado (administrador), Cancelado (estorno), Cancelado (contestação). Todas somam o total.
-- **Por evento** e **detalhe por unidade** (código, pedido, evento, data de aprovação, situação atual), paginado.
+- **Aviso da regra** no topo, uma linha por período do mês, gerada da própria regra (valor, formas que entram e referência).
+- **Total a repassar**, **ingressos por Pix** e **ingressos por cartão** ("só para informação, sem valor" quando nenhum período do mês aceita cartão), e a tabela **por período**.
+- **Situação atual** das unidades no repasse: Válido, Utilizado, Cancelado (administrador), Cancelado (estorno), Cancelado (contestação). Todas somam o total.
+- **Por evento** (Pix, cartão, no repasse e valor) e **detalhe por unidade** (código, pedido, evento, data de aprovação, forma de pagamento, situação atual e se entra no repasse), paginado. O CSV traz as mesmas colunas por unidade e, no rodapé, a regra de cada período, os números por período e o total a repassar.
 - **Conciliação:** quantas unidades os itens dos pedidos aprovados no mês previam, contra quantos ingressos existem. Pedido aprovado **sem nenhum ingresso** que não seja "pago sem estoque" é divergência a investigar antes de cobrar (a recuperação de ingressos do Prompt 13 a resolve, e a conciliação passa a fechar: testado).
 - **Exceções para análise** (seção própria desde 10/10/2026): pagamento aprovado **sem estoque** não gera ingresso, **não conta** e é listado à parte com pedido, unidades pagas, valor, data, referência no gateway e se o caso já foi marcado como tratado no painel, mais os totais. A fórmula da taxa **não mudou** e marcar como tratado não altera nada nela. É exceção, não venda inventada; a leitura contratual segue pendente (D-54). O extrato `ops:fee` traz a mesma tabela.
 - **Receita separada da taxa:** bruta, estornada, contestada e líquida do mês. A taxa é por unidade emitida, não sobre a receita.

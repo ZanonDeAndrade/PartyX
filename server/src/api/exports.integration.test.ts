@@ -418,8 +418,9 @@ describe.skipIf(!ADMIN_URL)('exportações e contingência (integração)', () =
       const fee = parseCsv(await (await adm.get('/admin/exports/fee.csv?month=2026-12')).text());
       const f = Object.fromEntries(fee.map(r => [r[0], r[1]]));
       const feeScreen = await json(await adm.get('/admin/reports/fee?month=2026-12'));
-      expect(f['Ingressos apurados (unidades)']).toBe(String(feeScreen.units));
-      expect(f['Valor da taxa no mês (R$)']).toBe((feeScreen.feeCents / 100).toFixed(2).replace('.', ','));
+      expect(f['Ingressos no repasse (unidades)']).toBe(String(feeScreen.units));
+      expect(f['Total a repassar (R$)']).toBe((feeScreen.feeCents / 100).toFixed(2).replace('.', ','));
+      expect(f['Ingressos pagos por Pix']).toBe(String(feeScreen.pixUnits));
     });
 
     it('a busca digitada (CPF/e-mail) não vai para a auditoria; quem, o quê e quando vão', async () => {

@@ -632,7 +632,7 @@ function checkCancel(input: CancelInput) {
 }
 
 export const CANCEL_GUIDANCE =
-  'O ingresso foi cancelado na plataforma e a portaria passa a recusá-lo. A plataforma não devolve dinheiro: se a Política prevê reembolso, a PartyX estorna no painel do Mercado Pago o valor pago pelo ingresso com a taxa de serviço dele (o detalhe do pedido mostra quanto). O pedido, o ingresso e a data do pagamento continuam registrados e o ingresso segue contando na taxa mensal. O estoque não é reposto (decisão D-14 pendente).';
+  'O ingresso foi cancelado na plataforma e a portaria passa a recusá-lo. A plataforma não devolve dinheiro: se a Política prevê reembolso, a PartyX estorna no painel do Mercado Pago o valor pago pelo ingresso com a taxa de serviço dele (o detalhe do pedido mostra quanto). O pedido, o ingresso e a data do pagamento continuam registrados e o ingresso segue na apuração da taxa mensal pela regra da data do pagamento. O estoque não é reposto (decisão D-14 pendente).';
 
 /**
  * Cancela ingressos (RF-62). Só ingresso **válido**: um que já entrou não pode ser cancelado (a entrada aconteceu), e o que já

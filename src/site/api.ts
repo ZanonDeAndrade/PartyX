@@ -1088,15 +1088,48 @@ export interface PromoterRanking {
   }[];
   withoutPromoter: { tickets: number; cents: number; orders: number };
 }
+/** Período do mês sob uma regra da taxa da contratada (D-93): valor por ingresso e formas de pagamento que entram no repasse. */
+export interface FeePeriod {
+  startsAt: string;
+  endsAt: string;
+  label: string;
+  notice: string;
+  perTicketCents: number;
+  /** Nulo: qualquer forma entra. */
+  methods: ('pix' | 'cartao')[] | null;
+  reference: string;
+  pixUnits: number;
+  cardUnits: number;
+  otherUnits: number;
+  units: number;
+  feeCents: number;
+  cardInFee: boolean;
+}
+
 export interface FeeReport {
   month: string;
   criterion: string;
-  feePerTicketCents: number;
+  /** Aviso do topo: uma linha por período. */
+  notice: string[];
+  periods: FeePeriod[];
+  /** Ingressos no repasse e total a repassar. */
   units: number;
   feeCents: number;
+  pixUnits: number;
+  cardUnits: number;
+  otherUnits: number;
+  cardUnitsInFee: number;
   originOrders: number;
   byCurrentStatus: { label: string; units: number }[];
-  byEvent: { eventId: string; eventName: string; units: number; feeCents: number }[];
+  byEvent: {
+    eventId: string;
+    eventName: string;
+    pixUnits: number;
+    cardUnits: number;
+    otherUnits: number;
+    units: number;
+    feeCents: number;
+  }[];
   reconciliation: {
     expectedUnits: number;
     issuedUnits: number;
@@ -1129,6 +1162,9 @@ export interface FeeReport {
     eventName: string;
     paidAt: string;
     current: string;
+    method: 'pix' | 'cartao' | null;
+    inFee: boolean;
+    feeCents: number;
   }[];
 }
 
