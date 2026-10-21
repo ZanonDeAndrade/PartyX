@@ -272,6 +272,14 @@ Detalhes técnicos e provas em `docs/pagamento-mercadopago.md`. A integração u
 `mp-webhook-secret`, gravados por `bash scripts/setup-mp-credentials-producao.sh` (digitação oculta, confere a conta pela API, nunca
 grava em arquivo). Gravados em 11/10/2026; a assinatura foi regravada no mesmo dia e conferida com a notificação simulada do painel.
 
+**Versões fixas na revisão (21/10/2026):** o `deploy.sh candidata` monta os três segredos do Mercado Pago pelo número da versão atual
+(`mp-access-token:N`), não por `latest`. Com `latest`, o Cloud Run lê o valor quando cada instância inicia, e uma versão nova entraria
+sozinha nas revisões já publicadas (as revisões até a `partyx-00056-lac` ainda leem `latest`). Fixadas, voltar para uma revisão volta
+também às credenciais dela, enquanto a versão estiver ativa. **Troca de credenciais:** `bash infra/producao/trocar-credenciais-mp.sh`
+no terminal do responsável (digitação oculta; formato `APP_USR-`; o token conferido em `/users/me` contra o `MP_COLLECTOR_ID`, sem
+mostrar o id; a Public Key conferida na API pública; cada valor gravado como versão nova, sem desativar as antigas), depois
+`candidata` e `virar`. As versões antigas só são desativadas depois de 24 horas sem erro.
+
 **Ligar em produção** (só com autorização expressa; continua com as vendas fechadas até o go-live):
 
 ```bash

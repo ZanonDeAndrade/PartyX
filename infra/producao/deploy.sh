@@ -446,7 +446,19 @@ cmd_candidata() {
   local image; image="${IMAGE:-$(release_image)}"
   # Segredos obrigatórios sempre; SMTP e Turnstile só entram se o segredo já tem valor (o Cloud Run recusa montar segredo sem versão).
   local secrets="DATABASE_URL=database-url:latest,SESSION_SECRET=session-secret:latest,QR_HMAC_KEYS=qr-hmac-keys:latest"
-  [ "$PAYMENT_GATEWAY" != "mercadopago" ] || secrets="$secrets,MP_ACCESS_TOKEN=mp-access-token:latest,MP_PUBLIC_KEY=mp-public-key:latest,MP_WEBHOOK_SECRET=mp-webhook-secret:latest"
+  # Mercado Pago: versão FIXA de cada segredo, a de agora. Com `latest`, o Cloud Run lê o valor quando cada instância inicia, e uma
+  # versão nova gravada no Secret Manager entraria sozinha nas revisões já publicadas; fixada, a revisão fica com as credenciais com
+  # que foi conferida, e voltar para ela volta também a elas (enquanto a versão estiver ativa no Secret Manager).
+  if [ "$PAYMENT_GATEWAY" = "mercadopago" ]; then
+    local s v state pinned=""
+    for s in MP_ACCESS_TOKEN=mp-access-token MP_PUBLIC_KEY=mp-public-key MP_WEBHOOK_SECRET=mp-webhook-secret; do
+      read -r v state < <(g secrets versions describe latest --secret="${s#*=}" --format='value(name.basename(),state)' 2>/dev/null || true)
+      [[ "${v:-}" =~ ^[0-9]+$ && "${state:-}" = "ENABLED" ]] || { echo "Recuso: a versão atual do segredo ${s#*=} não está ativa ou não foi encontrada." >&2; exit 1; }
+      pinned="$pinned,$s:$v"
+    done
+    secrets="$secrets$pinned"
+    echo "== Mercado Pago com versões fixas:${pinned//,/ }"
+  fi
   ! has_version smtp-url || secrets="$secrets,SMTP_URL=smtp-url:latest"
   [ "$TURNSTILE_ENABLED" != "true" ] || secrets="$secrets,TURNSTILE_SECRET=turnstile-secret:latest"
   echo "== revisão candidata, sem tráfego (venda: $SALES_OPEN; cadastro: $SIGNUP_OPEN)"
