@@ -77,5 +77,7 @@ reversão; o modelo está em `../relatorios.md`. O aviso do relatório é gerado
 
 ## Pendente
 
-- Não publicado: sem push e sem deploy. A migração 0020 não está no Neon. Entra na próxima release.
+- **Publicado em 21/10/2026:** release `release-2026-10-21` (`9306d2c`), migração 0020 aplicada no Neon (`partyx-migrate-btvg2`,
+  backup `partyx-20261021T194644Z.dump` antes), revisão `partyx-00060-rox` com 100% desde 20:04 UTC (17:04 em Brasília). Registro:
+  `publicacao-producao-2026-10-21.md`.
 - Rollback do código depois da 0020: a versão anterior ignora a tabela e volta a contar os ingressos pagos por cartão.

@@ -623,3 +623,16 @@ A publicação das regras de menores, prevista aqui, saiu no mesmo dia: ver a se
 **Publicado:** revisão `partyx-00056-lac` (tag `release-2026-10-20`, commit `f312704`), 100% desde 20/10 23:00 UTC (20:00 BRT), com a migração `0019_evento_privado` (só expande; backup `partyx-20261020T141001Z.dump` antes) e `env.prod.yaml` com Termos 1.6, Privacidade 1.3 e Cancelamento 1.2, vigência 2026-10-20. Chave "Evento privado" por evento, aba Acesso e página Solicitações no painel; compra e transferência só para conta autorizada, conferidas no servidor; nenhum evento privado na virada (depois dela, o `teste02`, de teste, ficou privado e foi encerrado). Também o S-02 (teto de 100 respostas "já tem cadastro" por hora). Teste rápido 15 de 15 pela candidata e pelo domínio; bateria 58 de 58 nos dois; Chromium e Firefox a 390 px. Registros: `docs/registros/publicacao-producao-2026-10-20.md` e `docs/registros/evento-privado.md`.
 
 **Referência de retorno (rollback) a partir daqui: `partyx-00056-lac`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00054-nor ./infra/producao/deploy.sh rollback` (mesmo banco; a revisão anterior abre a compra de qualquer evento privado a todos).
+
+## 39. Vigésima sétima publicação: conta nova do Mercado Pago (21/10/2026)
+
+**Publicado:** revisão `partyx-00058-qaq` (imagem da `release-2026-10-20`, `f312704`; `env.prod.yaml` e `deploy.sh` do commit `4bb8e41`), 100% desde 21/10 19:24 UTC (16:24 BRT), sem migração (backup do dia conferido). Credenciais da conta nova gravadas pelo responsável com `trocar-credenciais-mp.sh --nova-conta` (token 2, chave pública 2, assinatura 5); `MP_COLLECTOR_ID` 433226424; segredos do Mercado Pago com versão fixa na revisão; `conferir` com as formas ativas (Pix, crédito, débito). Teste rápido 15 de 15 pela candidata e pelo domínio; "conta conferida" no log. Registro: `docs/registros/publicacao-producao-2026-10-21.md`.
+
+**A `partyx-00056-lac` não é mais retorno:** ela lê os segredos como `latest` (credenciais novas) com o `MP_COLLECTOR_ID` antigo e não aprovaria pagamento.
+
+## 40. Vigésima oitava publicação: taxa da contratada só sobre pedidos pagos por Pix (D-93, 21/10/2026)
+
+**Publicado:** revisão `partyx-00060-rox` (tag `release-2026-10-21`, commit `9306d2c`), 100% desde 21/10 20:04 UTC (17:04 BRT), com a migração `0020_regra_taxa_contratada` (só expande; backup `partyx-20261021T194644Z.dump` antes). Regra da taxa em `contract_fee_rules` (original e a da D-93 desde 21/10/2026 00:00 em Brasília, só Pix); tela, CSV e extrato com Pix, cartão e total a repassar. Mesma conta e versões fixas da seção 39. Teste rápido 15 de 15 pela candidata e pelo domínio; bateria 58 de 58 nos dois; Chromium e Firefox a 390 px. Registros: `docs/registros/publicacao-producao-2026-10-21.md` e `docs/registros/taxa-por-pix-d93.md`.
+
+**Referência de retorno (rollback) a partir daqui: `partyx-00060-rox`.** Para desfazer: `PROJECT=partyx-producao REVISAO=partyx-00058-qaq ./infra/producao/deploy.sh rollback` (mesmo banco e mesma conta; o relatório volta a contar os ingressos pagos por cartão).
+
